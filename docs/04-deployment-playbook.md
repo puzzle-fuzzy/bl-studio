@@ -99,6 +99,26 @@ $COMPOSE logs api --tail 50       # 看日志
 
 改代码 → `pnpm run verify` → `pnpm run deploy:prod`。每次按**新 commit SHA** 重建镜像（层缓存让构建很快），迁移幂等，边缘脚本幂等。
 
+> **成本提示**：`deploy:prod` 会把 runtime 镜像（~1.97GB，含 node_modules + ffmpeg）一起重传，
+> 即使只改了前端。前端热修用下面的 web-only 路径省带宽、且不动 api/worker。
+
+### 4.1 web-only 快速发版（只改前端时用，传输 ~20MB、不动 api/worker）
+
+```bash
+NEWSHA=$(git rev-parse HEAD)
+docker build --platform linux/amd64 -f infra/docker/Dockerfile --target web \
+  --build-arg BAILIAN_STUDIO_RELEASE_TAG="$NEWSHA" \
+  --build-arg VITE_API_ORIGIN= --build-arg VITE_WEB_ORIGIN="https://create.yxswy.com" \
+  -t "bailian-studio-web:$NEWSHA" .
+docker save -o "web-$NEWSHA.tar" "bailian-studio-web:$NEWSHA"
+rsync -az "web-$NEWSHA.tar" yxswy-server:/opt/bailian-studio/
+ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /opt/bailian-studio/web-$NEWSHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$NEWSHA docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra -f /opt/bailian-studio/infra/docker/docker-compose.prod.yml up -d --no-deps web"
+```
+
+> 注意：这只把 web 容器切到新 SHA，`BAILIAN_STUDIO_RELEASE_TAG` 仍是旧 SHA（api/worker
+> 保持运行旧镜像）。验证用 Vite 内容指纹：`curl` 线上首页提取 `/assets/index-*.js`，
+> 与本地 `apps/web/dist/assets/` 同名文件字节数一致即已生效（压缩后别 grep 组件名）。
+
 ---
 
 ## 5. 启用 / 停用观测栈（先核心后观测）
