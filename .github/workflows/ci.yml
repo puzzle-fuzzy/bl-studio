@@ -1,0 +1,41 @@
+# 推送/PR 时跑完整 verify 门禁：baseline + 包边界 + manifests + typecheck + 全仓测试。
+# 用 GitHub Actions 的 postgres service 充当 test DB（共享测试库 :55432）。
+# 生产部署仍在本地执行（deploy:prod / deploy:prod:web），CI 只做质量门禁。
+name: verify
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: bailian-studio
+          POSTGRES_PASSWORD: bailian-studio
+          POSTGRES_DB: bailian-studio_test
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U bailian-studio"
+          --health-interval 2s
+          --health-timeout 2s
+          --health-retries 20
+    env:
+      DATABASE_URL: postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.9.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run db:push:test
+      - run: pnpm run verify

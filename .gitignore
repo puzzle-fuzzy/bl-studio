@@ -19,8 +19,9 @@ infra/env/.env.prod-infra
 .codegraph/
 .superpowers/
 
-# 部署镜像导出 tar（deploy-prod.sh 临时产物，失败时也绝不应入库）
+# 部署镜像导出 tar（deploy-prod.sh / web-only 发版的临时产物，失败时也绝不应入库）
 images-*.tar
+web-*.tar
 
 # Playwright
 playwright-report/

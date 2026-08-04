@@ -104,7 +104,7 @@ pnpm run prod:up
 
 ### 5.1 Grafana（推荐）
 
-1. 打开 `https://logs.yxswy.com`（Caddy basic_auth），用 `GRAFANA_ADMIN_USER/PASSWORD` 登录。
+1. 打开 `https://logs.yxswy.com`（宿主机 nginx basic_auth），用 `GRAFANA_ADMIN_USER/PASSWORD` 登录。
 2. 三个预置仪表盘（`Bailian Studio` 文件夹）：
    - **日志浏览器**：按 level/scope 过滤的全量日志流 + 日志量时序。
    - **错误面板**：`request.failed by errorCode`、`task.threw`、`task.outcome by outcome`、全部 error 日志。
@@ -176,11 +176,11 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 
 | 症状 | 排查路径 |
 |---|---|
-| 公网打不开 / 证书失败 | 检查 80/443 是否开放、DNS A 记录是否指向服务器、`logs caddy` 是否有证书错误 |
+| 公网打不开 / 证书失败 | 检查 80/443 是否开放、DNS A 记录是否指向服务器、宿主机 nginx 日志（`journalctl -u nginx` / `/var/log/nginx/error.log`）与 certbot 证书是否有效 |
 | `logs.yxswy.com` 401 | `CADDY_BASIC_AUTH_HASH` 是否由 `caddy hash-password` 生成、用户名是否 `viewer` |
 | Grafana 打不开/白屏 | `GF_SERVER_ROOT_URL` 是否为 `https://<LOGS_DOMAIN>`；`logs grafana` |
 | Loki 里没有日志 | `logs alloy`（docker.sock 权限、positions 卷）；`logs loki`（receiving 错误）；Grafana datasource `url: http://loki:3100` |
-| 限流/审计按 IP 错乱 | 检查 Caddy→nginx→api 的 XFF 链：Caddy 覆盖真实 IP、nginx 追加、`API_TRUST_PROXY=true` |
+| 限流/审计按 IP 错乱 | 检查 宿主机 nginx → web nginx → api 的 XFF 链：每层用 `$proxy_add_x_forwarded_for` 追加、`API_TRUST_PROXY=true`（API 取首项=真实 IP） |
 | worker 不消费队列 | `logs worker`、`/api/health/ready` 的 worker 字段、数据库连接 |
 | 迁移失败 | `logs migrate`；`run --rm migrate` 手动重跑（幂等） |
 | 卷权限（loki/grafana） | 首次挂载若报权限，用一次性 `user: root` init 修正属主后重启 |
@@ -189,7 +189,7 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 
 - 两个 env 文件（`.env.production` / `.env.prod-infra`）**gitignored**，服务器侧 `chmod 600`；脚本不打印任何凭据值。
 - `check:production-env` 发布前强制：HTTPS origin、`COOKIE_SECURE`/`CSRF_REQUIRE_ORIGIN`/`API_RATE_LIMIT_ENABLED`/`API_TRUST_PROXY=true`、非占位 SMTP/OSS、SHA tag、干净工作区。
-- Caddy 是唯一 TLS 入口并**覆盖** XFF 为真实客户端 IP，nginx 只追加本层 IP——客户端无法伪造限流身份。
+- 宿主机 nginx 是唯一 TLS 入口，X-Forwarded-For 用 `$proxy_add_x_forwarded_for` 逐层追加，API 取首项（真实客户端 IP）做限流身份——客户端无法伪造。
 - Grafana：关闭匿名访问与自助注册、挂 basic_auth 子域名、日志保留 31 天。
 - 应用日志脱敏：`logger` 对 prompt/body/authorization/token 等 key 一律输出 `[Redacted]`。
 
