@@ -13,7 +13,7 @@ import { GenerationsPanel } from '@/components/generations/GenerationsPanel'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
-import { buildParameterFormSchema, visibleFormFields } from '@/lib/parameter-form-schema'
+import { buildParameterFormSchema, visibleFormFields, type FormField } from '@/lib/parameter-form-schema'
 import { readParameterValidationErrors, type FieldIssue } from '@/lib/parameter-validation'
 import { buildSubmitPayload } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
@@ -53,15 +53,10 @@ export function CreatePage() {
 
   const model = selectModelById(models, modelId ?? '')
 
-  // 加载模型目录；默认选第一个可用模型
+  // 加载模型目录；默认模型由 ModelSelector 级联下拉负责（视频/首子模式/首模型）。
   useEffect(() => {
     void loadModels()
   }, [loadModels])
-
-  useEffect(() => {
-    if (modelId !== undefined || models.length === 0) return
-    setModelId(models[0]?.id)
-  }, [models, modelId])
 
   // `?reuse=<id>` 深链：从历史生成记录还原模型与全部参数（含参考图）。
   const reuseId = searchParams.get('reuse')
@@ -110,11 +105,16 @@ export function CreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId])
 
-  // 参数变化 → 防抖费用预估
+  // 参数变化 → 防抖费用预估。必填项缺失（如图生图缺输入图像）时跳过请求，避免无效报错。
   useEffect(() => {
     if (model === undefined) return
     if (estimateTimer.current !== null) clearTimeout(estimateTimer.current)
     const epoch = ++estimateEpoch.current
+    if (missingRequiredFields(visibleFormFields(schema, values), values).length > 0) {
+      setEstimating(false)
+      setEstimate(null)
+      return
+    }
     setEstimating(true)
     estimateTimer.current = setTimeout(() => {
       const { params, assetRefs } = buildSubmitPayload(model, values, promptRefs)
@@ -157,6 +157,17 @@ export function CreatePage() {
     event.preventDefault()
     if (model === undefined || isSubmitting) return
     setSubmitError(null)
+    // 客户端必填校验：缺失时字段级红字提示，不发请求（避免通用「输入内容不合法」）。
+    const missing = missingRequiredFields(visibleFormFields(schema, values), values)
+    if (missing.length > 0) {
+      setFieldErrors(new Map(missing.map(field => [field.parameter.name, {
+        field: field.parameter.name,
+        code: 'REQUIRED',
+        message: `${field.parameter.label}为必填`,
+      }])))
+      setSubmitError('请先补全必填项')
+      return
+    }
     setIsSubmitting(true)
     try {
       const { params, assetRefs } = buildSubmitPayload(model, values, promptRefs)
@@ -284,6 +295,19 @@ export function CreatePage() {
       </div>
     </form>
   )
+}
+
+/**
+ * 客户端必填校验：找出缺失值的必填字段（图生图缺「输入图像」、文生图缺提示词等）。
+ * media 字段要求非空数组；其余要求非 undefined/null/空串/NaN。
+ */
+function missingRequiredFields(fields: readonly FormField[], values: Record<string, unknown>): FormField[] {
+  return fields.filter(field => {
+    if (field.parameter.required !== true) return false
+    const value = values[field.parameter.name]
+    if (field.control === 'media') return !Array.isArray(value) || value.length === 0
+    return value === undefined || value === null || value === '' || (typeof value === 'number' && Number.isNaN(value))
+  })
 }
 
 /**
