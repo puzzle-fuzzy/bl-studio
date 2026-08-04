@@ -21,10 +21,12 @@ function listWorkspaceManifests(): string[] {
 }
 
 function listDockerfileManifests(): string[] {
-  return [...dockerfile.matchAll(/^COPY ((?:apps|packages)\/[^\s]+\/package\.json) /gm)]
-    .map(match => match[1])
-    .filter((manifest): manifest is string => manifest !== undefined)
-    .sort()
+  // manifests 可能出现在多个阶段（workspace 全量依赖 + runtime 生产依赖），去重后比对。
+  return [...new Set(
+    [...dockerfile.matchAll(/^COPY ((?:apps|packages)\/[^\s]+\/package\.json) /gm)]
+      .map(match => match[1])
+      .filter((manifest): manifest is string => manifest !== undefined),
+  )].sort()
 }
 
 describe('Docker workspace dependency cache', () => {

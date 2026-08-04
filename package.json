@@ -70,6 +70,7 @@
   },
   "dependencies": {
     "drizzle-kit": "catalog:",
+    "postgres": "catalog:",
     "tsx": "^4.23.5"
   },
   "devDependencies": {
@@ -79,7 +80,6 @@
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "catalog:",
     "dotenv-cli": "^11.0.0",
-    "postgres": "catalog:",
     "turbo": "^2.10.8",
     "typescript": "catalog:",
     "vitest": "catalog:"
