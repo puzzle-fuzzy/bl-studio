@@ -54,6 +54,7 @@
     "deploy:prod": "bash infra/scripts/deploy-prod.sh",
     "deploy:prod:web": "bash infra/scripts/deploy-prod-web.sh",
     "prod:status": "bash infra/scripts/prod-status.sh",
+    "prod:sync-dashscope-key": "bash infra/scripts/sync-dashscope-key.sh",
     "check:production-env:infra": "tsx infra/scripts/check-production-env.ts infra",
     "prod:up": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml up -d --no-build --pull never",
     "prod:down": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml down",
