@@ -14,13 +14,17 @@ import { ValidationError } from './errors'
 export const CreateGenerationSchema = z.object({
   modelId: z.string().min(1, 'Model ID is required'),
   params: z.record(z.string(), z.unknown()),
+  // assetRefs 允许为空对象（{}）：纯文生图/文生视频模型没有媒体绑定也合法。
+  // 不能加 `refine(keys.length > 0)`——它会拒绝前端对无媒体模型发送的空 assetRefs，
+  // 导致所有无媒体模型的预估/创建都报「输入内容不合法」。媒体必填由
+  // model-core 的 validateModelParams 在业务层校验。
   assetRefs: z.record(
     z.string().min(1, 'Asset parameter name is required'),
     z.union([
       z.string().min(1, 'Asset ID is required'),
       z.array(z.string().min(1, 'Asset ID is required')).min(1, 'At least one asset ID is required'),
     ]),
-  ).refine(refs => Object.keys(refs).length > 0, 'At least one asset binding is required').optional(),
+  ).optional(),
   idempotencyKey: z.string().optional(),
 })
 

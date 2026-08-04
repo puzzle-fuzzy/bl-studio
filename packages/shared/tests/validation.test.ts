@@ -22,7 +22,7 @@ describe('validation schemas', () => {
     expect(parsed.idempotencyKey).toBe('k-1')
   })
 
-  it('accepts ordered generation asset bindings and rejects empty bindings', () => {
+  it('accepts ordered generation asset bindings and an empty assetRefs map', () => {
     const parsed = CreateGenerationSchema.parse({
       modelId: 'qwen-image-edit',
       params: { prompt: 'edit this' },
@@ -30,11 +30,15 @@ describe('validation schemas', () => {
     })
     expect(parsed.assetRefs).toEqual({ image: ['asset-a', 'asset-b'] })
 
-    expect(() => CreateGenerationSchema.parse({
-      modelId: 'qwen-image-edit',
-      params: { prompt: 'edit this' },
+    // 无媒体模型发送空 assetRefs（{}）必须合法；媒体必填由业务层 validateModelParams 校验。
+    const empty = CreateGenerationSchema.parse({
+      modelId: 'qwen-image-2.0-pro',
+      params: { prompt: 'a cat' },
       assetRefs: {},
-    })).toThrow()
+    })
+    expect(empty.assetRefs).toEqual({})
+
+    // 绑定值里的空数组仍非法（union 要求至少 1 个 ID）。
     expect(() => CreateGenerationSchema.parse({
       modelId: 'qwen-image-edit',
       params: { prompt: 'edit this' },
