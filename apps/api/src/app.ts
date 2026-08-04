@@ -32,6 +32,9 @@ import { createPointsRoutes } from './modules/points'
 import { appMetrics } from './lib/metrics'
 
 const accessLogger = createLogger('api')
+
+// worker 存活心跳被认为过期的阈值：worker 每 5s 更新心跳行，15s 无更新即视为
+// 失联（允许 3 个心跳周期的抖动容差）。用于 /api/health/ready 的 worker 检查。
 const WORKER_HEARTBEAT_STALE_AFTER_MS = 15_000
 
 export interface ApiAppOptions {

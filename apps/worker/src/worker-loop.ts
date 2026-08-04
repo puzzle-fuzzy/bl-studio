@@ -86,6 +86,12 @@ export class WorkerLoop {
     })
     this.logger = config.logger ?? createLogger(`worker:${config.workerId}`)
     this.metrics = metrics
+    // 任务租约与轮询节奏（默认值）：
+    // - 锁 90s：任务执行期间持有；worker 崩溃后最迟 90s 由其它 worker 重新认领。
+    // - 心跳 = 锁/3（约 30s）：执行期间周期性续租，网络抖动在锁过期前有重试机会。
+    // - poll 100ms：任务入队后低延迟被消费；空闲 sleep 1s 避免无任务时空转。
+    // - errorBackoff 5s：迭代抛错后退避，防止错误风暴打满 CPU。
+    // - worker 存活心跳 5s：与任务租约分离，存活 ≠ 持有某任务锁。
     this.lockDurationMs = config.lockDurationMs ?? 90_000
     this.lockHeartbeatMs = config.lockHeartbeatMs
       ?? Math.max(1_000, Math.floor(this.lockDurationMs / 3))

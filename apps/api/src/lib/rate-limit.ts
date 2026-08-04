@@ -69,6 +69,9 @@ export function readApiRateLimitConfig(
   source: Readonly<Record<string, string | undefined>> = process.env,
 ): ApiRateLimitConfig {
   const production = source['NODE_ENV']?.trim().toLowerCase() === 'production'
+  // 各桶默认配额（请求/分钟）。生产更严格：auth 10 防爆破、generation 30 防刷量、
+  // upload 10 防存储滥用、write 120 兜底；开发放宽便于本地联调。单实例进程内
+  // 限流，多副本水平扩展前需换 Redis/网关（见 docs）。
   const defaults = production
     ? { requests: 120, auth: 10, generation: 30, upload: 10 }
     : { requests: 600, auth: 30, generation: 120, upload: 30 }
