@@ -1,5 +1,5 @@
 import { Brush, Library, Sparkles, Wrench } from 'lucide-react'
-import { NavLink } from 'react-router'
+import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
   SidebarContent,
@@ -17,7 +17,6 @@ import { BrandMark } from '@/components/shared/BrandMark'
 import { NotificationMenu } from '@/components/layout/NotificationMenu'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
-import { cn } from '@/lib/utils'
 
 // 主导航：任务列表已并入创作页「最新任务」，不再单独占菜单项；作品库改名「资产」。
 const NAV_ITEMS = [
@@ -29,6 +28,8 @@ const NAV_ITEMS = [
 
 /** 主导航侧栏。底部固定通知 + 账户（头像 + 完整邮箱）。 */
 export function Nav() {
+  const { pathname } = useLocation()
+
   return (
     <Sidebar>
       <SidebarHeader>
@@ -41,8 +42,9 @@ export function Nav() {
             <SidebarMenu>
               {NAV_ITEMS.map(item => (
                 <SidebarMenuItem key={item.to}>
-                  <SidebarMenuButton asChild isActive={item.to === '/create'}>
-                    <NavLink to={item.to} className={({ isActive }) => cn(isActive && 'bg-sidebar-accent')}>
+                  {/* 选中态由当前路径判断（含子路由前缀，如 /generations/:id） */}
+                  <SidebarMenuButton asChild isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
+                    <NavLink to={item.to}>
                       <item.icon />
                       <span>{item.label}</span>
                     </NavLink>
