@@ -40,3 +40,6 @@ compactor:
   # filesystem 存储下，保留期由 compactor 周期性执行删除；必须开启。
   retention_enabled: true
   compaction_interval: 10m
+  # 开启 delete API（logs:prune 清理旧日志用）：队列化的删除请求在下次
+  # compaction 时真正从索引与 chunks 中移除，作为 2C2G 服务器吃紧时的安全阀。
+  deletion_mode: filter-and-delete

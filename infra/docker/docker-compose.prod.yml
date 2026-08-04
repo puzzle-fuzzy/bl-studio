@@ -41,6 +41,9 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # 2C2G 单机护栏：内存上限保证任一容器不会拖垮整栈；观测栈限额更紧，
+    # 超限只重启自己（restart: unless-stopped），应用不受影响。
+    mem_limit: 512m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required in .env.prod-infra}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required in .env.prod-infra}
@@ -66,6 +69,7 @@ services:
       postgres:
         condition: service_healthy
     restart: "no"
+    mem_limit: 384m
     networks: [backend]
     logging: *json-logging
 
@@ -80,6 +84,7 @@ services:
       LOG_FORMAT: json
     command: ["bun", "apps/api/src/index.ts"]
     restart: unless-stopped
+    mem_limit: 384m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -111,6 +116,7 @@ services:
       LOG_FORMAT: json
     command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
     restart: unless-stopped
+    mem_limit: 384m
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -124,6 +130,7 @@ services:
     image: bailian-studio-web:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     pull_policy: never
     restart: unless-stopped
+    mem_limit: 128m
     depends_on:
       api:
         condition: service_healthy
@@ -136,6 +143,7 @@ services:
   caddy:
     image: caddy:2.8.1-alpine
     restart: unless-stopped
+    mem_limit: 64m
     ports:
       - "80:80"
       - "443:443"
@@ -159,12 +167,17 @@ services:
   loki:
     image: grafana/loki:3.6.12
     restart: unless-stopped
+    # 仅绑定 localhost：供服务器上的 logs:prune 调 delete API 清理旧日志，
+    # 不向公网暴露。
+    ports:
+      - "127.0.0.1:3100:3100"
     command: ["-config.file=/etc/loki/loki.yaml"]
     volumes:
       - ../loki/loki.yaml:/etc/loki/loki.yaml:ro
       - loki_data:/loki
     networks: [logging]
     logging: *json-logging
+    mem_limit: 256m
 
   alloy:
     # 采集器用 Grafana Alloy（Promtail 已于 2026-03 EOL 的官方替代）。
@@ -183,10 +196,12 @@ services:
         condition: service_started
     networks: [logging]
     logging: *json-logging
+    mem_limit: 128m
 
   grafana:
     image: grafana/grafana:12.4.2
     restart: unless-stopped
+    mem_limit: 192m
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER required in .env.prod-infra}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required in .env.prod-infra}
@@ -209,6 +224,7 @@ services:
   backup:
     image: postgres:16-alpine
     restart: unless-stopped
+    mem_limit: 64m
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       BACKUP_DIR: ${BACKUP_DIR:-/backups}

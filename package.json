@@ -59,6 +59,8 @@
     "prod:logs": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f --tail=100",
     "logs:api": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f api",
     "logs:worker": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f worker",
+    "logs:prune": "bash infra/scripts/prune-loki-logs.sh",
+    "prod:mem": "ssh -o ConnectTimeout=10 $(awk -F= '$1==\"DEPLOY_HOST\"{sub(/^[^=]*=/,\"\");print;exit}' infra/env/.env.prod-infra) 'free -h && docker stats --no-stream'",
     "db:backup:production": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml exec -T backup /bin/sh /usr/local/bin/backup-postgres.sh"
   },
   "devDependencies": {

@@ -60,9 +60,14 @@ DEPLOY_HOST="$(env_value DEPLOY_HOST "$ENV_INFRA")"
 DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR "$ENV_INFRA")"
 DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY "$ENV_INFRA")"
 SITE_DOMAIN="$(env_value SITE_DOMAIN "$ENV_INFRA")"
+# 目标服务器 CPU 架构。本机（Apple Silicon）与服务器（x86_64）架构不同时，
+# 必须显式指定服务器架构跨平台构建，否则产出的 arm64 镜像无法在 x64 上运行。
+# 若本机与服务器同为 x86_64，可在 .env.prod-infra 置空走默认 linux/amd64。
+DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM "$ENV_INFRA")"
 [[ -n "$DEPLOY_HOST" ]] || fail "缺少 DEPLOY_HOST"
 [[ -n "$DEPLOY_REMOTE_DIR" ]] || fail "缺少 DEPLOY_REMOTE_DIR"
 [[ -n "$SITE_DOMAIN" ]] || fail "缺少 SITE_DOMAIN"
+DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 
 SSH_ARGS=()
 if [[ -n "$DEPLOY_SSH_KEY" ]]; then SSH_ARGS=(-i "$DEPLOY_SSH_KEY"); fi
@@ -71,11 +76,11 @@ ssh_cmd() { ssh "${SSH_ARGS[@]}" "$DEPLOY_HOST" "$1"; }
 echo "==> 部署目标：$DEPLOY_HOST（镜像 tag: ${SHA:0:12}）"
 
 # ── 本机构镜像（SHA tag，不可变）─────────────────────────────────
-echo "==> 构建 runtime / web 镜像"
-docker build -f infra/docker/Dockerfile --target runtime \
+echo "==> 构建 runtime / web 镜像（平台 $DEPLOY_PLATFORM）"
+docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target runtime \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   -t "bailian-studio-runtime:$SHA" .
-docker build -f infra/docker/Dockerfile --target web \
+docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target web \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   --build-arg VITE_API_ORIGIN= \
   --build-arg VITE_WEB_ORIGIN="https://$SITE_DOMAIN" \

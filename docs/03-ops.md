@@ -128,6 +128,23 @@ pnpm run logs:worker
 pnpm run prod:logs -- --no-follow   # 一次性全量
 ```
 
+## 5.5 内存护栏与日志清理（2C2G 服务器）
+
+生产栈在低配单机上运行时，每个容器都设了 `mem_limit` 上限：观测栈（loki 256m /
+alloy 128m / grafana 192m）限额更紧，超限只重启自己，**不会拖垮 api/worker 等应用进程**。
+
+当服务器内存吃紧（建议先删除旧日志再考虑升配）：
+
+```bash
+pnpm run prod:mem            # 看服务器内存 + 各容器实时占用
+pnpm run logs:prune          # 队列化删除 24h 前的日志（安全阀）
+CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
+```
+
+删除由 Loki compactor 在下次压缩（约 10 分钟内）真正应用；`loki.yaml` 已开启
+`deletion_mode: filter-and-delete`。日志默认保留 31 天，磁盘吃紧时用 `logs:prune`
+主动缩短。
+
 ## 6. 备份与恢复
 
 - **自动备份**：`backup` 容器每 24h 执行 `infra/scripts/backup-postgres.sh`，`pg_dump | gzip` 写入 `backups` 命名卷（保留 `BACKUP_RETENTION_DAYS` 天）。备份文件带 UTC 时间戳。
