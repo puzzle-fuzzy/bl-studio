@@ -133,14 +133,14 @@ ssh_cmd "bash $REMOTE_INFRA/scripts/setup-host-edge.sh $REMOTE_INFRA"
 
 # ── 冒烟 ─────────────────────────────────────────────────────────
 echo "==> 等待 api 容器健康（最多 ~2.5 分钟）"
-API_CONTAINER="bailian-studio-prod-api"
 healthy=""
 for _ in $(seq 1 30); do
-  status="$(ssh_cmd "docker inspect --format '{{.State.Health.Status}}' $API_CONTAINER 2>/dev/null || echo starting")"
-  if [[ "$status" == "healthy" ]]; then healthy=1; break; fi
+  # 用 compose ps 解析容器状态（名字带 -1 后缀，不能硬编码）。
+  status="$(ssh_cmd "$COMPOSE ps api --format '{{.Status}}' 2>/dev/null || echo starting")"
+  if [[ "$status" == *"healthy"* ]]; then healthy=1; break; fi
   sleep 5
 done
-[[ -n "$healthy" ]] || fail "api 未在预期时间内变为 healthy（${API_CONTAINER}）"
+[[ -n "$healthy" ]] || fail "api 未在预期时间内变为 healthy"
 
 echo "==> 公网冒烟（给 Let's Encrypt 首次签发留时间，最多 ~2 分钟）"
 smoke_ok=""

@@ -53,18 +53,17 @@ server {
 }
 EOF
 done
-nginx -t && systemctl reload nginx
+# 注意：`cmd && next` 中 cmd 失败会被 set -e 豁免，这里显式判断，失败即中止。
+if ! nginx -t; then echo "nginx -t 失败（HTTP-only conf.d）" >&2; exit 1; fi
+systemctl reload nginx
 echo "==> HTTP-only conf.d 已生效"
 
-# 3) 缺证书则签发（幂等，已存在直接跳过）。
-NEED_CERT=0
-for d in "${DOMAINS[@]}"; do
-  [[ -f "/etc/letsencrypt/live/$d/fullchain.pem" ]] || NEED_CERT=1
-done
-if [[ "$NEED_CERT" == "1" ]]; then
+# 3) 缺证书则签发（幂等）。certbot 一次签发覆盖两个域名的 SAN 证书，
+#    只检查主域 live 目录即可（logs 目录本就不存在）。
+if [[ ! -f "/etc/letsencrypt/live/${DOMAINS[0]}/fullchain.pem" ]]; then
   echo "==> 签发证书（certbot webroot）..."
   certbot certonly --webroot -w "$ACME_ROOT" \
-    -d create.yxswy.com -d logs.yxswy.com \
+    -d "${DOMAINS[0]}" -d "${DOMAINS[1]}" \
     --non-interactive --agree-tos --email "$LE_EMAIL" \
     --keep-until-expiring
 else
@@ -76,5 +75,6 @@ for d in "${DOMAINS[@]}"; do
   [[ -f "$INFRA_DIR/nginx/$d.conf" ]] || { echo "缺少模板 $INFRA_DIR/nginx/$d.conf" >&2; exit 1; }
   cp "$INFRA_DIR/nginx/$d.conf" "$NGINX_CONFD/$d.conf"
 done
-nginx -t && systemctl reload nginx
+if ! nginx -t; then echo "nginx -t 失败（完整 conf.d）" >&2; exit 1; fi
+systemctl reload nginx
 echo "==> 完整 conf.d 已生效：create/logs.yxswy.com"
