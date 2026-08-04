@@ -29,8 +29,8 @@ env_value() {
 }
 
 # ── 预检 1：本地环境文件存在 ──────────────────────────────────────
-[[ -f "$ENV_APP" ]] || fail "缺少 $ENV_APP（复制 .env.production.example 后填写）"
-[[ -f "$ENV_INFRA" ]] || fail "缺少 $ENV_INFRA（复制 .env.prod-infra.example 后填写）"
+[[ -f "$ENV_APP" ]] || fail "缺少 ${ENV_APP}（复制 .env.production.example 后填写）"
+[[ -f "$ENV_INFRA" ]] || fail "缺少 ${ENV_INFRA}（复制 .env.prod-infra.example 后填写）"
 
 # ── 预检 2：干净工作区 + commit SHA ──────────────────────────────
 git diff --quiet && git diff --cached --quiet || fail "工作区有未提交改动；生产镜像只能从干净工作区构建"
@@ -73,10 +73,10 @@ SSH_ARGS=()
 if [[ -n "$DEPLOY_SSH_KEY" ]]; then SSH_ARGS=(-i "$DEPLOY_SSH_KEY"); fi
 ssh_cmd() { ssh "${SSH_ARGS[@]}" "$DEPLOY_HOST" "$1"; }
 
-echo "==> 部署目标：$DEPLOY_HOST（镜像 tag: ${SHA:0:12}）"
+echo "==> 部署目标：${DEPLOY_HOST}（镜像 tag: ${SHA:0:12}）"
 
 # ── 本机构镜像（SHA tag，不可变）─────────────────────────────────
-echo "==> 构建 runtime / web 镜像（平台 $DEPLOY_PLATFORM）"
+echo "==> 构建 runtime / web 镜像（平台 ${DEPLOY_PLATFORM}）"
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target runtime \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   -t "bailian-studio-runtime:$SHA" .
@@ -127,7 +127,7 @@ for _ in $(seq 1 30); do
   if [[ "$status" == "healthy" ]]; then healthy=1; break; fi
   sleep 5
 done
-[[ -n "$healthy" ]] || fail "api 未在预期时间内变为 healthy（$API_CONTAINER）"
+[[ -n "$healthy" ]] || fail "api 未在预期时间内变为 healthy（${API_CONTAINER}）"
 
 echo "==> 公网冒烟（给 Let's Encrypt 首次签发留时间，最多 ~2 分钟）"
 smoke_ok=""
