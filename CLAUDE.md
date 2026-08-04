@@ -26,10 +26,18 @@ pnpm run check:manifests  # manifest 一致性
 pnpm run db:push / db:push:test
 ```
 
-生产部署/日志/备份见 `docs/03-ops.md`：`pnpm run deploy:prod` 一键发布
-（构建 SHA 镜像 → rsync → docker load → 迁移 → 滚动 up → 冒烟）；日志栈
-Loki + Alloy + Grafana 挂在 `logs.yxswy.com`。`pnpm run check:production-env:infra`
-校验基础设施 env（`.env.prod-infra`）。
+## 生产部署（做部署前必读）
+
+**先读 `docs/04-deployment-playbook.md`（部署手册：正确流程 + 踩坑清单）和 `docs/03-ops.md`（运维：日志/备份/回滚/故障排查）。** 一键发布：`pnpm run verify && pnpm run deploy:prod`。日志栈 Loki + Alloy + Grafana 挂在 `logs.yxswy.com`（观测栈在 `observability` profile，`pnpm run prod:observability:up` 启用）。
+
+**生产环境的关键事实（易踩坑，务必先知道）：**
+- 服务器是**共享机**（SSH 别名 `yxswy-server` = root@101.35.246.159），同时跑着多个其它服务。
+- **HTTPS 边缘 = 宿主机 nginx + certbot**（80/443 被独占），**不是 Caddy**。站点配置在 `/etc/nginx/conf.d/*.yxswy.com.conf`，反代到 127.0.0.1:5002（web）/5300（grafana）。
+- 本机 **arm64 → 服务器 x86_64**：构建必须 `--platform linux/amd64`（deploy 脚本已处理）。
+- 本机 **Clash fake-ip 劫持 DNS**：本地 `dig` 不可信，查 DNS 要在服务器上 `getent hosts`。
+- 两个域名共用一份 Let's Encrypt SAN 证书（在 `live/create.yxswy.com/`），logs 站点引用同一路径。
+- 运行时用户是 `bun`（无 node 用户）；镜像内 Node ≥24（apt 的 v20 会让 worker 静默退出）。
+- 安全红线：`.env.production` / `.env.prod-infra` gitignored，**绝不打印/提交任何凭据值**。
 
 测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后 `db:push` + `db:push:test`。
 
