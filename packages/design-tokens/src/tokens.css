@@ -1,0 +1,114 @@
+:root {
+  --rb-font-system: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --rb-font-display: "PingFang SC", -apple-system, BlinkMacSystemFont, "Segoe UI",
+    "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
+  --rb-font-size-micro: 0.75rem;
+  --rb-font-size-caption: 0.8125rem;
+  --rb-font-size-body: 0.9375rem;
+  --rb-font-size-control: 0.9375rem;
+  --rb-font-size-title: 1.5rem;
+  --rb-font-size-display: 2rem;
+  --rb-line-height-tight: 1.2;
+  --rb-line-height-copy: 1.55;
+
+  --rb-radius-sm: 6px;
+  --rb-radius-md: 10px;
+  --rb-radius-lg: 14px;
+  --rb-radius-panel: 14px;
+  --rb-radius-control: 8px;
+  --rb-radius-pill: 999px;
+  --rb-control-height: 44px;
+  --rb-header-height: 4.5rem;
+  --rb-content-max-width: 1660px;
+  --rb-workbench-panel-width: 29rem;
+  --rb-sidebar-collapsed-width: 4.5rem;
+  --rb-sidebar-expanded-width: 16rem;
+  --rb-shadow-popover: 0 18px 42px rgb(22 25 23 / 0.14);
+  --rb-shadow-panel: 0 12px 30px rgb(22 25 23 / 0.06);
+  --rb-shadow-control: 0 4px 14px rgb(22 25 23 / 0.08);
+  --rb-surface-shadow: var(--rb-shadow-panel);
+  --rb-surface-shadow-hover: 0 14px 32px rgb(22 25 23 / 0.1);
+  --rb-surface-shadow-inset: inset 0 1px 0 rgb(255 255 255 / 0.72);
+  --rb-header-shadow: none;
+  --rb-action-shadow: none;
+  --rb-action-shadow-hover: none;
+  --rb-action-active-shadow: none;
+  --rb-action-bg: var(--rb-accent);
+  --rb-action-fg: var(--rb-accent-fg);
+  --rb-action-border: 1px solid transparent;
+  --rb-divider: var(--rb-border);
+}
+
+[data-theme="dark"] {
+  --rb-bg: #0b0b0b;
+  --rb-canvas: #111211;
+  --rb-sidebar: #0a0b0a;
+  --rb-sidebar-raised: #171a17;
+  --rb-sidebar-fg: #f2f3ee;
+  --rb-sidebar-muted: #91978e;
+  --rb-sidebar-subtle: #c4c9c0;
+  --rb-sidebar-border: rgb(255 255 255 / 0.12);
+  --rb-surface: #191b19;
+  --rb-surface-raised: #202420;
+  --rb-surface-strong: #2b302b;
+  --rb-fg: #f1f1f1;
+  --rb-muted: #a6aaa3;
+  --rb-subtle: #d0d3cc;
+  --rb-border: rgb(255 255 255 / 0.12);
+  --rb-border-strong: rgb(255 255 255 / 0.2);
+  --rb-accent: #e46b78;
+  --rb-accent-hover: #f0818c;
+  --rb-accent-fg: #ffffff;
+  --rb-signal: #d8ddd4;
+  --rb-signal-soft: #293029;
+  --rb-image: #d4a7a2;
+  --rb-video: #aec3a7;
+  --rb-audio: #d1b988;
+  --rb-text: #d1d4ce;
+  --rb-disabled-bg: #2c302c;
+  --rb-disabled-fg: #777d76;
+  --rb-danger: #ff7777;
+  --rb-warning: #e1b15c;
+  --rb-success: #a5d09d;
+  --rb-overlay: rgb(0 0 0 / 0.82);
+  --rb-shadow-panel: 0 14px 32px rgb(0 0 0 / 0.2);
+  --rb-shadow-control: 0 6px 18px rgb(0 0 0 / 0.24);
+}
+
+:root:not([data-theme="dark"]),
+[data-theme="light"] {
+  --rb-bg: #f7f7f5;
+  --rb-canvas: #f0efeb;
+  --rb-sidebar: #202622;
+  --rb-sidebar-raised: #2b332d;
+  --rb-sidebar-fg: #f5f5ef;
+  --rb-sidebar-muted: #a6afa3;
+  --rb-sidebar-subtle: #d5dbd2;
+  --rb-sidebar-border: rgb(255 255 255 / 0.14);
+  --rb-surface: #fffdfa;
+  --rb-surface-raised: #f7f5ef;
+  --rb-surface-strong: #ebe8df;
+  --rb-fg: #20231f;
+  --rb-muted: #70776f;
+  --rb-subtle: #50584f;
+  --rb-border: rgb(32 35 31 / 0.12);
+  --rb-border-strong: rgb(32 35 31 / 0.22);
+  --rb-accent: #d95567;
+  --rb-accent-hover: #be4054;
+  --rb-accent-fg: #ffffff;
+  --rb-signal: #59645a;
+  --rb-signal-soft: #e7eee6;
+  --rb-image: #9f675f;
+  --rb-video: #668167;
+  --rb-audio: #9a7849;
+  --rb-text: #5e665e;
+  --rb-disabled-bg: #e8e6e0;
+  --rb-disabled-fg: #a4a9a1;
+  --rb-danger: #b9574f;
+  --rb-warning: #9b7744;
+  --rb-success: #5e896d;
+  --rb-overlay: rgb(37 38 36 / 0.52);
+  --rb-shadow-panel: 0 12px 30px rgb(38 40 35 / 0.08);
+  --rb-shadow-control: 0 4px 14px rgb(38 40 35 / 0.1);
+}

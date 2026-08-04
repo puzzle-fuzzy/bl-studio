@@ -1,0 +1,1 @@
+export { createAssetRoutes } from './routes'

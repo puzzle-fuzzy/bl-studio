@@ -1,0 +1,592 @@
+/**
+ * Bailian Studio API 线缆契约的 Zod schema 镜像。
+ *
+ * api-client 对每个响应都用这里的 schema 校验，从而端到端地把传输层类型化，
+ * 全程无需 `as` 强转：`fetch().json()` 一律视为 `unknown`，只有 `.parse()`
+ * 成功才能得到带类型的值。
+ *
+ * 这些类型【刻意】只定义在本包里（而不从 @bailian-studio/model-core 导入），以保持
+ * api-client 是一个纯粹的传输层，仅依赖 @bailian-studio/shared + zod。
+ */
+import { z } from 'zod'
+
+export const ModelOperationSchema = z.enum([
+  'text.chat',
+  'image.text-to-image',
+  'image.image-to-image',
+  'image.edit',
+  'video.text-to-video',
+  'video.image-to-video',
+  'video.reference-to-video',
+  'video.edit',
+  'video.understand',
+  'speech.recognize',
+  'music.generate',
+])
+
+export const ModelParameterSchema = z.object({
+  name: z.string(),
+  label: z.string(),
+  type: z.enum(['text', 'number', 'select', 'boolean', 'media']),
+  required: z.boolean().optional(),
+  defaultValue: z.unknown().optional(),
+  description: z.string().optional(),
+  options: z.array(z.object({ label: z.string(), value: z.unknown() })).optional(),
+  min: z.number().optional(),
+  max: z.number().optional(),
+  exclusiveMin: z.boolean().optional(),
+  exclusiveMax: z.boolean().optional(),
+  step: z.number().finite().positive().optional(),
+  maxLength: z.number().optional(),
+  minItems: z.number().int().positive().optional(),
+  maxItems: z.number().int().positive().optional(),
+  visibleWhen: z.object({ field: z.string(), equals: z.unknown() }).optional(),
+  // 仅 media 类型参数携带：约束「作品库」选择器按媒体种类过滤候选成品。
+  mediaKind: z.enum(['image', 'video', 'audio', 'text']).optional(),
+})
+
+const ModelReferenceFormatSchema = z.enum([
+  'angle-bracket',
+  'image-bracket',
+  'chinese',
+])
+
+function normalizeLegacyModelReferenceFormat(value: unknown): unknown {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    return value
+  }
+
+  const item = value as Record<string, unknown>
+  if (item.referenceFormat !== undefined) return value
+
+  const request = item.request
+  if (typeof request !== 'object' || request === null || Array.isArray(request)) {
+    return value
+  }
+
+  const nestedReferenceFormat = (request as Record<string, unknown>).referenceFormat
+  if (nestedReferenceFormat === undefined) return value
+
+  return { ...item, referenceFormat: nestedReferenceFormat }
+}
+
+const ModelCatalogItemContractSchema = z.object({
+  id: z.string(),
+  provider: z.enum(['dashscope']),
+  providerModel: z.string(),
+  displayName: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  operation: ModelOperationSchema,
+  taskMode: z.enum(['sync', 'provider_async', 'stream']),
+  capabilities: z.array(z.string()),
+  parameters: z.array(ModelParameterSchema),
+  mediaGroups: z.array(z.object({
+    parameters: z.array(z.string()).min(2),
+    minItems: z.number().int().positive().optional(),
+    maxItems: z.number().int().positive().optional(),
+    when: z.object({
+      field: z.string(),
+      present: z.boolean(),
+    }).optional(),
+  })).optional(),
+  availability: z
+    .object({ enabled: z.boolean(), stage: z.enum(['stable', 'beta', 'hidden']) })
+    .optional(),
+  referenceFormat: ModelReferenceFormatSchema.optional(),
+})
+
+export const ModelCatalogItemSchema = z.preprocess(
+  normalizeLegacyModelReferenceFormat,
+  ModelCatalogItemContractSchema,
+)
+
+export const ModelCatalogResponseSchema = z.object({
+  items: z.array(ModelCatalogItemSchema),
+})
+
+const Sha256Schema = z.string().regex(/^sha256:[0-9a-f]{64}$/)
+
+const BailianCoverageStatusSchema = z.object({
+  totalRequirements: z.number().int().nonnegative(),
+  coveredRequirements: z.number().int().nonnegative(),
+  legacyRequirements: z.number().int().nonnegative(),
+  coveredConsumerIds: z.array(z.string()),
+  legacyConsumerIds: z.array(z.string()),
+}).superRefine((coverage, context) => {
+  if (coverage.totalRequirements !== coverage.coveredRequirements + coverage.legacyRequirements) {
+    context.addIssue({ code: 'custom', message: 'Bailian coverage counts are inconsistent' })
+  }
+  if (coverage.coveredConsumerIds.length !== coverage.coveredRequirements) {
+    context.addIssue({ code: 'custom', path: ['coveredConsumerIds'], message: 'Covered model count does not match the id list' })
+  }
+  if (coverage.legacyConsumerIds.length !== coverage.legacyRequirements) {
+    context.addIssue({ code: 'custom', path: ['legacyConsumerIds'], message: 'Legacy model count does not match the id list' })
+  }
+  const allIds = [...coverage.coveredConsumerIds, ...coverage.legacyConsumerIds]
+  if (new Set(allIds).size !== allIds.length) {
+    context.addIssue({ code: 'custom', message: 'Bailian coverage model ids must be unique' })
+  }
+})
+
+export const BailianContractStatusSchema = z.object({
+  sdkVersion: z.string(),
+  catalogRevision: z.string(),
+  catalogHash: Sha256Schema,
+  requirementsHash: Sha256Schema,
+  maintenance: z.enum(['manual', 'official-sync']),
+  sourceImportedAt: z.string(),
+  latestModelReviewAt: z.string(),
+  coverage: BailianCoverageStatusSchema,
+})
+
+export const NormalizedArtifactSchema = z.object({
+  kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
+  sourceUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  thumbnailStatus: z.enum(['queued', 'processing', 'ready', 'failed']).optional(),
+  text: z.string().optional(),
+  mimeType: z.string().optional(),
+  providerMeta: z.unknown().optional(),
+})
+
+export const OutputResultSchema = z.object({
+  artifacts: z.array(NormalizedArtifactSchema),
+  usage: z.unknown().optional(),
+  raw: z.unknown().optional(),
+})
+
+// 这里刻意宽松：error_json 在 DB 里可能是 TaskError 结构，也可能是普通 Error 形状。
+export const GenerationErrorJsonSchema = z.object({
+  code: z.string().optional(),
+  message: z.string().optional(),
+  category: z.string().optional(),
+  retriable: z.boolean().optional(),
+  name: z.string().optional(),
+  details: z.record(z.string(), z.unknown()).optional(),
+})
+
+export const GenerationRecordSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  modelId: z.string(),
+  provider: z.enum(['dashscope']),
+  providerModel: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  inputParams: z.record(z.string(), z.unknown()),
+  assetRefs: z.record(
+    z.string(),
+    z.array(z.string()).min(1),
+  ).optional(),
+  status: z.string(),
+  statusReason: z.string().optional(),
+  providerTaskId: z.string().optional(),
+  providerStatus: z.string().optional(),
+  requestId: z.string().optional(),
+  traceId: z.string().optional(),
+  outputResult: OutputResultSchema.optional(),
+  errorJson: GenerationErrorJsonSchema.optional(),
+  costEstimate: z.number(),
+  currency: z.literal('CNY'),
+  pricingVersion: z.string(),
+  modelManifestHash: z.string(),
+  costFinal: z.number().optional(),
+  parentRecordId: z.string().optional(),
+  idempotencyKey: z.string().optional(),
+  cancelRequestedAt: z.string().optional(),
+  providerCancelStatus: z.enum(['not_requested', 'requested', 'succeeded', 'failed', 'unsupported']),
+  hiddenAt: z.string().optional(),
+  deletedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const ProviderRequestAuditSchema = z.object({
+  id: z.string(),
+  generationId: z.string(),
+  taskId: z.string().optional(),
+  userId: z.string(),
+  provider: z.string(),
+  providerModel: z.string(),
+  operation: z.enum(['submit', 'poll', 'chat', 'cancel']),
+  status: z.enum(['started', 'succeeded', 'failed', 'unsupported']),
+  providerTaskId: z.string().optional(),
+  providerRequestId: z.string().optional(),
+  attempt: z.number().int().nonnegative(),
+  estimatedCostCents: z.number().int().nonnegative(),
+  billedCostCents: z.number().int().nonnegative().optional(),
+  error: z.object({
+    code: z.string(),
+    category: z.string(),
+    message: z.string(),
+    retriable: z.boolean(),
+  }).optional(),
+  startedAt: z.string(),
+  completedAt: z.string().optional(),
+  latencyMs: z.number().int().nonnegative().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const TaskDiagnosticsSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  status: z.string(),
+  attempts: z.number().int().nonnegative(),
+  maxAttempts: z.number().int().positive(),
+  createdAt: z.string(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  updatedAt: z.string(),
+  error: z.object({
+    category: z.string(),
+    message: z.string(),
+    retriable: z.boolean(),
+    code: z.string().optional(),
+  }).optional(),
+  durationMs: z.number().int().nonnegative().optional(),
+})
+
+export const GenerationDiagnosticsSchema = z.object({
+  generationId: z.string(),
+  traceId: z.string().optional(),
+  generationDurationMs: z.number().int().nonnegative().optional(),
+  tasks: z.array(TaskDiagnosticsSchema),
+  providerRequests: z.array(ProviderRequestAuditSchema),
+})
+
+export const GenerationArtifactSchema = z.object({
+  id: z.string(),
+  recordId: z.string(),
+  userId: z.string(),
+  kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
+  sourceUrl: z.string().optional(),
+  text: z.string().optional(),
+  mimeType: z.string().optional(),
+  storageProvider: z.enum(['oss', 'local']).optional(),
+  storageKey: z.string().optional(),
+  storageUrl: z.string().optional(),
+  readUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  thumbnailStatus: z.enum(['queued', 'processing', 'ready', 'failed']).optional(),
+  byteSize: z.number().optional(),
+  status: z.enum(['pending', 'stored', 'failed']),
+  errorJson: GenerationErrorJsonSchema.optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const CreateGenerationResponseSchema = z.object({
+  record: GenerationRecordSchema,
+  task: z.object({ id: z.string(), type: z.string(), status: z.string() }),
+  // 服务端会顺带返回一个 SSE 形态的事件，客户端用不到，故这里不做校验。
+  event: z.unknown(),
+})
+
+export const GenerationEstimateSchema = z.object({
+  modelId: z.string(),
+  provider: z.string(),
+  providerModel: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  params: z.record(z.string(), z.unknown()),
+  costEstimate: z.number().int().nonnegative(),
+  currency: z.literal('CNY'),
+  credits: z.object({
+    availableCents: z.number().int().nonnegative(),
+    reservedCents: z.number().int().nonnegative(),
+    canAfford: z.boolean(),
+  }),
+  usage: z.object({
+    attemptCount: z.number().int().nonnegative(),
+    successfulCount: z.number().int().nonnegative(),
+    generationCount: z.number().int().nonnegative(),
+    estimatedCents: z.number().int().nonnegative(),
+    chargedCents: z.number().int().nonnegative(),
+    providerCostCents: z.number().int().nonnegative(),
+    // Deprecated HTTP alias; use providerCostCents for provider-reported cost.
+    finalCents: z.number().int().nonnegative(),
+  }),
+  limits: z.object({
+    dailyTaskLimit: z.number().int().positive().optional(),
+    dailyCostLimitCents: z.number().int().positive().optional(),
+    dailyQuotaMode: z.enum(['attempts', 'successful']),
+  }),
+})
+
+export const GenerationEstimateResponseSchema = z.object({
+  estimate: GenerationEstimateSchema,
+})
+
+export const ListGenerationsResponseSchema = z.object({
+  items: z.array(GenerationRecordSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const ListGenerationArtifactsResponseSchema = z.object({
+  items: z.array(GenerationArtifactSchema),
+})
+
+// 「我的作品库」：按用户列出 artifact（含 keyset 分页）。与按 record 列出
+// 产物的 ListGenerationArtifactsResponseSchema 区别在于：本 schema 带 nextCursor。
+export const ListArtifactsResponseSchema = z.object({
+  items: z.array(GenerationArtifactSchema),
+  nextCursor: z.string().optional(),
+})
+
+/** 取消生成返回的 record（已翻 cancel 标志位）。 */
+export const CancelGenerationResponseSchema = z.object({
+  record: GenerationRecordSchema,
+})
+
+/** 重跑生成返回新 record + task（与创建生成同构）。 */
+export const RetryGenerationResponseSchema = CreateGenerationResponseSchema
+
+// --- 生成分享（Generation sharing） ----------------------------------------
+
+/** 面向所有者的 share（含 userId）。由所有者侧的 share 端点返回。 */
+export const GenerationShareSchema = z.object({
+  id: z.string(),
+  recordId: z.string(),
+  userId: z.string(),
+  includeParams: z.boolean(),
+  expiresAt: z.string().optional(),
+  revokedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+/** 面向公众的 share —— 不含 userId。出现在公开的只读 read model 里。 */
+export const PublicGenerationShareSchema = z.object({
+  id: z.string(),
+  recordId: z.string(),
+  expiresAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+/**
+ * 严格收敛后的公开 record：不含 userId、cost、idempotency、outputResult 等
+ * 敏感字段，确保匿名访客只能看到必要信息。
+ */
+export const PublicSharedGenerationRecordSchema = z.object({
+  id: z.string(),
+  modelId: z.string(),
+  provider: z.enum(['dashscope']),
+  providerModel: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  inputParams: z.record(z.string(), z.unknown()).optional(),
+  status: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+/** 公众视角下的 artifact 投影；readUrl 由 API 层在响应时附加上来。 */
+export const PublicSharedGenerationArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
+  mimeType: z.string().optional(),
+  byteSize: z.number().optional(),
+  status: z.enum(['pending', 'stored', 'failed']),
+  readUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  createdAt: z.string(),
+})
+
+export const GenerationShareResponseSchema = z.object({
+  share: GenerationShareSchema,
+})
+
+export const PublicSharedGenerationResponseSchema = z.object({
+  share: PublicGenerationShareSchema,
+  record: PublicSharedGenerationRecordSchema,
+  artifacts: z.array(PublicSharedGenerationArtifactSchema),
+})
+
+/**
+ * 服务端错误信封。
+ *
+ * `traceId` is optional for backwards compatibility with older API responses;
+ * `cause` is also optional because it is only present for wrapped internal
+ * errors and is intentionally kept as a short, already-sanitized string.
+ */
+export const ApiErrorSchema = z.object({
+  success: z.literal(false),
+  error: z.object({
+    code: z.string(),
+    message: z.string(),
+    details: z.unknown().optional(),
+    cause: z.string().optional(),
+  }),
+  traceId: z.string().optional(),
+})
+
+export const PublicUserSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  displayName: z.string().nullable(),
+  role: z.enum(['user', 'admin']),
+  emailVerifiedAt: z.string(),
+})
+
+export const AuthResponseSchema = z.object({
+  user: PublicUserSchema,
+})
+
+export const RegistrationResultSchema = z.object({
+  status: z.literal('verification_required'),
+  email: z.string(),
+  resendAvailableAt: z.string(),
+})
+
+export const RegistrationResponseSchema = z.object({
+  registration: RegistrationResultSchema,
+})
+
+export const EmailActionAcceptedSchema = z.object({
+  accepted: z.literal(true),
+  retryAt: z.string().optional(),
+})
+
+export const LogoutResponseSchema = z.object({
+  ok: z.boolean(),
+})
+
+// --- Media jobs --------------------------------------------------------------
+
+export const MediaJobErrorSchema = z.object({
+  code: z.string().optional(),
+  message: z.string(),
+  category: z.string(),
+  retriable: z.boolean(),
+})
+
+export const MediaJobSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  operation: z.enum(['video.extract_audio']),
+  status: z.enum(['queued', 'processing', 'succeeded', 'failed', 'cancelled']),
+  sourceAssetId: z.string().optional(),
+  sourceKind: z.enum(['image', 'video', 'audio']),
+  outputAssetId: z.string().optional(),
+  input: z.record(z.string(), z.unknown()),
+  output: z.record(z.string(), z.unknown()).optional(),
+  error: MediaJobErrorSchema.optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const MediaTaskSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  domain: z.string(),
+  status: z.string(),
+})
+
+export const CreateMediaJobResponseSchema = z.object({
+  job: MediaJobSchema,
+  task: MediaTaskSchema,
+})
+
+export const MediaJobResponseSchema = z.object({
+  job: MediaJobSchema,
+})
+
+export type ModelParameter = z.infer<typeof ModelParameterSchema>
+export type ModelOperation = z.infer<typeof ModelOperationSchema>
+export type ModelCatalogItem = z.infer<typeof ModelCatalogItemSchema>
+export type BailianContractStatus = z.infer<typeof BailianContractStatusSchema>
+export type NormalizedArtifact = z.infer<typeof NormalizedArtifactSchema>
+export type OutputResult = z.infer<typeof OutputResultSchema>
+export type GenerationErrorJson = z.infer<typeof GenerationErrorJsonSchema>
+export type GenerationRecord = z.infer<typeof GenerationRecordSchema>
+export type ProviderRequestAudit = z.infer<typeof ProviderRequestAuditSchema>
+export type TaskDiagnostics = z.infer<typeof TaskDiagnosticsSchema>
+export type GenerationDiagnostics = z.infer<typeof GenerationDiagnosticsSchema>
+export type GenerationArtifact = z.infer<typeof GenerationArtifactSchema>
+export type CreateGenerationResponse = z.infer<typeof CreateGenerationResponseSchema>
+export type GenerationEstimate = z.infer<typeof GenerationEstimateSchema>
+export type ListGenerationsResult = z.infer<typeof ListGenerationsResponseSchema>
+export type ListGenerationArtifactsResult = z.infer<typeof ListGenerationArtifactsResponseSchema>
+export type ListArtifactsResult = z.infer<typeof ListArtifactsResponseSchema>
+export type CancelGenerationResult = z.infer<typeof CancelGenerationResponseSchema>
+export type RetryGenerationResult = z.infer<typeof RetryGenerationResponseSchema>
+export type GenerationShare = z.infer<typeof GenerationShareSchema>
+export type GenerationShareResult = z.infer<typeof GenerationShareResponseSchema>
+export type PublicSharedGeneration = z.infer<typeof PublicSharedGenerationResponseSchema>
+export type PublicUser = z.infer<typeof PublicUserSchema>
+export type RegistrationResult = z.infer<typeof RegistrationResultSchema>
+export type EmailActionAccepted = z.infer<typeof EmailActionAcceptedSchema>
+export type ApiError = z.infer<typeof ApiErrorSchema>
+export type MediaJob = z.infer<typeof MediaJobSchema>
+export type CreateMediaJobResult = z.infer<typeof CreateMediaJobResponseSchema>
+
+export const AssetItemSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
+  source: z.enum(['upload', 'link', 'generation', 'derived']),
+  url: z.string().optional(),
+  /** Fresh attachment URL returned by asset detail endpoints for stored objects. */
+  downloadUrl: z.string().optional(),
+  /** Compact preview image; the original media URL remains in `url`. */
+  thumbnailUrl: z.string().optional(),
+  thumbnailStatus: z.enum(['queued', 'processing', 'ready', 'failed']).optional(),
+  text: z.string().optional(),
+  mimeType: z.string().optional(),
+  byteSize: z.number().optional(),
+  durationSeconds: z.number().nonnegative().optional(),
+  declaredResolution: z.string().optional(),
+  fileName: z.string().optional(),
+  recordId: z.string().optional(),
+  modelId: z.string().optional(),
+  createdAt: z.string(),
+})
+
+export const AssetResponseSchema = z.object({
+  asset: AssetItemSchema,
+})
+
+export const AssetCapabilitiesSchema = z.object({
+  maxAssetSizeBytes: z.number().int().positive(),
+  maxMediaDurationSeconds: z.number().positive().optional(),
+  allowedMimeTypes: z.array(z.string()),
+  allowedKinds: z.array(z.enum(['image', 'video', 'audio', 'text', 'archive'])),
+})
+
+export const ListAssetsResponseSchema = z.object({
+  items: z.array(AssetItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const UsageSummarySchema = z.object({
+  generationCount: z.number().int().nonnegative(),
+  attemptCount: z.number().int().nonnegative().optional(),
+  successfulCount: z.number().int().nonnegative().optional(),
+  estimatedCents: z.number().int().nonnegative(),
+  chargedCents: z.number().int().nonnegative(),
+  providerCostCents: z.number().int().nonnegative(),
+  // Deprecated HTTP alias; use providerCostCents for provider-reported cost.
+  finalCents: z.number().int().nonnegative(),
+  period: z.object({
+    since: z.string(),
+    until: z.string(),
+  }),
+  currency: z.literal('CNY'),
+})
+
+export const UsageSummaryResponseSchema = z.object({ usage: UsageSummarySchema })
+
+export const CreditBalanceSchema = z.object({
+  userId: z.string(),
+  availableCents: z.number().int().nonnegative(),
+  reservedCents: z.number().int().nonnegative(),
+  totalCents: z.number().int().nonnegative(),
+})
+
+export const CreditBalanceResponseSchema = z.object({
+  balance: CreditBalanceSchema,
+})
+
+export type AssetItem = z.infer<typeof AssetItemSchema>
+export type AssetCapabilities = z.infer<typeof AssetCapabilitiesSchema>
+export type ListAssetsResult = z.infer<typeof ListAssetsResponseSchema>
+export type UsageSummary = z.infer<typeof UsageSummarySchema>
+export type CreditBalance = z.infer<typeof CreditBalanceSchema>

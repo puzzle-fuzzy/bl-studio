@@ -1,0 +1,1 @@
+export { createMediaRoutes } from './routes'

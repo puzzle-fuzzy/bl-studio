@@ -1,0 +1,684 @@
+/**
+ * Bailian Studio 数据库 Schema 定义。
+ *
+ * 核心架构（按业务域）：
+ *  1. users / sessions —— 自托管邮箱+密码认证与可撤销 JWT 会话（@bailian-studio/auth）。
+ *  2. generation_records / generation_artifacts / task_records —— 生成任务
+ *     生命周期的中枢：提交→轮询→产物持久化（@bailian-studio/generation-repository）。
+ *  3. generation_shares —— 把一条生成记录公开分享，支持过期/撤销，每记录至多一份活跃分享。
+ *
+ * 设计理念：
+ *  - 软删除：业务表统一带 deletedAt/deletedBy；唯一索引多为 `WHERE deletedAt
+ *    IS NULL` 形态的部分唯一索引，让已删除记录不再占用唯一性名额。
+ *  - 审计列：所有业务表都带 createdBy/updatedBy（默认 'system'）+ createdAt/
+ *    updatedAt（`withTimezone: true`，存 UTC）。这套审计列在每张表里语义一致，
+ *    因此下文不再逐字段注释；只在与默认语义不同或有特殊不变量处才加注。
+ *  - 幂等性：generation_records 通过 `(userId, idempotencyKey)` 部分唯一索引
+ *    防重复提交（idempotencyKey IS NOT NULL 才计入）。
+ *  - 级联删除：FK `onDelete: 'cascade'` 让删用户/记录时自动清理从属行；
+ *    `onDelete: 'set null'` 用于自引用的衍生关系（parentRecordId）。
+ *  - 分布式锁：task_records 用 lockedBy/lockedUntil 实现 worker 抢占，配合
+ *    `SELECT ... FOR UPDATE SKIP LOCKED`（见 repository）做到无锁竞争认领。
+ *
+ * 数据流（生成主链路）：
+ *   用户请求 → generation_records(submitting) + task_records(generation.submit)
+ *   worker 抢占 → markProcessing → providerTaskId → task_records(generation.poll) 轮询
+ *   完成后 → generation_records(succeeded) → 可选 task_records(artifact.persist)
+ *   产物落库 → generation_artifacts(succeeded)
+ *
+ * @see @bailian-studio/generation-repository 封装 generation_records 与 task_records 的 CRUD 与状态机
+ * @see ./notify.ts generation_events outbox 与 pg_notify trigger 装配
+ */
+
+import { sql } from 'drizzle-orm'
+import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
+
+/**
+ * 用户表 —— 自托管认证的用户主表。
+ *
+ * 邮箱在"未软删除"范围内唯一（部分唯一索引），删除后允许同邮箱重新注册；
+ * 密码以 argon2id 哈希存储（@node-rs/argon2），明文永不落库。所有业务表通过
+ * userId 关联到此处。
+ */
+export const users = pgTable('users', {
+  id: text('id').primaryKey(),
+  email: text('email').notNull(),
+  /** argon2id 密码哈希（由 @node-rs/argon2 生成），永不存明文。 */
+  passwordHash: text('password_hash').notNull(),
+  /** 为空表示邮箱尚未验证；已有用户由迁移回填为创建时间。 */
+  emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  displayName: text('display_name'),
+  role: text('role').notNull().default('user'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('users_role_check', sql`${table.role} in ('user', 'admin')`),
+  // 部分唯一索引：仅对未软删除的邮箱强制唯一，故已删除邮箱可被重新注册。
+  uniqueIndex('users_email_idx').on(table.email).where(sql`${table.deletedAt} is null`),
+])
+
+/**
+ * 邮箱验证和密码重置使用的一次性动作令牌。
+ *
+ * 只保存原始 token 的 SHA-256，不保存能够直接使用的凭据。消费动作与对应的
+ * 用户状态变更必须在同一个事务中完成。
+ */
+export const authActionTokens = pgTable('auth_action_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  purpose: text('purpose').notNull(),
+  tokenHash: text('token_hash').notNull(),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  consumedAt: timestamp('consumed_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('auth_action_tokens_purpose_check', sql`${table.purpose} in ('email_verification', 'password_reset')`),
+  uniqueIndex('auth_action_tokens_hash_idx').on(table.tokenHash),
+  index('auth_action_tokens_user_purpose_idx').on(table.userId, table.purpose, table.createdAt),
+  index('auth_action_tokens_expiry_idx').on(table.expiresAt),
+])
+
+/**
+ * 会话表 —— 与 JWT 配合实现可撤销会话。
+ *
+ * 登录时签发 JWT（载荷含 sessionId）并在本表插入一行；每次请求校验 JWT
+ * 签名 + 本表仍有有效行；登出/吊销即删除（或软删除）该行，使 token 在 exp
+ * 之前即失效。这是"可撤销"语义的关键：单纯 JWT 无法做到未到期主动失效。
+ */
+export const sessions = pgTable('sessions', {
+  /** 会话标识，对应 JWT 的 jti，UUID 格式。 */
+  id: text('id').primaryKey(),
+  /** 关联用户，删用户时级联清掉其所有会话。 */
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('sessions_user_idx').on(table.userId),
+])
+
+/**
+ * 用户与资源访问审计表。
+ *
+ * 与 provider_request_audits 不同，这张表记录产品侧的安全事件：谁在何时
+ * 登录、创建/取消生成、读取 artifact 或管理分享。它不保存请求体、prompt、
+ * 凭据、signed URL 或原始 provider 数据。userId 使用 set null，确保用户被
+ * 删除后仍能保留不可抵赖的安全时间线。
+ */
+export const auditLogs = pgTable('audit_logs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+  action: text('action').notNull(),
+  outcome: text('outcome').notNull(),
+  targetType: text('target_type'),
+  targetId: text('target_id'),
+  requestId: text('request_id'),
+  traceId: text('trace_id'),
+  method: text('method'),
+  /** 仅保存 pathname，不保存 query string。 */
+  path: text('path'),
+  metadataJson: jsonb('metadata_json').$type<Record<string, string | number | boolean | null>>(),
+  occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment')`),
+  check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
+  index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
+  index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),
+  index('audit_logs_target_occurred_idx').on(table.targetType, table.targetId, table.occurredAt),
+  index('audit_logs_request_idx').on(table.requestId),
+])
+
+/**
+ * 生成记录表 —— 整个生成流程的中枢业务表。
+ *
+ * 每行记录一个生成请求的完整生命周期：从 submitting 提交、processing
+ * 处理中、到 succeeded/failed/cancelled 终态。涵盖文本生成图像/视频/音频等
+ * 多种媒体类型；输入参数与输出结果各以 JSONB 落库以适配多变的 provider
+ * schema。状态字段变更会写入 generation_events（见 notify.ts 的触发器）。
+ */
+export const generationRecords = pgTable('generation_records', {
+  id: text('id').primaryKey(),
+  /** 归属用户，删用户时级联清掉其全部生成记录。 */
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** 模型 ID，对应 MODEL_REGISTRY 中的条目（如 'qwen-image'）。 */
+  modelId: text('model_id').notNull(),
+  /** 提供商名称（如 'dashscope'），决定 worker 走哪条 runner。 */
+  provider: text('provider').notNull(),
+  /** 提供商侧的模型标识（如 'qwen-image-v1'），用于实际 API 调用。 */
+  providerModel: text('provider_model').notNull(),
+  /** 生成类别：'image' | 'video' | 'audio' | 'text'，驱动前端展示与分类查询。 */
+  category: text('category').notNull(),
+  /** 输入参数（提示词、尺寸、风格等），结构随 provider/模型而变。 */
+  inputParamsJson: jsonb('input_params_json').$type<Record<string, unknown>>().notNull(),
+  /**
+   * 生命周期状态：submitting | processing | succeeded | failed | cancelled。
+   * 注意 `processing` 是 repository 内部中间态（worker 已抢占 submit 任务），
+   * 不属于 event bus 包 的 GenerationStatus union；前端通过 SSE 透明
+    * 接收，不做特判。该列状态变更会触发 notify.ts 安装的 outbox 捕获器。
+   */
+  status: text('status').notNull(),
+  /** 状态变更原因说明（如失败时的简述）。 */
+  statusReason: text('status_reason'),
+  /** 提供商返回的任务 ID，用于 worker 周期性 poll 任务进度。 */
+  providerTaskId: text('provider_task_id'),
+  /** 提供器侧任务状态（如 'pending'/'running'/'completed'/'failed'）。 */
+  providerStatus: text('provider_status'),
+   /** DashScope API 请求 ID，用于跨 provider 排查问题、关联日志。 */
+   requestId: text('request_id'),
+   /** 一次生成生命周期的链路 ID；历史记录无法还原时保持为空。 */
+   traceId: text('trace_id'),
+  /** 输出结果（媒体 URL、元数据等），结构随 provider 而变。 */
+  outputResultJson: jsonb('output_result_json').$type<Record<string, unknown>>(),
+  /** 失败时的错误详情（错误码、message、原始响应等）。 */
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  /** 预估费用（整数分 CNY），提交时按模型定价规则计算。 */
+  costEstimate: integer('cost_estimate').notNull(),
+  /** Currency captured with the price snapshot; currently only CNY is supported. */
+  currency: text('currency').notNull().default('CNY'),
+  /** Deterministic pricing fingerprint used for this estimate. */
+  pricingVersion: text('pricing_version').notNull().default('legacy-unknown'),
+  /** Deterministic full-manifest fingerprint used for this request. */
+  modelManifestHash: text('model_manifest_hash').notNull().default('legacy-unknown'),
+  /** 最终费用（整数分 CNY），完成时回填。 */
+  costFinal: integer('cost_final'),
+  /**
+   * 父记录 ID，支持生成衍生关系（如图像变体、视频续集）。删父记录时置空
+   * 而非级联，避免删除原作时连带动静衍生物一起消失。
+   */
+  parentRecordId: text('parent_record_id').references((): AnyPgColumn => generationRecords.id, { onDelete: 'set null' }),
+  /**
+   * 幂等键，由客户端提供。配合下方的部分唯一索引，保证同一用户同一 key
+   * 不会被重复提交成两条记录。
+   */
+  idempotencyKey: text('idempotency_key'),
+  cancelRequestedAt: timestamp('cancel_requested_at', { withTimezone: true }),
+  /** 提供商侧取消状态：'none' | 'requested' | 'cancelled' | 'failed'。 */
+  providerCancelStatus: text('provider_cancel_status').notNull(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  /** 仅从默认任务列表收起，不影响生成执行、产物或费用。 */
+  hiddenAt: timestamp('hidden_at', { withTimezone: true }),
+  hiddenBy: text('hidden_by'),
+  /** 软删除：记录与产物仍保留，可从“已删除”筛选中恢复。 */
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  // 用户列表的主查询路径：按用户 + 创建时间倒序分页。
+  index('generation_records_user_created_idx').on(table.userId, table.createdAt),
+  // 幂等保障：同一用户 + 同一 idempotencyKey 只能有一条记录（NULL 不计入）。
+  uniqueIndex('generation_records_user_idempotency_key_idx')
+    .on(table.userId, table.idempotencyKey)
+    .where(sql`${table.idempotencyKey} is not null`),
+  // 轮询查询：worker 按状态 + 更新时间扫描待处理/重试任务。
+  index('generation_records_status_updated_idx').on(table.status, table.updatedAt),
+  // 用户任务列表按展示状态筛选；createdAt 保持 keyset 分页顺序。
+  index('generation_records_user_library_idx').on(
+    table.userId,
+    table.deletedAt,
+    table.hiddenAt,
+    table.createdAt,
+  ),
+  // 衍生关系反查：由父记录找其衍生物。
+  index('generation_records_parent_record_idx').on(table.parentRecordId),
+])
+
+/**
+ * User credit account and immutable balance ledger. The account row is the
+ * concurrency lock/snapshot; ledger entries are append-only audit facts.
+ */
+export const creditAccounts = pgTable('credit_accounts', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().unique().references(() => users.id, { onDelete: 'cascade' }),
+  availableCents: integer('available_cents').notNull().default(0),
+  reservedCents: integer('reserved_cents').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('credit_accounts_available_non_negative', sql`${table.availableCents} >= 0`),
+  check('credit_accounts_reserved_non_negative', sql`${table.reservedCents} >= 0`),
+])
+
+export const creditLedgerEntries = pgTable('credit_ledger_entries', {
+  id: text('id').primaryKey(),
+  accountId: text('account_id').notNull().references(() => creditAccounts.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  generationId: text('generation_id').references(() => generationRecords.id, { onDelete: 'set null' }),
+  kind: text('kind').notNull(),
+  availableDeltaCents: integer('available_delta_cents').notNull(),
+  reservedDeltaCents: integer('reserved_delta_cents').notNull(),
+  availableBalanceCents: integer('available_balance_cents').notNull(),
+  reservedBalanceCents: integer('reserved_balance_cents').notNull(),
+  idempotencyKey: text('idempotency_key').notNull(),
+  reason: text('reason'),
+  actorUserId: text('actor_user_id').references(() => users.id, { onDelete: 'set null' }),
+  requestId: text('request_id'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('credit_ledger_kind_check', sql`${table.kind} in ('grant', 'recharge', 'reserve', 'settle', 'refund', 'adjustment')`),
+  uniqueIndex('credit_ledger_account_idempotency_idx').on(table.accountId, table.idempotencyKey),
+  index('credit_ledger_account_created_idx').on(table.accountId, table.createdAt),
+  index('credit_ledger_generation_idx').on(table.generationId),
+])
+
+/**
+ * 生成产物表 —— 一次生成任务输出的媒体文件元数据。
+ *
+ * 一条 generation_record 可对应多条产物（多图、视频多段等）。产物通常先以
+ * provider 返回的临时 sourceUrl 落库，随后由 artifact.persist 任务异步拉取
+ * 并写入存储后端（local/OSS），最终回填 storageProvider/storageKey/storageUrl。
+ */
+export const generationArtifacts = pgTable('generation_artifacts', {
+  id: text('id').primaryKey(),
+  /** 所属生成记录，删记录时级联清掉产物。 */
+  recordId: text('record_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  /** 所属用户（冗余自 record，方便按用户直接查询产物与做权限校验）。 */
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** 产物类型：image | video | audio | text | metadata。 */
+  kind: text('kind').notNull(),
+  /** provider 返回的原始链接，可能是临时 URL，需异步持久化到自家存储。 */
+  sourceUrl: text('source_url'),
+  /** 文本类产物的正文内容（直接落库，不走存储）。 */
+  text: text('text'),
+  mimeType: text('mime_type'),
+  /** 实际存储后端：local | oss | s3 | cos。pending 态产物此列为空。 */
+  storageProvider: text('storage_provider'),
+  /** 对象在存储后端中的 key（持久化后回填）。 */
+  storageKey: text('storage_key'),
+  /** 持久化后对外可访问的 URL（由存储适配器的 createReadUrl 生成）。 */
+  storageUrl: text('storage_url'),
+  byteSize: integer('byte_size'),
+  /** 持久化状态：pending | persisting | succeeded | failed。 */
+  status: text('status').notNull(),
+  /** 持久化失败时的错误详情。 */
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  // 详情页按记录加载产物的主索引。
+  index('generation_artifacts_record_created_idx').on(table.recordId, table.createdAt),
+  // 用户级产物查询（"我的作品"列表）。
+  index('generation_artifacts_user_created_idx').on(table.userId, table.createdAt),
+  // worker 扫描待持久化产物：按状态 + 更新时间。
+  index('generation_artifacts_status_updated_idx').on(table.status, table.updatedAt),
+  // 防重持久化：同一记录下同一 storageKey 只能有一条（NULL 不计入）。
+  uniqueIndex('generation_artifacts_record_storage_key_idx')
+    .on(table.recordId, table.storageKey)
+    .where(sql`${table.storageKey} is not null`),
+])
+
+/**
+ * 生成分享表 —— 把一条 generation_record 公开分享。
+ *
+ * v2 设计的关键不变量：
+ *  - 分享默认不公开输入参数；只有 owner 明确选择时才返回 inputParams；
+ *  - 分享可设置过期时间，也可由 owner 主动撤销；撤销后原访问键永久失效；
+ *  - 每条记录至多一份活跃分享：靠 recordId 上的部分唯一索引
+ *    `WHERE deletedAt IS NULL AND revokedAt IS NULL` 强制；
+ *  - 公开访问键不可枚举：id 形如 `share_<32hex>`，由owner 创建时生成；
+ *  - 删除用户或生成记录时级联清掉对应分享。
+ *
+ * 公开读取（GET /api/shares/generations/:shareId）无需登录，但 API 层只返回
+ * 严格裁剪过的只读视图（默认不含 prompt、storageKey、owner/cost 等），见
+ * repository 的 PublicShared* 类型。
+ */
+export const generationShares = pgTable('generation_shares', {
+  /** 公开访问键，不透明随机串（share_<32hex>），不可枚举。 */
+  id: text('id').primaryKey(),
+  /** 被分享的生成记录，删记录时级联删除分享。 */
+  recordId: text('record_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  /** owner 用户（冗余自 record，便于 owner 查询自己的分享），删用户级联。 */
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** 是否允许公开 read model 返回原始输入参数；默认关闭，避免 prompt 泄露。 */
+  includeParams: boolean('include_params').notNull().default(false),
+  /** 公开访问截止时间；NULL 表示不自动过期。 */
+  expiresAt: timestamp('expires_at', { withTimezone: true }),
+  /** owner 主动撤销时间；撤销后公开读取必须失效。 */
+  revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  revokedBy: text('revoked_by'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  // 每条记录至多一个未撤销分享；过期分享可由 owner 重新激活，仍复用原访问键。
+  uniqueIndex('generation_shares_record_idx')
+    .on(table.recordId)
+    .where(sql`${table.deletedAt} is null and ${table.revokedAt} is null`),
+  // owner 按"我的分享"列表查询。
+  index('generation_shares_user_created_idx').on(table.userId, table.createdAt),
+  // 公开读取和 owner 管理都需要快速筛选未撤销分享。
+  index('generation_shares_revoked_expires_idx').on(table.revokedAt, table.expiresAt),
+])
+
+/**
+ * 用户资产表 —— 用户主动上传或通过 URL 导入的媒体文件。
+ *
+ * 与 generation_artifacts 的区别：
+ *  - user_assets 记录用户主动提供的文件，以及辅助动作产生的派生文件；
+ *  - source 字段区分上传（upload）、URL 导入（link）与派生结果（derived）；
+ *  - 上传即 ready，无需经过异步 persist 流程（因为文件本来就在用户本地）。
+ *
+ * metadataJson 为扩展预留，可记录 ASR 任务 ID、编辑参数等附加上下文。
+ */
+export const userAssets = pgTable('user_assets', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  source: text('source').notNull(), // 'upload' | 'link' | 'generation' | 'derived'
+  generationArtifactId: text('generation_artifact_id').references(() => generationArtifacts.id, { onDelete: 'set null' }),
+  recordId: text('record_id').references(() => generationRecords.id, { onDelete: 'set null' }),
+  modelId: text('model_id'),
+  fileName: text('file_name'),
+  originalUrl: text('original_url'),
+  mimeType: text('mime_type'),
+  byteSize: integer('byte_size'),
+  storageProvider: text('storage_provider'),
+  storageKey: text('storage_key'),
+  storageUrl: text('storage_url'),
+  metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>(),
+  status: text('status').notNull().default('ready'),
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('user_assets_user_created_idx').on(table.userId, table.createdAt),
+  index('user_assets_kind_idx').on(table.kind),
+  index('user_assets_source_idx').on(table.source),
+  index('user_assets_record_idx').on(table.recordId),
+  uniqueIndex('user_assets_generation_artifact_idx')
+    .on(table.generationArtifactId)
+    .where(sql`${table.generationArtifactId} is not null and ${table.deletedAt} is null`),
+])
+
+/**
+ * Asset derivatives are infrastructure-owned, reusable previews derived from a
+ * user asset. Keeping them in a separate table avoids coupling user_assets to
+ * one preview implementation and leaves room for future proxy, poster, and
+ * waveform derivatives.
+ */
+export const assetDerivatives = pgTable('asset_derivatives', {
+  id: text('id').primaryKey(),
+  assetId: text('asset_id').notNull().references(() => userAssets.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  kind: text('kind').notNull(),
+  status: text('status').notNull(),
+  storageProvider: text('storage_provider'),
+  storageKey: text('storage_key'),
+  mimeType: text('mime_type'),
+  byteSize: integer('byte_size'),
+  metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>(),
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('asset_derivatives_kind_check', sql`${table.kind} in ('thumbnail')`),
+  check('asset_derivatives_status_check', sql`${table.status} in ('queued', 'processing', 'ready', 'failed')`),
+  uniqueIndex('asset_derivatives_asset_kind_idx')
+    .on(table.assetId, table.kind)
+    .where(sql`${table.deletedAt} is null`),
+  index('asset_derivatives_status_updated_idx').on(table.status, table.updatedAt),
+  index('asset_derivatives_user_created_idx').on(table.userId, table.createdAt),
+])
+
+/** 用户生成请求中媒体参数到稳定资产 ID 的持久引用。 */
+export const generationInputAssets = pgTable('generation_input_assets', {
+  generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  parameterName: text('parameter_name').notNull(),
+  position: integer('position').notNull().default(0),
+  assetId: text('asset_id').notNull().references(() => userAssets.id, { onDelete: 'restrict' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  uniqueIndex('generation_input_assets_parameter_idx').on(table.generationId, table.parameterName, table.position),
+  index('generation_input_assets_asset_idx').on(table.assetId),
+])
+
+export const mediaJobs = pgTable('media_jobs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  operation: text('operation').notNull(),
+  status: text('status').notNull(),
+  sourceAssetId: text('source_asset_id'),
+  sourceKind: text('source_kind').notNull(),
+  outputAssetId: text('output_asset_id'),
+  inputJson: jsonb('input_json').$type<Record<string, unknown>>().notNull(),
+  outputJson: jsonb('output_json').$type<Record<string, unknown>>(),
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('media_jobs_user_created_idx').on(table.userId, table.createdAt),
+  index('media_jobs_status_updated_idx').on(table.status, table.updatedAt),
+  index('media_jobs_source_asset_idx').on(table.sourceAssetId),
+])
+
+/**
+ * 任务记录表 —— 异步任务队列的核心表。
+ *
+ * 配合 `SELECT ... FOR UPDATE SKIP LOCKED`（在 repository.claimNextQueuedTask
+ * 中）实现无锁竞争的并发安全任务抢占：多个 worker 同时取任务时各自跳过
+ * 已被对方锁住的行，互不阻塞。主要任务类型：
+ *  - generation.submit：提交生成请求到 provider；
+ *  - generation.poll：周期性轮询 provider 任务状态；
+ *  - artifact.persist：把产物从临时 URL 拉取并存入自家存储；
+ *  - generation.cancel：发起取消。
+ *
+ * 重试由 attempts/maxAttempts 控制，下次执行时间由 nextRunAt 决定（用于
+ * 退避与定时任务）。
+ */
+export const taskRecords = pgTable('task_records', {
+  id: text('id').primaryKey(),
+  /** 任务类型：generation.submit | generation.poll | artifact.persist | generation.cancel 等。 */
+  type: text('type').notNull(),
+  /** 任务域：generation | artifact，用于按域分组/过滤。 */
+  domain: text('domain').notNull(),
+  /**
+   * 任务状态：queued | running | succeeded | failed | cancelled | retry。
+   * 状态机见 task engine 包；repository 是唯一合法的变更入口。
+   */
+  status: text('status').notNull(),
+  /** 优先级（数值越大越优先），同状态下按优先级出队。 */
+  priority: integer('priority').notNull(),
+  /** 任务输入参数，结构由 type 决定（如 recordId、provider 任务 ID 等）。 */
+  inputJson: jsonb('input_json').$type<Record<string, unknown>>().notNull(),
+  /** 任务输出结果，成功后回填。 */
+  outputJson: jsonb('output_json').$type<Record<string, unknown>>(),
+   /** 当前持有该任务的 worker 实例标识，用于抢占与诊断。 */
+   lockedBy: text('locked_by'),
+   /** 锁过期时间；超时后视为僵尸任务可被重新抢占（见 claim 的清理逻辑）。 */
+   lockedUntil: timestamp('locked_until', { withTimezone: true }),
+   /** 最近一次执行开始时间；retry 会在下一次 claim 时刷新。 */
+   startedAt: timestamp('started_at', { withTimezone: true }),
+   /** 最近一次执行结束时间；queued/running 任务为空。 */
+   completedAt: timestamp('completed_at', { withTimezone: true }),
+  /** 已尝试次数，失败时递增；达到 maxAttempts 后不再重试。 */
+  attempts: integer('attempts').notNull(),
+  /** 最大尝试次数上限，防止异常任务无限重试。 */
+  maxAttempts: integer('max_attempts').notNull(),
+  /** 下次可执行时间，支持延迟重试（退避）与定时任务；claim 按此时间过滤。 */
+  nextRunAt: timestamp('next_run_at', { withTimezone: true }).notNull(),
+  /** 失败时的错误详情（错误码、message、堆栈摘要等）。 */
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  /** 关联的业务记录 ID（通常是 generation_records.id），用于反查关联任务。 */
+  recordId: text('record_id'),
+  /** 关联用户 ID（冗余自业务记录），便于按用户筛选与权限校验。 */
+  userId: text('user_id'),
+  /** 分布式链路追踪 ID，串起整条请求生命周期的日志。 */
+  traceId: text('trace_id'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+ }, table => [
+   check('task_records_status_check', sql`${table.status} in ('queued', 'running', 'succeeded', 'failed', 'cancelled')`),
+   check('task_records_attempts_check', sql`${table.attempts} >= 0`),
+   check('task_records_max_attempts_check', sql`${table.maxAttempts} > 0`),
+   // 任务队列的核心索引：claim 按 status → nextRunAt → priority → createdAt
+  // 顺序筛选并抢占。FOR UPDATE SKIP LOCKED 在此索引上高效工作。
+  index('task_records_queue_idx').on(table.status, table.nextRunAt, table.priority, table.createdAt),
+  // 僵尸任务清理：按锁持有者 + 锁过期时间扫描需要回收的任务。
+  index('task_records_lock_idx').on(table.lockedBy, table.lockedUntil),
+  // 业务记录反查：列出某条生成记录的全部关联任务。
+  index('task_records_record_idx').on(table.recordId),
+])
+
+/**
+ * Generation event outbox. Every user-visible generation status transition is
+ * appended here in the same database transaction as the state change. The
+ * API's LISTEN connection is only a wake-up signal; reconnecting clients use
+ * this table and their SSE Last-Event-ID to catch up without relying on
+ * process-local memory.
+ */
+export const generationEvents = pgTable('generation_events', {
+  id: text('id').primaryKey(),
+  recordId: text('record_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  status: text('status').notNull(),
+  modelId: text('model_id').notNull(),
+  /** The generation record's updated_at at the time of the transition. */
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  /** Append order tie-breaker used by the opaque SSE cursor. */
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('generation_events_user_created_idx').on(table.userId, table.createdAt, table.id),
+  index('generation_events_created_idx').on(table.createdAt, table.id),
+  index('generation_events_record_created_idx').on(table.recordId, table.createdAt),
+])
+
+/**
+ * Provider 请求审计表 —— 每一次真实的 submit / poll / chat / cancel 调用一行。
+ *
+ * 这张表只保存稳定的排障与计费关联字段，不保存 API key、请求 body 或 provider
+ * 原始响应。`started` 记录允许我们识别 worker 在外部调用期间崩溃的请求；完成后
+ * 由 repository 更新为 succeeded / failed / unsupported，并写入 provider requestId
+ * 与耗时。历史 generation 记录无法安全还原每一次 provider 调用，因此新表只对
+ * 迁移后的新请求开始积累真实审计数据，不伪造历史行。
+ */
+export const providerRequestAudits = pgTable('provider_request_audits', {
+  id: text('id').primaryKey(),
+  generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  taskId: text('task_id').references(() => taskRecords.id, { onDelete: 'set null' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  provider: text('provider').notNull(),
+  providerModel: text('provider_model').notNull(),
+  /** submit | poll | chat | cancel */
+  operation: text('operation').notNull(),
+  /** started | succeeded | failed | unsupported */
+  status: text('status').notNull(),
+  /** Stable generation-scoped identity reused across submit retries. */
+  idempotencyKey: text('idempotency_key'),
+  providerTaskId: text('provider_task_id'),
+  providerRequestId: text('provider_request_id'),
+  attempt: integer('attempt').notNull(),
+  /** 本次调用对应的产品侧估价；整数分 CNY。仅作审计上下文，不可跨 poll 行直接求和。 */
+  estimatedCostCents: integer('estimated_cost_cents').notNull(),
+  /** 只有 provider 已确认完成并返回可结算费用时才写入。 */
+  billedCostCents: integer('billed_cost_cents'),
+  errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  completedAt: timestamp('completed_at', { withTimezone: true }),
+  latencyMs: integer('latency_ms'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('provider_request_audits_generation_started_idx').on(table.generationId, table.startedAt),
+  index('provider_request_audits_task_idx').on(table.taskId),
+  index('provider_request_audits_request_idx').on(table.providerRequestId),
+  index('provider_request_audits_idempotency_idx').on(table.idempotencyKey),
+  index('provider_request_audits_status_started_idx').on(table.status, table.startedAt),
+])
+
+/**
+ * Generation 级用量结算表 —— 每条 generation 恰好一行，避免按 provider poll
+ * 次数重复计算成本。创建时写入 estimatedCostCents，provider 完成后回填
+ * finalCostCents；失败/取消保留估价但没有最终费用。历史 generation 由迁移脚本
+ * 按 generation_records 一对一回填，后续月度统计只读这张表。
+ */
+export const usageRecords = pgTable('usage_records', {
+  id: text('id').primaryKey(),
+  generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  modelId: text('model_id').notNull(),
+  provider: text('provider').notNull(),
+  providerModel: text('provider_model').notNull(),
+  category: text('category').notNull(),
+  /** reserved | settled | failed | cancelled */
+  status: text('status').notNull(),
+  /** 创建请求时的估价，整数分 CNY。 */
+  estimatedCostCents: integer('estimated_cost_cents').notNull(),
+  /** provider 完成后确认的最终费用，整数分 CNY。 */
+  /** Provider-reported final cost, present only after provider success. */
+  providerCostCents: integer('provider_cost_cents'),
+  /** User-facing settled charge; null while reserved, zero after refund. */
+  chargedCostCents: integer('charged_cost_cents'),
+  /** 最终结算对应的 provider requestId；不是 poll 请求数。 */
+  providerRequestId: text('provider_request_id'),
+  settledAt: timestamp('settled_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  uniqueIndex('usage_records_generation_idx').on(table.generationId),
+  index('usage_records_user_created_idx').on(table.userId, table.createdAt),
+  index('usage_records_status_created_idx').on(table.status, table.createdAt),
+])
+
+/**
+ * Worker 存活心跳。它与 task lease heartbeat 不同：lease 只证明某个任务仍被
+ * 某个 worker 持有，本表用于 API 判断是否至少有一个 worker 仍能消费新任务。
+ */
+export const workerHeartbeats = pgTable('worker_heartbeats', {
+  workerId: text('worker_id').primaryKey(),
+  status: text('status').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).notNull(),
+  lastSeenAt: timestamp('last_seen_at', { withTimezone: true }).notNull(),
+  stoppedAt: timestamp('stopped_at', { withTimezone: true }),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('worker_heartbeats_status_seen_idx').on(table.status, table.lastSeenAt),
+])

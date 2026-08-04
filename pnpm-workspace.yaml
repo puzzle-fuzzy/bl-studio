@@ -1,0 +1,32 @@
+packages:
+  - apps/*
+  - packages/*
+
+# 共享依赖版本中心。取 npm 最新稳定版；新增共享依赖时在此登记，包内引用 "catalog:"。
+catalog:
+  # bailian-hub SDK 由集成链路精确锁定（bailian-adapter 的 coverage 基线绑定该版本）。
+  "@puzzle-fuzzy/bailian-sdk": 2.0.0-beta.7
+  "@node-rs/argon2": ^2.0.2
+  "@types/ali-oss": ^6.23.3
+  "@types/nodemailer": 8.0.1
+  "@types/react": ^19.2.18
+  "@types/react-dom": ^19.2.4
+  "@vitejs/plugin-react": ^6.0.5
+  "@vitest/coverage-v8": ^4.1.10
+  ali-oss: ^6.23.0
+  drizzle-kit: ^0.31.10
+  drizzle-orm: ^0.45.2
+  elysia: ^1.4.29
+  lucide-react: ^1.28.0
+  nodemailer: 9.0.3
+  postgres: ^3.4.9
+  react: ^19.2.8
+  react-dom: ^19.2.8
+  react-router: ^8.3.0
+  react-window: ^2.3.0
+  tailwindcss: ^4.3.3
+  typescript: ^7.0.2
+  vite: ^8.2.0
+  vitest: ^4.1.10
+  zod: ^4.4.3
+  zustand: ^5.0.14

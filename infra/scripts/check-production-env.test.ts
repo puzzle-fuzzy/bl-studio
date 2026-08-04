@@ -1,0 +1,163 @@
+import { describe, expect, it } from 'vitest'
+import {
+  checkProductionEnvironment,
+  checkProductionReleaseSource,
+  formatProductionPreflightFailure,
+} from './check-production-env'
+
+const releaseSha = '0123456789abcdef0123456789abcdef01234567'
+
+function validEnvironment(): Record<string, string> {
+  return {
+    NODE_ENV: 'production',
+    BAILIAN_STUDIO_RELEASE_TAG: releaseSha,
+    DATABASE_URL: 'postgres://forge:secret@db.internal:5432/bailian-studio',
+    DASHSCOPE_API_KEY: 'sk-real-provider-key',
+    AUTH_JWT_SECRET: 'a'.repeat(32),
+    AUTH_PUBLIC_WEB_ORIGIN: 'https://create.yxswy.com',
+    SMTP_HOST: 'smtp.163.com',
+    SMTP_PORT: '465',
+    SMTP_SECURE: 'true',
+    SMTP_USER: 'mailer@163.com',
+    SMTP_PASS: 'smtp-authorization-code',
+    SMTP_FROM: 'Bailian Studio <mailer@163.com>',
+    COOKIE_SECURE: 'true',
+    CSRF_REQUIRE_ORIGIN: 'true',
+    API_RATE_LIMIT_ENABLED: 'true',
+    CORS_ALLOWED_ORIGINS: 'https://create.yxswy.com',
+    VITE_WEB_ORIGIN: 'https://create.yxswy.com',
+    VITE_API_ORIGIN: '',
+    OSS_REGION: 'oss-cn-shanghai',
+    OSS_BUCKET: 'bailian-studio-prod',
+    OSS_ACCESS_KEY_ID: 'access-key-id',
+    OSS_ACCESS_KEY_SECRET: 'access-key-secret',
+    MEDIA_MAX_DURATION_SECONDS: '1800',
+    API_MAX_JSON_BODY_BYTES: '2097152',
+    API_MAX_MULTIPART_BODY_BYTES: '125829120',
+    API_MAX_OTHER_BODY_BYTES: '8388608',
+    GENERATION_DAILY_TASK_LIMIT: '0',
+    GENERATION_DAILY_COST_LIMIT_CENTS: '0',
+  }
+}
+
+describe('production environment preflight', () => {
+  it('accepts a complete production configuration without network calls', () => {
+    const result = checkProductionEnvironment(validEnvironment())
+
+    expect(result.issues).toEqual([])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('rejects placeholders and unsafe production flags without exposing values', () => {
+    const result = checkProductionEnvironment({
+      ...validEnvironment(),
+      DATABASE_URL: 'postgres://bailian-studio:CHANGE_ME@db.example.internal:5432/bailian-studio',
+      AUTH_JWT_SECRET: 'dev-secret-change-me',
+      COOKIE_SECURE: 'false',
+      CORS_ALLOWED_ORIGINS: 'https://your-domain.example',
+      VITE_WEB_ORIGIN: 'https://your-domain.example',
+      OSS_BUCKET: 'replace-with-oss-bucket',
+    })
+
+    expect(result.issues.map(issue => issue.key)).toEqual([
+      'DATABASE_URL',
+      'AUTH_JWT_SECRET',
+      'OSS_BUCKET',
+      'COOKIE_SECURE',
+      'CORS_ALLOWED_ORIGINS',
+      'VITE_WEB_ORIGIN',
+    ])
+    const message = formatProductionPreflightFailure(result)
+    expect(message).toContain('DATABASE_URL')
+    expect(message).not.toContain('CHANGE_ME')
+    expect(message).not.toContain('dev-secret-change-me')
+    expect(message).not.toContain('replace-with-oss-bucket')
+  })
+
+  it('allows the personal default of no daily cost or task cap', () => {
+    const result = checkProductionEnvironment({
+      ...validEnvironment(),
+      GENERATION_DAILY_TASK_LIMIT: '0',
+      GENERATION_DAILY_COST_LIMIT_CENTS: '0',
+    })
+
+    expect(result.issues).toEqual([])
+  })
+
+  it('requires every production SMTP identity and credential without exposing values', () => {
+    const result = checkProductionEnvironment({
+      ...validEnvironment(),
+      SMTP_HOST: ' ',
+      SMTP_USER: '',
+      SMTP_PASS: '\t',
+      SMTP_FROM: '   ',
+    })
+
+    expect(result.issues.map(issue => issue.key).filter(key => key.startsWith('SMTP_'))).toEqual([
+      'SMTP_HOST',
+      'SMTP_USER',
+      'SMTP_PASS',
+      'SMTP_FROM',
+    ])
+
+    const message = formatProductionPreflightFailure(result)
+    expect(message).toContain('SMTP_HOST')
+    expect(message).toContain('SMTP_USER')
+    expect(message).toContain('SMTP_PASS')
+    expect(message).toContain('SMTP_FROM')
+    expect(message).not.toContain('mailer@163.com')
+    expect(message).not.toContain('smtp-authorization-code')
+  })
+
+  it('rejects a non-HTTPS public authentication origin as an error', () => {
+    const publicOrigin = 'http://create.yxswy.com'
+    const result = checkProductionEnvironment({
+      ...validEnvironment(),
+      AUTH_PUBLIC_WEB_ORIGIN: publicOrigin,
+    })
+
+    expect(result.issues.map(issue => issue.key)).toContain('AUTH_PUBLIC_WEB_ORIGIN')
+    expect(result.warnings).toEqual([])
+    expect(formatProductionPreflightFailure(result)).not.toContain(publicOrigin)
+  })
+
+  it('requires an immutable full Git commit release tag', () => {
+    const missing = checkProductionEnvironment({
+      ...validEnvironment(),
+      BAILIAN_STUDIO_RELEASE_TAG: '',
+    })
+    const mutable = checkProductionEnvironment({
+      ...validEnvironment(),
+      BAILIAN_STUDIO_RELEASE_TAG: 'latest',
+    })
+
+    expect(missing.issues.map(issue => issue.key)).toContain('BAILIAN_STUDIO_RELEASE_TAG')
+    expect(mutable.issues.map(issue => issue.key)).toContain('BAILIAN_STUDIO_RELEASE_TAG')
+    expect(formatProductionPreflightFailure(mutable)).not.toContain('latest')
+  })
+
+  it('accepts only a clean checkout matching the configured release tag', () => {
+    expect(checkProductionReleaseSource(validEnvironment(), {
+      headSha: releaseSha,
+      worktreeClean: true,
+    })).toEqual([])
+
+    const differentSha = 'fedcba9876543210fedcba9876543210fedcba98'
+    const issues = checkProductionReleaseSource(validEnvironment(), {
+      headSha: differentSha,
+      worktreeClean: false,
+    })
+
+    expect(issues.map(issue => issue.key)).toEqual(['GIT_WORKTREE', 'BAILIAN_STUDIO_RELEASE_TAG'])
+    const message = formatProductionPreflightFailure({ issues, warnings: [] })
+    expect(message).not.toContain(releaseSha)
+    expect(message).not.toContain(differentSha)
+  })
+
+  it('rejects a release source whose Git identity cannot be verified', () => {
+    expect(checkProductionReleaseSource(validEnvironment(), {
+      headSha: undefined,
+      worktreeClean: undefined,
+    }).map(issue => issue.key)).toEqual(['GIT_HEAD', 'GIT_WORKTREE'])
+  })
+})

@@ -1,0 +1,25 @@
+{
+  "name": "@bailian-studio/media-repository",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-utils": "./src/test-utils.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@bailian-studio/db": "workspace:*",
+    "@bailian-studio/shared": "workspace:*",
+    "@bailian-studio/task-engine": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "postgres": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

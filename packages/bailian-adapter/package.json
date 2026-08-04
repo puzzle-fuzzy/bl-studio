@@ -1,0 +1,20 @@
+{
+  "name": "@bailian-studio/bailian-adapter",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests"
+  },
+  "dependencies": {
+    "@puzzle-fuzzy/bailian-sdk": "catalog:",
+    "@bailian-studio/model-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

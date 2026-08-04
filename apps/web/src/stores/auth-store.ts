@@ -1,0 +1,139 @@
+import { create } from 'zustand'
+import type { PublicUser } from '@bailian-studio/api-client'
+import { apiClient } from '@/lib/api'
+
+export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
+
+/**
+ * 认证 store。
+ *
+ * 继承 Vue 版最佳实践：登出时统一清理各 store 的私有数据（注册表机制），
+ * 避免跨用户数据残留。`getCurrentUser` 把 401 映射为 null，因此 restore 能
+ * 区分「未登录」与「真故障」。
+ */
+
+/** 登出/登出所有设备时被调用的私有数据清理回调。 */
+const privateDataResets = new Set<() => void | Promise<void>>()
+
+export function registerPrivateDataReset(fn: () => void | Promise<void>): void {
+  privateDataResets.add(fn)
+}
+
+export async function resetAllPrivateData(): Promise<void> {
+  await Promise.allSettled([...privateDataResets].map(fn => fn()))
+}
+
+interface AuthState {
+  status: AuthStatus
+  user: PublicUser | null
+  pendingVerificationEmail: string | null
+  isPending: boolean
+  lastError: string | null
+
+  restore(): Promise<void>
+  login(email: string, password: string): Promise<void>
+  register(email: string, password: string, displayName?: string): Promise<boolean>
+  verifyEmail(token: string): Promise<void>
+  resendVerification(email: string): Promise<void>
+  forgotPassword(email: string): Promise<void>
+  resetPassword(token: string, newPassword: string): Promise<void>
+  changePassword(currentPassword: string, newPassword: string): Promise<void>
+  logout(): Promise<void>
+  logoutAll(): Promise<void>
+}
+
+function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase()
+}
+
+export const useAuthStore = create<AuthState>((set, get) => ({
+  status: 'unknown',
+  user: null,
+  pendingVerificationEmail: null,
+  isPending: false,
+  lastError: null,
+
+  async restore() {
+    if (get().status === 'authenticated') return
+    try {
+      const user = await apiClient.getCurrentUser()
+      set({ status: user === null ? 'anonymous' : 'authenticated', user })
+    } catch {
+      set({ status: 'anonymous', user: null })
+    }
+  },
+
+  async login(email, password) {
+    set({ isPending: true, lastError: null })
+    try {
+      const user = await apiClient.login({ email: normalizeEmail(email), password })
+      set({ status: 'authenticated', user })
+    } catch (error) {
+      set({ lastError: error instanceof Error ? error.message : String(error) })
+      throw error
+    } finally {
+      set({ isPending: false })
+    }
+  },
+
+  async register(email, password, displayName) {
+    set({ isPending: true, lastError: null })
+    try {
+      const result = await apiClient.register({
+        email: normalizeEmail(email),
+        password,
+        displayName,
+      })
+      if (result.status === 'verification_required') {
+        set({ pendingVerificationEmail: result.email })
+        return true
+      }
+      return false
+    } catch (error) {
+      set({ lastError: error instanceof Error ? error.message : String(error) })
+      throw error
+    } finally {
+      set({ isPending: false })
+    }
+  },
+
+  async verifyEmail(token) {
+    const user = await apiClient.verifyEmail({ token })
+    set({ status: 'authenticated', user, pendingVerificationEmail: null })
+  },
+
+  async resendVerification(email) {
+    await apiClient.resendVerification({ email: normalizeEmail(email) })
+  },
+
+  async forgotPassword(email) {
+    await apiClient.forgotPassword({ email: normalizeEmail(email) })
+  },
+
+  async resetPassword(token, newPassword) {
+    await apiClient.resetPassword({ token, newPassword })
+  },
+
+  async changePassword(currentPassword, newPassword) {
+    const user = await apiClient.changePassword({ currentPassword, newPassword })
+    set({ user })
+  },
+
+  async logout() {
+    try {
+      await apiClient.logout()
+    } finally {
+      await resetAllPrivateData()
+      set({ status: 'anonymous', user: null })
+    }
+  },
+
+  async logoutAll() {
+    try {
+      await apiClient.logoutAll()
+    } finally {
+      await resetAllPrivateData()
+      set({ status: 'anonymous', user: null })
+    }
+  },
+}))

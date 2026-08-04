@@ -1,0 +1,35 @@
+{
+  "name": "@bailian-studio/api",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "bun --env-file=../../infra/env/.env src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@elysia/cors": "^1.4.2",
+    "@bailian-studio/auth": "workspace:*",
+    "@bailian-studio/bailian-adapter": "workspace:*",
+    "@bailian-studio/credit-ledger": "workspace:*",
+    "@bailian-studio/event-bus": "workspace:*",
+    "@bailian-studio/generation-repository": "workspace:*",
+    "@bailian-studio/media-repository": "workspace:*",
+    "@bailian-studio/model-core": "workspace:*",
+    "@bailian-studio/shared": "workspace:*",
+    "@bailian-studio/storage": "workspace:*",
+    "@bailian-studio/task-engine": "workspace:*",
+    "elysia": "catalog:",
+    "nodemailer": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@types/nodemailer": "catalog:",
+    "typescript": "catalog:"
+  }
+}

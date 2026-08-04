@@ -1,0 +1,65 @@
+name: bailian-studio-production
+
+# This file deliberately does not create a production Postgres container.
+# Point DATABASE_URL at the managed or separately operated database, take a
+# backup, then run `bun run db:migrate:production` before starting services.
+services:
+  api:
+    image: "bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}"
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: runtime
+      args:
+        BAILIAN_STUDIO_RELEASE_TAG: "${BAILIAN_STUDIO_RELEASE_TAG}"
+    env_file:
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
+    command: ["bun", "apps/api/src/index.ts"]
+    ports:
+      - "5003:5003"
+    restart: unless-stopped
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:5003/api/health/live').then(response => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+
+  worker:
+    # API owns the build; Worker must run the exact same immutable image.
+    image: "bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}"
+    pull_policy: never
+    env_file:
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
+    command: ["bun", "apps/worker/src/index.ts"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  web:
+    # The Dockerfile web target serves apps/web (merged React frontend).
+    image: "bailian-studio-web:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}"
+    pull_policy: never
+    build:
+      context: ../..
+      dockerfile: infra/docker/Dockerfile
+      target: web
+      args:
+        BAILIAN_STUDIO_RELEASE_TAG: "${BAILIAN_STUDIO_RELEASE_TAG}"
+        # Empty means the browser uses same-origin `/api/...`; nginx forwards
+        # those requests to the API container. Set an absolute API origin only
+        # when deploying the API on a separately managed public origin.
+        VITE_API_ORIGIN: "${VITE_API_ORIGIN:-}"
+        VITE_WEB_ORIGIN: "${VITE_WEB_ORIGIN:-}"
+    ports:
+      - "5002:5002"
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy

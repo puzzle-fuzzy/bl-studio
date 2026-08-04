@@ -1,0 +1,22 @@
+# Docker 构建上下文排除（保持上下文小、且不复制本地状态）。
+.git
+.gitignore
+.codegraph
+.turbo
+**/.turbo
+coverage
+**/coverage
+dist
+**/dist
+node_modules
+**/node_modules
+var
+**/var
+.env
+.env.local
+.env.test
+.env.production
+.env*.example
+*.log
+Dockerfile*
+docker-compose*.yml

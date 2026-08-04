@@ -1,0 +1,1 @@
+CREATE INDEX "provider_request_audits_idempotency_idx" ON "provider_request_audits" USING btree ("idempotency_key");

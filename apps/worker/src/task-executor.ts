@@ -1,0 +1,156 @@
+/**
+ * Worker 任务分发器。
+ *
+ * 本文件只识别 task type 并把任务交给对应处理器；生成状态机、artifact 持久化和
+ * media 处理分别位于独立模块，避免不同业务生命周期共享一个大型实现文件。
+ */
+
+import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { MediaRepository } from '@bailian-studio/media-repository'
+import { createLogger, MetricsCollector, type Logger } from '@bailian-studio/shared'
+import type { StorageAdapter } from '@bailian-studio/storage'
+import type { TaskRecord } from '@bailian-studio/task-engine'
+import { processArtifactPersistTask } from './artifact-task-handler'
+import type { ArtifactFetchPolicy } from './artifact-persist'
+import { processGenerationTask } from './generation-task-handler'
+import { processMediaTask } from './media-task-handler'
+import type { MediaProcessor } from './media-processor'
+import type { ProviderRegistry } from './providers'
+import { processThumbnailTask } from './thumbnail-task-handler'
+import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
+
+export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
+
+export interface TaskExecutorDeps {
+  readonly repository: GenerationRepository
+  readonly providerRegistry: ProviderRegistry
+  readonly modelRegistry: ModelRegistryLookup
+  readonly storage: StorageAdapter
+  readonly mediaRepository?: MediaRepository
+  readonly mediaProcessor?: MediaProcessor
+  /** Maximum age of a generation submit task before it is failed. */
+  readonly generationSubmitTimeoutMs?: number
+  /** Maximum age of a provider polling lifecycle before it is failed. */
+  readonly providerAsyncMaxDurationMs?: number
+  /** Maximum age of an artifact persistence task before it is failed. */
+  readonly artifactPersistTimeoutMs?: number
+  /** Provider artifact download security policy. */
+  readonly artifactFetch?: ArtifactFetchPolicy
+  /** Optional in-process counters/timers for task and provider diagnostics. */
+  readonly metrics?: MetricsCollector
+  readonly logger?: Logger
+}
+
+export class TaskExecutor {
+  private readonly logger: Logger
+  private readonly metrics: MetricsCollector
+
+  constructor(private readonly deps: TaskExecutorDeps) {
+    this.logger = deps.logger ?? createLogger('task-executor')
+    this.metrics = deps.metrics ?? new MetricsCollector()
+  }
+
+  async processTask(task: TaskRecord): Promise<TaskProcessOutcome> {
+    const startedAt = Date.now()
+    try {
+      const outcome = await this.executeTask(task)
+      this.recordTaskMetrics(task, outcome.status, Date.now() - startedAt)
+      return outcome
+    }
+    catch (error) {
+      this.recordTaskMetrics(task, 'threw', Date.now() - startedAt)
+      throw error
+    }
+  }
+
+  private async executeTask(task: TaskRecord): Promise<TaskProcessOutcome> {
+    if (task.type === 'media.thumbnail') {
+      return processThumbnailTask(task, {
+        repository: this.deps.repository,
+        storage: this.deps.storage,
+        logger: this.logger,
+        ...(this.deps.mediaProcessor === undefined
+          ? {}
+          : { mediaProcessor: this.deps.mediaProcessor }),
+        ...(this.deps.artifactFetch === undefined
+          ? {}
+          : { artifactFetch: this.deps.artifactFetch }),
+      })
+    }
+
+    if (task.type === 'media.process') {
+      return processMediaTask(task, {
+        storage: this.deps.storage,
+        logger: this.logger,
+        ...(this.deps.mediaRepository === undefined
+          ? {}
+          : { mediaRepository: this.deps.mediaRepository }),
+        ...(this.deps.mediaProcessor === undefined
+          ? {}
+          : { mediaProcessor: this.deps.mediaProcessor }),
+      })
+    }
+
+    const recordId = readRecordId(task)
+    if (recordId === undefined) {
+      return {
+        status: 'failed',
+        error: {
+          category: 'validation',
+          message: `Task ${task.id} is missing a string recordId in its input`,
+          retriable: false,
+          code: 'TASK_RECORD_ID_INVALID',
+        },
+      }
+    }
+    if (task.type === 'artifact.persist') {
+      return processArtifactPersistTask(recordId, task, {
+        repository: this.deps.repository,
+        storage: this.deps.storage,
+        logger: this.logger,
+        metrics: this.metrics,
+        ...(this.deps.artifactPersistTimeoutMs === undefined
+          ? {}
+          : { maxDurationMs: this.deps.artifactPersistTimeoutMs }),
+        ...(this.deps.artifactFetch === undefined ? {} : { artifactFetch: this.deps.artifactFetch }),
+      })
+    }
+
+    return processGenerationTask(recordId, task, {
+      repository: this.deps.repository,
+      providerRegistry: this.deps.providerRegistry,
+      modelRegistry: this.deps.modelRegistry,
+      storage: this.deps.storage,
+      logger: this.logger,
+      metrics: this.metrics,
+      ...(this.deps.generationSubmitTimeoutMs === undefined
+        ? {}
+        : { submitTimeoutMs: this.deps.generationSubmitTimeoutMs }),
+      ...(this.deps.providerAsyncMaxDurationMs === undefined
+        ? {}
+        : { asyncMaxDurationMs: this.deps.providerAsyncMaxDurationMs }),
+      })
+  }
+
+  private recordTaskMetrics(task: TaskRecord, outcome: string, durationMs: number): void {
+    this.metrics.increment('worker.task', { type: task.type, outcome })
+    this.metrics.timing('worker.task.duration', durationMs, { type: task.type })
+    this.logger.info('task.duration', {
+      taskId: task.id,
+      traceId: task.traceId,
+      recordId: task.recordId,
+      taskType: task.type,
+      outcome,
+      durationMs,
+    })
+  }
+}
+
+export function createTaskExecutor(deps: TaskExecutorDeps): TaskExecutor {
+  return new TaskExecutor(deps)
+}
+
+function readRecordId(task: TaskRecord): string | undefined {
+  const value = task.input['recordId']
+  return typeof value === 'string' && value.length > 0 ? value : undefined
+}

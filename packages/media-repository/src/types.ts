@@ -1,0 +1,76 @@
+import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
+
+export type MediaOperation = 'video.extract_audio'
+export type MediaJobStatus = 'queued' | 'processing' | 'succeeded' | 'failed' | 'cancelled'
+export type MediaSourceKind = 'image' | 'video' | 'audio'
+export type MediaOutputKind = 'image' | 'video' | 'audio' | 'text'
+
+export interface MediaJob {
+  id: string
+  userId: string
+  operation: MediaOperation
+  status: MediaJobStatus
+  sourceAssetId?: string
+  sourceKind: MediaSourceKind
+  outputAssetId?: string
+  input: Record<string, unknown>
+  output?: Record<string, unknown>
+  error?: TaskError
+  createdAt: string
+  updatedAt: string
+}
+
+export interface CreateMediaJobInput {
+  userId: string
+  operation: MediaOperation
+  source: {
+    assetId: string
+    kind: MediaSourceKind
+    fileName?: string
+  }
+  options?: Record<string, unknown>
+  /** One lifecycle trace for the auxiliary media action. */
+  traceId?: string
+  now?: string
+}
+
+export interface MediaSource {
+  storageProvider: string
+  storageKey: string
+  fileName: string
+  mimeType: string
+  byteSize: number
+}
+
+export interface CreateMediaJobResult {
+  job: MediaJob
+  task: TaskRecord
+}
+
+export interface GetMediaJobInput {
+  userId: string
+  jobId: string
+}
+
+export interface CompleteMediaJobInput {
+  jobId: string
+  outputAsset: {
+    id: string
+    kind: MediaOutputKind
+    fileName: string
+    mimeType: string
+    byteSize: number
+    storageProvider: string
+    storageKey: string
+    storageUrl?: string
+    metadata?: Record<string, unknown>
+  }
+  output?: Record<string, unknown>
+  now?: string
+}
+
+export interface FailMediaJobInput {
+  jobId: string
+  error: TaskError
+  now?: string
+}

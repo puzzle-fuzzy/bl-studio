@@ -1,0 +1,1 @@
+ALTER TABLE "provider_request_audits" ADD COLUMN "idempotency_key" text;

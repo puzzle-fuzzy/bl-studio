@@ -1,0 +1,17 @@
+name: bailian-studio-test
+
+services:
+  bailian-studio-postgres-test:
+    image: postgres:16-alpine
+    container_name: bailian-studio-postgres-test
+    ports:
+      - "55432:5432"
+    environment:
+      POSTGRES_USER: bailian-studio
+      POSTGRES_PASSWORD: bailian-studio
+      POSTGRES_DB: bailian-studio_test
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bailian-studio -d bailian-studio_test"]
+      interval: 2s
+      timeout: 2s
+      retries: 20

@@ -1,0 +1,29 @@
+{
+  "name": "@bailian-studio/worker",
+  "version": "0.0.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "dev": "tsx --env-file=../../infra/env/.env src/index.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@bailian-studio/bailian-adapter": "workspace:*",
+    "@bailian-studio/event-bus": "workspace:*",
+    "@bailian-studio/generation-repository": "workspace:*",
+    "@bailian-studio/media-repository": "workspace:*",
+    "@bailian-studio/model-core": "workspace:*",
+    "@bailian-studio/provider-dashscope": "workspace:*",
+    "@bailian-studio/shared": "workspace:*",
+    "@bailian-studio/storage": "workspace:*",
+    "@bailian-studio/task-engine": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  }
+}

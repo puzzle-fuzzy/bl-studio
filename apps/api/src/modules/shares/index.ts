@@ -1,0 +1,1 @@
+export { createShareRoutes } from './routes'

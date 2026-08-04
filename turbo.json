@@ -1,0 +1,55 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "globalPassThroughEnv": [
+    "DATABASE_URL",
+    "DASHSCOPE_API_KEY",
+    "BAILIAN_WORKSPACE_ID",
+    "BAILIAN_CONTRACT_LOCALE",
+    "WORKER_ID",
+    "WORKER_POLL_INTERVAL_MS",
+    "WORKER_IDLE_SLEEP_MS",
+    "WORKER_LOCK_DURATION_MS",
+    "DASHSCOPE_BASE_URL",
+    "OSS_REGION",
+    "OSS_BUCKET",
+    "OSS_ACCESS_KEY_ID",
+    "OSS_ACCESS_KEY_SECRET",
+    "OSS_ENDPOINT",
+    "ARTIFACT_LOCAL_ROOT",
+    "ARTIFACT_LOCAL_PUBLIC_BASE_URL",
+    "AUTH_JWT_SECRET",
+    "AUTH_PUBLIC_WEB_ORIGIN",
+    "SMTP_HOST",
+    "SMTP_PORT",
+    "SMTP_SECURE",
+    "SMTP_USER",
+    "SMTP_PASS",
+    "SMTP_FROM",
+    "API_HOST",
+    "API_PORT",
+    "API_TRUST_PROXY",
+    "COOKIE_SECURE",
+    "CORS_ALLOWED_ORIGINS",
+    "OSS_KEY_PREFIX",
+    "VITE_API_ORIGIN",
+    "VITE_WEB_ORIGIN",
+    "NODE_ENV"
+  ],
+  "tasks": {
+    "build": {
+      "dependsOn": ["^build"],
+      "outputs": ["dist/**"]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "typecheck": {},
+    "test": {},
+    "test:coverage": {},
+    "preview": {
+      "cache": false,
+      "persistent": true
+    }
+  }
+}

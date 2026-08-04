@@ -1,0 +1,2 @@
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_action_check" CHECK ("audit_logs"."action" in ('auth.register', 'auth.login', 'auth.logout', 'generation.create', 'generation.cancel', 'generation.retry', 'artifact.read', 'share.create', 'share.revoke'));--> statement-breakpoint
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_outcome_check" CHECK ("audit_logs"."outcome" in ('succeeded', 'failed'));

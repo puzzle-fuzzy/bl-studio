@@ -1,0 +1,3 @@
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_status_check" CHECK ("task_records"."status" in ('queued', 'running', 'succeeded', 'failed', 'cancelled'));--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_attempts_check" CHECK ("task_records"."attempts" >= 0);--> statement-breakpoint
+ALTER TABLE "task_records" ADD CONSTRAINT "task_records_max_attempts_check" CHECK ("task_records"."max_attempts" > 0);

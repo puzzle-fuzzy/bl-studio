@@ -1,0 +1,295 @@
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
+import { userAssets } from '@bailian-studio/db'
+import { eq } from 'drizzle-orm'
+import {
+  MediaRepositoryError,
+  createIsolatedMediaRepository,
+  createMediaRepositoryFromUrl,
+  createMediaTestUser,
+  resetMediaRepositoryTestDb,
+  type IsolatedMediaRepository,
+} from '../src'
+
+let iso!: IsolatedMediaRepository
+
+beforeAll(async () => {
+  iso = await createIsolatedMediaRepository()
+})
+
+afterAll(async () => {
+  await iso.close()
+})
+
+async function expectRejects(fn: () => Promise<unknown>, code: string): Promise<void> {
+  let caught: unknown
+  try {
+    await fn()
+  } catch (error) {
+    caught = error
+  }
+  expect(caught).toBeInstanceOf(MediaRepositoryError)
+  expect(caught).toMatchObject({ code })
+}
+
+async function seedVideoAsset(userId: string, id = 'asset_video'): Promise<void> {
+  await iso.db.insert(userAssets).values({
+    id,
+    userId,
+    kind: 'video',
+    source: 'upload',
+    fileName: 'video.mp4',
+    mimeType: 'video/mp4',
+    byteSize: 10,
+    storageProvider: 'local',
+    storageKey: `user_uploads/${userId}/video.mp4`,
+    storageUrl: null,
+    metadataJson: {},
+    status: 'ready',
+    createdAt: new Date('2026-07-09T00:00:00.000Z'),
+    updatedAt: new Date('2026-07-09T00:00:00.000Z'),
+  })
+}
+
+describe('media repository', () => {
+  beforeEach(async () => {
+    await resetMediaRepositoryTestDb(iso.db)
+  })
+
+  it('creates a queued media job and media.process task', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id)
+    const result = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: {
+        assetId: 'asset_video',
+        kind: 'video',
+        fileName: 'video.mp4',
+      },
+      now: '2026-07-09T00:00:00.000Z',
+    })
+
+    expect(result.job.status).toBe('queued')
+    expect(result.job.operation).toBe('video.extract_audio')
+    expect(result.job.input).toMatchObject({ options: { format: 'mp3' } })
+    expect(result.task.type).toBe('media.process')
+    expect(result.task.domain).toBe('media')
+    expect(result.job.input).toEqual({
+      source: { assetId: 'asset_video', kind: 'video', fileName: 'video.mp4' },
+      options: { format: 'mp3' },
+    })
+    expect(result.task.input).toEqual({
+      jobId: result.job.id,
+      operation: 'video.extract_audio',
+      options: { format: 'mp3' },
+    })
+    await expect(iso.repository.getMediaSource(result.job.id)).resolves.toEqual({
+      storageProvider: 'local',
+      storageKey: 'user_uploads/owner/video.mp4',
+      fileName: 'video.mp4',
+      mimeType: 'video/mp4',
+      byteSize: 10,
+    })
+  })
+
+  it('rejects a media job that has no owner-verified source asset', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+
+    await expectRejects(() => iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'missing', kind: 'video' },
+    }), 'MEDIA_SOURCE_ASSET_NOT_FOUND')
+  })
+
+  it('does not accept an asset id belonging to another user', async () => {
+    const owner = await createMediaTestUser(iso.db, { id: 'owner' })
+    const other = await createMediaTestUser(iso.db, { id: 'other' })
+    await iso.db.insert(userAssets).values({
+      id: 'asset_other_video',
+      userId: other.id,
+      kind: 'video',
+      source: 'upload',
+      fileName: 'other.mp4',
+      mimeType: 'video/mp4',
+      byteSize: 10,
+      storageProvider: 'local',
+      storageKey: 'user_uploads/other/other.mp4',
+      storageUrl: null,
+      metadataJson: {},
+      status: 'ready',
+      createdAt: new Date('2026-07-09T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-09T00:00:00.000Z'),
+    })
+
+    await expectRejects(() => iso.repository.createMediaJob({
+      userId: owner.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_other_video', kind: 'video' },
+    }), 'MEDIA_SOURCE_ASSET_NOT_FOUND')
+  })
+
+  it('returns only owned jobs', async () => {
+    const owner = await createMediaTestUser(iso.db, { id: 'owner' })
+    const other = await createMediaTestUser(iso.db, { id: 'other' })
+    await seedVideoAsset(owner.id)
+    const created = await iso.repository.createMediaJob({
+      userId: owner.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_video', kind: 'video' },
+    })
+
+    expect(await iso.repository.getMediaJob({ userId: owner.id, jobId: created.job.id })).toMatchObject({ id: created.job.id })
+    expect(await iso.repository.getMediaJob({ userId: other.id, jobId: created.job.id })).toBeUndefined()
+  })
+
+  it('marks a job processing', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id)
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_video', kind: 'video' },
+    })
+
+    const processing = await iso.repository.markMediaJobProcessing(created.job.id, '2026-07-09T00:01:00.000Z')
+    expect(processing.status).toBe('processing')
+    expect(processing.updatedAt).toBe('2026-07-09T00:01:00.000Z')
+  })
+
+  it('completes a job and creates an output user asset', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id, 'asset_source')
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_source', kind: 'video' },
+    })
+
+    const completed = await iso.repository.completeMediaJob({
+      jobId: created.job.id,
+      outputAsset: {
+        id: 'asset_output',
+        kind: 'audio',
+        fileName: 'video.mp3',
+        mimeType: 'audio/mpeg',
+        byteSize: 123,
+        storageProvider: 'local',
+        storageKey: 'media-jobs/job/video.mp3',
+        storageUrl: '/api/artifacts/local/media-jobs/job/video.mp3',
+        metadata: { durationSeconds: 5 },
+      },
+      output: { durationSeconds: 5 },
+      now: '2026-07-09T00:02:00.000Z',
+    })
+
+    expect(completed.status).toBe('succeeded')
+    expect(completed.outputAssetId).toBe('asset_output')
+    expect(completed.output).toEqual({ durationSeconds: 5 })
+
+    const [asset] = await iso.db.select().from(userAssets).where(eq(userAssets.id, 'asset_output')).limit(1)
+    expect(asset?.userId).toBe(user.id)
+    expect(asset?.kind).toBe('audio')
+    expect(asset?.source).toBe('derived')
+    expect(asset?.metadataJson).toMatchObject({
+      mediaJobId: created.job.id,
+      sourceAssetId: 'asset_source',
+      operation: 'video.extract_audio',
+      durationSeconds: 5,
+    })
+
+    const retried = await iso.repository.completeMediaJob({
+      jobId: created.job.id,
+      outputAsset: {
+        id: 'asset_output',
+        kind: 'audio',
+        fileName: 'video.mp3',
+        mimeType: 'audio/mpeg',
+        byteSize: 123,
+        storageProvider: 'local',
+        storageKey: 'media-jobs/job/video.mp3',
+      },
+      output: { durationSeconds: 5 },
+      now: '2026-07-09T00:03:00.000Z',
+    })
+    expect(retried.status).toBe('succeeded')
+    expect(retried.outputAssetId).toBe('asset_output')
+
+    const outputAssets = await iso.db.select().from(userAssets).where(eq(userAssets.id, 'asset_output'))
+    expect(outputAssets).toHaveLength(1)
+  })
+
+  it('serializes concurrent completion attempts for the same job', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id, 'asset_source')
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_source', kind: 'video' },
+    })
+
+    const completion = {
+      jobId: created.job.id,
+      outputAsset: {
+        id: 'asset_output',
+        kind: 'audio' as const,
+        fileName: 'video.mp3',
+        mimeType: 'audio/mpeg',
+        byteSize: 123,
+        storageProvider: 'local' as const,
+        storageKey: 'media-jobs/job/video.mp3',
+      },
+      output: { durationSeconds: 5 },
+      now: '2026-07-09T00:02:00.000Z',
+    }
+
+    const peerHandles = Array.from({ length: 7 }, () => createMediaRepositoryFromUrl(iso.databaseUrl))
+    const peers = [iso.repository, ...peerHandles.map(handle => handle.repository)]
+    try {
+      const completions = await Promise.all(peers.map(peer => peer.completeMediaJob(completion)))
+
+      expect(completions).toHaveLength(8)
+      for (const result of completions) {
+        expect(result.status).toBe('succeeded')
+        expect(result.outputAssetId).toBe('asset_output')
+      }
+    } finally {
+      await Promise.all(peerHandles.map(handle => handle.close()))
+    }
+
+    const outputAssets = await iso.db.select().from(userAssets).where(eq(userAssets.id, 'asset_output'))
+    expect(outputAssets).toHaveLength(1)
+  })
+
+  it('marks a job failed with structured error', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id)
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_video', kind: 'video' },
+    })
+
+    const failed = await iso.repository.failMediaJob({
+      jobId: created.job.id,
+      error: { category: 'system', message: 'ffmpeg missing', retriable: false, code: 'FFMPEG_NOT_CONFIGURED' },
+    })
+
+    expect(failed.status).toBe('failed')
+    expect(failed.error).toEqual({
+      category: 'system',
+      message: 'ffmpeg missing',
+      retriable: false,
+      code: 'FFMPEG_NOT_CONFIGURED',
+    })
+  })
+
+  it('rejects unsupported source kinds', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await expectRejects(() => iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'missing', kind: 'image' },
+    }), 'MEDIA_JOB_INVALID_OPERATION')
+  })
+})

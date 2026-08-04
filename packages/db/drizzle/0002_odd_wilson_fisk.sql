@@ -1,0 +1,1 @@
+ALTER TABLE "generation_records" ADD COLUMN "request_id" text;

@@ -1,0 +1,5 @@
+ALTER TABLE "audit_logs" DROP CONSTRAINT "audit_logs_action_check";--> statement-breakpoint
+ALTER TABLE "generation_records" ADD COLUMN "hidden_at" timestamp with time zone;--> statement-breakpoint
+ALTER TABLE "generation_records" ADD COLUMN "hidden_by" text;--> statement-breakpoint
+CREATE INDEX "generation_records_user_library_idx" ON "generation_records" USING btree ("user_id","deleted_at","hidden_at","created_at");--> statement-breakpoint
+ALTER TABLE "audit_logs" ADD CONSTRAINT "audit_logs_action_check" CHECK ("audit_logs"."action" in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment'));

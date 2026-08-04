@@ -1,0 +1,23 @@
+node_modules/
+.turbo/
+dist/
+var/
+coverage/
+*.log
+.DS_Store
+
+# 本地环境文件（绝不提交）
+infra/env/.env
+infra/env/.env.test
+.env
+.env.local
+.env.*.local
+
+# 本地工具状态
+.codegraph/
+.superpowers/
+
+# Playwright
+playwright-report/
+test-results/
+e2e/.playwright

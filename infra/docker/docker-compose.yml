@@ -1,0 +1,27 @@
+name: bailian-studio-dev
+
+services:
+  bailian-studio-postgres-dev:
+    image: postgres:16-alpine
+    container_name: bailian-studio-postgres-dev
+    ports:
+      - "55431:5432"
+    environment:
+      POSTGRES_USER: bailian-studio
+      POSTGRES_PASSWORD: bailian-studio
+      POSTGRES_DB: bailian-studio_dev
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U bailian-studio -d bailian-studio_dev"]
+      interval: 2s
+      timeout: 2s
+      retries: 20
+
+  # Development-only SMTP sink. It accepts mail without credentials and keeps
+  # verification links out of application logs. Production must use a real
+  # authenticated SMTP provider; see infra/env/.env.production.example.
+  bailian-studio-mailpit-dev:
+    image: axllent/mailpit:v1.30.3
+    container_name: bailian-studio-mailpit-dev
+    ports:
+      - "11025:1025"
+      - "18025:8025"
