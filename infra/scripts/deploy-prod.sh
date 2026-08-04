@@ -69,9 +69,14 @@ DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM "$ENV_INFRA")"
 [[ -n "$SITE_DOMAIN" ]] || fail "缺少 SITE_DOMAIN"
 DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 
-SSH_ARGS=()
-if [[ -n "$DEPLOY_SSH_KEY" ]]; then SSH_ARGS=(-i "$DEPLOY_SSH_KEY"); fi
-ssh_cmd() { ssh "${SSH_ARGS[@]}" "$DEPLOY_HOST" "$1"; }
+# 不用数组（macOS bash 3.2 下 set -u + 空数组展开会误报 unbound variable）。
+ssh_cmd() {
+  if [[ -n "$DEPLOY_SSH_KEY" ]]; then
+    ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
+  else
+    ssh "$DEPLOY_HOST" "$1"
+  fi
+}
 
 echo "==> 部署目标：${DEPLOY_HOST}（镜像 tag: ${SHA:0:12}）"
 
