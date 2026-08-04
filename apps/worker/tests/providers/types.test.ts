@@ -21,7 +21,7 @@ describe('providerError', () => {
       details: { requestId: 'req_1' },
     })
 
-    // No details argument → no `details` key at all.
+    // 不传 details 参数 → 完全不含 `details` 键。
     expect('details' in providerError('ERR', 'm', 'provider', false)).toBe(false)
   })
 })

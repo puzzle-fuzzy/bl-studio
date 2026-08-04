@@ -9,7 +9,7 @@ export interface AssetConfig {
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
 
-/** Parse upload/probe limits once at the API composition root. */
+/** 在 API 组合根节点一次性解析上传/探测相关的限制。 */
 export function readAssetConfig(source: EnvironmentSource = process.env): AssetConfig {
   const maxAssetSizeBytes = positiveNumberOrDefault(source['ASSET_MAX_SIZE_BYTES'], DEFAULT_MAX_ASSET_SIZE_BYTES)
   const maxDuration = nonNegativeNumberOrDefault(source['MEDIA_MAX_DURATION_SECONDS'], DEFAULT_MAX_MEDIA_DURATION_SECONDS)

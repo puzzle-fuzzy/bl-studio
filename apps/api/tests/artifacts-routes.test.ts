@@ -231,7 +231,7 @@ class FakeStorageAdapter implements StorageAdapter {
   }
 }
 
-// Fake auth: any non-empty cookie token authenticates as `currentUserId`.
+// 假认证：任意非空 cookie token 都会以 `currentUserId` 身份通过认证。
 let currentUserId = 'user_1'
 const fakeAuthService = createFakeAuthService(() => ({
   id: currentUserId,

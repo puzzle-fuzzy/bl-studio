@@ -1,10 +1,8 @@
 /**
- * Idempotently creates the zero-balance credit account required by every user.
+ * 幂等地为每个用户创建所需的零余额 credit account。
  *
- * Registration already creates this row transactionally. This command covers
- * users created before the credit ledger migration and is safe to run after
- * every schema push. It does not manufacture grants or alter existing ledger
- * balances.
+ * 注册流程已在事务内创建该行。此命令用于补足 credit ledger 迁移之前创建的用户，
+ * 每次 schema push 之后都可安全运行。它不会凭空发放额度，也不会改动既有 ledger 余额。
  */
 import postgres from 'postgres'
 

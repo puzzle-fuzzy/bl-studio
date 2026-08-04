@@ -52,9 +52,8 @@ export function estimateBailianModelCost(
     }
   }
 
-  // Streaming multimodal models expose exact token buckets only after the
-  // response completes. Their preflight estimate remains duration based;
-  // final billing is still calculated from official usage rates.
+  // 流式多模态模型只在响应完成后才暴露精确 token 用量。其预检估价仍按时长估算；
+  // 最终计费仍以官方 usage 费率计算。
   if (manifest.pricing.actualUsage !== undefined) {
     return {
       cents: estimatePriceCents(manifest, params),

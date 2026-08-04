@@ -1,6 +1,6 @@
 /**
- * Shared test fixtures for the worker package: in-memory repository/provider
- * doubles and structured-log capture. Hand-written and type-complete (no casts).
+ * worker 包的共享测试 fixtures：内存版 repository/provider 替身与结构化日志捕获。
+ * 手写且类型完备（无类型断言）。
  */
 import type {
   AuditLog,
@@ -79,7 +79,7 @@ export interface LogEntry {
 
 export type RecordingLogger = Logger & { entries: LogEntry[] }
 
-/** A Logger that records every call into `entries` instead of writing to stderr. */
+/** 一个把每次调用都记录进 `entries`、而不是写入 stderr 的 Logger。 */
 export function createRecordingLogger(): RecordingLogger {
   const entries: LogEntry[] = []
   return {
@@ -101,14 +101,14 @@ export type RepoMutation =
   | { kind: 'completeAssetThumbnail'; input: CompleteAssetThumbnailInput }
   | { kind: 'failAssetThumbnail'; input: FailAssetThumbnailInput }
 
-/** In-memory repository implementing the methods TaskExecutor exercises. */
+/** 实现 TaskExecutor 所用方法的内存版 repository。 */
 export class FakeRepository implements GenerationRepository {
   readonly mutations: RepoMutation[] = []
   readonly records = new Map<string, GenerationRecord>()
   readonly artifacts = new Map<string, GenerationArtifact>()
   readonly thumbnailSources = new Map<string, AssetThumbnailSource>()
   readonly savedTasks: TaskRecord[] = []
-  /** When set, claimNextQueuedTask rejects once with this error before draining the queue. */
+  /** 设置后，claimNextQueuedTask 在排空队列前会先用该错误 reject 一次。 */
   claimError: Error | null = null
   readonly claimQueue: TaskRecord[] = []
   readonly renewedTaskLocks: RenewTaskLockInput[] = []
@@ -376,7 +376,7 @@ export class FakeRepository implements GenerationRepository {
     return existing ?? makeRecord({ id: recordId })
   }
 
-  // Methods not exercised by TaskExecutor / WorkerLoop.
+  // TaskExecutor / WorkerLoop 不会调用到的方法。
   createGeneration(_input: CreateGenerationInput): Promise<CreateGenerationResult> {
     return Promise.reject(new Error('FakeRepository.createGeneration is not used'))
   }
@@ -417,8 +417,8 @@ export class FakeRepository implements GenerationRepository {
     return Promise.resolve(undefined)
   }
 
-  // Share methods are not exercised by TaskExecutor / WorkerLoop; stubbed to
-  // satisfy the GenerationRepository interface contract.
+  // Share 相关方法不被 TaskExecutor / WorkerLoop 调用；仅为满足
+  // GenerationRepository 接口契约而 stub。
   createGenerationShare(_input: CreateGenerationShareInput): Promise<GenerationShare> {
     return Promise.reject(new Error('FakeRepository.createGenerationShare is not used'))
   }
@@ -437,8 +437,8 @@ export class FakeRepository implements GenerationRepository {
   revokeGenerationShare(_input: RevokeGenerationShareInput): Promise<GenerationShare | undefined> {
     return Promise.resolve(undefined)
   }
-  // Unified-asset methods are not exercised by TaskExecutor / WorkerLoop; stubbed
-  // to satisfy the GenerationRepository interface contract.
+  // Unified-asset 相关方法不被 TaskExecutor / WorkerLoop 调用；仅为满足
+  // GenerationRepository 接口契约而 stub。
   createUserAsset(_input: CreateUserAssetInput): Promise<void> {
     return Promise.resolve()
   }
@@ -461,7 +461,7 @@ export class FakeRepository implements GenerationRepository {
   }
 }
 
-/** ProviderRunner returning queued outputs in order, or throwing when armed. */
+/** 按顺序返回队列中输出的 ProviderRunner，被武装（设置 throwError）时抛错。 */
 export class FakeProviderRunner implements ProviderRunner {
   readonly providerId = 'fake'
   readonly inputs: ProviderExecuteInput[] = []

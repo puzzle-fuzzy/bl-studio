@@ -29,8 +29,8 @@ class FakeStorageAdapter implements StorageAdapter {
   }
 }
 
-// Fake auth service: any non-empty cookie token authenticates as `currentUserId`.
-// Tests mutate `currentUserId` to impersonate different users (owner vs other).
+// 假认证服务：任意非空 cookie token 都会以 `currentUserId` 身份通过认证。
+// 测试通过修改 `currentUserId` 来模拟不同用户（所有者 vs 其他用户）。
 let currentUserId = 'user_1'
 const fakeAuthService = createFakeAuthService(() => ({
   id: currentUserId,
@@ -48,7 +48,7 @@ const fakeCreditLedger: CreditLedger = {
   releaseStaleReservations: async () => ({ candidates: 0, released: 0, skipped: true, releasedEntryIds: [] }),
 }
 
-/** Build a Request carrying the session cookie (authenticated). */
+/** 构造携带会话 cookie（已认证）的 Request。 */
 function authed(url: string, init: RequestInit = {}): Request {
   const headers = new Headers(init.headers)
   headers.set('cookie', 'bailian_studio_session=fake-token')
@@ -82,9 +82,9 @@ async function readUntilReader(reader: ReadableStreamDefaultReader<Uint8Array>, 
   return text
 }
 
-// generation_records.userId has a FK → users.id, so a users row must exist for
-// currentUserId before any generation insert. Seed lazily per user (every insert
-// flows through postGeneration) and clear the set when the DB is reset.
+// generation_records.userId 有外键指向 users.id，因此在插入任何 generation 前，
+// currentUserId 对应的 users 行必须存在。按用户懒初始化（所有插入都经由
+// postGeneration），并在重置 DB 时清空该集合。
 const seededUsers = new Set<string>()
 async function ensureCurrentUserSeeded(): Promise<void> {
   if (seededUsers.has(currentUserId)) return
@@ -682,7 +682,7 @@ describe('generation routes', () => {
     const create = await postGeneration({ modelId: 'qwen-image', params: { prompt: 'secret', n: 1, size: '1328*1328' } })
     const created = await create.json() as { success: true; data: { record: { id: string } } }
 
-    currentUserId = 'artifact_other' // impersonate a different user
+    currentUserId = 'artifact_other' // 模拟另一个用户
     const response = await app.handle(authed(`http://localhost/api/generations/${created.data.record.id}/artifacts`))
     const body = await response.json() as { success: false; error: { code: string } }
 

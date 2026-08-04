@@ -1,6 +1,6 @@
 /**
  * Provider Registry
- * Owns provider runner instances and dispatches execution by provider id.
+ * 持有 provider runner 实例，并按 provider id 分发执行。
  */
 
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
@@ -18,7 +18,7 @@ export class ProviderRegistry {
     this.runners.set(runner.providerId, runner)
   }
 
-  /** Throws if no runner is registered for the given provider id. */
+  /** 若指定的 provider id 未注册 runner，则抛出异常。 */
   get(providerId: string): ProviderRunner {
     const runner = this.runners.get(providerId)
     if (runner === undefined) {
@@ -27,7 +27,7 @@ export class ProviderRegistry {
     return runner
   }
 
-  /** Resolve a runner for a manifest via its supports() predicate. */
+  /** 通过 supports() 谓词为 manifest 解析出 runner。 */
   resolve(manifest: FrozenModelManifest): ProviderRunner {
     for (const runner of this.runners.values()) {
       if (runner.supports(manifest)) return runner
@@ -45,9 +45,8 @@ export class ProviderRegistry {
 }
 
 /**
- * Build a registry from configuration. Providers are only registered when their
- * config is supplied, so the worker stays runnable without every provider's
- * credentials.
+ * 依据配置构建注册表。仅当某 provider 的配置被提供时才注册它，
+ * 这样即使缺少部分 provider 的凭据，worker 依然可以运行。
  */
 export function createProviderRegistry(options: CreateProviderRegistryOptions = {}): ProviderRegistry {
   const registry = new ProviderRegistry()

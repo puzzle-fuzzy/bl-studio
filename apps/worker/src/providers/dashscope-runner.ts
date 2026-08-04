@@ -1,9 +1,9 @@
 /**
  * DashScope Provider Runner
- * Implements ProviderRunner for the Alibaba Cloud DashScope (Bailian / 百炼) provider.
+ * 为阿里云 DashScope（Bailian / 百炼）provider 实现 ProviderRunner。
  *
- * Type strategy: consume provider-dashscope's discriminated unions directly and
- * reuse model-core's validation, so no unsafe casts are needed.
+ * 类型策略：直接消费 provider-dashscope 的判别联合，并复用 model-core 的校验，
+ * 因此无需任何不安全的类型断言。
  */
 
 import {
@@ -58,9 +58,8 @@ export class DashScopeProviderRunner implements ProviderRunner {
   async execute(input: ProviderExecuteInput): Promise<ProviderExecuteOutput> {
     const { manifest, inputParams, providerTaskId, idempotencyKey, estimatedCostCents } = input
 
-    // Poll only needs the provider task identity. Submit-only media URLs are
-    // deliberately not persisted, so validating the original submit manifest
-    // here would incorrectly reject a valid async continuation.
+    // 轮询只需要 provider task 标识。submit 专用的媒体 URL 故意不持久化，
+    // 因此在这里校验原始 submit manifest 会错误地拒绝合法的异步续跑。
     if (providerTaskId !== undefined) {
       try {
         return await this.poll(manifest, inputParams, providerTaskId, estimatedCostCents)
@@ -69,7 +68,7 @@ export class DashScopeProviderRunner implements ProviderRunner {
       }
     }
 
-    // Reuse model-core's parameter validation (defaults, ranges, options).
+    // 复用 model-core 的参数校验（默认值、取值范围、选项）。
     const validation = validateModelParams(manifest, inputParams)
     if (!validation.valid) {
       const first = validation.errors[0]
@@ -271,9 +270,8 @@ export class DashScopeProviderRunner implements ProviderRunner {
   }
 
   /**
-   * Convert a thrown error into a non-throwing ProviderExecuteOutput.
-   * DashScopeHttpError carries a classified ProviderErrorInfo; everything else
-   * is treated as an opaque provider error.
+   * 把抛出的错误转换为不抛异常的 ProviderExecuteOutput。
+   * DashScopeHttpError 携带已分类的 ProviderErrorInfo；其余错误一律视为不透明的 provider 错误。
    */
   private toProviderFailure(error: unknown): ProviderExecuteOutput {
     if (error instanceof DashScopeHttpError) {

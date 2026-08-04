@@ -120,8 +120,8 @@ export function createApp(options: ApiAppOptions) {
     appMetrics.timing('api.request.duration', durationMs, { method: request.method, status: String(status) })
   })
   .onError(({ error, request, set }) => {
-    // onError is defined directly on the app: a named plugin's onError does not
-    // propagate in Elysia 1.4, so this must live here to catch route errors.
+    // onError 直接定义在 app 上：Elysia 1.4 中命名插件的 onError 不会向上
+    // 传播，因此必须写在这里才能捕获路由错误。
     set.status = httpStatusForError(error)
     const traceId = getRequestTrace(request)?.requestId
     if (traceId !== undefined) set.headers['x-trace-id'] = traceId
@@ -187,8 +187,8 @@ export function createApp(options: ApiAppOptions) {
       if (dependencies.storage.healthCheck !== undefined) {
         await dependencies.storage.healthCheck()
       } else {
-        // Keep custom adapters that predate the readiness probe usable while
-        // production adapters perform a real backend connectivity check.
+        // 让先于就绪探针出现的自定义适配器保持可用；
+        // 生产适配器则执行真实的后端连通性检查。
         await dependencies.storage.createReadUrl({ key: 'health/ready', expiresInSeconds: 60 })
       }
     } catch (error) {

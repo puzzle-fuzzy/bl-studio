@@ -15,9 +15,8 @@ export class LocalFileTooLargeError extends Error {
 }
 
 /**
- * Open a bounded local file response without buffering the entire object in
- * the API process. The stat check prevents an unbounded file from being
- * exposed; the stream keeps normal large responses off the heap.
+ * 打开有界（bounded）的本地文件响应，避免在 API 进程中缓冲整个对象。
+ * stat 检查防止暴露无上限大小的文件；流式返回让常规大响应不占用堆内存。
  */
 export async function createLocalFileResponse(input: {
   path: string

@@ -29,8 +29,7 @@ export class GenerationSseHub {
     if (event.id !== undefined) {
       if (this.seenEventIds.has(event.id)) return
       this.seenEventIds.add(event.id)
-      // Keep deduplication bounded; durable replay is still governed by the
-      // client's Last-Event-ID and the repository outbox.
+      // 保持去重集合有界；持久化重放仍由客户端的 Last-Event-ID 与 repository outbox 控制。
       if (this.seenEventIds.size > 10_000) {
         const oldest = this.seenEventIds.values().next().value
         if (typeof oldest === 'string') this.seenEventIds.delete(oldest)
@@ -56,8 +55,8 @@ export class GenerationSseHub {
 
     const existing = this.buffers.get(channel) ?? []
     existing.push(encoded)
-    // Cap per-channel buffer so a perpetually-absent subscriber can't grow it
-    // without bound; drop the oldest event when over the cap.
+    // 限制每个 channel 的缓冲长度，避免长期不在线的订阅者让缓冲无限增长；
+    // 超出上限时丢弃最旧的事件。
     if (existing.length > BUFFER_CAP) existing.shift()
     this.buffers.set(channel, existing)
   }
@@ -85,10 +84,9 @@ export class GenerationSseHub {
   }
 
   /**
-   * Atomically attach a listener and take the events that arrived before the
-   * connection opened. JavaScript runs this synchronous section without
-   * interleaving a publish, so an event cannot fall between drain and
-   * subscribe during SSE setup.
+   * 原子地挂载监听器并取走连接建立之前到达的事件。JavaScript 会不插入任何
+   * publish 地执行这段同步代码，因此在 SSE 建立期间事件不会落在 drain 与
+   * subscribe 之间的窗口里。
    */
   subscribeAndDrain(userId: string, listener: Listener): GenerationSseSubscription {
     const unsubscribe = this.subscribe(userId, listener)

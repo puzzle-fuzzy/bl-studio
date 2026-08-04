@@ -31,7 +31,7 @@ describe('jwt HS256', () => {
   it('rejects an expired token', () => {
     const issuedAt = 1_000_000
     const token = signJwt({ secret: SECRET, userId: 'u', sessionId: 's', ttlSeconds: 60, nowMs: issuedAt })
-    // 120s later — past the 60s lifetime
+    // 120 秒后——已超过 60 秒有效期
     expect(verifyJwt(token, { secret: SECRET, nowMs: issuedAt + 120_000 })).toBeUndefined()
   })
 
@@ -44,15 +44,15 @@ describe('jwt HS256', () => {
     const tokenV1 = signJwt({ secret: SECRET, userId: 'u', sessionId: 's', ttlSeconds: 60, keyVersion: 1 })
     const tokenV2 = signJwt({ secret: SECRET, userId: 'u', sessionId: 's', ttlSeconds: 60, keyVersion: 2 })
 
-    // Both tokens verify with no version check
+    // 不检查版本时两个 token 都能通过验证
     expect(verifyJwt(tokenV1, { secret: SECRET })).toMatchObject({ sub: 'u', ver: 1 })
     expect(verifyJwt(tokenV2, { secret: SECRET })).toMatchObject({ sub: 'u', ver: 2 })
 
-    // Version check rejects mismatched versions
+    // 版本检查会拒绝版本不匹配的 token
     expect(verifyJwt(tokenV1, { secret: SECRET, expectedKeyVersion: 2 })).toBeUndefined()
     expect(verifyJwt(tokenV2, { secret: SECRET, expectedKeyVersion: 1 })).toBeUndefined()
 
-    // Version check accepts matching versions
+    // 版本检查接受版本匹配的 token
     expect(verifyJwt(tokenV1, { secret: SECRET, expectedKeyVersion: 1 })).toMatchObject({ sub: 'u', ver: 1 })
     expect(verifyJwt(tokenV2, { secret: SECRET, expectedKeyVersion: 2 })).toMatchObject({ sub: 'u', ver: 2 })
   })

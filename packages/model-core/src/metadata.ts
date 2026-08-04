@@ -6,10 +6,9 @@ export interface ModelAuditMetadata {
 }
 
 /**
- * Return deterministic, runtime-portable identifiers for the model contract.
- * This is an audit fingerprint, not a security signature: it deliberately uses
- * a small pure-JS hash so model-core remains usable in browser and worker
- * bundles without a Node crypto dependency.
+ * 为模型契约返回确定且运行时可移植的标识符。
+ * 这是审计指纹而非安全签名：刻意使用小型纯 JS 哈希，使 model-core 无需
+ * Node crypto 依赖即可在浏览器与 worker bundle 中可用。
  */
 export function getModelAuditMetadata(manifest: FrozenModelManifest | ModelManifest): ModelAuditMetadata {
   return {

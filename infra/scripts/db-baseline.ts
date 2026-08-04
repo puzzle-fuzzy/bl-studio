@@ -1,17 +1,13 @@
 /**
- * Mark an already-provisioned current schema as covered by the checked-in
- * Drizzle migration history.
+ * 将已就绪的当前 schema 标记为已纳入已入库的 Drizzle 迁移历史。
  *
- * `drizzle-kit push` does not populate `drizzle.__drizzle_migrations`. That is
- * fine for a disposable database, but it makes the next `drizzle-kit migrate`
- * try to replay 0000 against a live schema. This command is intentionally
- * conservative: it only creates the bookkeeping table, verifies that the
- * current application tables exist, then records the exact SHA-256/hash
- * timestamp pair from the repository.
- * It never changes application rows or schema tables.
+ * `drizzle-kit push` 不会填充 `drizzle.__drizzle_migrations`。对一次性数据库这没问题，
+ * 但会导致下一次 `drizzle-kit migrate` 试图对现有 schema 重放 0000。
+ * 本命令刻意保持保守：只创建台账表、校验当前应用表存在，然后按仓库记录
+ * 精确的 SHA-256/hash 与时间戳配对。它绝不改动应用数据行或 schema 表。
  *
- * Use `pnpm run db:baseline` (dev) or set DATABASE_URL explicitly. For a fresh
- * database, use `pnpm run db:migrate` instead.
+ * 开发环境使用 `pnpm run db:baseline`，或显式设置 DATABASE_URL；全新数据库请改用
+ * `pnpm run db:migrate`。
  */
 
 import { createHash } from 'node:crypto'

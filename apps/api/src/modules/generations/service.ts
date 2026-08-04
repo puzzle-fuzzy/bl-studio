@@ -29,12 +29,11 @@ export interface GenerationLifecycleUseCases {
 }
 
 /**
- * Application-layer orchestration for creating a generation.
+ * 创建生成记录的应用层编排。
  *
- * HTTP routes remain responsible for authentication, request validation,
- * auditing and response shaping. This use case owns the business ordering:
- * estimate first, read today's usage, enforce limits, then create the record
- * and durable submit task through the repository transaction.
+ * HTTP 路由仍负责认证、请求校验、审计与响应整形。此 use case 拥有业务顺序：
+ * 先估算，再读取当日用量，执行限额校验，最后通过 repository 事务创建记录与
+ * 持久化的提交任务。
  */
 export function createGenerationUseCase(deps: CreateGenerationUseCaseDependencies) {
   return {
@@ -53,10 +52,9 @@ export function createGenerationUseCase(deps: CreateGenerationUseCaseDependencie
 }
 
 /**
- * Application-layer entry points for user-driven lifecycle transitions.
- * Ownership, retryability and state transitions remain repository invariants;
- * the HTTP layer only supplies authenticated, schema-validated input and shapes
- * the response/audit event.
+ * 用户驱动的生命周期变更的应用层入口。
+ * 所有权、可重试性与状态流转仍是 repository 的不变量；
+ * HTTP 层只提供经过认证与 schema 校验的输入，并整形响应/审计事件。
  */
 export function createGenerationLifecycleUseCases(
   repository: GenerationRepository,

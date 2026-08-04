@@ -22,13 +22,13 @@ export interface PersistArtifactsForRecordInput {
 }
 
 export interface ArtifactFetchPolicy {
-  /** Exact extra provider hosts allowed in addition to DashScope result hosts. */
+  /** 除 DashScope 结果域名外，额外允许访问的 provider 域名。 */
   allowedHosts?: readonly string[]
-  /** Maximum bytes accepted from a provider artifact. Defaults to 100 MiB. */
+  /** 单个 provider artifact 允许的最大字节数，默认 100 MiB。 */
   maxBytes?: number
-  /** Maximum time spent fetching and consuming one provider artifact. */
+  /** 获取并消费单个 provider artifact 的最大耗时。 */
   timeoutMs?: number
-  /** Maximum number of validated redirects. */
+  /** 最多跟随的有效重定向次数。 */
   maxRedirects?: number
 }
 
@@ -121,7 +121,7 @@ async function readArtifactPayload(
   }
 }
 
-/** Build the storage key for an artifact. Exported for targeted unit tests. */
+/** 构建 artifact 的存储 key。导出以供针对性的单元测试使用。 */
 export function artifactStorageKey(
   recordId: string,
   artifactId: string,
@@ -137,8 +137,8 @@ function extensionForContent(contentType: string | undefined, kind: GenerationAr
   if (lower.includes('png')) return 'png'
   if (lower.includes('jpeg') || lower.includes('jpg')) return 'jpeg'
   if (lower.includes('mp4')) return 'mp4'
-  // audio/mpeg is the standard MIME for MP3 files (DashScope's music output).
-  // Use .mp3 so browsers and OSes recognize it; reserve .mpeg for video/mpeg.
+  // audio/mpeg 是 MP3 文件的标准 MIME（DashScope 音乐输出）。
+  // 使用 .mp3 后缀以便浏览器和操作系统识别；.mpeg 留给 video/mpeg。
   if (lower.includes('audio/mpeg') || lower.includes('mp3')) return 'mp3'
   if (lower.includes('text')) return 'txt'
 

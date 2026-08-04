@@ -1,8 +1,8 @@
 /**
- * Centralized mapping from domain errors to HTTP responses.
+ * 领域错误到 HTTP 响应的集中映射。
  *
- * Every error thrown inside a route is funneled through here by the global
- * onError plugin, so routes never repeat try/catch + status-bookkeeping.
+ * 路由内抛出的每个错误都会由全局 onError 插件汇聚到这里，路由因此无需重复
+ * try/catch + 状态码簿记。
  */
 
 import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
@@ -16,13 +16,13 @@ import { RequestBodyTooLargeError } from './request-guards'
 export interface ErrorResponseBody {
   success: false
   error: { code: string; message: string; details?: unknown; cause?: string }
-  /** Request-scoped correlation id; omitted when the error is built outside HTTP. */
+  /** 请求级关联 id；在 HTTP 之外构造错误时省略。 */
   traceId?: string
 }
 
 /**
- * Status code per repository error code. A Record over the full union means
- * the compiler errors if a new code is added without a mapping here.
+ * 各 repository 错误码对应的 HTTP 状态码。使用覆盖完整联合类型的 Record，
+ * 意味着新增错误码而未在此处提供映射时编译器会报错。
  */
 const REPOSITORY_STATUS: Record<GenerationRepositoryErrorCode, number> = {
   MODEL_NOT_FOUND: 404,
@@ -98,10 +98,9 @@ export function errorResponseBody(error: unknown, traceId?: string): ErrorRespon
 }
 
 /**
- * Build the same error envelope for route branches that intentionally map a
- * domain condition to a different public code/status instead of throwing.
- * Keeping this helper beside the centralized mapper prevents those branches
- * from silently drifting away from the transport contract.
+ * 为那些有意将领域条件映射为不同公开 code/status 而非抛异常的路由分支，
+ * 构建同一套错误响应结构。把这个辅助函数放在集中映射器旁边，可防止这些分支
+ * 悄悄偏离传输契约。
  */
 export function requestErrorResponseBody(
   request: Request,
@@ -176,8 +175,8 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof ZodError) {
-    // Manual zod parses land here: surface the first issue with its path so the
-    // client sees which field failed.
+    // 手动 zod 解析会走到这里：展示第一个 issue 及其 path，
+    // 让客户端知道是哪个字段校验失败。
     const first = error.issues[0]
     const path = first?.path.join('.') ?? ''
     const message = first === undefined

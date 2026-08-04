@@ -29,9 +29,9 @@ import type { ProviderRequestAudit } from './provider-request-types'
  */
 export type RepositoryGenerationStatus = GenerationStatus | 'processing'
 export type GenerationLibraryState = 'visible' | 'hidden' | 'deleted'
-/** Public persisted bindings always preserve ordered array shape. */
+/** 公开的持久化绑定始终保留有序数组形态。 */
 export type GenerationAssetRefs = Record<string, string[]>
-/** Create requests accept a scalar as shorthand for one ordered asset binding. */
+/** 创建请求接受标量作为单个有序资产绑定的简写。 */
 export type GenerationAssetRefInput = Record<string, string | string[]>
 
 /** 一条生成记录的完整领域模型（跨边界传递时时间戳为 ISO 字符串）。 */
@@ -43,7 +43,7 @@ export interface GenerationRecord {
   providerModel: string
   category: ModelCategory
   inputParams: Record<string, unknown>
-  /** Stable user-asset bindings keyed by Manifest media parameter name. */
+  /** 以 Manifest 媒体参数名为键的稳定 user-asset 绑定。 */
   assetRefs?: GenerationAssetRefs
   status: RepositoryGenerationStatus
   statusReason?: string
@@ -69,8 +69,8 @@ export interface GenerationRecord {
 }
 
 /**
- * Changes only how a generation appears in the owner's task library.
- * It never cancels provider execution, deletes artifacts, or changes billing.
+ * 只改变生成在 owner 任务库中的呈现方式。
+ * 它绝不会取消 provider 执行、删除产物或改变计费。
  */
 export interface SetGenerationLibraryStateInput {
   recordId: string
@@ -88,11 +88,11 @@ export interface CreateGenerationInput {
   idempotencyKey?: string
   /** API 创建请求可传入的链路 ID；缺省时由 repository 生成。 */
   traceId?: string
-  /** Admission limits checked atomically inside the creation transaction. */
+  /** 在创建事务内部做原子校验的准入限额。 */
   quota?: GenerationQuotaLimits
   /**
-   * Internal retry seam: a historical binding remains usable after the asset
-   * is hidden from the library. HTTP create requests never set this flag.
+   * 内部重试接缝：资产从库中隐藏后，历史绑定仍然可用。
+   * HTTP 创建请求永远不会设置该标志。
    */
   allowDeletedAssetRefs?: boolean
 }
@@ -139,7 +139,7 @@ export interface RegisterWorkerHeartbeatInput {
 export interface CreateGenerationResult {
   record: GenerationRecord
   task: TaskRecord
-  /** The durable `generation.created` event committed with the record/task. */
+  /** 与 record/task 一起提交的持久化 `generation.created` 事件。 */
   event: GenerationEvent
 }
 
@@ -160,12 +160,12 @@ export interface GenerationEventCursor {
 
 export interface ListGenerationEventsOptions {
   userId?: string
-  /** Return events strictly after this durable event id. */
+  /** 返回严格晚于该持久化 event id 的事件。 */
   afterId?: string
   /**
-   * Return events strictly after a previously resolved durable position.
-   * Internal outbox consumers use this form so cursor progress survives
-   * retention or owner deletion removing the referenced event row.
+   * 返回严格晚于某个已解析持久化位置的事件。
+   * 内部 outbox 消费者使用此形式，使游标进度在 retention 或 owner 删除
+   * 引用的 event 行后仍然有效。
    */
   afterCursor?: GenerationEventCursor
   limit?: number
@@ -249,7 +249,7 @@ export interface GetOwnedStorageObjectInput {
 export interface OwnedStorageObject {
   id: string
   mimeType?: string
-  /** Original user-facing name when the owned object is a user asset. */
+  /** 当拥有对象是用户资产时，其原始面向用户的名称。 */
   fileName?: string
   source: 'generation_artifact' | 'user_asset' | 'asset_derivative'
 }
@@ -309,15 +309,14 @@ export interface CompleteGenerationInput {
 
 export interface CompleteGenerationResult {
   /**
-   * The state transition outcome. `cancelled` means a cancellation request
-   * won the row lock and the provider output was deliberately discarded;
-   * `already_completed` is an idempotent replay after a prior successful
-   * completion. Callers must not treat either case as a fresh settlement.
+   * 状态迁移结果。`cancelled` 表示取消请求赢得了行锁，provider 输出被有意丢弃；
+   * `already_completed` 是在此前成功完成后的一次幂等重放。
+   * 调用方不得把这两种情况当作一次新的结算。
    */
   outcome: 'completed' | 'cancelled' | 'already_completed' | 'already_failed'
   record: GenerationRecord
   task?: TaskRecord
-  /** Provider-reported cost exceeded the user-facing reservation cap. */
+  /** provider 报告的最终费用超过了面向用户的预留上限。 */
   billingAnomaly?: { estimatedCents: number; reportedCents: number }
 }
 

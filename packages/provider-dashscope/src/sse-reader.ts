@@ -114,8 +114,8 @@ export async function readSseStream(
       for (const line of lines) consumeLine(line)
     }
 
-    // A provider may close the stream without a trailing newline. Preserve the
-    // final event instead of silently dropping the last token/usage chunk.
+    // provider 可能在不带结尾换行符时关闭流；保留最后的事件，
+    // 而不是静默丢弃最后一个 token/usage 块。
     if (buffer.length > 0) consumeLine(buffer)
   } finally {
     if (signal !== undefined && onAbort !== undefined) {

@@ -33,8 +33,8 @@ const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
 }
 
 /**
- * Resolve a user-facing download name without falling back to an internal
- * storage key. Stored names and asset ids are both treated as untrusted.
+ * 解析面向用户的下载文件名，不退回使用内部 storage key。
+ * 存储名与 asset id 一律视为不可信输入。
  */
 export function assetDownloadFileName(
   fileName: string | undefined,
@@ -50,9 +50,9 @@ export function assetDownloadFileName(
 }
 
 /**
- * Build an attachment Content-Disposition value with an ASCII compatibility
- * fallback and an RFC 5987 UTF-8 filename. No raw control characters, quotes,
- * backslashes, or path separators can reach the header value.
+ * 构造 attachment 的 Content-Disposition 值：含 ASCII 兼容回退与 RFC 5987
+ * UTF-8 文件名。任何原始控制字符、引号、反斜杠或路径分隔符都不允许进入
+ * 该 header 值。
  */
 export function attachmentContentDisposition(fileName: string): string {
   const sanitizedFileName = sanitizeFileName(fileName)

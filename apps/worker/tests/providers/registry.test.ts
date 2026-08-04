@@ -11,7 +11,7 @@ if (qwenImage === undefined) {
   throw new Error('qwen-image manifest missing from registry — test setup failed')
 }
 
-/** Minimal ProviderRunner stub for registry mechanics. */
+/** 用于测试注册表机制的最小 ProviderRunner stub。 */
 function fakeRunner(id: string, willSupport: boolean): ProviderRunner {
   return {
     providerId: id,
@@ -59,7 +59,7 @@ describe('ProviderRegistry', () => {
     registry.register(fakeRunner('alpha', false))
     registry.register(fakeRunner('alpha', true))
 
-    // Only one entry remains and supports() reflects the latest registration.
+    // 只保留一个条目，且 supports() 反映的是最近一次的注册。
     expect(registry.list()).toEqual(['alpha'])
     expect(registry.resolve(qwenImage).supports(qwenImage)).toBe(true)
   })

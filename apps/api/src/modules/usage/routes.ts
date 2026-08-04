@@ -18,8 +18,8 @@ export function createUsageRoutes(deps: ApiDependencies) {
       data: {
         usage: {
           ...usage,
-          // Deprecated alias retained at the HTTP boundary while clients migrate;
-          // providerCostCents is the canonical provider-reported value.
+          // 客户端迁移期间在 HTTP 边界保留的已弃用别名；
+          // providerCostCents 才是规范化的 provider 上报值。
           finalCents: usage.providerCostCents,
           period,
           currency: 'CNY' as const,

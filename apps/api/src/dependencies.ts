@@ -11,11 +11,10 @@ import type { ArtifactConfig } from './lib/artifact-config'
 import type { GenerationSseHub } from './modules/generations/sse-hub'
 
 /**
- * All runtime capabilities available to the HTTP application.
+ * HTTP 应用可用的全部运行时能力。
  *
- * This is the API composition boundary: route modules receive these concrete
- * capabilities from the process entrypoint and never create database pools,
- * read process.env, or reach into another module's mutable singleton.
+ * 这是 API 的组合边界：路由模块从进程入口接收这些具体能力，绝不自行创建
+ * 数据库连接池、读取 process.env，或触及另一模块的可变单例。
  */
 export interface ApiDependencies {
   readonly authService: AuthService

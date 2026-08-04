@@ -28,8 +28,8 @@ class FakeStorageAdapter implements StorageAdapter {
   }
 }
 
-// Fake auth: any non-empty bailian_studio_session token authenticates as `currentUserId`.
-// Tests mutate currentUserId to impersonate owner vs intruder.
+// 假认证：任意非空 bailian_studio_session token 都会以 `currentUserId` 身份通过认证。
+// 测试通过修改 currentUserId 来模拟所有者 vs 闯入者。
 let currentUserId = 'owner'
 const fakeAuthService = createFakeAuthService(() => ({
   id: currentUserId,

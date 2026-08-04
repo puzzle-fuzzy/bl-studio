@@ -60,9 +60,9 @@ function matchingPersistedArtifact(
 }
 
 /**
- * Attach short-lived preview URLs to list projections. Local previews come
- * from durable derivatives; OSS previews use provider-side processing.
- * Originals stay in sourceUrl and are still used by the full output viewer.
+ * 为列表投影附加短期有效的预览 URL。本地预览来自持久化的派生对象；
+ * OSS 预览使用 provider 侧的处理参数。原图保留在 sourceUrl，
+ * 仍供完整输出查看器使用。
  */
 export async function attachGenerationThumbnailUrls(
   records: readonly GenerationRecord[],
@@ -127,8 +127,7 @@ export async function attachGenerationThumbnailUrls(
         }
       }
       catch {
-        // A preview optimization must never make the task list unavailable.
-        // The existing provider source remains a functional fallback.
+        // 预览优化绝不能导致任务列表不可用。现有的 provider 源仍可作为可用回退。
         return withStatus
       }
     }))

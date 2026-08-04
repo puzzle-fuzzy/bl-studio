@@ -9,11 +9,10 @@ interface WindowState {
 }
 
 /**
- * Small, process-local fixed-window limiter for the single-instance API.
+ * 面向单实例 API 的轻量、进程内固定窗口限流器。
  *
- * This is intentionally a guardrail rather than a distributed quota system:
- * it protects the personal deployment from accidental loops and basic abuse,
- * while the generation cost limits remain owned by the repository/database.
+ * 有意做成护栏而非分布式配额系统：它保护个人部署免受意外循环与基础滥用，
+ * 而生成成本限额仍由 repository/数据库负责。
  */
 export class MemoryRateLimiter {
   private readonly windows = new Map<string, WindowState>()
@@ -57,7 +56,7 @@ export class MemoryRateLimiter {
 
 export interface ApiRateLimitConfig {
   enabled: boolean
-  /** Only trust forwarded headers when a reverse proxy overwrites them. */
+  /** 仅在反向代理会重写转发头时，才信任这些头。 */
   trustProxy: boolean
   requestsPerMinute: number
   authRequestsPerMinute: number

@@ -19,8 +19,8 @@ export type AssetKind = 'image' | 'video' | 'audio' | 'text' | 'archive'
 export type AssetSource = 'upload' | 'link' | 'generation' | 'derived'
 
 /**
- * Return the physical key only when the active adapter owns that stored
- * object. A key from another provider must never be signed by this process.
+ * 仅当当前适配器拥有该存储对象时才返回物理 key。
+ * 其他 provider 的 key 绝不能被本进程签名。
  */
 export function assetDownloadStorageKey(
   item: Pick<UnifiedAssetItem, 'storageKey' | 'storageProvider'>,
@@ -88,7 +88,7 @@ export async function uploadAsset(args: {
   storage: StorageAdapter
   repository: GenerationRepository
   config: AssetConfig
-  /** Test seam; production uses the local ffprobe-based probe. */
+  /** 测试接缝；生产环境使用基于本地 ffprobe 的探测。 */
   probeMediaDuration?: (file: File) => Promise<number>
 }): Promise<AssetUploadResult> {
   const { file, userId, kindParam, storage, repository, config } = args
@@ -132,14 +132,14 @@ export async function uploadAsset(args: {
   try {
     await repository.createUserAsset(input)
   } catch (error) {
-    // Storage is an external side effect. Remove the object when the durable
-    // asset row cannot be committed, otherwise retries leak orphaned blobs.
+    // 存储是外部副作用。当持久化的资产行无法提交时，删除该对象，
+    // 否则重试会泄漏孤儿 blob。
     if (storage.deleteObject !== undefined) {
       try {
         await storage.deleteObject({ key: stored.key })
       } catch {
-        // Preserve the original DB error; orphan cleanup can be reconciled by
-        // a later storage janitor without hiding the failed upload.
+        // 保留原始 DB 错误；孤儿清理可交给后续的存储巡检任务统一处理，
+        // 无需掩盖本次上传失败。
       }
     }
     throw error

@@ -302,7 +302,7 @@ export const GenerationEstimateSchema = z.object({
     estimatedCents: z.number().int().nonnegative(),
     chargedCents: z.number().int().nonnegative(),
     providerCostCents: z.number().int().nonnegative(),
-    // Deprecated HTTP alias; use providerCostCents for provider-reported cost.
+    // 已废弃的 HTTP 别名；provider 侧成本请改用 providerCostCents。
     finalCents: z.number().int().nonnegative(),
   }),
   limits: z.object({
@@ -404,9 +404,8 @@ export const PublicSharedGenerationResponseSchema = z.object({
 /**
  * 服务端错误信封。
  *
- * `traceId` is optional for backwards compatibility with older API responses;
- * `cause` is also optional because it is only present for wrapped internal
- * errors and is intentionally kept as a short, already-sanitized string.
+ * `traceId` 为可选，以兼容旧版 API 响应；`cause` 同样可选，因为只在包装后的
+ * 内部错误中出现，且刻意保持为简短、已清洗过的字符串。
  */
 export const ApiErrorSchema = z.object({
   success: z.literal(false),
@@ -450,7 +449,7 @@ export const LogoutResponseSchema = z.object({
   ok: z.boolean(),
 })
 
-// --- Media jobs --------------------------------------------------------------
+// --- 媒体任务（Media jobs） --------------------------------------------------
 
 export const MediaJobErrorSchema = z.object({
   code: z.string().optional(),
@@ -524,9 +523,9 @@ export const AssetItemSchema = z.object({
   kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
   source: z.enum(['upload', 'link', 'generation', 'derived']),
   url: z.string().optional(),
-  /** Fresh attachment URL returned by asset detail endpoints for stored objects. */
+  /** 已存储对象由资产详情端点返回的全新附件 URL。 */
   downloadUrl: z.string().optional(),
-  /** Compact preview image; the original media URL remains in `url`. */
+  /** 紧凑预览图；原始媒体 URL 仍在 `url` 中。 */
   thumbnailUrl: z.string().optional(),
   thumbnailStatus: z.enum(['queued', 'processing', 'ready', 'failed']).optional(),
   text: z.string().optional(),
@@ -563,7 +562,7 @@ export const UsageSummarySchema = z.object({
   estimatedCents: z.number().int().nonnegative(),
   chargedCents: z.number().int().nonnegative(),
   providerCostCents: z.number().int().nonnegative(),
-  // Deprecated HTTP alias; use providerCostCents for provider-reported cost.
+  // 已废弃的 HTTP 别名；provider 侧成本请改用 providerCostCents。
   finalCents: z.number().int().nonnegative(),
   period: z.object({
     since: z.string(),

@@ -95,7 +95,7 @@ function wrapAsUserMessage(input: Record<string, unknown>): void {
   }
 }
 
-/** Native DashScope text generation accepts input.messages, not input.prompt. */
+/** DashScope 原生文本生成接口接受 input.messages，而非 input.prompt。 */
 function wrapAsTextChatMessage(input: Record<string, unknown>): void {
   const prompt = input.prompt
   delete input.prompt

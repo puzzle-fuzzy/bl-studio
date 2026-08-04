@@ -1,8 +1,8 @@
 /**
- * Projects already-persisted generation artifacts into the unified user asset
- * table. Stable artifact IDs and a partial unique index make repeated runs
- * safe. Source and access URLs may expire, so reusable assets retain stable
- * storage provider/key identity instead of persisted URLs.
+ * 将已持久化的 generation artifact 投影到统一的用户资产表。
+ * 稳定的 artifact ID 与部分唯一索引保证可重复运行。
+ * 源 URL 与访问 URL 可能过期，因此可复用资产保留稳定的 storage provider/key 标识，
+ * 而非持久化 URL。
  */
 import postgres from 'postgres'
 

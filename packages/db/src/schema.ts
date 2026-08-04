@@ -190,11 +190,11 @@ export const generationRecords = pgTable('generation_records', {
   errorJson: jsonb('error_json').$type<Record<string, unknown>>(),
   /** 预估费用（整数分 CNY），提交时按模型定价规则计算。 */
   costEstimate: integer('cost_estimate').notNull(),
-  /** Currency captured with the price snapshot; currently only CNY is supported. */
+  /** 与价格快照一起捕获的货币；当前仅支持 CNY。 */
   currency: text('currency').notNull().default('CNY'),
-  /** Deterministic pricing fingerprint used for this estimate. */
+  /** 本次估价使用的确定性定价指纹。 */
   pricingVersion: text('pricing_version').notNull().default('legacy-unknown'),
-  /** Deterministic full-manifest fingerprint used for this request. */
+  /** 本次请求使用的确定性完整 manifest 指纹。 */
   modelManifestHash: text('model_manifest_hash').notNull().default('legacy-unknown'),
   /** 最终费用（整数分 CNY），完成时回填。 */
   costFinal: integer('cost_final'),
@@ -242,8 +242,8 @@ export const generationRecords = pgTable('generation_records', {
 ])
 
 /**
- * User credit account and immutable balance ledger. The account row is the
- * concurrency lock/snapshot; ledger entries are append-only audit facts.
+ * 用户积分账户与不可变余额账本。账户行是并发锁/快照；
+ * 账本条目是只追加的审计事实。
  */
 export const creditAccounts = pgTable('credit_accounts', {
   id: text('id').primaryKey(),
@@ -420,10 +420,9 @@ export const userAssets = pgTable('user_assets', {
 ])
 
 /**
- * Asset derivatives are infrastructure-owned, reusable previews derived from a
- * user asset. Keeping them in a separate table avoids coupling user_assets to
- * one preview implementation and leaves room for future proxy, poster, and
- * waveform derivatives.
+ * 资产衍生品：由用户资产派生、归属基础设施的可复用预览。单独建表可避免把
+ * user_assets 绑定到某一种预览实现，并为未来的 proxy、poster、waveform
+ * 等衍生类型留出空间。
  */
 export const assetDerivatives = pgTable('asset_derivatives', {
   id: text('id').primaryKey(),
@@ -561,11 +560,9 @@ export const taskRecords = pgTable('task_records', {
 ])
 
 /**
- * Generation event outbox. Every user-visible generation status transition is
- * appended here in the same database transaction as the state change. The
- * API's LISTEN connection is only a wake-up signal; reconnecting clients use
- * this table and their SSE Last-Event-ID to catch up without relying on
- * process-local memory.
+ * Generation 事件 outbox。每次用户可见的 generation 状态变更都在同一数据库
+ * 事务内追加到这里。API 的 LISTEN 连接只是唤醒信号；重连的客户端借助本表与
+ * 其 SSE Last-Event-ID 追赶进度，不依赖进程内内存。
  */
 export const generationEvents = pgTable('generation_events', {
   id: text('id').primaryKey(),
@@ -573,9 +570,9 @@ export const generationEvents = pgTable('generation_events', {
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   status: text('status').notNull(),
   modelId: text('model_id').notNull(),
-  /** The generation record's updated_at at the time of the transition. */
+  /** 状态变更时 generation record 的 updated_at。 */
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
-  /** Append order tie-breaker used by the opaque SSE cursor. */
+  /** 追加顺序的平局决胜字段，供不透明 SSE cursor 使用。 */
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
 }, table => [
   index('generation_events_user_created_idx').on(table.userId, table.createdAt, table.id),
@@ -603,7 +600,7 @@ export const providerRequestAudits = pgTable('provider_request_audits', {
   operation: text('operation').notNull(),
   /** started | succeeded | failed | unsupported */
   status: text('status').notNull(),
-  /** Stable generation-scoped identity reused across submit retries. */
+  /** 稳定的、跨 submit 重试复用的 generation 级身份。 */
   idempotencyKey: text('idempotency_key'),
   providerTaskId: text('provider_task_id'),
   providerRequestId: text('provider_request_id'),
@@ -648,10 +645,9 @@ export const usageRecords = pgTable('usage_records', {
   status: text('status').notNull(),
   /** 创建请求时的估价，整数分 CNY。 */
   estimatedCostCents: integer('estimated_cost_cents').notNull(),
-  /** provider 完成后确认的最终费用，整数分 CNY。 */
-  /** Provider-reported final cost, present only after provider success. */
+  /** provider 完成后确认的最终费用（整数分 CNY），仅在其成功后写入。 */
   providerCostCents: integer('provider_cost_cents'),
-  /** User-facing settled charge; null while reserved, zero after refund. */
+  /** 面向用户的结算费用；保留期为空，退款后为 0。 */
   chargedCostCents: integer('charged_cost_cents'),
   /** 最终结算对应的 provider requestId；不是 poll 请求数。 */
   providerRequestId: text('provider_request_id'),

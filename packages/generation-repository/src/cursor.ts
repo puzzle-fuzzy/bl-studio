@@ -24,8 +24,8 @@ export interface ListGenerationRecordsOptions {
   /** 可选状态过滤（如 'succeeded'、'failed'）。 */
   status?: string
   /**
-   * Owner library views combined with OR semantics. When omitted or empty,
-   * the default view contains every non-hidden, non-deleted record.
+   * Owner 库视图，多个视图以 OR 语义组合。缺省或为空时，
+   * 默认视图包含所有未隐藏、未删除的记录。
    */
   views?: readonly GenerationListView[]
 }

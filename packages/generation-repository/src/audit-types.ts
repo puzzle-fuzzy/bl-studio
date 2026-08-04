@@ -1,9 +1,8 @@
 /**
- * User-facing security/audit events.
+ * 面向用户的安全/审计事件。
  *
- * This is deliberately a small, closed action set. Provider request audits
- * remain a separate concern because they describe outbound provider calls,
- * not user intent or access to product resources.
+ * 这里刻意采用一个小而封闭的动作集合。Provider 请求审计是另一条独立关注点，
+ * 因为它描述的是出站 provider 调用，而非用户意图或对产品资源的访问。
  */
 export type AuditAction =
   | 'auth.register'

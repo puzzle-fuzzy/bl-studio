@@ -104,10 +104,9 @@ export async function createTestUser(
 }
 
 /**
- * Seed deterministic test credits through the same ledger path used by the
- * admin grant endpoint. Keeping this helper in the repository test seam lets
- * service-level integration tests fund users without importing DB tables or
- * the credit package directly from a runtime app.
+ * 通过 admin grant 端点同一条账本路径，seed 确定性的测试积分。
+ * 把该 helper 留在 repository 测试接缝处，让服务级集成测试能给用户充值，
+ * 而无需在运行时应用里直接 import 数据库表或 credit 包。
  */
 export async function grantTestCredits(
   urlOrDb: string | BailianStudioDb,

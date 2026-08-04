@@ -21,18 +21,18 @@ describe('model catalog composition', () => {
 
   it('includes the text, image-edit, and keling-extension additions', () => {
     const ids = new Set(MODEL_REGISTRY.map(model => model.id))
-    // text category
+    // 文本类别
     expect(ids.has('qwen-plus')).toBe(true)
     expect(ids.has('qwen-max')).toBe(true)
     expect(ids.has('deepseek-v4-pro')).toBe(true)
     expect(ids.has('deepseek-v4-flash')).toBe(true)
-    // image edit
+    // 图像编辑
     expect(ids.has('qwen-image-edit-max')).toBe(true)
-    // keling extended tasks
+    // keling 扩展任务
     expect(ids.has('keling-first-last-frame-video')).toBe(true)
     expect(ids.has('keling-reference-video')).toBe(true)
     expect(ids.has('keling-video-edit')).toBe(true)
-    // video completion
+    // 视频补全
     expect(ids.has('happyhorse-video-edit')).toBe(true)
     expect(ids.has('vidu-reference-video')).toBe(true)
     expect(ids.has('wanx-2.7-video-edit')).toBe(true)

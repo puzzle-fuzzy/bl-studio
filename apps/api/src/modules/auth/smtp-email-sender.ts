@@ -33,11 +33,10 @@ export type MailTransportFactory = (options: {
 }) => MailTransport
 
 /**
- * Creates the initial 163-compatible transactional mail adapter.
+ * 创建兼容 163 的事务邮件适配器。
  *
- * Configuration is resolved lazily so local API startup remains possible
- * before SMTP is configured. Any send attempt fails without printing the
- * credentials, recipient, or full action URL.
+ * 配置懒加载，因此在未配置 SMTP 前本地 API 也能正常启动。任何发送失败都不会
+ * 打印凭据、收件人或完整动作 URL。
  */
 export function createSmtpEmailSender(
   source: EnvironmentSource = process.env,

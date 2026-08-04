@@ -8,7 +8,7 @@ export interface ProbeMediaDurationOptions {
   runProbe?: (ffprobePath: string, inputPath: string) => Promise<string>
 }
 
-/** Read the duration of an audio/video file without trusting browser metadata. */
+/** 读取音频/视频文件时长，不信任浏览器上报的元数据。 */
 export async function probeMediaDuration(
   file: File,
   options: ProbeMediaDurationOptions = {},

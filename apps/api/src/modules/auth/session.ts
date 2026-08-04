@@ -2,9 +2,8 @@ import { AuthError, type AuthService, type PublicUser } from '@bailian-studio/au
 import { readCookie, SESSION_COOKIE } from './cookies'
 
 /**
- * Resolve the authenticated user from the session cookie. Returns undefined
- * when there is no cookie, the token is invalid/expired, or the session was
- * revoked — callers treat all of these the same (not authenticated).
+ * 从会话 cookie 解析已认证用户。无 cookie、token 无效/过期或会话已被吊销时
+ * 返回 undefined——调用方把所有情况都同等对待（视为未认证）。
  */
 export async function resolveAuthUser(request: Request, authService: AuthService): Promise<PublicUser | undefined> {
   const token = readCookie(request.headers.get('cookie'), SESSION_COOKIE)
@@ -13,7 +12,7 @@ export async function resolveAuthUser(request: Request, authService: AuthService
   return verified?.user
 }
 
-/** Resolve the authenticated user or throw AUTH_UNAUTHORIZED (→ 401). */
+/** 解析已认证用户，否则抛出 AUTH_UNAUTHORIZED（→ 401）。 */
 export async function requireAuthUser(request: Request, authService: AuthService): Promise<PublicUser> {
   const user = await resolveAuthUser(request, authService)
   if (user === undefined) {
@@ -22,7 +21,7 @@ export async function requireAuthUser(request: Request, authService: AuthService
   return user
 }
 
-/** Resolve an authenticated administrator or throw AUTH_FORBIDDEN (→403). */
+/** 解析已认证的管理员，否则抛出 AUTH_FORBIDDEN（→ 403）。 */
 export async function requireAdminUser(request: Request, authService: AuthService): Promise<PublicUser> {
   const user = await requireAuthUser(request, authService)
   if (user.role !== 'admin') {

@@ -39,6 +39,7 @@ export function readRequestGuardConfig(
   }
 }
 
+/** 请求守卫入口：先校验 body 大小，再对携带会话 cookie 的写请求做 CSRF origin 校验。 */
 export function validateRequestGuards(
   request: Request,
   config: RequestGuardConfig,
@@ -81,10 +82,9 @@ export function validateContentLength(
 }
 
 /**
- * Replace a request body with a counting stream so chunked requests are held
- * to the same limit as requests that provide Content-Length. The original
- * Request is returned when there is no body; callers can safely assign the
- * returned Request to the Elysia context before its parser runs.
+ * 用计数流替换请求体，使 chunked 请求与带 Content-Length 的请求受相同限制。
+ * 无请求体时返回原始 Request；调用方可在 Elysia 解析器运行前安全地把返回的
+ * Request 赋给上下文。
  */
 export function wrapRequestBodyWithLimit(request: Request, config: RequestGuardConfig): Request {
   if (request.body === null || request.method === 'GET' || request.method === 'HEAD') return request
@@ -108,6 +108,7 @@ export function wrapRequestBodyWithLimit(request: Request, config: RequestGuardC
   } as RequestInit & { duplex: 'half' })
 }
 
+/** CSRF 防护：Origin/Referer 必须属于允许的来源；requireOrigin 时缺失即拒绝。 */
 export function validateCsrfOrigin(
   request: Request,
   allowedOrigins: readonly string[],

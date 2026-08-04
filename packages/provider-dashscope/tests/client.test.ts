@@ -825,7 +825,7 @@ describe('DashScopeClient request_id extraction', () => {
         task_status: 'PENDING',
         task_id: 'task-123',
       },
-      // no request_id
+      // 无 request_id
     }
     const { fetch } = createFetch([jsonResponse(raw)])
     const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })

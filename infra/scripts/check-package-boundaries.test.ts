@@ -34,9 +34,9 @@ describe('package boundary rules', () => {
 
   it('guards the API service from importing db and provider-dashscope directly', () => {
     expect(source).toContain("scope: 'apps/api'")
-    // apps/api's banned package regex is db|provider-dashscope (NOT storage —
-    // @bailian-studio/storage is intentionally allowed). Assert the real pattern, not a
-    // looser substring that happens to match other scopes' rules.
+    // apps/api 的 banned 包正则应为 db|provider-dashscope（而非 storage ——
+    // @bailian-studio/storage 是有意放行的）。断言真实的模式，
+    // 而不是恰好能匹配其他 scope 规则的更宽松子串。
     expect(source).toContain('@bailian-studio\\/(db|provider-dashscope)')
     expect(source).toContain('apps\\/worker')
   })

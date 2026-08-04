@@ -1,12 +1,11 @@
 /**
- * Operational probes and retention for the durable task queue/outbox.
+ * 持久化任务队列/outbox 的运维探针与 retention。
  *
- * The command is intentionally standalone so it can run from a cron job or a
- * one-shot maintenance container without exposing queue internals on a public
- * API route. Retention is dry-run by default; `--apply` is required before any
- * row is deleted.
+ * 该命令刻意独立成脚本，可从 cron 或一次性维护容器运行，
+ * 无需在公开 API 路由上暴露队列内部实现。retention 默认 dry-run，
+ * 只有传入 `--apply` 才会真正删除任何行。
  *
- * Examples:
+ * 示例：
  *   DATABASE_URL=... pnpm exec tsx infra/scripts/queue-ops.ts health
  *   DATABASE_URL=... pnpm exec tsx infra/scripts/queue-ops.ts retention
  *   DATABASE_URL=... pnpm exec tsx infra/scripts/queue-ops.ts retention --apply
@@ -210,6 +209,7 @@ export async function readQueueHealth(
 ): Promise<QueueHealthSnapshot> {
   const nowIso = now.toISOString()
   const staleReservationCutoff = new Date(now.getTime() - STALE_RESERVATION_AFTER_MS).toISOString()
+  // 并行执行六类只读探针查询，汇总后用于健康分级（ok/warning/critical）。
   const [taskRows, eventRows, billingRows, staleReservationRows, artifactRows, creditRows] = await Promise.all([
     db.unsafe<{
       queued_count: number | string

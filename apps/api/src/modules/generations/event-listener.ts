@@ -20,8 +20,8 @@ export interface StartGenerationEventListenerOptions {
 }
 
 /**
- * Pure mapping, exported for unit testing. `GenerationEventPayload.status`
- * is `string`, so notification.status flows in cast-free.
+ * 纯映射函数，导出供单元测试使用。`GenerationEventPayload.status` 是 `string`，
+ * 因此 notification.status 可以无需类型断言直接流入。
  */
 export function generationEventFromNotification(
   notification: GenerationEventNotification,
@@ -42,9 +42,9 @@ export function generationEventFromNotification(
 }
 
 /**
- * Ensure the trigger is installed, then listen for generation_events and
- * republish each as an SSE event into the hub. The hub delivers to live SSE
- * subscribers and keeps a bounded pre-connection buffer for the next connect.
+ * 确保 trigger 已安装，然后监听 generation_events 并把每个事件重发布为
+ * hub 中的 SSE 事件。hub 会推送给在线 SSE 订阅者，并为下一次连接保留
+ * 有界的连接前缓冲。
  */
 export async function startGenerationEventListener(
   options: StartGenerationEventListenerOptions,
@@ -61,9 +61,8 @@ export async function startGenerationEventListener(
     }
     draining = (async () => {
       do {
-        // A NOTIFY can arrive while the previous query is in flight. Keep a
-        // dirty bit so that notification is not lost behind the in-flight
-        // promise; the next pass reads strictly after the advanced cursor.
+        // 前一次查询进行期间可能又有 NOTIFY 到达。用一个脏位保证该通知不会
+        // 被 in-flight 的 promise 吞掉；下一轮严格在推进后的游标之后读取。
         drainRequested = false
         const events = await options.repository.listGenerationEvents({
           ...(cursor === undefined
@@ -94,9 +93,8 @@ export async function startGenerationEventListener(
     logger,
     onEvent: () => { void drain() },
   })
-  // Close the race between reading the startup cursor and registering LISTEN:
-  // anything committed during that window is present in the outbox and is
-  // drained immediately after the listener is ready.
+  // 消除「读取启动游标」与「注册 LISTEN」之间的竞态：该窗口内提交的所有内容
+  // 都在 outbox 中，监听器就绪后会立即被 drain。
   await drain()
   return listener
 }

@@ -1,17 +1,14 @@
 /**
- * Generation event outbox DDL.
+ * 生成事件 outbox DDL。
  *
- * The trigger belongs to the generation repository boundary: it captures
- * generation status transitions into the durable outbox and emits a NOTIFY
- * wake-up hint. The database package remains responsible only for generic
- * LISTEN/NOTIFY transport.
+ * 触发器归属在 generation repository 边界：它把生成状态流转捕获进持久化
+ * outbox，并发出 NOTIFY 唤醒提示。数据库包只负责通用的 LISTEN/NOTIFY 传输。
  */
 import postgres from 'postgres'
 
 /**
- * Idempotently install the generation status capture and outbox notification
- * triggers. This is invoked during API startup because schema push workflows
- * do not install executable trigger DDL.
+ * 幂等地安装「生成状态捕获」与「outbox 通知」触发器。
+ * 在 API 启动时调用，因为 schema push 流程不会安装可执行的触发器 DDL。
  */
 export async function ensureGenerationEventsTrigger(connectionString: string): Promise<void> {
   const sql = postgres(connectionString, { max: 1 })
@@ -56,10 +53,9 @@ export async function ensureGenerationEventsTrigger(connectionString: string): P
       $$ LANGUAGE plpgsql
     `
     await sql`DROP TRIGGER IF EXISTS generation_status_event_capture ON generation_records`
-    // `notify_generation_events` reads record_id from the outbox row. Remove
-    // any legacy copy on generation_records before recreating the two triggers
-    // on their intended tables; otherwise a status update fails with
-    // `record "new" has no field "record_id"` while handling the wrong row.
+    // `notify_generation_events` 从 outbox 行读取 record_id。在把两个触发器
+    // 重建到各自目标表之前，先移除 generation_records 上的遗留副本；否则
+    // 处理错误行时状态更新会报 `record "new" has no field "record_id"`。
     await sql`DROP TRIGGER IF EXISTS generation_events_notify ON generation_records`
     await sql`
       CREATE TRIGGER generation_status_event_capture

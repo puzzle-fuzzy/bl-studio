@@ -61,8 +61,8 @@ export function createGenerationRoutes(deps: ApiDependencies) {
     return { success: true, data: { estimate: toEstimateResponse(estimate, usage, balance, deps.generationLimits) } }
   })
    .post('/', async ({ request, body, set }) => {
-    // userId comes from the authenticated session cookie, never the body —
-    // a client cannot claim another user's id (closes the IDOR hole).
+    // userId 来自已认证的会话 cookie，绝不取自请求体——
+    // 客户端无法冒用其他用户的 id（堵死 IDOR 漏洞）。
      const user = await requireAuthUser(request, deps.authService)
     try {
       const input = validateInput(CreateGenerationSchema, body)
@@ -84,8 +84,8 @@ export function createGenerationRoutes(deps: ApiDependencies) {
       })
 
        const event = {
-         // The event id is generated and committed by the repository in the
-         // same transaction as the record/task. It is the SSE reconnect cursor.
+         // 事件 id 由 repository 在与 record/task 同一事务内生成并提交。
+         // 它是 SSE 重连游标。
          id: result.event.id,
          ...makeGenerationEvent('generation.created', {
            recordId: result.record.id,
@@ -147,8 +147,7 @@ export function createGenerationRoutes(deps: ApiDependencies) {
             controller.enqueue(encoder.encode(chunk))
           }
           catch {
-            // A client may disappear between an event publish and stream
-            // cancellation. Release the hub listener and timer immediately.
+            // 事件发布与流取消之间客户端可能已消失。立即释放 hub 监听器与定时器。
             cleanup()
           }
         }
@@ -168,8 +167,8 @@ export function createGenerationRoutes(deps: ApiDependencies) {
               }
             })
             .catch(() => {
-              // The live stream stays open; the browser will retry with the
-              // same Last-Event-ID and the next request can catch up again.
+              // 保持实时流打开；浏览器会用相同的 Last-Event-ID 重试，
+              // 下一次请求即可再次追平。
             })
         }
         heartbeat = setInterval(() => {
@@ -394,8 +393,8 @@ export function createGenerationRoutes(deps: ApiDependencies) {
     const { id } = validateInput(GetGenerationSchema, params)
 
     const record = await repository.getGenerationRecord(id)
-    // IDOR guard: a missing record and someone else's record are both 404,
-    // so the response never leaks a record's existence to a non-owner.
+    // IDOR 防护：记录不存在与属于他人一律返回 404，
+    // 从而响应永远不会向非所有者泄露记录是否存在。
     if (record === undefined || record.userId !== user.id) {
       set.status = 404
       return requestErrorResponseBody(request, 'GENERATION_NOT_FOUND', `Generation not found: ${id}`, set)
@@ -518,7 +517,7 @@ function toEstimateResponse(
       estimatedCents: usage.estimatedCents,
       chargedCents: usage.chargedCents,
       providerCostCents: usage.providerCostCents,
-      // Deprecated alias retained at the HTTP boundary while clients migrate.
+      // 客户端迁移期间在 HTTP 边界保留的已弃用别名。
       finalCents: usage.providerCostCents,
     },
     limits: {

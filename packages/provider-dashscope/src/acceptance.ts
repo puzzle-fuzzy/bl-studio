@@ -35,14 +35,13 @@ export interface ModelAcceptanceReport {
 }
 
 /**
- * Build deterministic, non-sensitive input values for offline request checks.
- * These values are never sent to a provider unless an operator explicitly runs
- * the live canary script.
+ * 为离线请求校验构建确定性、非敏感的输入值。除非运维显式运行线上 canary 脚本，
+ * 这些值绝不会发送给 provider。
  */
 export function buildOfflineFixtureParams(manifest: FrozenModelManifest): Record<string, unknown> {
   const params: Record<string, unknown> = {}
 
-  // Activate conditional fields with the manifest-declared discriminator value.
+  // 用 manifest 声明的 discriminator 值激活条件字段。
   for (const parameter of manifest.parameters) {
     if (parameter.visibleWhen !== undefined && params[parameter.visibleWhen.field] === undefined) {
       params[parameter.visibleWhen.field] = parameter.visibleWhen.equals

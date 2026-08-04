@@ -1,7 +1,6 @@
 /**
- * Idempotently queues persisted thumbnails for historical local and HTTPS-link
- * image/video assets. OSS-backed assets keep using provider-side processing,
- * so backfilling them would only duplicate storage and worker cost.
+ * 幂等地为历史本地存储及 HTTPS 链接的图片/视频资源排队生成已持久化的缩略图。
+ * OSS 托管的资源继续使用服务端处理，对其做 backfill 只会重复产生存储与 worker 成本。
  */
 import postgres from 'postgres'
 

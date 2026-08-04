@@ -1,8 +1,8 @@
 /**
- * Bailian Studio worker entrypoint.
+ * Bailian Studio worker 入口。
  *
- * Wires the generation repository, provider registry, and model registry into a
- * WorkerLoop and runs it until signalled to stop.
+ * 把 generation 仓库、provider 注册表与模型注册表装配进 WorkerLoop，
+ * 并一直运行直到收到停止信号。
  */
 
 import { getModelById } from '@bailian-studio/model-core'
@@ -15,7 +15,7 @@ import { createProviderRegistry } from './providers'
 import { verifyBailianRuntime } from './bailian-runtime'
 import { readWorkerEnv } from './config'
 
-// Re-exports for programmatic use.
+// 为编程式使用而重新导出。
 export { createTaskExecutor, type TaskProcessOutcome, type ModelRegistryLookup } from './task-executor'
 export type { TaskExecutor } from './task-executor'
 export {

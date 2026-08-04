@@ -144,8 +144,8 @@ function deepSeekV4(options: DeepSeekV4Options): ModelManifest {
       unit: 'per_token',
       quantityKey: 'maxCompletionTokens',
       currency: 'CNY',
-      // Contract v3-covered models are priced by the SDK through bailian-adapter.
-      // This non-authoritative tier only satisfies the legacy manifest shape.
+      // Contract v3 覆盖的模型由 SDK 通过 bailian-adapter 定价。
+      // 这个非权威阶梯仅为满足遗留 manifest 形态。
       tiers: [{ condition: {}, priceCents: 0 }],
     },
     availability: { enabled: true, stage: 'stable' },

@@ -4,7 +4,7 @@ export interface ArtifactConfig {
   readonly maxReadBytes: number
 }
 
-/** Read the API-side guardrail for local artifact responses once at startup. */
+/** 启动时一次性读取本地产物响应的 API 侧护栏配置。 */
 export function readArtifactConfig(
   source: Readonly<Record<string, string | undefined>> = process.env,
 ): ArtifactConfig {

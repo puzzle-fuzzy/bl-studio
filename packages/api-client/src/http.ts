@@ -106,7 +106,7 @@ export async function unwrapData<T>(
   return envelope.data.data
 }
 
-/** Execute an endpoint whose successful response intentionally has no body. */
+/** 执行一个成功响应刻意不带 body 的端点。 */
 export async function requestNoContent(
   url: string,
   init: RequestInit,

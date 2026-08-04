@@ -1,12 +1,12 @@
 /**
- * Cross-cutting HTTP middleware helpers: security response headers and CORS.
+ * 横切 HTTP 中间件辅助：安全响应头与 CORS。
  *
- * Full authentication/authorization is deferred until there is a user model;
- * these are the production prerequisites that don't depend on one.
+ * 完整的认证/授权推迟到存在用户模型之后再实现；
+ * 这里是不依赖用户模型的线上必备前置能力。
  */
 
 /**
- * Security headers applied to every response.
+ * 应用到每个响应的安全响应头。
  */
 export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
   'x-content-type-options': 'nosniff',
@@ -15,8 +15,8 @@ export const SECURITY_HEADERS: Readonly<Record<string, string>> = {
 }
 
 /**
- * Allowed CORS origins, from CORS_ALLOWED_ORIGINS (comma-separated) with a
- * localhost default for local web-app development.
+ * 允许的 CORS 来源，取自 CORS_ALLOWED_ORIGINS（逗号分隔）；
+ * 本地 web 应用开发默认使用 localhost。
  */
 export function getAllowedOrigins(source: Readonly<Record<string, string | undefined>> = process.env): string[] {
   const raw = source['CORS_ALLOWED_ORIGINS']
@@ -26,12 +26,12 @@ export function getAllowedOrigins(source: Readonly<Record<string, string | undef
 }
 
 // ---------------------------------------------------------------------------
-// Request identity + access logging.
+// 请求身份 + 访问日志。
 //
-// Each request gets a requestId (echoing an inbound x-request-id when the
-// caller supplies one, otherwise a fresh UUID) and a start timestamp. These
-// are carried between onRequest and onAfterResponse via a WeakMap keyed by the
-// Request object, which avoids Elysia .state typing and is GC-friendly.
+// 每个请求都会获得一个 requestId（调用方传入 x-request-id 时原样回显，
+// 否则生成新的 UUID）和一个开始时间戳。二者通过以 Request 对象为键的 WeakMap
+// 在 onRequest 与 onAfterResponse 之间传递，这避免了 Elysia .state 的类型问题，
+// 且对 GC 友好。
 // ---------------------------------------------------------------------------
 
 export interface RequestTrace {
@@ -43,7 +43,7 @@ const requestTraces = new WeakMap<Request, RequestTrace>()
 
 const REQUEST_ID_HEADER = 'x-request-id'
 
-/** Resolve the requestId for a request: prefer the caller's, else generate one. */
+/** 解析请求的 requestId：优先用调用方传入的，否则生成一个新的。 */
 export function resolveRequestId(request: Request): string {
   const inbound = request.headers.get(REQUEST_ID_HEADER)
   const normalized = inbound?.trim()
@@ -51,7 +51,7 @@ export function resolveRequestId(request: Request): string {
   return crypto.randomUUID()
 }
 
-/** Record a trace for a request so onAfterResponse can compute duration. */
+/** 为请求记录 trace，使 onAfterResponse 能计算耗时。 */
 export function beginRequestTrace(request: Request): RequestTrace {
   const trace: RequestTrace = { requestId: resolveRequestId(request), startedAt: Date.now() }
   requestTraces.set(request, trace)
@@ -62,7 +62,7 @@ export function getRequestTrace(request: Request): RequestTrace | undefined {
   return requestTraces.get(request)
 }
 
-/** Preserve the request id and start time when an early hook wraps a body. */
+/** 当早期 hook 包装请求体时，保留请求 id 与开始时间。 */
 export function copyRequestTrace(from: Request, to: Request): void {
   const trace = requestTraces.get(from)
   if (trace !== undefined) requestTraces.set(to, trace)

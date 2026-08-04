@@ -1,10 +1,9 @@
 /**
- * Provider Runner Interface
- * Abstracts different AI provider implementations behind a unified interface
+ * Provider Runner 接口
+ * 用统一接口抽象不同的 AI provider 实现
  *
- * Type strategy: reuse domain types directly (TaskErrorCategory, NormalizedOutput)
- * so the provider layer composes with task-engine and generation-repository
- * without unsafe casts.
+ * 类型策略：直接复用领域类型（TaskErrorCategory、NormalizedOutput），
+ * 让 provider 层无需不安全的类型断言即可与 task-engine、generation-repository 组合。
  */
 
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
@@ -12,16 +11,16 @@ import type { NormalizedOutput } from '@bailian-studio/provider-dashscope'
 import type { TaskErrorCategory } from '@bailian-studio/task-engine'
 
 /**
- * Input parameters for provider execution
+ * provider 执行的输入参数
  */
 export interface ProviderExecuteInput {
   readonly manifest: FrozenModelManifest
   readonly inputParams: Record<string, unknown>
   readonly taskId: string
-  /** Cost reserved with the durable generation record; reused across submit and poll. */
+  /** 随持久化 generation 记录预留的费用；在 submit 与 poll 之间复用。 */
   readonly estimatedCostCents: number
   readonly providerTaskId?: string
-  /** Stable identity for a submit/chat operation; omitted for polls. */
+  /** submit/chat 操作的稳定标识；poll 时省略。 */
   readonly idempotencyKey?: string
 }
 
@@ -68,8 +67,8 @@ export interface ProviderFailedOutput extends ProviderExecuteMetadata {
 }
 
 /**
- * Provider error information.
- * Reuses TaskErrorCategory so this composes directly into TaskError.
+ * Provider 错误信息。
+ * 复用 TaskErrorCategory，使该类型可直接组合进 TaskError。
  */
 export interface ProviderError {
   readonly code: string
@@ -85,25 +84,25 @@ export type ProviderCancelOutput =
   | { readonly status: 'failed'; readonly requestId?: string; readonly error: ProviderError }
 
 /**
- * Provider Runner interface.
- * All provider implementations must implement this interface.
+ * Provider Runner 接口。
+ * 所有 provider 实现都必须实现该接口。
  */
 export interface ProviderRunner {
-  /** Execute a generation task. */
+  /** 执行一个 generation task。 */
   execute(input: ProviderExecuteInput): Promise<ProviderExecuteOutput>
 
-  /** Best-effort cancellation after an async provider task has been submitted. */
+  /** 异步 provider task 提交后的尽力取消。 */
   cancel?(input: ProviderCancelInput): Promise<ProviderCancelOutput>
 
-  /** Whether this runner can handle the given manifest. */
+  /** 该 runner 是否能处理给定的 manifest。 */
   supports(manifest: FrozenModelManifest): boolean
 
-  /** Provider identifier this runner owns (e.g. 'dashscope'). */
+  /** 该 runner 所属的 provider 标识（例如 'dashscope'）。 */
   readonly providerId: string
 }
 
 /**
- * Build a ProviderError from a code/message/category triple.
+ * 由 code/message/category 三元组构建 ProviderError。
  */
 export function providerError(
   code: string,

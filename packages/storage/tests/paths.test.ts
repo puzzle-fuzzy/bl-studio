@@ -18,8 +18,8 @@ async function makeTmp(): Promise<string> {
   return dir
 }
 
-// This test file lives at packages/storage/tests — the nearest turbo.json
-// ancestor is the monorepo root, which is what every resolver call must anchor to.
+// 本测试文件位于 packages/storage/tests —— 最近的 turbo.json 祖先是 monorepo
+// 根目录，所有 resolver 调用都必须以此作为锚点。
 const here = dirname(fileURLToPath(import.meta.url))
 const repoRoot = findRepoRoot(here)
 
@@ -40,10 +40,9 @@ describe('resolveArtifactLocalRoot', () => {
   })
 
   it('resolves a relative value against the repo root, NOT the cwd', () => {
-    // Under `turbo run test` the package cwd is `packages/storage`, so a
-    // cwd-based resolve would land at packages/storage/var/test-artifacts.
-    // Anchoring to repoRoot is what makes the worker (writer) and API (reader)
-    // agree on the same physical directory.
+    // `turbo run test` 下包 cwd 是 `packages/storage`，若基于 cwd 解析会落到
+    // packages/storage/var/test-artifacts。锚定 repoRoot 才能让 worker（写入方）
+    // 与 API（读取方）指向同一个物理目录。
     expect(resolveArtifactLocalRoot({ ARTIFACT_LOCAL_ROOT: 'var/test-artifacts' })).toBe(resolve(repoRoot, 'var/test-artifacts'))
   })
 
@@ -74,16 +73,15 @@ describe('resolveArtifactLocalRoot', () => {
     const value = process.platform === 'win32'
       ? join(repoRoot, 'var', 'artifacts')
       : 'G:\\bailian-studio\\var\\artifacts'
-    // Documents the detection that drives the non-fatal warning: win32-absolute
-    // but NOT posix-absolute, so on macOS/Linux it would otherwise be treated
-    // as a relative path fragment.
+    // 记录触发非致命告警的检测逻辑：win32-absolute 但非 posix-absolute，
+    // 因此在 macOS/Linux 上它本会被当作相对路径片段处理。
     expect(win32.isAbsolute(value)).toBe(true)
     expect(posix.isAbsolute(value)).toBe(false)
 
     const resolved = resolveArtifactLocalRoot({ ARTIFACT_LOCAL_ROOT: value })
     expect(isAbsolute(resolved)).toBe(true)
     expect(resolved.startsWith(repoRoot)).toBe(true)
-    // Deterministic across calls (worker and API see the same value).
+    // 多次调用结果确定一致（worker 与 API 看到同一值）。
     expect(resolveArtifactLocalRoot({ ARTIFACT_LOCAL_ROOT: value })).toBe(resolved)
   })
 })
@@ -104,7 +102,7 @@ describe('findRepoRoot', () => {
     const counting = () => { calls++; return false }
     findRepoRoot(here, counting)
     findRepoRoot(here, counting)
-    // Each call walks the full ancestor chain because the injected path is uncached.
+    // 每次调用都会走完整祖先链，因为注入的路径不会缓存。
     expect(calls).toBeGreaterThan(1)
   })
 })

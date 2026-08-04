@@ -20,14 +20,14 @@ export interface OssClientLike {
   get?(key: string): Promise<{ content: Uint8Array; res?: { headers?: Record<string, string> } }>
 }
 
-/** OSS video snapshot instruction used for media-library card thumbnails. */
+/** 用于媒体库卡片缩略图的 OSS 视频截图指令。 */
 export const OSS_VIDEO_SNAPSHOT_PROCESS = 'video/snapshot,t_1000,f_jpg,w_400,m_fast'
 
 /**
- * OSS image-processing instruction used by compact previews.
+ * 紧凑预览使用的 OSS 图片处理指令。
  *
- * The longest edge is bounded to 640px and encoded as WebP. Full-resolution
- * reads deliberately use a separately signed URL without this process.
+ * 最长边限制为 640px 并编码为 WebP。原始分辨率读取刻意使用不带该
+ * process 的独立签名 URL。
  */
 export const OSS_IMAGE_THUMBNAIL_PROCESS = 'image/resize,m_lfit,w_640,h_640/format,webp/quality,Q_80'
 
@@ -57,7 +57,7 @@ export class OssStorageAdapter implements StorageAdapter {
     this.keyPrefix = options.keyPrefix ?? ''
   }
 
-  /** Resolve a logical key into the physical key for a new write. */
+  /** 将逻辑 key 解析为新写入使用的物理 key。 */
   private resolveWriteKey(key: string): string {
     if (this.keyPrefix.length === 0 || key === this.keyPrefix || key.startsWith(`${this.keyPrefix}/`)) return key
     return `${this.keyPrefix}/${key}`
@@ -80,8 +80,8 @@ export class OssStorageAdapter implements StorageAdapter {
     const head = this.options.client.head
     if (head === undefined) throw new Error('OSS storage health probe is not configured')
     try {
-      // HEAD avoids downloading any data. A missing sentinel is healthy: the
-      // 404 proves the credentials can reach the configured bucket/object API.
+      // HEAD 不会下载任何数据。哨兵对象缺失即视为健康：404 说明凭据能触达
+      // 配置的 bucket/object API。
       await head.call(this.options.client, 'health/ready')
     } catch (error) {
       const status = readStorageErrorStatus(error)
@@ -91,9 +91,8 @@ export class OssStorageAdapter implements StorageAdapter {
   }
 
   async createReadUrl(input: StorageReadUrlInput): Promise<string> {
-    // `input.key` is the persisted physical storage key. Historical keys may
-    // use a namespace different from the current OSS_KEY_PREFIX and must be
-    // signed exactly as stored.
+    // `input.key` 是持久化的物理 storage key。历史 key 可能使用与当前
+    // OSS_KEY_PREFIX 不同的命名空间，必须按原样存储签名。
     const fullKey = input.key
     return this.options.client.signatureUrl(fullKey, {
       expires: input.expiresInSeconds,
@@ -121,7 +120,7 @@ export class OssStorageAdapter implements StorageAdapter {
   async deleteObject(input: StorageDeleteInput): Promise<void> {
     const remove = this.options.client.delete
     if (remove === undefined) return
-    // Deletion compensates a persisted object; do not rewrite its namespace.
+    // 删除是对已持久化对象的补偿操作；不要改写其命名空间。
     await remove.call(this.options.client, input.key)
   }
 }

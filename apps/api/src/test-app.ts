@@ -1,9 +1,9 @@
 /**
- * Test-only application factory.
+ * 仅供测试的应用工厂。
  *
- * Every suite gets an application with an immutable dependency graph.  Tests
- * must pass the capabilities they need to `createTestApp`; there is no shared
- * app singleton and no process-wide setter that can leak state between suites.
+ * 每个测试套件都获得一个依赖图不可变的应用。测试必须把自己需要的能力传给
+ * `createTestApp`；不存在共享的 app 单例，也没有可在套件之间泄漏状态的
+ * 进程级 setter。
  */
 import type { AuthService } from '@bailian-studio/auth'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'

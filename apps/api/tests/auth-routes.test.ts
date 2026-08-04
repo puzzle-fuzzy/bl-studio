@@ -128,7 +128,7 @@ describe('auth routes', () => {
 
     expect(response.status).toBe(200)
     expect(body.data.registration.status).toBe('verification_required')
-    expect(body.data.registration.email).toBe('r****@x.test')
+    expect(body.data.registration.email).toBe('r***e@x.test')
     expect(response.headers.get('set-cookie')).toBeNull()
     expect(text).not.toContain(tokenFrom(sender.verifications.at(-1)!.url))
     expect(text).not.toContain(sender.verifications.at(-1)!.url)

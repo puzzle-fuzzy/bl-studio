@@ -1,11 +1,10 @@
 /**
- * One-shot operator command for promoting an existing account.
+ * 一次性运维命令：将现有账号提升为管理员。
  *
- * This intentionally lives outside the public API. It requires an explicit
- * --confirm flag so a mistyped selector cannot silently change privileges.
- * The operation is idempotent: promoting an existing admin succeeds again.
+ * 该命令刻意放在公开 API 之外。它要求显式的 --confirm 参数，
+ * 避免拼错的选择器悄悄改变权限。操作是幂等的：再次提升已是管理员的账号也会成功。
  *
- * Examples:
+ * 示例：
  *   DATABASE_URL=... pnpm exec tsx infra/scripts/promote-admin.ts --email=owner@example.com --confirm
  *   DATABASE_URL=... pnpm exec tsx infra/scripts/promote-admin.ts --user-id=user_123 --confirm
  */

@@ -6,7 +6,7 @@ export function createMediaAssetId(): string {
   return `asset_${crypto.randomUUID()}`
 }
 
-/** Stable output identity for a media job; retries must not create duplicate assets. */
+/** 媒体任务的稳定输出标识；重试不得产生重复资产。 */
 export function createMediaOutputAssetId(jobId: string, outputKind: string): string {
   return `asset_${jobId}_${outputKind}`
 }

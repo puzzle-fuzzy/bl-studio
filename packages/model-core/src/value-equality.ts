@@ -1,10 +1,8 @@
 /**
- * Compare manifest values used by select options and visibility rules.
+ * 比较 select 选项与可见性规则使用的 manifest 值。
  *
- * Some provider parameters are structured values, for example Fun-ASR's
- * channel list `[0]`. UI transports and default values do not necessarily
- * preserve object identity, so strict equality alone would reject an otherwise
- * valid configured option.
+ * 部分 provider 参数是结构化值，例如 Fun-ASR 的 channel 列表 `[0]`。UI 传输与
+ * 默认值不一定保留对象同一性，因此仅靠严格相等会拒绝本应有效的已配置选项。
  */
 export function modelValuesEqual(left: unknown, right: unknown): boolean {
   if (Object.is(left, right)) return true

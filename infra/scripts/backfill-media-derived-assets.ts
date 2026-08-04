@@ -1,8 +1,7 @@
 /**
- * Idempotently corrects media-action output assets created before the derived
- * source category existed. `media_jobs` stores the source asset ID and the
- * output asset metadata stores the media job ID, so the backfill is safe to
- * repeat and does not need to infer lineage from filenames or URLs.
+ * 幂等地修正 derived source 分类出现之前创建的媒体处理输出资产。
+ * `media_jobs` 保存源资产 ID，输出资产的 metadata 保存媒体任务 ID，
+ * 因此该 backfill 可安全重复执行，无需从文件名或 URL 推断血缘关系。
  */
 import postgres from 'postgres'
 

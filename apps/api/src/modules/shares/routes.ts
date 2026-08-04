@@ -14,9 +14,9 @@ type PublicArtifactWithReadUrl = PublicSharedGenerationArtifact & {
 }
 
 /**
- * Public share reads. No auth: anyone with the opaque share id can read the
- * strictly scoped public model. `readUrl` is attached here (API layer) from the
- * storage adapter — the repository never calls storage.
+ * 公开分享的读取。无鉴权：任何持有不透明 share id 的人都可以读取
+ * 严格限定的公开模型。`readUrl` 在此（API 层）由存储适配器生成——
+ * repository 从不调用存储。
  */
 export function createShareRoutes(deps: ApiDependencies) {
   const resolveArtifactReadUrl = resolveArtifactReadUrlUseCase({ storage: deps.storage })

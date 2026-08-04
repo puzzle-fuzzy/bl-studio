@@ -14,7 +14,7 @@ type AuthDatabase = BailianStudioDb | BailianStudioDbTransaction
 
 export type AuthActionTokenPurpose = 'email_verification' | 'password_reset'
 
-/** Authentication-only projection of a user row. */
+/** 仅含认证字段的 user 行投影。 */
 export interface UserRepositoryRecord {
   id: string
   email: string

@@ -28,15 +28,15 @@ export interface TaskExecutorDeps {
   readonly storage: StorageAdapter
   readonly mediaRepository?: MediaRepository
   readonly mediaProcessor?: MediaProcessor
-  /** Maximum age of a generation submit task before it is failed. */
+  /** generation submit 任务超过该时长即判定失败。 */
   readonly generationSubmitTimeoutMs?: number
-  /** Maximum age of a provider polling lifecycle before it is failed. */
+  /** provider 轮询生命周期超过该时长即判定失败。 */
   readonly providerAsyncMaxDurationMs?: number
-  /** Maximum age of an artifact persistence task before it is failed. */
+  /** 产物持久化任务超过该时长即判定失败。 */
   readonly artifactPersistTimeoutMs?: number
-  /** Provider artifact download security policy. */
+  /** provider 产物下载安全策略。 */
   readonly artifactFetch?: ArtifactFetchPolicy
-  /** Optional in-process counters/timers for task and provider diagnostics. */
+  /** 可选的进程内计数器/计时器，用于任务与 provider 诊断。 */
   readonly metrics?: MetricsCollector
   readonly logger?: Logger
 }

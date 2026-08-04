@@ -30,11 +30,11 @@ export interface ProviderFailureFixture {
 }
 
 /**
- * Offline wire fixtures shared by operation-level client tests.
+ * 供操作级客户端测试共享的离线 wire fixtures。
  *
- * These are intentionally response-shape fixtures, not a second provider
- * contract. Covered-model schema validation remains owned by the adapter; this
- * table verifies the provider client's stable error and lifecycle projection.
+ * 这些刻意是响应形状的 fixtures，而非第二套 provider 契约。covered-model 的
+ * schema 校验仍归 adapter 负责；本表验证的是 provider 客户端稳定的错误与
+ * 生命周期投影。
  */
 export const PROVIDER_FAILURE_FIXTURES: readonly ProviderFailureFixture[] = [
   {

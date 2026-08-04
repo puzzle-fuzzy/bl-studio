@@ -14,10 +14,8 @@ export interface ResolveGenerationInputParamsInput {
 }
 
 /**
- * Structured input-resolution failure consumed by the generation task
- * handler's existing error classifier. Persisted-data violations are
- * non-retryable validation errors; transient storage signing failures are
- * retryable system errors.
+ * 供 generation task 处理器现有错误分类器消费的结构化输入解析失败。
+ * 持久化数据违规属于不可重试的校验错误；存储签名临时失败属于可重试的系统错误。
  */
 export class GenerationInputAssetResolutionError extends Error {
   readonly info: ProviderErrorInfo
@@ -42,9 +40,8 @@ export class GenerationInputAssetResolutionError extends Error {
 }
 
 /**
- * Materialize durable generation asset bindings into short-lived provider
- * input URLs. The returned object is a fresh copy; neither DB params nor asset
- * rows are changed, so every submit retry receives newly signed URLs.
+ * 将持久的 generation 资产绑定物化为短时效的 provider 输入 URL。
+ * 返回对象是全新副本；DB params 与资产行均不变，因此每次 submit 重试都会拿到新签名的 URL。
  */
 export async function resolveGenerationInputParams(
   input: ResolveGenerationInputParamsInput,

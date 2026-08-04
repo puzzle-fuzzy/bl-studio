@@ -1,10 +1,9 @@
 /**
- * Validate the production environment before a release.
+ * 发布前校验生产环境。
  *
- * This command intentionally performs no network calls and never prints
- * environment values. It catches placeholder credentials and unsafe flags
- * before Docker/API/Worker startup, while leaving real provider, OSS, TLS and
- * database checks to the target-environment smoke checklist.
+ * 该命令刻意不发起任何网络调用，也绝不打印环境变量值。它会在 Docker/API/Worker
+ * 启动前拦截占位凭据与不安全开关，而真实 provider、OSS、TLS 与数据库的检查
+ * 则交给目标环境的 smoke checklist。
  */
 
 import { resolve } from 'node:path'
@@ -77,6 +76,7 @@ export function checkProductionEnvironment(
     addIssue('NODE_ENV', '必须明确设置为 production')
   }
 
+  // 必填键：缺失或仍为模板占位值（change_me、example.com 等）都会判为 issue。
   for (const key of REQUIRED_NON_EMPTY_KEYS) {
     const current = value(key)
     if (current === undefined) {

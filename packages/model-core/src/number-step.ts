@@ -1,8 +1,8 @@
 const STEP_TOLERANCE = 1e-9
 
 /**
- * Mirrors the HTML number/range step rule while remaining stable for decimal
- * steps such as 0.1, where direct modulo checks suffer floating-point noise.
+ * 对齐 HTML number/range 的 step 规则，同时对小数字长（如 0.1）保持稳定——
+ * 直接取模校验在小数步长下会受浮点噪声影响。
  */
 export function isNumberStepAligned(value: number, step: number, base = 0): boolean {
   if (!Number.isFinite(value) || !Number.isFinite(step) || step <= 0 || !Number.isFinite(base)) {

@@ -30,9 +30,9 @@ beforeAll(async () => {
   repository = createGenerationRepository({ db })
 })
 
-// File-scoped (not nested in a describe) so the connection stays open for EVERY
-// describe in this file — nesting afterAll in the first describe closed the DB
-// before the sibling "requestId tracking" describe ran, causing CONNECTION_ENDED.
+// 文件级（不嵌套在 describe 内），让连接对本文件的每个 describe 都保持打开——
+// 若把 afterAll 嵌套在第一个 describe 里，会在兄弟 describe（"requestId tracking"）
+// 运行前关闭数据库，导致 CONNECTION_ENDED。
 afterAll(async () => {
   await db.close()
   await testDb.close()
@@ -57,7 +57,7 @@ async function seedCreditAccounts(excludeUserIds: readonly string[] = []): Promi
 describe('generation repository', () => {
   beforeEach(async () => {
     await resetBailianStudioTestDb(db)
-    // Create test users to satisfy foreign key constraints
+    // 创建测试用户以满足外键约束
     await db.insert(users).values([
       {
         id: 'user_1',
@@ -889,7 +889,7 @@ describe('generation repository', () => {
     })
 
     expect(keling.record.costEstimate).toBe(300)
-    // HappyHorse video edit bills both five-second input and five-second output.
+    // HappyHorse 视频编辑按 5 秒输入 + 5 秒输出计费。
     expect(happyhorseEdit.record.costEstimate).toBe(1600)
     expect(music.record.costEstimate).toBe(12)
     expect(deepseek.record.costEstimate).toBe(10)
@@ -947,8 +947,8 @@ describe('generation repository', () => {
     expect(storedRecords).toHaveLength(1)
     expect(storedTasks).toHaveLength(1)
 
-    // Lock must expire AFTER the claim `now` (real current time, via nextRunAt);
-    // a past lockedUntil would trip the reclaim-stalled-task clause and re-claim.
+    // 锁必须在认领 `now`（真实当前时间，取自 nextRunAt）之后才过期；
+    // 若 lockedUntil 在过去，会命中「重认领停滞任务」分支并再次被认领。
     const claimNow = results[0]!.task.nextRunAt
     const lockedUntil = new Date(new Date(claimNow).getTime() + 30_000).toISOString()
     const claimed = await repository.claimNextQueuedTask({
@@ -1011,8 +1011,8 @@ describe('generation repository', () => {
       params: { prompt: 'lantern', n: 1, size: '1328*1328' },
     })
 
-    // Lock must expire AFTER the claim `now` (real current time, via nextRunAt);
-    // a past lockedUntil would trip the reclaim-stalled-task clause and re-claim.
+    // 锁必须在认领 `now`（真实当前时间，取自 nextRunAt）之后才过期；
+    // 若 lockedUntil 在过去，会命中「重认领停滞任务」分支并再次被认领。
     const claimNow = created.task.nextRunAt
     const lockedUntil = new Date(new Date(claimNow).getTime() + 30_000).toISOString()
     const claimed = await repository.claimNextQueuedTask({
@@ -2590,8 +2590,8 @@ describe('generation repository', () => {
 
       const allIds = [...page1.items, ...page2.items, ...page3.items].map(r => r.id)
       expect(allIds).toHaveLength(5)
-      expect(new Set(allIds).size).toBe(5) // no overlap, no skips
-      // Newest first: page1 precedes page3 in descending order.
+      expect(new Set(allIds).size).toBe(5) // 无重叠、无跳过
+      // 最新在前：page1 在降序排列中先于 page3。
       expect(page1.items[0]!.createdAt >= page3.items[0]!.createdAt).toBe(true)
     })
 
@@ -2625,7 +2625,7 @@ describe('generation repository', () => {
 describe('GenerationRepository requestId tracking', () => {
   beforeEach(async () => {
     await resetBailianStudioTestDb(db)
-    // Create test user to satisfy foreign key constraints
+    // 创建测试用户以满足外键约束
     await db.insert(users).values({
       id: 'user-1',
       email: 'user-test@example.com',
@@ -2699,7 +2699,7 @@ describe('GenerationRepository requestId tracking', () => {
       params: { prompt: 'test' },
     })
 
-    // First update with requestId
+    // 第一次更新带 requestId
     await repository.scheduleGenerationPoll({
       recordId: record.record.id,
       providerTaskId: 'prov-task-123',
@@ -2708,12 +2708,12 @@ describe('GenerationRepository requestId tracking', () => {
       now: '2025-01-06T00:00:00.000Z',
     })
 
-    // Second update without requestId (should not overwrite)
+    // 第二次更新不带 requestId（不应覆盖）
     await repository.scheduleGenerationPoll({
       recordId: record.record.id,
       providerTaskId: 'prov-task-123',
       nextRunAt: '2025-01-06T02:00:00.000Z',
-      // no requestId provided
+      // 未提供 requestId
       now: '2025-01-06T01:00:00.000Z',
     })
 

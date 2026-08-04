@@ -1,8 +1,7 @@
 /**
- * Transactional email port owned by the authentication domain.
+ * 认证域拥有的事务邮件 port。
  *
- * The auth package never imports an SMTP implementation. Runtime applications
- * inject an adapter while tests use an in-memory sender.
+ * auth 包从不导入任何 SMTP 实现：运行时应用注入 adapter，测试使用内存发送器。
  */
 export interface TransactionalEmailSender {
   sendEmailVerification(input: {

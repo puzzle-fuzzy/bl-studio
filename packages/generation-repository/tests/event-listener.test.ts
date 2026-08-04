@@ -14,7 +14,7 @@ let iso: IsolatedGenerationRepository
 beforeAll(async () => {
   iso = await createIsolatedGenerationRepository()
   await ensureGenerationEventsTrigger(iso.databaseUrl)
-  // Create test user to satisfy foreign key constraints
+  // 创建测试用户以满足外键约束
   await createTestUser(iso.databaseUrl, 'user_listen')
   await grantTestCredits(iso.db, 'user_listen', 100, 'event listener test seed')
 })

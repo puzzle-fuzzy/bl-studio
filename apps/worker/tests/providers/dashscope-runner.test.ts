@@ -12,7 +12,7 @@ if (qwenImage === undefined || wanxVideo === undefined || kelingVideo === undefi
 }
 
 // ---------------------------------------------------------------------------
-// Fakes
+// 替身
 // ---------------------------------------------------------------------------
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -27,7 +27,7 @@ interface QueuedFetch {
   calls: Array<{ url: string }>
 }
 
-/** A fetch implementation that returns Responses in FIFO order, recording URLs. */
+/** 按 FIFO 顺序返回 Response、并记录 URL 的 fetch 实现。 */
 function queuedFetch(responses: Response[]): QueuedFetch {
   const queue = [...responses]
   const calls: Array<{ url: string }> = []
@@ -37,9 +37,9 @@ function queuedFetch(responses: Response[]): QueuedFetch {
     if (next === undefined) throw new Error('queuedFetch: response queue exhausted')
     return next
   }
-  // Merge onto the real fetch so the result carries fetch's static surface
-  // (e.g. preconnect) and satisfies `typeof fetch` without a cast. The merged
-  // call signature belongs to `core`, so requests hit our queue, not the network.
+  // 合并到真实 fetch 上，使结果携带 fetch 的静态表面（如 preconnect），
+  // 并在无需类型断言的情况下满足 `typeof fetch`。合并后的调用签名属于 `core`，
+  // 因此请求只会命中我们的队列，而不会真正访问网络。
   const impl: DashScopeFetch = Object.assign(core, fetch)
   return { fetch: impl, calls }
 }
@@ -65,14 +65,12 @@ function poll(
   return { manifest, inputParams, taskId: 'task_1', providerTaskId, estimatedCostCents }
 }
 
-// ---------------------------------------------------------------------------
-
 describe('DashScopeProviderRunner.execute', () => {
   it('returns a validation error without calling the provider when params are invalid', async () => {
     const { fetch, calls } = queuedFetch([])
     const runner = makeRunner(fetch)
 
-    const result = await runner.execute(submit(qwenImage, { n: 1 })) // missing required prompt
+    const result = await runner.execute(submit(qwenImage, { n: 1 })) // 缺少必填的 prompt
 
     expect(result.success).toBe(false)
     expect(result.requiresPoll).toBe(false)
@@ -219,7 +217,7 @@ describe('DashScopeProviderRunner.execute', () => {
     }))
 
     expect(result.success).toBe(true)
-    // Request estimate is 5 × 60 = 300 cents; final usage is 7 × 60 = 420 cents.
+    // 请求预估为 5 × 60 = 300 分；最终 usage 为 7 × 60 = 420 分。
     expect(result.costCents).toBe(420)
   })
 
@@ -257,10 +255,9 @@ describe('DashScopeProviderRunner.execute', () => {
     expect(result.error?.category).toBe('provider')
     expect(result.error?.retryable).toBe(true)
 
-    // NOTE: the generic PROVIDER_ERROR branch in toProviderFailure is defensive —
-    // the dashscope client wraps every fetch failure in DashScopeHttpError, so it
-    // cannot be reached through the fetch injection seam and is intentionally not
-    // exercised here.
+    // 注意：toProviderFailure 中通用的 PROVIDER_ERROR 分支是防御性的 ——
+    // dashscope 客户端会把每次 fetch 失败包装成 DashScopeHttpError，
+    // 因此该分支无法通过 fetch 注入缝触达，这里有意不去覆盖。
   })
 
   it('preserves HTTP status in the provider error code when DashScope returns no code', async () => {

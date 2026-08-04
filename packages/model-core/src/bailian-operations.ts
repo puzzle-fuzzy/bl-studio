@@ -1,10 +1,9 @@
 /**
- * Bailian Studio product manifest -> Bailian SDK operation mapping.
+ * Bailian Studio 产品 manifest → Bailian SDK operation 的映射。
  *
- * This file intentionally contains only the consumer-owned product identity to
- * capability decision. Provider model IDs and execution modes continue to come
- * from ModelManifest; request fields, transports, responses, lifecycle and
- * official pricing belong to @puzzle-fuzzy/bailian-sdk.
+ * 本文件刻意只包含"消费者持有的产品标识 → 能力"这一决策。provider 模型 ID
+ * 与执行模式仍来自 ModelManifest；请求字段、传输、响应、生命周期与官方定价
+ * 归属 @puzzle-fuzzy/bailian-sdk。
  */
 
 import { MODEL_REGISTRY, listModels } from './registry'

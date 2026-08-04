@@ -1,6 +1,6 @@
 export type CreditLedgerKind = 'grant' | 'recharge' | 'reserve' | 'settle' | 'refund' | 'adjustment'
 
-/** PostgreSQL integer upper bound used by every persisted cents field. */
+/** 所有持久化 cents 字段使用的 PostgreSQL 整数上界。 */
 export const MAX_CREDIT_AMOUNT_CENTS = 2_147_483_647
 
 export interface CreditAccount {

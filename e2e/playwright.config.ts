@@ -2,9 +2,9 @@ import { defineConfig } from '@playwright/test'
 
 const databaseUrl = 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
 
-// Keep the browser smoke self-contained: the API uses the isolated test DB,
-// the Web client talks to the API on the fixed 5003 port, and no provider key
-// or Worker process is needed because the test stops at a queued generation.
+// 保持浏览器 smoke 测试自包含：API 使用隔离的测试数据库，
+// Web 客户端通过固定 5003 端口访问 API，且不需要 provider key 或 Worker 进程，
+// 因为测试在生成任务进入 queued 状态后就结束了。
 const inheritedTestEnv: Record<string, string> = {
   DATABASE_URL: databaseUrl,
   AUTH_JWT_SECRET: 'e2e-only-secret-do-not-use-in-production',

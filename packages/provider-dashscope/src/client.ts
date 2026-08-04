@@ -56,13 +56,13 @@ export interface CreateDashScopeClientOptions {
   apiKey: string
   fetch?: DashScopeFetch
   baseUrl?: string
-  /** Optional OpenAI-compatible chat root; defaults to the provider host derived from baseUrl. */
+  /** 可选的 OpenAI 兼容 chat 根路径；默认取 baseUrl 推导出的 provider host。 */
   chatBaseUrl?: string
   /** Keling、HappyHorse、Fun Music 等工作空间专属端点所需。 */
   workspaceId?: string
   /** Contract v3 校验错误的输出语言。 */
   contractLocale?: 'zh-CN' | 'en-US'
-  /** Abort an individual provider HTTP request after this duration. */
+  /** 单次 provider HTTP 请求超过该时长后中止。 */
   requestTimeoutMs?: number
 }
 
@@ -70,7 +70,7 @@ export interface CreateDashScopeClientOptions {
 export interface ProviderSubmitInput {
   manifest: FrozenModelManifest
   params: Record<string, unknown>
-  /** Stable per-generation submission identity used to make provider retries safe. */
+  /** 每次生成的稳定提交标识，用于保证 provider 重试安全。 */
   idempotencyKey?: string
 }
 

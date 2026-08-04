@@ -13,12 +13,11 @@ export interface ModelManifestCheckSummary {
 }
 
 /**
- * Explicit root-level gate for the model catalog.
+ * 模型目录的显式顶层入口检查。
  *
- * The registry also checks itself at module load, but keeping this command
- * explicit makes the onboarding contract visible in CI and in the developer
- * workflow. It intentionally stays inside model-core and never imports an SDK,
- * adapter, provider, database, or service.
+ * registry 在模块加载时也会自检，但保留这条显式命令，能让 CI 与开发者工作流
+ * 都看到 onboarding 契约。它刻意留在 model-core 内部，绝不 import SDK、
+ * adapter、provider、数据库或 service。
  */
 export function checkModelManifests(
   manifests: readonly FrozenModelManifest[] = MODEL_REGISTRY,

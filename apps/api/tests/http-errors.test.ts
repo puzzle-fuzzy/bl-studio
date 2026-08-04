@@ -139,7 +139,7 @@ describe('errorResponseBody', () => {
       error: { code: 'INTERNAL_ERROR', message: 'outer', cause: 'root cause' },
     })
 
-    // Non-Error values fall back to the generic message.
+    // 非 Error 值回退到通用消息。
     expect(errorResponseBody('something odd')).toEqual({
       success: false,
       error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },

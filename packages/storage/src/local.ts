@@ -24,7 +24,7 @@ export class LocalStorageAdapter implements StorageAdapter {
     this.keyPrefix = options.keyPrefix ?? ''
   }
 
-  /** Resolve a logical key into the physical key for a new write. */
+  /** 将逻辑 key 解析为新写入使用的物理 key。 */
   private resolveWriteKey(key: string): string {
     if (this.keyPrefix.length === 0 || key === this.keyPrefix || key.startsWith(`${this.keyPrefix}/`)) return key
     return `${this.keyPrefix}/${key}`
@@ -51,8 +51,8 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async createReadUrl(input: StorageReadUrlInput): Promise<string> {
-    // Read keys come from the persisted storageKey. Keep historical keys
-    // addressable even when the active write namespace has changed.
+    // 读 key 来自持久化的 storageKey；即使当前写入命名空间已变更，也要保证
+    // 历史 key 仍可寻址。
     const safeKey = sanitizeKey(input.key)
     // 本地适配器的"读 URL"只是一段由 API 路由负责解析的相对路径，不做签名、
     // 也不校验 expiresInSeconds（本地存储的访问控制由 API 路由层负责）。

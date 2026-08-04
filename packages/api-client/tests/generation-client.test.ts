@@ -21,7 +21,7 @@ interface QueuedFetch {
   calls: Array<{ url: string; method: string; body: string | undefined; credentials: RequestCredentials | undefined }>
 }
 
-/** Fake fetch returning Responses in FIFO order, recording each call. */
+/** 按 FIFO 顺序返回 Response 的假 fetch，并记录每次调用。 */
 function queuedFetch(responses: Response[]): QueuedFetch {
   const queue = [...responses]
   const calls: QueuedFetch['calls'] = []
@@ -36,8 +36,8 @@ function queuedFetch(responses: Response[]): QueuedFetch {
     if (next === undefined) throw new Error('queuedFetch: response queue exhausted')
     return next
   }
-  // Merge onto the real fetch so the result carries fetch's static surface
-  // (e.g. preconnect) and satisfies `typeof fetch` without a cast.
+  // 合并到真实 fetch 上，使结果携带 fetch 的静态面（如 preconnect），
+  // 无需强转即可满足 `typeof fetch`。
   return { fetch: Object.assign(core, fetch), calls }
 }
 
@@ -57,8 +57,8 @@ const qwenImage: ModelCatalogItem = {
   availability: { enabled: true, stage: 'stable' },
 }
 
-// A full manifest carries request/output/pricing the client does not model —
-// the schema must strip those and still parse cleanly.
+// 完整 manifest 携带了客户端不建模的 request/output/pricing ——
+// schema 必须剔除这些字段且仍能干净解析。
 const fullManifest = {
   ...qwenImage,
   request: { kind: 'dashscope-image-message', endpoint: '/x', bindings: {} },
@@ -312,7 +312,7 @@ describe('createApiClient', () => {
     expect(result.record.id).toBe('rec_1')
     expect(result.task.type).toBe('generation.submit')
     expect(calls[0]?.method).toBe('POST')
-    // No userId in the body — the API derives it from the session cookie.
+    // body 中不含 userId —— API 从 session cookie 推导。
     expect(calls[0]?.body).toEqual(JSON.stringify({
       modelId: 'qwen-image',
       params: { prompt: 'lantern' },

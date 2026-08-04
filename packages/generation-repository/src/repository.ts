@@ -302,6 +302,7 @@ function referenceIds(value: AssetReferenceValue): string[] {
   return ids
 }
 
+/** 校验并规整生成参数：无 assetRefs 时走纯参数校验；有 assetRefs 时校验媒体绑定并归一化。 */
 function prepareGenerationParams(
   manifest: FrozenModelManifest,
   inputParams: Record<string, unknown>,
@@ -408,6 +409,7 @@ function flattenAssetRefs(assetRefs: GenerationAssetRefs | undefined): Array<{
     )
 }
 
+/** 在事务内锁定被引用的资产行（FOR UPDATE），并校验归属、就绪状态与媒体类型。 */
 async function lockAndValidateGenerationAssets(
   tx: BailianStudioTx,
   input: {
@@ -461,6 +463,7 @@ async function lockAndValidateGenerationAssets(
   }
 }
 
+/** 把 generation_input_assets 的查询行按参数名重新聚合成有序的资产引用。 */
 function refsFromRows(
   rows: ReadonlyArray<{ parameterName: string; position: number; assetId: string }>,
 ): GenerationAssetRefs | undefined {
@@ -481,6 +484,7 @@ function refsFromRows(
   return refs
 }
 
+/** 把任意值递归规范化成字符串（对象键排序、数组保持顺序），用于幂等比较。 */
 function canonicalize(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
   if (value !== null && typeof value === 'object') {
@@ -568,11 +572,11 @@ export interface GenerationEstimate {
 }
 
 export interface DailyGenerationUsage {
-  /** Number of generation attempts, including failed and cancelled records. */
+  /** 生成尝试次数，包含 failed 与 cancelled 的记录。 */
   attemptCount: number
-  /** Number of provider-successful generations (usage status = settled). */
+  /** provider 侧成功的生成数（usage 状态为 settled）。 */
   successfulCount: number
-  /** Deprecated transport alias for attemptCount. */
+  /** 已废弃的 attemptCount 传输别名。 */
   generationCount: number
   estimatedCents: number
   chargedCents: number
@@ -585,7 +589,7 @@ export interface DailyGenerationUsageInput {
   until: string
 }
 
-/** Time-window usage aggregate reused by daily limits and monthly reporting. */
+/** 时间窗口内的用量聚合，供每日限额与月度报表复用。 */
 export type GenerationUsage = DailyGenerationUsage
 export type GenerationUsageInput = DailyGenerationUsageInput
 
@@ -600,7 +604,7 @@ export interface GenerationRepository {
   listGenerationRecords(userId: string, options?: ListGenerationRecordsOptions): Promise<ListGenerationRecordsResult>
   getGenerationRecord(id: string): Promise<GenerationRecord | undefined>
   setGenerationLibraryState(input: SetGenerationLibraryStateInput): Promise<GenerationRecord>
-  /** Internal Worker read model; never expose its storage coordinates over HTTP. */
+  /** Worker 内部读模型；切勿把存储坐标通过 HTTP 暴露。 */
   getGenerationInputAssets(recordId: string): Promise<GenerationInputAsset[]>
   getGenerationDiagnostics?: (id: string) => Promise<GenerationDiagnostics | undefined>
   updateGenerationRecord(id: string, patch: UpdateGenerationRecordPatch): Promise<GenerationRecord>
@@ -633,7 +637,7 @@ export interface GenerationRepository {
    */
   retryGeneration(input: RetryGenerationInput): Promise<CreateGenerationResult>
   listArtifactsForRecord(recordId: string): Promise<GenerationArtifact[]>
-  /** Batch counterpart used by paginated task lists to avoid one query per record. */
+  /** 批量版本，供分页任务列表使用，避免每条记录各查一次。 */
   listArtifactsForRecords(recordIds: readonly string[]): Promise<GenerationArtifact[]>
   listPendingArtifactsForRecord(recordId: string): Promise<GenerationArtifact[]>
   markArtifactStored(input: MarkArtifactStoredInput): Promise<GenerationArtifact>
@@ -643,7 +647,7 @@ export interface GenerationRepository {
   saveTask(task: TaskRecord, options?: SaveTaskOptions): Promise<TaskRecord | undefined>
   getTask(id: string): Promise<TaskRecord | undefined>
   listGenerationEvents(options?: ListGenerationEventsOptions): Promise<GenerationEvent[]>
-  /** Resolve a durable SSE cursor within an optional user scope. */
+  /** 在可选的用户 scope 内解析一个持久化 SSE 游标。 */
   getGenerationEvent(id: string, userId?: string): Promise<GenerationEvent | undefined>
   getLatestGenerationEvent(): Promise<GenerationEvent | undefined>
   createGenerationShare(input: CreateGenerationShareInput): Promise<GenerationShare>
@@ -653,19 +657,19 @@ export interface GenerationRepository {
   /** 公开分享的内部对象读取查询；只供 API 生成分享专属读取响应。 */
   getPublicSharedArtifact(shareId: string, artifactId: string): Promise<GenerationArtifact | undefined>
 
-  /** Read-only database probe used by the API readiness endpoint. */
+  /** 只读数据库探针，供 API readiness 端点使用。 */
   healthCheck?: () => Promise<void>
 
-  /** Register/update process liveness used to distinguish API health from worker health. */
+  /** 注册/更新进程存活状态，用于区分 API 健康与 worker 健康。 */
   registerWorkerHeartbeat?: (input: RegisterWorkerHeartbeatInput) => Promise<WorkerHeartbeat>
   touchWorkerHeartbeat?: (workerId: string, now?: string) => Promise<WorkerHeartbeat | undefined>
   stopWorkerHeartbeat?: (workerId: string, now?: string) => Promise<WorkerHeartbeat | undefined>
   getWorkerHealth?: (input?: { now?: string; staleAfterMs?: number }) => Promise<WorkerHealth>
 
-  /** Read-only daily usage aggregation used for preflight task/cost limits. */
+  /** 只读的每日用量聚合，用于任务/成本限额的预检。 */
   getDailyGenerationUsage?: (input: DailyGenerationUsageInput) => Promise<DailyGenerationUsage>
 
-  /** Read-only usage aggregation for arbitrary reporting windows, including the current month. */
+  /** 只读用量聚合，支持任意报表时间窗口，包括当月。 */
   getGenerationUsage?: (input: GenerationUsageInput) => Promise<GenerationUsage>
 
   startProviderRequest(input: StartProviderRequestInput): Promise<ProviderRequestAudit>
@@ -674,7 +678,7 @@ export interface GenerationRepository {
 
   /** 插入一条用户上传/导入的资产记录（user_assets 表）。 */
   createUserAsset(input: CreateUserAssetInput): Promise<void>
-  /** Worker-only source lookup for a durable thumbnail derivative task. */
+  /** 仅 Worker 使用的来源查询，供持久化缩略图衍生任务读取。 */
   getAssetThumbnailSource(derivativeId: string): Promise<AssetThumbnailSource | undefined>
   markAssetThumbnailProcessing(input: MarkAssetThumbnailProcessingInput): Promise<boolean>
   completeAssetThumbnail(input: CompleteAssetThumbnailInput): Promise<void>
@@ -808,9 +812,8 @@ function defaultGenerationListCondition() {
 }
 
 /**
- * Library views are OR-ed so a user can inspect, for example, completed and
- * hidden records together. Execution status remains independent from owner
- * presentation state.
+ * 库视图以 OR 组合，让用户可以同时查看如 completed 与 hidden 的记录。
+ * 执行状态与 owner 的展示状态相互独立。
  */
 function generationListViewCondition(
   views: readonly GenerationListView[] | undefined,
@@ -1186,8 +1189,8 @@ async function readGenerationUsage(
   db: BailianStudioDb | BailianStudioTx,
   input: GenerationUsageInput,
 ): Promise<GenerationUsage> {
-  // Read the generation-level ledger, never provider_request_audits: poll rows
-  // are operational evidence and must not multiply the user's cost.
+  // 只读 generation 级账本，绝不读 provider_request_audits：poll 行是运营证据，
+  // 不能乘进用户的成本。
   const [usage] = await db
     .select({
       attemptCount: sql<number>`count(*)::int`,
@@ -1275,7 +1278,7 @@ async function markUsageRecordTerminal(
   }
 }
 
-/** Refund the reservation and close the usage row exactly once. */
+/** 退还预留并恰好关闭一次 usage 行。 */
 async function refundGenerationInTransaction(
   tx: BailianStudioTx,
   record: GenerationRecordRow,
@@ -1527,8 +1530,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
 
           const createdAt = nowIso()
           if (input.quota !== undefined) {
-            // Serialize admissions per user without holding a process-local lock;
-            // the xact lock is released automatically on commit/rollback.
+            // 按用户串行化准入，不持有进程内锁；
+            // 事务锁在 commit/rollback 时自动释放。
             await tx.execute(sql`select pg_advisory_xact_lock(hashtextextended(${input.userId}, 0))`)
             const window = utcDayWindow(new Date(createdAt))
             const usage = await readGenerationUsage(tx, {
@@ -1663,10 +1666,9 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
               status: insertedRecord.status,
               modelId: insertedRecord.modelId,
               updatedAt: insertedRecord.updatedAt,
-              // All outbox append timestamps must come from PostgreSQL. Status
-              // trigger events use clock_timestamp(); mixing in the app clock
-              // can reverse cursor order when the two clocks differ slightly.
-              // Millisecond precision keeps Date/ISO cursor round-trips exact.
+              // 所有 outbox 追加时间戳必须来自 PostgreSQL。状态触发事件使用
+              // clock_timestamp()；混入应用时钟会导致两个时钟略有偏差时游标
+              // 顺序颠倒。毫秒精度保证 Date/ISO 游标往返精确。
               createdAt: sql`date_trunc('milliseconds', clock_timestamp())`,
             })
             .returning()
@@ -1761,9 +1763,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
     },
 
     /**
-     * Move an owner record between visible, hidden and soft-deleted library
-     * states. This deliberately does not touch generation status, queued tasks,
-     * artifacts, usage or billing.
+     * 在可见、隐藏与软删除三种库状态之间移动 owner 记录。
+     * 刻意不去触碰 generation 状态、排队任务、产物、用量或计费。
      */
     async setGenerationLibraryState(input) {
       const now = input.now ?? nowIso()
@@ -2063,10 +2064,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
       const now = input.now ?? nowIso()
 
       return db.transaction(async tx => {
-        // Serialize completion against requestGenerationCancel. Without a row
-        // lock, a provider response that was already in flight could overwrite
-        // a cancellation request and settle credits after the user had won the
-        // cancellation race.
+        // 让 complete 与 requestGenerationCancel 串行化。若不加行锁，已经在途的
+        // provider 响应可能会覆盖取消请求，并在用户赢得取消竞态后结算 credits。
         const [currentRecord] = await tx
           .select()
           .from(generationRecords)
@@ -2233,9 +2232,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Generation record not found: ${input.recordId}`)
         }
 
-        // A provider failure can arrive after a user cancellation request (or
-        // after another worker has already finalized the record). Preserve the
-        // first terminal decision instead of resurrecting or overwriting it.
+        // provider 失败可能发生在用户取消请求之后（或另一 worker 已收尾该记录之后）。
+        // 保留第一个终态决策，而不是复活或覆盖它。
         if (currentRecord.status === 'succeeded' || currentRecord.status === 'failed') {
           return toGenerationRecord(currentRecord)
         }
@@ -2311,9 +2309,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
       const now = input.now ?? nowIso()
 
       return db.transaction(async tx => {
-        // Lock the record before finalizing cancellation. A stale worker may
-        // call this after a provider success; the lock and terminal guard make
-        // the first terminal transition win instead of rewriting success.
+        // 在落定取消前锁住记录。陈旧 worker 可能在 provider 成功后调用本方法；
+        // 行锁与终态守卫让第一个终态迁移胜出，而不是改写成功结果。
         const [current] = await tx
           .select()
           .from(generationRecords)
@@ -2491,9 +2488,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
       const now = input.now ?? nowIso()
 
       return db.transaction(async tx => {
-        // Do the state transition in the UPDATE predicate itself. A separate
-        // read-then-write sequence lets a worker win the race between the two
-        // statements and incorrectly cancel a record that already moved on.
+        // 直接在 UPDATE 谓词里完成状态迁移。分开的「先读后写」序列会让 worker
+        // 在两语句之间的竞态中胜出，从而错误地取消一条已经推进的记录。
         const submittingPatch: UpdateGenerationRecordPatch = {
           cancelRequestedAt: now,
           providerCancelStatus: 'requested',
@@ -2645,7 +2641,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
       return rows.map(row => toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail))
     },
 
-    /** List artifacts for a page of records in one stable, bounded query. */
+    /** 用一次稳定且有界的查询列出整页记录对应的产物。 */
     async listArtifactsForRecords(recordIds) {
       const uniqueRecordIds = [...new Set(recordIds)]
       if (uniqueRecordIds.length === 0) return []
@@ -2746,9 +2742,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             createdAt: new Date(now),
             updatedAt: new Date(now),
           })
-          // Only the deterministic projection ID is retry-idempotent. Do not
-          // swallow unrelated uniqueness/integrity violations, because the
-          // artifact update must roll back if its asset projection is invalid.
+          // 只有确定性的投影 ID 才是重试幂等的。不要吞掉无关的唯一性/完整性
+          // 违规——若资产投影无效，artifact 更新必须回滚。
           .onConflictDoNothing({ target: userAssets.id })
           .returning({ id: userAssets.id })
 
@@ -2928,10 +2923,9 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
     },
 
     /**
-     * Read the append-only generation event stream for SSE catch-up. The
-     * event id is intentionally opaque; the repository resolves it to the
-     * `(createdAt, id)` cursor so callers never depend on database ordering
-     * details.
+     * 读取 append-only 的生成事件流，供 SSE 追更。event id 有意保持不透明；
+     * repository 把它解析为 `(createdAt, id)` 游标，调用方无需依赖数据库
+     * 排序细节。
      */
     async listGenerationEvents(input = {}) {
       const limit = Math.min(Math.max(input.limit ?? 100, 1), 500)
@@ -2946,9 +2940,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           .where(eq(generationEvents.id, input.afterId))
           .limit(1)
 
-        // An unknown Last-Event-ID cannot safely be mapped to a cursor. The
-        // client will reconnect with a fresh cursor instead of receiving the
-        // entire event history.
+        // 未知的 Last-Event-ID 无法安全映射为游标。客户端将以全新游标重连，
+        // 而不是接收整个事件历史。
         if (after === undefined) return []
         afterCursor = {
           id: after.id,
@@ -2979,9 +2972,9 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
     },
 
     /**
-     * Resolve one durable SSE cursor before opening a reconnect stream.
-     * Scoping by userId deliberately makes a cursor belonging to another user
-     * indistinguishable from a purged cursor at the HTTP boundary.
+     * 在打开重连流之前解析一个持久化 SSE 游标。
+     * 按 userId 限定作用域，刻意让「属于另一用户的游标」与「已被清除的游标」
+     * 在 HTTP 边界上无法区分。
      */
     async getGenerationEvent(id, userId) {
       const [row] = await db
@@ -3075,8 +3068,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
         .update(generationShares)
         .set({
           includeParams: input.includeParams ?? existing.includeParams,
-          // Calling create again for an expired share reactivates it. If no new
-          // expiry is supplied, the owner explicitly gets a non-expiring share.
+          // 对已过期分享再次调用 create 会重新激活它。若未提供新的过期时间，
+          // owner 将显式获得一个永不过期的分享。
           expiresAt: input.expiresAt === undefined ? null : new Date(input.expiresAt),
           revokedAt: null,
           revokedBy: null,
@@ -3549,6 +3542,7 @@ interface PrepareGenerationRequestInput {
   assetRefs?: GenerationAssetRefInput
 }
 
+/** 解析模型 manifest、校验并规整参数、估算成本，产出创建生成所需的全套准备数据。 */
 function prepareGenerationRequest(input: PrepareGenerationRequestInput): {
   estimate: GenerationEstimate & { manifest: FrozenModelManifest }
   prepared: PreparedGenerationParams
@@ -3582,6 +3576,7 @@ export function estimateGenerationRequest(
   return prepareGenerationRequest(input).estimate
 }
 
+/** 用官方 SDK 估算生成成本；校验失败统一转成 INVALID_GENERATION_PARAMS。 */
 function estimateGenerationCost(
   manifest: FrozenModelManifest,
   params: Readonly<Record<string, unknown>>,

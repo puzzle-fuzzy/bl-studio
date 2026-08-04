@@ -20,7 +20,7 @@ import type { BailianStudioSSEEvent } from './events'
  * 因此这里把参数声明为开放的结构形态（任意 event 字符串 + 任意 data），而非封闭的联合。
  */
 export interface SseMessage {
-  /** Browser reconnect cursor. Omitted for connection/heartbeat messages. */
+  /** 浏览器重连游标；连接/心跳消息中省略。 */
   id?: string
   event: string
   data: unknown

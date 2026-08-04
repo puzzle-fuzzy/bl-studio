@@ -97,9 +97,9 @@ function isDashScopeResultHost(hostname: string): boolean {
   const resultLabel = labels[0]
   const ossLabel = labels[1]
   if (resultLabel === undefined || ossLabel === undefined) return false
-  // DashScope currently emits both legacy `dashscope-result-*` and direct
-  // `dashscope-*` OSS accelerated result hosts. Keep the provider-owned
-  // prefix and DNS shape checks; never accept an arbitrary aliyuncs.com host.
+  // DashScope 目前会同时返回 legacy 的 `dashscope-result-*` 与直接的
+  // `dashscope-*` OSS 加速结果域名。保留 provider 专属前缀与 DNS 结构校验，
+  // 绝不接受任意的 aliyuncs.com 域名。
   const resultPrefix = resultLabel.startsWith('dashscope-result-')
     ? 'dashscope-result-'
     : resultLabel.startsWith('dashscope-')
@@ -119,6 +119,10 @@ function configuredHosts(values: readonly string[] | undefined): ReadonlySet<str
   return hosts
 }
 
+/**
+ * SSRF 防护：校验协议、凭据、端口与主机名，只允许显式白名单域名或
+ * DashScope 专属结果域名，拒绝 IP 字面量与本地/内网主机名。
+ */
 function validateUrl(value: string | URL, allowedHosts: ReadonlySet<string>): URL {
   let url: URL
   try {

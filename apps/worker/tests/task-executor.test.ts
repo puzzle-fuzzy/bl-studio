@@ -55,8 +55,8 @@ function setup(opts: {
     storage,
     logger,
     metrics,
-    // Fixtures use a historical fixed timestamp; keep normal behavior tests
-    // outside the production timeout window and override it in timeout tests.
+    // fixtures 使用历史固定时间戳；让正常行为测试避开生产超时窗口，
+    // 并在超时测试中覆盖该值。
     generationSubmitTimeoutMs: opts.submitTimeoutMs ?? 365 * 24 * 60 * 60 * 1000,
     providerAsyncMaxDurationMs: opts.asyncMaxDurationMs ?? 365 * 24 * 60 * 60 * 1000,
     artifactPersistTimeoutMs: opts.artifactPersistTimeoutMs ?? 365 * 24 * 60 * 60 * 1000,
@@ -483,8 +483,8 @@ describe('TaskExecutor.processTask', () => {
     const outcome = await processTask(makeTask({ attempts: 1 }))
 
     expect(outcome.status).toBe('retry')
-    // No repository mutation: the 'retry' outcome reschedules the current task
-    // via transitionTask (handled by the worker loop), not via scheduleGenerationPoll.
+    // 没有任何仓库 mutation：'retry' 结果通过 transitionTask 重新调度当前任务
+    // （由 worker loop 处理），而不是走 scheduleGenerationPoll。
     expect(repo.mutations.map(m => m.kind)).toEqual([])
     expect(logger.entries.some(e => e.message === 'task.retry')).toBe(true)
   })
@@ -511,10 +511,10 @@ describe('TaskExecutor.processTask', () => {
   })
 
   it('retries a submit-stage exception even without a providerTaskId (re-calls submit)', async () => {
-    // A transient network error whose message lacks the literal words the old
-    // substring heuristic looked for ("fetch failed" / "ECONNRESET") must still
-    // be retried, and submit-stage failures must retry by rescheduling submit —
-    // not be permanently failed for lack of a providerTaskId to resume.
+    // 一条瞬时网络错误消息若缺少旧的子串启发式所寻找的字面词
+    // （"fetch failed" / "ECONNRESET"），也必须被重试；
+    // 且 submit 阶段的失败应通过重新调度 submit 来重试，
+    // 而不能因缺少可恢复的 providerTaskId 而被永久判失败。
     const { repo, runner, processTask } = setup({ record: makeRecord({ providerTaskId: undefined }) })
     runner.throwError = new Error('fetch failed: ECONNRESET')
 

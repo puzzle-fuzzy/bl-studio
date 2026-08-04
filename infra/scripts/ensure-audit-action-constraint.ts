@@ -1,7 +1,6 @@
 /**
- * Keeps local/test databases created with `drizzle-kit push` aligned with the
- * checked-in audit action constraint. Drizzle push currently does not detect
- * changes to this CHECK constraint; production uses checked-in migrations.
+ * 让通过 `drizzle-kit push` 创建的本地/测试数据库与已入库的 audit action 约束保持一致。
+ * Drizzle push 目前不会检测该 CHECK 约束的变更；生产环境使用已入库的迁移。
  */
 import postgres from 'postgres'
 

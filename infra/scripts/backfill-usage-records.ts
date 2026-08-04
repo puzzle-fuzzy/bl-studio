@@ -1,10 +1,9 @@
 /**
- * Idempotently backfill the generation-level usage ledger.
+ * 幂等地 backfill 生成任务级别的 usage ledger。
  *
- * `drizzle-kit push` synchronizes schema but does not execute checked-in SQL
- * migration data statements, so local dev/test workflows call this explicitly
- * after push. Production migrations already contain the same INSERT; the
- * generation_id unique index makes running this script again harmless.
+ * `drizzle-kit push` 只会同步 schema，不会执行已入库的 SQL 迁移数据语句，
+ * 因此本地开发/测试流程在 push 之后需显式调用本脚本。生产迁移已包含相同的 INSERT；
+ * generation_id 唯一索引保证重复执行本脚本也无副作用。
  */
 import postgres from 'postgres'
 

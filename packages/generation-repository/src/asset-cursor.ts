@@ -1,4 +1,4 @@
-/** Versioned, resource/filter-bound keyset cursor for the canonical asset list. */
+/** 规范资产列表的 keyset 游标：带版本号，并与资源类型及过滤条件绑定。 */
 import { GenerationRepositoryError } from './errors'
 import type { AssetSort, ListUnifiedAssetsOptions } from './asset-types'
 

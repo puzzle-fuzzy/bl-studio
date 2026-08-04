@@ -88,14 +88,14 @@ export interface ModelParameter {
   options?: Array<{ label: string; value: unknown }>
   min?: number
   max?: number
-  /** Whether the numeric lower bound is excluded (for example top_p > 0). */
+  /** 数值下界是否开区间（例如 top_p > 0）。 */
   exclusiveMin?: boolean
-  /** Whether the numeric upper bound is excluded (for example temperature < 2). */
+  /** 数值上界是否开区间（例如 temperature < 2）。 */
   exclusiveMax?: boolean
-  /** Allowed numeric increment. `1` declares an integer-only parameter. */
+  /** 允许的数值增量。`1` 表示该参数只接受整数。 */
   step?: number
   maxLength?: number
-  /** Ordered media cardinality. Omitted means a single asset. */
+  /** 有序媒体的数量范围。省略表示单条资产。 */
   minItems?: number
   maxItems?: number
   visibleWhen?: ParameterVisibilityRule
@@ -107,13 +107,13 @@ export interface ModelParameter {
   mediaKind?: ModelCategory
 }
 
-/** Optional activation condition for a media cardinality group. */
+/** 媒体数量组的可选激活条件。 */
 export interface MediaGroupCondition {
   field: string
   present: boolean
 }
 
-/** Cross-field cardinality for media parameters that share one provider limit. */
+/** 共享同一个 provider 上限的媒体参数的跨字段数量约束。 */
 export interface MediaParameterGroup {
   parameters: string[]
   minItems?: number
@@ -193,10 +193,9 @@ export interface PriceTier {
 }
 
 /**
- * Provider usage billing for streaming chat models.
- * Rates are integer CNY cents per one million tokens.  Keeping this beside
- * the manifest's estimate tiers prevents the worker from branching on model
- * ids when a provider returns separate text/audio input usage.
+ * 流式 chat 模型的 provider usage 计费。
+ * 费率为每百万 token 的整数分（CNY）。把它放在 manifest 估价阶梯旁，可避免
+ * worker 在 provider 返回分离的文本/音频输入 usage 时按模型 id 分支。
  */
 export interface ChatTokenUsagePricing {
   kind: 'chat_tokens'
@@ -217,7 +216,7 @@ export interface PricingRule {
   quantityKey: string
   tiers: PriceTier[]
   currency: 'CNY'
-  /** Optional final-cost calculation when provider usage exposes token buckets. */
+  /** 当 provider usage 暴露 token 桶时的可选最终费用计算。 */
   actualUsage?: ChatTokenUsagePricing
 }
 

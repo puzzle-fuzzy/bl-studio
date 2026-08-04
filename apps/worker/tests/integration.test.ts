@@ -13,7 +13,7 @@ const VIDEO_DATA_URL = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t'
 
 beforeAll(async () => {
   iso = await createIsolatedGenerationRepository()
-  // Create test users to satisfy foreign key constraints
+  // 创建测试用户以满足外键约束
   await createTestUser(iso.databaseUrl, 'user_e2e')
   await createTestUser(iso.databaseUrl, 'user_e2e_poll')
   await createTestUser(iso.databaseUrl, 'user_e2e_multi')
@@ -27,8 +27,8 @@ afterAll(async () => {
 })
 
 /**
- * A runner whose outputs are queued in advance; supports() is always true, so
- * ProviderRegistry.resolve() picks it for any manifest.
+ * 输出预先排队的 runner；supports() 恒为 true，
+ * 因此 ProviderRegistry.resolve() 会为任何 manifest 选中它。
  */
 class ScriptedRunner implements ProviderRunner {
   readonly providerId = 'scripted'
@@ -74,9 +74,8 @@ async function runUntilSucceeded(loop: WorkerLoop, recordId: string, timeoutMs: 
     while (Date.now() - start < timeoutMs) {
       const record = await iso.repository.getGenerationRecord(recordId)
       if (record?.status === 'succeeded') {
-        // Generation status reaches succeeded before the optional
-        // artifact.persist task finishes. Do not let the next test claim that
-        // still-queued task and make the integration suite order-dependent.
+        // generation 状态会在可选的 artifact.persist 任务完成前先到达 succeeded。
+        // 不要让下一个测试认领仍排队的该任务，否则集成测试套件会产生顺序依赖。
         const pendingArtifacts = await iso.repository.listPendingArtifactsForRecord(recordId)
         const generatedAsset = (await iso.repository.listUnifiedAssets(record.userId, {
           source: 'generation',

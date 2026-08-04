@@ -1,7 +1,7 @@
 /**
- * Worker Loop.
- * Continuously claims queued tasks and runs them through the TaskExecutor.
- * Owns its poll/idle timing and graceful shutdown flag.
+ * Worker Loop。
+ * 持续认领队列中的任务并通过 TaskExecutor 执行。
+ * 负责自身的 poll/idle 计时与优雅停止标志。
  */
 
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
@@ -22,31 +22,31 @@ export interface WorkerLoopConfig {
   modelRegistry: ModelRegistryLookup
   storage: StorageAdapter
   mediaRepository?: MediaRepository
-  /** Media processor created by the composition root. */
+  /** 由组合根创建的媒体处理器。 */
   mediaProcessor?: MediaProcessor
-  /** Lock duration claimed on each task (ms). Defaults to 90s. */
+  /** 每条任务声明的锁时长（毫秒）。默认 90s。 */
   lockDurationMs?: number
-  /** Interval for renewing a running task lock. Defaults to one third of lockDurationMs. */
+  /** 续租运行中任务锁的间隔。默认 lockDurationMs 的三分之一。 */
   lockHeartbeatMs?: number
-  /** Pause between task scans (ms). Defaults to 100ms. */
+  /** 两次任务扫描之间的间隔（毫秒）。默认 100ms。 */
   pollIntervalMs?: number
-  /** Sleep when no task is claimable (ms). Defaults to 1000ms. */
+  /** 无任务可认领时的休眠（毫秒）。默认 1000ms。 */
   idleSleepMs?: number
-  /** Backoff after an iteration throws (ms). Defaults to 5000ms. */
+  /** 一次迭代抛错后的退避（毫秒）。默认 5000ms。 */
   errorBackoffMs?: number
-  /** Maximum age of a generation submit task before it is failed. */
+  /** generation submit 任务超过该时长即判定失败。 */
   generationSubmitTimeoutMs?: number
-  /** Maximum age of a provider polling lifecycle before it is failed. */
+  /** provider 轮询生命周期超过该时长即判定失败。 */
   providerAsyncMaxDurationMs?: number
-  /** Maximum age of an artifact persistence task before it is failed. */
+  /** 产物持久化任务超过该时长即判定失败。 */
   artifactPersistTimeoutMs?: number
-  /** Provider artifact download security policy. */
+  /** provider 产物下载安全策略。 */
   artifactFetch?: ArtifactFetchPolicy
-  /** Interval for updating the worker liveness row. Defaults to 5s. */
+  /** 更新 worker 存活行的间隔。默认 5s。 */
   workerHeartbeatIntervalMs?: number
-  /** Optional structured logger; defaults to createLogger(`worker:<workerId>`). */
+  /** 可选的结构化日志器；默认 createLogger(`worker:<workerId>`)。 */
   logger?: Logger
-  /** Optional in-process metrics collector for task/provider counters and timings. */
+  /** 可选的进程内指标收集器，用于任务/provider 计数器与计时。 */
   metrics?: MetricsCollector
 }
 
@@ -101,7 +101,7 @@ export class WorkerLoop {
     this.workerHeartbeatIntervalMs = config.workerHeartbeatIntervalMs ?? 5_000
   }
 
-  /** Run until stop() is called. Resolves on clean shutdown. */
+  /** 一直运行直到调用 stop()。优雅停止时 resolve。 */
   async run(): Promise<void> {
     this.running = true
     const stopHeartbeat = this.startWorkerHeartbeat()
@@ -123,15 +123,15 @@ export class WorkerLoop {
     this.running = false
   }
 
-  /** Read-only snapshot for local diagnostics and tests; metrics are process-local. */
+  /** 供本地诊断与测试使用的只读快照；metrics 为进程内数据。 */
   metricsSnapshot(): MetricsSnapshot {
     return this.metrics.snapshot()
   }
 
   /**
-   * Keep liveness separate from task leases: a worker can be alive while idle,
-   * and a task lease can be healthy while the process is about to disappear.
-   * Repository failures are logged but never terminate task consumption.
+   * 让存活状态与任务租约相互独立：worker 空闲时也可以存活，
+   * 而进程即将消失时任务租约仍可能健康。
+   * 仓库层失败只记录日志，绝不终止任务消费。
    */
   private startWorkerHeartbeat(): () => Promise<void> {
     const register = this.config.repository.registerWorkerHeartbeat
@@ -205,7 +205,7 @@ export class WorkerLoop {
     await sleep(this.pollIntervalMs)
   }
 
-  /** Process a single task. Exposed for targeted testing. */
+  /** 处理单个任务。为针对性测试而暴露。 */
   async runTask(task: TaskRecord): Promise<void> {
     const lease = this.startLease(task)
 
@@ -239,8 +239,8 @@ export class WorkerLoop {
   }
 
   /**
-   * Start a lease heartbeat only for tasks obtained through the real claim path.
-   * Direct unit-test calls may provide an unclaimed task without lock metadata.
+   * 只为通过真实认领路径获得的任务启动租约心跳。
+   * 直接的单测调用可能传入没有锁元数据的未认领任务。
    */
   private startLease(task: TaskRecord): TaskLease {
     if (task.lockedBy === undefined || task.lockedUntil === undefined) {
@@ -277,8 +277,7 @@ export class WorkerLoop {
             })
           }
         } catch (error) {
-          // A transient heartbeat failure should not immediately discard the task;
-          // the next tick gets another chance before the current lease expires.
+          // 瞬时的心跳失败不应立即丢弃任务；在当前租约到期前，下一个心跳周期还有重试机会。
           this.logger.warn('task.lock_renew_failed', {
             taskId: task.id,
             traceId: task.traceId,
@@ -294,6 +293,8 @@ export class WorkerLoop {
       await activeRenewal
     }
 
+    // 按 lockHeartbeatMs 周期续租：任务执行期间持续向后刷新 lockedUntil，
+    // 防止租约过期后被其它 worker 重新认领。
     const timer = setInterval(() => { void renew() }, this.lockHeartbeatMs)
     return {
       isLost: () => lost,
@@ -305,7 +306,7 @@ export class WorkerLoop {
     }
   }
 
-  /** Save a result only while the claimed worker still owns the task row. */
+  /** 仅当认领该任务的 worker 仍持有任务行时才保存结果。 */
   private async saveTaskIfOwned(task: TaskRecord, nextTask: TaskRecord): Promise<boolean> {
     const saved = await this.config.repository.saveTask(
       nextTask,
@@ -328,6 +329,7 @@ interface TaskLease {
   stop(): Promise<void>
 }
 
+/** 把处理器产出转换为 task-engine 状态迁移（succeed / fail / retry / cancel）。 */
 function applyTaskOutcome(task: TaskRecord, outcome: TaskProcessOutcome): TaskRecord {
   const now = currentIso()
   switch (outcome.status) {
@@ -355,10 +357,9 @@ function applyTaskOutcome(task: TaskRecord, outcome: TaskProcessOutcome): TaskRe
 }
 
 /**
- * Render an error for logs/storage, walking the `.cause` chain so the real
- * driver-level message surfaces. Drizzle wraps DB errors in DrizzleQueryError
- * whose `message` is just the SQL + params; the actionable cause (e.g.
- * "relation task_records does not exist") lives on `.cause`.
+ * 为日志/存储渲染错误信息，沿 `.cause` 链上溯，让真正位于驱动层的消息浮出水面。
+ * Drizzle 会把数据库错误包装成 DrizzleQueryError，其 `message` 只有 SQL + 参数；
+ * 可操作的根因（例如 "relation task_records does not exist"）位于 `.cause` 上。
  */
 function errorMessage(error: unknown): string {
   if (!(error instanceof Error)) return String(error)

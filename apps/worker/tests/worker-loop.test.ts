@@ -50,7 +50,7 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
   return { loop, repo, runner, logger }
 }
 
-/** Reject if the promise hasn't settled within `ms`, so a runaway loop fails fast. */
+/** 若 promise 在 `ms` 内未落定则 reject，让失控的循环快速失败。 */
 async function resolveWithin(p: Promise<unknown>, ms: number): Promise<void> {
   let timer: ReturnType<typeof setTimeout> | undefined
   const timeout = new Promise<void>((_, reject) => {
@@ -143,7 +143,7 @@ describe('WorkerLoop', () => {
     const runPromise = loop.run()
     loop.stop()
     await resolveWithin(runPromise, 500)
-    // Resolving without throwing is the assertion.
+    // 未抛错地 resolve 本身就是断言。
     expect(true).toBe(true)
   })
 
@@ -161,9 +161,8 @@ describe('WorkerLoop', () => {
   })
 
   it('finishes the in-flight task before shutting down (graceful stop)', async () => {
-    // A provider that blocks until we resolve a deferred. We call stop() while
-    // the task is mid-flight and assert the loop still completes the task
-    // (saves it as succeeded) before run() resolves — no work is dropped.
+    // 一个会阻塞直到我们 resolve 一个 deferred 的 provider。我们在任务执行中途调用 stop()，
+    // 并断言 run() resolve 前循环仍会完成该任务（保存为 succeeded）——不会丢失任何工作。
     const { loop, repo, runner } = buildLoop()
     repo.records.set('rec_1', makeRecord())
 
@@ -175,14 +174,14 @@ describe('WorkerLoop', () => {
     repo.claimQueue.push(makeTask())
     const runPromise = loop.run()
 
-    // Give the loop a tick to claim + enter the blocking provider call.
+    // 给循环一个 tick 去认领任务并进入阻塞的 provider 调用。
     await new Promise(r => setTimeout(r, 20))
-    loop.stop()              // shutdown requested mid-task
-    expect(repo.savedTasks).toHaveLength(0)   // task still in flight
-    resolveExecution()       // let the provider finish
+    loop.stop()              // 任务中途请求停止
+    expect(repo.savedTasks).toHaveLength(0)   // 任务仍在执行中
+    resolveExecution()       // 让 provider 完成
     await resolveWithin(runPromise, 500)
 
-    // The in-flight task was completed and saved despite stop() — graceful.
+    // 尽管调用了 stop()，执行中的任务仍被完成并保存——优雅停止。
     expect(repo.savedTasks).toHaveLength(1)
     expect(repo.savedTasks[0]?.status).toBe('succeeded')
   })
@@ -239,23 +238,22 @@ describe('WorkerLoop', () => {
   })
 
   it('two workers sharing a queue source each claim a distinct task', async () => {
-    // Simulates the FOR UPDATE SKIP LOCKED contract from the repo layer: two
-    // WorkerLoops pulling from a shared claim source never both process the
-    // same task. The shared source hands each task to exactly one claimant.
+    // 模拟仓库层的 FOR UPDATE SKIP LOCKED 契约：两个 WorkerLoop 从共享的认领源拉取时，
+    // 绝不会同时处理同一个任务。共享源把每个任务恰好交给一个认领者。
     const sharedQueue: TaskRecord[] = [
       makeTask({ id: 'task_a', input: { recordId: 'rec_a' }, recordId: 'rec_a' }),
       makeTask({ id: 'task_b', input: { recordId: 'rec_b' }, recordId: 'rec_b' }),
     ]
 
-    // A claim function that atomically shifts from the shared queue — each
-    // task leaves the queue exactly once, mirroring the SQL skip-locked claim.
+    // 一个从共享队列原子 shift 的认领函数——每个任务恰好出队一次，
+    // 对应 SQL 的 skip-locked 认领语义。
     const claim = async (): Promise<TaskRecord | undefined> => sharedQueue.shift()
 
     const makeWorker = (workerId: string): LoopHarness => {
       const repo = new FakeRepository()
       repo.records.set('rec_a', makeRecord({ id: 'rec_a' }))
       repo.records.set('rec_b', makeRecord({ id: 'rec_b' }))
-      // Override claimNextQueuedTask to draw from the shared source.
+      // 覆写 claimNextQueuedTask，使其从共享源取任务。
       repo.claimNextQueuedTask = claim
       const runner = new FakeProviderRunner()
       runner.outputs.push(
@@ -285,10 +283,10 @@ describe('WorkerLoop', () => {
     const w1 = makeWorker('worker-1')
     const w2 = makeWorker('worker-2')
 
-    // Run both concurrently; each task is claimed by exactly one worker.
+    // 并发运行两者；每个任务恰好被一个 worker 认领。
     const r1 = w1.loop.run()
     const r2 = w2.loop.run()
-    await new Promise(r => setTimeout(r, 30))   // let both drain the queue
+    await new Promise(r => setTimeout(r, 30))   // 让两者排空队列
     w1.loop.stop()
     w2.loop.stop()
     await Promise.all([resolveWithin(r1, 500), resolveWithin(r2, 500)])
@@ -298,7 +296,7 @@ describe('WorkerLoop', () => {
       ...w2.repo.savedTasks.map(t => t.id),
     ]
     expect(processedIds).toHaveLength(2)
-    expect(new Set(processedIds).size).toBe(2)   // no double-processing
+    expect(new Set(processedIds).size).toBe(2)   // 没有重复处理
     expect(processedIds.sort()).toEqual(['task_a', 'task_b'])
   })
 })

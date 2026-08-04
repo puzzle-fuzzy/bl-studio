@@ -5,9 +5,8 @@ export interface GenerationLimits {
 }
 
 /**
- * Read limits on demand so tests and local development can change process.env
- * without rebuilding the API module. `0` means disabled; positive integers are
- * hard per-user UTC-day limits.
+ * 按需读取限额，使测试和本地开发无需重建 API 模块即可修改 process.env。
+ * `0` 表示禁用；正整数为按用户 UTC 日的硬限额。
  */
 export function readGenerationLimits(source: Readonly<Record<string, string | undefined>> = process.env): GenerationLimits {
   return {

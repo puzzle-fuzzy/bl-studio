@@ -12,7 +12,7 @@ export function sessionCookieAttributes(maxAgeSeconds: number, secure: boolean):
   return { httpOnly: true, sameSite: 'lax', path: '/', secure, maxAge: maxAgeSeconds }
 }
 
-/** Cookie set value that expires immediately, used to clear the session cookie on logout. */
+/** 立即过期的 cookie 设置值，用于登出时清除会话 cookie。 */
 export function clearedCookieAttributes(secure: boolean): SessionCookieAttributes & { value: '' } {
   return { ...sessionCookieAttributes(0, secure), value: '' }
 }
@@ -31,7 +31,7 @@ export function readCookie(cookieHeader: string | null, name: string): string | 
   return undefined
 }
 
-/** Cookies require Secure in production (HTTPS). Off by default for local dev over HTTP. */
+/** 生产环境（HTTPS）下 cookie 必须带 Secure；本地 HTTP 开发默认关闭。 */
 export function cookieSecure(source: Readonly<Record<string, string | undefined>> = process.env): boolean {
   return source['COOKIE_SECURE'] === 'true' || source['NODE_ENV'] === 'production'
 }

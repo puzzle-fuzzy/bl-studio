@@ -52,16 +52,14 @@ export async function runRehearsalSmoke(
 ): Promise<void> {
   let startAttempted = false
   try {
-    // Rehearsal data is intentionally disposable. Reset it before every run so
-    // stale queue, outbox, artifact, or migration state cannot contaminate the
-    // release verdict. `--keep` preserves only the freshly-created environment
-    // after this reset so a failed candidate can still be inspected.
+    // Rehearsal 数据刻意设计为可丢弃的。每次运行前重置，避免过期的队列、
+    // outbox、artifact 或迁移状态污染发布结论。`--keep` 只保留本次重置后
+    // 新建的环境，便于排查失败的候选版本。
     await runCommand(['down', '--volumes', '--remove-orphans'])
     if (options.build) {
-      // Build the two image owners first. Migrate, artifact-init, Worker and
-      // ops-health are image-only consumers, so letting `up --build` resolve
-      // everything concurrently can trigger pointless registry pulls before
-      // the shared local runtime image exists.
+      // 先构建两个镜像所有者。Migrate、artifact-init、Worker 和 ops-health
+      // 只是镜像消费者，若让 `up --build` 并发解析所有内容，可能在共享
+      // 本地运行时镜像就绪前触发无意义的 registry 拉取。
       await runCommand(['build', 'api', 'web'])
     }
     startAttempted = true
@@ -73,8 +71,8 @@ export async function runRehearsalSmoke(
     await verifyWebRelease(`${options.webOrigin}/`, fetchImpl)
     await runCommand(['--profile', 'ops', 'run', '--rm', 'ops-health'])
 
-    // A production-shaped restart must not leave the API reporting a stale or
-    // missing worker heartbeat after the worker process returns.
+    // 生产形态的 restart 不应让 API 在 worker 进程重启后仍报告过期或
+    // 缺失的 worker heartbeat。
     await runCommand(['restart', 'api', 'worker'])
     await waitForReady(`${options.apiOrigin}/api/health/ready`, fetchImpl)
     await waitForReady(`${options.webOrigin}/api/health/ready`, fetchImpl)

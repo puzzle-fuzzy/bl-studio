@@ -54,7 +54,7 @@ describe('persistArtifactsForRecord', () => {
   it('marks the artifact failed and rethrows when the artifact has no payload source', async () => {
     const repo = new FakeRepository()
     const storage = new FakeStorageAdapter()
-    // Neither text nor sourceUrl → readArtifactPayload throws before storage is touched.
+    // 既无 text 也无 sourceUrl → readArtifactPayload 在触及存储之前即抛错。
     repo.artifacts.set('artifact_1', makeArtifact({ text: undefined, sourceUrl: undefined, mimeType: undefined }))
 
     await expect(
@@ -65,7 +65,7 @@ describe('persistArtifactsForRecord', () => {
     expect(repo.artifacts.get('artifact_1')?.status).toBe('failed')
     const failed = repo.mutations.find(m => m.kind === 'markArtifactFailed')
     if (failed?.kind !== 'markArtifactFailed') throw new Error('expected markArtifactFailed mutation')
-    // "neither text nor sourceUrl" does not match the retriable pattern.
+    // "neither text nor sourceUrl" 不匹配可重试的正则模式。
     expect(failed.input.error.retriable).toBe(false)
     expect(failed.input.error.category).toBe('storage')
   })
@@ -155,8 +155,8 @@ describe('persistArtifactsForRecord', () => {
 
 describe('artifactStorageKey', () => {
   it('uses .mp3 for audio/mpeg (DashScope music output)', () => {
-    // Regression: audio artifacts were saved as .mpeg, which browsers/OSes
-    // treat as a video container. MP3's standard MIME is audio/mpeg.
+    // 回归测试：音频 artifact 曾保存为 .mpeg，浏览器/操作系统会把它当作视频容器。
+    // MP3 的标准 MIME 是 audio/mpeg。
     expect(artifactStorageKey('rec_1', 'art_1', 'audio/mpeg', 'audio')).toBe(
       'generations/rec_1/art_1.mp3',
     )

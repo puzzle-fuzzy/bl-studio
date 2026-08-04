@@ -24,10 +24,10 @@ export interface UnifiedAssetItem {
   source: AssetSource
   generationArtifactId?: string
   url?: string
-  /** Internal storage coordinates; API layers turn these into a fresh read URL. */
+  /** 内部存储坐标；API 层会据此拼出新的读取 URL。 */
   storageProvider?: string
   storageKey?: string
-  /** Internal derivative coordinates; API layers turn these into a read URL. */
+  /** 内部缩略图坐标；API 层会据此拼出读取 URL。 */
   thumbnailStatus?: AssetDerivativeStatus
   thumbnailStorageProvider?: string
   thumbnailStorageKey?: string
@@ -35,7 +35,7 @@ export interface UnifiedAssetItem {
   mimeType?: string
   byteSize?: number
   durationSeconds?: number
-  /** Declared generation/storage metadata; not a measured output dimension. */
+  /** 声明式的生成/存储元数据；不是实测输出维度。 */
   declaredResolution?: string
   fileName?: string       // 仅 upload/link 来源
   recordId?: string       // 仅 generation 来源
@@ -50,7 +50,7 @@ export interface ListUnifiedAssetsOptions {
   cursor?: string
   q?: string
   sort?: AssetSort
-  /** Model IDs whose display names matched q at the caller boundary. */
+  /** 在调用方边界上显示名匹配 q 的模型 ID 列表。 */
   modelIds?: readonly string[]
 }
 
@@ -76,7 +76,7 @@ export interface CreateUserAssetInput {
   storageKey?: string
   storageUrl?: string
   metadata?: Record<string, unknown>
-  /** Create the asset and its durable thumbnail task in one transaction. */
+  /** 在同一个事务里创建资产及其持久化的缩略图任务。 */
   enqueueThumbnail?: boolean
   traceId?: string
   now?: string

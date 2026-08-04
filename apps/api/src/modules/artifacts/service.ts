@@ -10,7 +10,7 @@ export interface ArtifactReadUrlUseCaseDependencies {
 }
 
 export interface ResolveArtifactReadUrlInput {
-  /** The API projection being returned; it may be a public or owner view. */
+  /** 正在返回的 API 投影；可能是公开视图或所有者视图。 */
   readonly artifact: {
     kind: 'image' | 'video' | 'audio' | 'text' | 'archive'
     status: ArtifactStatus
@@ -19,7 +19,7 @@ export interface ResolveArtifactReadUrlInput {
     thumbnailStorageProvider?: 'oss' | 'local'
     thumbnailStorageKey?: string
   }
-  /** Public local shares need their own unauthenticated route. */
+  /** 公开的本地分享需要走自己的免鉴权路由。 */
   readonly localReadUrl?: string
   readonly expiresInSeconds?: number
 }
@@ -65,6 +65,7 @@ export function resolveArtifactReadUrlUseCase(deps: ArtifactReadUrlUseCaseDepend
         return { ...artifact, readUrl }
       }
 
+      // OSS 图片/视频可即时生成缩略图（x-oss-process），无需预先生成存储对象。
       return {
         ...artifact,
         readUrl,

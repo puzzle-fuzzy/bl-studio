@@ -1,4 +1,4 @@
-/** Provider outbound-call audit records. */
+/** Provider 出站调用审计记录。 */
 
 export type ProviderRequestOperation = 'submit' | 'poll' | 'chat' | 'cancel'
 export type ProviderRequestStatus = 'started' | 'succeeded' | 'failed' | 'unsupported'

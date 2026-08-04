@@ -192,6 +192,10 @@ export async function processGenerationTask(
   }
 }
 
+/**
+ * 将 provider 执行结果应用到 generation 状态机：
+ * 成功且无需轮询则 complete；需轮询则调度 poll；可重试失败返回 retry；否则 fail。
+ */
 async function applyProviderResult(
   record: GenerationRecord,
   task: TaskRecord,
@@ -566,8 +570,8 @@ async function finishProviderRequestAudit(
       deps.logger.warn('provider.audit_missing', { auditId: audit.id })
     }
   } catch (error) {
-    // The provider result already exists. A finish-write failure must not turn a
-    // paid provider call into a second provider retry; keep the loss visible.
+    // provider 结果已经存在。finish 写入失败绝不能把一次已计费的 provider 调用
+    // 变成第二次 provider 重试；同时要让这次丢失保持可见（记录日志）。
     deps.logger.error('provider.audit_finish_failed', {
       auditId: audit.id,
       error: errorMessage(error),

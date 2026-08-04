@@ -1,13 +1,11 @@
 /**
- * Create three verified, development-only accounts for LAN acceptance testing.
+ * 为 LAN 验收测试创建三个已验证的、仅供开发使用的账号。
  *
- * This is an operator command, not a public registration bypass. It refuses
- * production mode and non-loopback database URLs, and requires --confirm.
- * Existing accounts with these reserved test addresses have their password
- * reset and are marked verified so a failed local SMTP experiment can be
- * repaired without leaving an unusable account behind.
+ * 这是运维命令，不是公开注册的旁路。它拒绝生产模式与非 loopback 的数据库 URL，
+ * 并要求 --confirm。对已存在同名保留测试地址的账号，会重置其密码并标记为已验证，
+ * 这样失败的本地 SMTP 实验可以被修复，而不会留下不可用的账号。
  *
- * Run:
+ * 运行方式：
  *   pnpm run seed:lan-test-accounts --confirm
  */
 import { randomBytes } from 'node:crypto'

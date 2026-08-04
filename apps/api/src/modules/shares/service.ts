@@ -29,9 +29,8 @@ export type RevokeShareResult =
   | { kind: 'share_not_found' }
 
 /**
- * Share orchestration lives here rather than in Elysia handlers. Repository
- * ownership checks and idempotency remain the source of truth; this boundary
- * only turns those outcomes into stable application results for HTTP adapters.
+ * 分享编排放在这里而非 Elysia handler 中。repository 的所有权检查与幂等性
+ * 仍为事实来源；该边界只把这些结果转换为供 HTTP 适配层使用的稳定应用结果。
  */
 export function createShareUseCase(deps: ShareUseCaseDependencies) {
   return {

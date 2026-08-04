@@ -67,13 +67,11 @@ export function estimatePriceCents(manifest: FrozenModelManifest, params: Record
 }
 
 /**
- * Calculate a final cost from provider usage declared by the manifest.
+ * 根据 manifest 声明的 provider usage 计算最终费用。
  *
- * This is intentionally separate from estimatePriceCents: an estimate may be
- * based on an input duration while a streaming provider bills actual text and
- * audio token buckets. Unknown or incomplete usage returns undefined so the
- * caller can retain the preflight estimate instead of recording a fabricated
- * price.
+ * 刻意与 estimatePriceCents 分离：估价可能基于输入时长，而流式 provider 按
+ * 实际文本/音频 token 桶计费。usage 未知或不完整时返回 undefined，让调用方
+ * 保留 preflight 估价，而不是记录一个捏造的价格。
  */
 export function calculateUsagePriceCents(
   manifest: FrozenModelManifest,

@@ -42,14 +42,14 @@ describe('estimatePriceCents', () => {
       output: { kind: 'text', path: 'output.text' },
       pricing: { unit: 'per_token', quantityKey: 'maxTokens', currency: 'CNY', tiers: [{ condition: {}, priceCents: 200 }] },
     }
-    // 200 cents per 1M tokens, 1024 tokens → 0.2048 cents → rounded to 0 (integer)
+    // 每百万 token 200 分，1024 token → 0.2048 分 → 取整为 0（整数分）
     expect(estimatePriceCents(textManifest, { maxTokens: 1024 })).toBe(0)
     expect(Number.isInteger(estimatePriceCents(textManifest, { maxTokens: 1024 }))).toBe(true)
   })
 
   it('rounds sub-cent per-second rates to integer cents (never a float into the integer column)', () => {
-    // Reproduces the screenplay-flash crash: priceCents 0.5 × 63s = 31.5, which used
-    // to be returned as a float and rejected by the integer cost_estimate column.
+    // 复现 screenplay-flash 的崩溃：priceCents 0.5 × 63s = 31.5，此前以浮点数
+    // 返回，被 integer 类型的 cost_estimate 列拒绝。
     const screenplayManifest: ModelManifest = {
       ...baseManifest,
       id: 'priced-screenplay',

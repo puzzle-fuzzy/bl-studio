@@ -26,28 +26,28 @@ export interface StorageWriteResult {
 
 /** 删除请求：使用 writeObject 返回的实际持久化 key。 */
 export interface StorageDeleteInput {
-  /** Physical key returned by writeObject; never re-prefix this value. */
+  /** writeObject 返回的实际持久化 key；不要再次加前缀。 */
   key: string
 }
 
 /** 生成只读访问 URL 的请求：实际持久化 key 与有效期（秒）。 */
 export interface StorageReadUrlInput {
-  /** Physical key returned by writeObject; never re-prefix this value. */
+  /** writeObject 返回的实际持久化 key；不要再次加前缀。 */
   key: string
   expiresInSeconds: number
   /**
-   * Optional provider-side processing instruction. OSS includes this value in
-   * the signature; local storage ignores it because it is served by the API.
+   * 可选的 provider 侧处理指令。OSS 会把它纳入签名；local 存储忽略它，
+   * 因为本地文件由 API 路由直接提供。
    */
   process?: string
-  /** User-facing attachment name. When omitted, the URL keeps inline/read semantics. */
+  /** 面向用户的附件文件名。省略时 URL 保持 inline/read 语义。 */
   downloadFileName?: string
 }
 
 export interface StorageReadInput {
-  /** Physical key returned by writeObject; never re-prefix this value. */
+  /** writeObject 返回的实际持久化 key；不要再次加前缀。 */
   key: string
-  /** Hard byte ceiling applied before returning the object to a worker. */
+  /** 返回对象给 worker 前施加的硬性字节上限。 */
   maxBytes: number
 }
 
@@ -67,11 +67,11 @@ export interface StorageAdapter {
   readonly provider: StorageProvider
   readonly keyPrefix: string
   writeObject(input: StorageWriteInput): Promise<StorageWriteResult>
-  /** Optional connectivity/readiness probe for the configured backend. */
+  /** 对配置后端执行可选连通性/就绪探测。 */
   healthCheck?(): Promise<void>
-  /** Optional read capability used by worker-side media processing. */
+  /** worker 侧媒体处理使用的可选读能力。 */
   readObject?(input: StorageReadInput): Promise<StorageReadResult>
-  /** Best-effort compensation hook for a DB write that fails after storage succeeds. */
+  /** DB 写入在存储成功后失败的尽力补偿钩子。 */
   deleteObject?(input: StorageDeleteInput): Promise<void>
   createReadUrl(input: StorageReadUrlInput): Promise<string>
 }

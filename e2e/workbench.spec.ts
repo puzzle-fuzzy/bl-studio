@@ -217,9 +217,8 @@ async function registerTestUser(page: Page): Promise<void> {
   await page.getByLabel('密码（至少 8 位）').fill(password)
   await page.getByRole('button', { name: '进入工作台', exact: true }).click()
 
-  // A new account is expected to fail login once, then the same form switches
-  // to registration. This keeps the smoke on the real user-facing flow rather
-  // than inserting a session cookie by hand.
+  // 新账号预期会先登录失败一次，随后同一表单切换到注册流程。
+  // 这样 smoke 走的是真实用户流程，而不是手动注入 session cookie。
   await expect(page.getByRole('alert')).toBeVisible()
   await page.getByRole('button', { name: '去注册', exact: true }).click()
   await page.getByRole('button', { name: '创建并进入工作台', exact: true }).click()

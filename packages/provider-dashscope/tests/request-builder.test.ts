@@ -66,10 +66,9 @@ describe('buildDashScopeRequest', () => {
     })
   })
 
-  // Video-edit shape: a required `video` media plus an optional `referenceImages`
-  // media. DashScope is order-sensitive (the `video` element must come first), so
-  // the manifest declares `video` before `referenceImages` and the builder must
-  // preserve that declaration order in `input.media`.
+  // video-edit 形状：一个必填的 `video` 媒体加一个可选的 `referenceImages` 媒体。
+  // DashScope 对顺序敏感（`video` 元素必须在前），因此 manifest 把 `video` 声明在
+  // `referenceImages` 之前，builder 必须保持该声明顺序写入 `input.media`。
   const videoEditManifest: ModelManifest = {
     id: 'test-video-edit',
     provider: 'dashscope',
@@ -145,9 +144,9 @@ describe('buildDashScopeRequest', () => {
     ])
   })
 
-  // dashscope-image-message (multimodal-generation endpoint) must speak
-  // input.messages[{role, content}], not flat input.prompt — both for text-only
-  // text-to-image and for image+text edit.
+  // dashscope-image-message（multimodal-generation 端点）必须使用
+  // input.messages[{role, content}] 结构，而非扁平的 input.prompt——无论纯文本
+  // 文生图还是 图+文 编辑都是如此。
   const imageMessageManifest: ModelManifest = {
     id: 'test-image-message',
     provider: 'dashscope',
@@ -235,10 +234,9 @@ describe('buildDashScopeRequest', () => {
   })
 
   describe('fun-music manifest (regression: 404 + wrong param placement)', () => {
-    // Locks down the two bugs that broke music generation:
-    //   1. endpoint must be relative (the /api/v1 prefix now lives on baseUrl)
-    //   2. music options belong inside `input` (not `parameters`) and use the
-    //      provider's snake_case field names.
+    // 锁定曾导致音乐生成失败的两个 bug：
+    //   1. endpoint 必须为相对路径（/api/v1 前缀现在位于 baseUrl）
+    //   2. 音乐参数属于 `input`（而非 `parameters`），并使用 provider 的 snake_case 字段名。
     const manifest = getModelById('fun-music-v1')!
 
     it('places prompt, gender, format, and watermark inside input with correct keys', () => {
@@ -248,11 +246,11 @@ describe('buildDashScopeRequest', () => {
         gender: 'female',
         format: 'mp3',
         enableAigcWatermark: true,
-        duration: 60,   // ui-only — must NOT reach the provider
+        duration: 60,   // ui-only — 绝不能到达 provider
       })
 
       expect(request.endpoint).toBe('/services/audio/music/generation')
-      expect(request.async).toBe(false)        // sync taskMode
+      expect(request.async).toBe(false)        // 同步 taskMode
       expect(request.body.input).toEqual({
         prompt: '夏日清新民谣',
         is_instrumental: false,
@@ -260,7 +258,7 @@ describe('buildDashScopeRequest', () => {
         format: 'mp3',
         enable_aigc_watermark: true,
       })
-      // No parameters object at all when everything lives in input.
+      // 所有参数都在 input 里时，不生成 parameters 对象。
       expect(request.body.parameters).toBeUndefined()
     })
 

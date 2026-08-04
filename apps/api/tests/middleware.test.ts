@@ -19,7 +19,7 @@ describe('http middleware', () => {
     }))
 
     expect(response.headers.get('access-control-allow-origin')).toBe('http://localhost:5002')
-    // Header field-values are case-insensitive in practice; @elysia/cors emits "Origin".
+    // 实际中响应头字段值不区分大小写；@elysia/cors 输出的是 "Origin"。
     expect((response.headers.get('vary') ?? '').toLowerCase()).toContain('origin')
   })
 

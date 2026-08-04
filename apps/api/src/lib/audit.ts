@@ -26,11 +26,10 @@ const MAX_STRING_VALUE_LENGTH = 256
 const MAX_TRACE_VALUE_LENGTH = 256
 
 /**
- * Best-effort audit persistence for HTTP actions.
+ * 对 HTTP 动作的尽力而为（best-effort）审计持久化。
  *
- * Audit failure is observable but never changes the business response: a
- * temporary audit-table/database problem must not turn a successful login or
- * artifact download into a user-visible failure.
+ * 审计失败可观测但绝不改变业务响应：审计表/数据库的临时故障不能让一次成功的
+ * 登录或产物下载变成用户可见的失败。
  */
 export async function recordApiAuditEvent(
   repositoryOrFactory: AuditRepository | (() => AuditRepository),
@@ -48,16 +47,14 @@ export async function recordApiAuditEvent(
       ...(requestId !== undefined ? { requestId } : {}),
       ...(traceId !== undefined ? { traceId } : {}),
       method: request.method,
-      // Only persist the pathname. Query parameters may contain opaque keys,
-      // signed URLs, or other user-controlled data that does not belong in an
-      // audit record.
+      // 只持久化 pathname。查询参数可能包含不透明密钥、签名 URL 或其他
+      // 用户可控数据，不应落入审计记录。
       path: new URL(request.url).pathname,
       ...(input.metadata !== undefined ? { metadata: sanitizeMetadata(input.metadata) } : {}),
     })
   }
   catch (error) {
-    // Do not log the exception object or message: database errors can include
-    // connection details. The action/outcome are sufficient for an alert.
+    // 不记录异常对象或消息：数据库错误可能包含连接信息。action/outcome 足以用于告警。
     logger.warn('audit.write_failed', {
       action: input.action,
       outcome: input.outcome,
@@ -66,7 +63,7 @@ export async function recordApiAuditEvent(
   }
 }
 
-/** Keep audit metadata primitive-only, bounded, and intentionally boring. */
+/** 审计元数据只保留原始类型、有界且刻意无敏感信息。 */
 function sanitizeMetadata(metadata: AuditEventMetadata): AuditEventMetadata {
   const safe: Record<string, string | number | boolean | null> = {}
   let count = 0
@@ -97,7 +94,7 @@ function boundedString(value: string | null | undefined): string | undefined {
   return value.slice(0, MAX_TRACE_VALUE_LENGTH)
 }
 
-/** Return a stable, non-sensitive error code for failed audit metadata. */
+/** 为失败的审计元数据返回稳定、不含敏感信息的错误码。 */
 export function auditErrorCode(error: unknown): string {
   if (typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string') {
     return error.code.slice(0, 64)

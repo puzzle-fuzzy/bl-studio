@@ -1,10 +1,9 @@
 /**
- * Pure provider/model degradation policy.
+ * 纯 provider/model 降级策略。
  *
- * This package deliberately has no database, HTTP, worker, or app imports.
- * A runtime adapter owns persistence and calls this policy with a durable
- * record. Keeping the state transition pure makes half-open behaviour and
- * cooldown boundaries deterministic in tests.
+ * 本包刻意不依赖数据库、HTTP、worker 或 app。运行时 adapter 负责持久化，
+ * 以持久化记录调用本策略。保持状态转换的纯粹性，使 half-open 行为与
+ * cooldown 边界在测试中可确定。
  */
 
 export type ProviderModelHealthStatus = 'healthy' | 'degraded'
@@ -85,8 +84,7 @@ export function freshProviderModelHealth(
 }
 
 /**
- * Returns true only while the cooldown blocks calls. Once it expires, the
- * next caller is allowed through as the half-open probe.
+ * 仅在冷却期拦截调用时返回 true。冷却过期后，下一个调用方作为 half-open 探测请求放行。
  */
 export function isDegraded(record: ProviderModelHealth | null, now: number): boolean {
   return record?.status === 'degraded'
@@ -101,8 +99,8 @@ export function degradedRemainingMs(record: ProviderModelHealth | null, now: num
 }
 
 /**
- * Computes one immutable state transition. Repeated failures during a live
- * cooldown do not extend the window; a failure after expiry reopens it.
+ * 计算一次不可变的状态转换。冷却期间反复失败不会延长冷却窗口；
+ * 冷却过期后的失败会重新打开窗口。
  */
 export function applyProviderOutcome(
   state: ProviderModelHealth | null,

@@ -29,7 +29,7 @@ export interface CreateMediaJobInput {
     fileName?: string
   }
   options?: Record<string, unknown>
-  /** One lifecycle trace for the auxiliary media action. */
+  /** 辅助媒体动作对应的一条生命周期 trace。 */
   traceId?: string
   now?: string
 }

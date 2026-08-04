@@ -53,10 +53,8 @@ export function resolveBailianPollTarget(
 }
 
 /**
- * Resolve the generic DashScope async-task cancellation endpoint. DashScope
- * exposes cancellation beside the task polling endpoint rather than as a
- * model-specific SDK operation, so it still uses the adapter-owned trusted
- * polling target as its base.
+ * 解析通用的 DashScope 异步任务取消端点。DashScope 的取消接口与任务轮询端点并列，
+ * 而非某个模型专属的 SDK operation，因此仍以 adapter 持有的可信轮询目标为基础。
  */
 export function resolveBailianCancelTarget(
   consumerId: string,
