@@ -113,9 +113,16 @@ function validatePassword(password: string, field = 'password'): void {
   }
 }
 
+/**
+ * 掩码邮箱用于展示（如注册后提示"已发送到 xxx@domain"）。
+ *
+ * 隐私原则：避免泄露邮箱首字符。超短 local（≤2 字符）整体掩码为 `***`；
+ * 较长 local 保留首尾字符便于用户辨认，中间掩码。域名保持原样。
+ */
 function maskEmail(email: string): string {
   const [local = '', domain = ''] = email.split('@')
-  return `${local.slice(0, 1)}${'*'.repeat(Math.max(2, local.length - 1))}@${domain}`
+  if (local.length <= 2) return `***@${domain}`
+  return `${local[0]}${'*'.repeat(Math.max(1, local.length - 2))}${local[local.length - 1]}@${domain}`
 }
 
 function normalizeWebOrigin(origin: string): string {

@@ -55,7 +55,11 @@ function sign(data: string, secret: string): string {
 
 /**
  * 常量时间字符串比较，防止通过响应耗时差异推断签名字符（时序攻击）。
- * 长度不一致直接返回 false，但仍走 timingSafeEqual 以保持恒定控制流。
+ *
+ * HS256 的签名输出长度固定（HMAC-SHA256 → 44 个 base64url 字符），因此
+ * 「长度不匹配」本身不泄露任何关于密钥的信息：攻击者无法通过改变签名段长度
+ * 观察任何密钥相关信号。长度一致时才需要 timingSafeEqual 逐字节比较，防止
+ * 通过字节比较的提前返回泄露「第几位开始不匹配」。
  */
 function safeCompare(a: string, b: string): boolean {
   const aBuf = Buffer.from(a)

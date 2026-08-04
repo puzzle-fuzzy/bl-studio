@@ -64,7 +64,7 @@ describe('auth service', () => {
 
     expect(result).toMatchObject({
       status: 'verification_required',
-      email: 'p******@x.test',
+      email: 'p*****g@x.test',
     })
     expect(emailSender.verifications.at(-1)?.to).toBe('pending@x.test')
     expect(emailSender.verifications.at(-1)?.url?.startsWith(
