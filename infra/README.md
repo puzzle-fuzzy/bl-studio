@@ -25,25 +25,27 @@ pnpm run dev          # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,50
 
 ## 生产部署
 
-生产编排为单机 Docker Compose + Caddy 自动 HTTPS，完整手册见 `docs/03-ops.md`。
+生产编排为单机 Docker Compose，HTTPS 由**宿主机 nginx** 终止（与 dev/lunar/p2p 等
+子域名同一套 certbot 运维），完整手册见 `docs/03-ops.md`。
 
 1. 复制并填写两个 gitignored env：
    ```bash
    cp infra/env/.env.production.example infra/env/.env.production
    cp infra/env/.env.prod-infra.example infra/env/.env.prod-infra
    ```
-   `CADDY_BASIC_AUTH_HASH` 用 `caddy hash-password --plaintext '<密码>'` 生成。
+   `LE_EMAIL` 填证书通知邮箱；`logs.yxswy.com` 的 basic_auth 密码 = `GRAFANA_ADMIN_PASSWORD`。
 2. 预检：
    ```bash
    pnpm run check:production-env       # 应用 env（需 --env-file infra/env/.env.production）
    pnpm run check:production-env:infra
    ```
-3. 一键发布（构建 SHA 镜像 → rsync → 迁移 → 滚动 up → 冒烟）：
+3. 一键发布（构建 SHA 镜像 → rsync → 迁移 → 滚动 up → 宿主机 nginx 边缘接入 → 冒烟）：
    ```bash
    pnpm run verify && pnpm run deploy:prod
    ```
 
 生产日志查看：`https://logs.yxswy.com`（Grafana，见 `docs/03-ops.md` 第 5 节）。
+观测栈（loki/alloy/grafana）默认不启动，核心稳定后 `pnpm run prod:observability:up` 启用。
 
 ## 本地生产形态演练
 

@@ -171,9 +171,9 @@ export function checkProductionInfrastructure(
     }
   }
 
-  const basicAuthHash = value('CADDY_BASIC_AUTH_HASH')
-  if (basicAuthHash === undefined || looksLikePlaceholder(basicAuthHash)) {
-    addIssue('CADDY_BASIC_AUTH_HASH', '不能为空或使用模板占位值（用 caddy hash-password 生成 bcrypt）')
+  const leEmail = value('LE_EMAIL')
+  if (leEmail === undefined || looksLikePlaceholder(leEmail) || !isEmail(leEmail)) {
+    addIssue('LE_EMAIL', '不能为空，且必须是合法邮箱（Let’s Encrypt 证书通知用）')
   }
 
   if (value('GRAFANA_ADMIN_USER') === undefined || looksLikePlaceholder(value('GRAFANA_ADMIN_USER')!)) {
@@ -216,6 +216,10 @@ export function checkProductionInfrastructure(
 function isHostname(host: string): boolean {
   if (host.length === 0 || host.length > 253) return false
   return /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(host)
+}
+
+function isEmail(email: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
 }
 
 export function checkProductionReleaseSource(

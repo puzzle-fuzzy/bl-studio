@@ -57,6 +57,8 @@
     "prod:down": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml down",
     "prod:ps": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml ps",
     "prod:logs": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f --tail=100",
+    "prod:observability:up": "docker compose --env-file infra/env/.env.prod-infra --profile observability -f infra/docker/docker-compose.prod.yml up -d --no-build --pull never",
+    "prod:observability:down": "docker compose --env-file infra/env/.env.prod-infra --profile observability -f infra/docker/docker-compose.prod.yml stop",
     "logs:api": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f api",
     "logs:worker": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f worker",
     "logs:prune": "bash infra/scripts/prune-loki-logs.sh",

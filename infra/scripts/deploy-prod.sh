@@ -103,10 +103,11 @@ REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 ssh_cmd "mkdir -p $REMOTE_INFRA/docker $REMOTE_INFRA/env $REMOTE_INFRA/loki $REMOTE_INFRA/alloy $REMOTE_INFRA/grafana $REMOTE_INFRA/nginx $REMOTE_INFRA/scripts"
 
 rsync -az "images-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
-rsync -az infra/docker/docker-compose.prod.yml infra/docker/Caddyfile.prod "$DEPLOY_HOST:$REMOTE_INFRA/docker/"
+rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docker/"
 rsync -az infra/loki/ infra/alloy/ infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/"
-rsync -az infra/nginx/bailian-studio.conf "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
-rsync -az infra/scripts/backup-postgres.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
+# 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
+rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
+rsync -az infra/scripts/backup-postgres.sh infra/scripts/setup-host-edge.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
 rsync -az "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 
 # 服务器侧收紧 env 文件权限（含真实凭据）。
@@ -118,14 +119,17 @@ ssh_cmd "docker load -i $DEPLOY_REMOTE_DIR/images-$SHA.tar"
 
 COMPOSE="docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml"
 
-echo "==> 拉取基础镜像（幂等，保证 --pull never 可启动）"
-ssh_cmd "$COMPOSE pull postgres caddy loki alloy grafana >/dev/null"
+echo "==> 拉取核心基础镜像（幂等；观测栈启用时另行 pull）"
+ssh_cmd "$COMPOSE pull postgres >/dev/null"
 
 echo "==> 执行数据库迁移"
 ssh_cmd "$COMPOSE run --rm migrate"
 
-echo "==> 滚动启动全栈"
+echo "==> 滚动启动核心栈"
 ssh_cmd "$COMPOSE up -d --no-build --pull never"
+
+echo "==> 接入宿主机 nginx 边缘（证书 + conf.d，幂等）"
+ssh_cmd "bash $REMOTE_INFRA/scripts/setup-host-edge.sh $REMOTE_INFRA"
 
 # ── 冒烟 ─────────────────────────────────────────────────────────
 echo "==> 等待 api 容器健康（最多 ~2.5 分钟）"

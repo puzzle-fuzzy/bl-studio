@@ -6,22 +6,25 @@
 
 ```text
 浏览器
-  │  https://create.yxswy.com  (TLS: Caddy 自动续期)
+  │  https://create.yxswy.com  (宿主机 nginx + Let's Encrypt 终止 TLS)
   ▼
-Caddy ──────────────► web (nginx 静态 + /api 反代) ──► api (Bun, :5003) ──► postgres
-  │                      ▲                                  ▲
-  │                      └── backend 网（不暴露 host 端口） ──┘
+宿主机 nginx ───► web (127.0.0.1:5002, nginx 静态 + /api 反代) ──► api (Bun, :5003) ──► postgres
+  │                  ▲                                             ▲
+  │                  └──────── backend 网（不暴露公网）─────────────┘
   │  https://logs.yxswy.com  (basic_auth)
   ▼
-Grafana ──► Loki ◄── Alloy ◄── docker.sock 采集 api/worker/web/caddy 日志
+Grafana (127.0.0.1:5300) ◄── Loki ◄── Alloy ◄── docker.sock 采集 api/worker/web 日志
 ```
 
-- **唯一公网入口**：Caddy（80/443 自动 HTTPS）。应用容器不打 host 端口。
-- **日志链**：应用输出 JSON-lines 到 stdout → Docker 采集 → Alloy 过滤推 Loki → Grafana 查询。
+- **HTTPS 边缘 = 宿主机 nginx**（与 dev/lunar/p2p 等子域名同一套运维 + certbot）。容器只
+  绑定 `127.0.0.1`，由宿主机 nginx 反代；应用容器不打公网端口。
+- **日志链**：应用输出 JSON-lines 到 stdout → Alloy 过滤推 Loki → Grafana 查询
+  （观测栈在 `observability` profile，核心上线后再启用）。
 - **数据**：postgres 命名卷持久化；每日 pg_dump 备份；Loki/Grafana 各自命名卷。
 - 关键配置来源：
-  - `infra/docker/docker-compose.prod.yml` 生产编排
-  - `infra/docker/Caddyfile.prod` TLS 边缘
+  - `infra/docker/docker-compose.prod.yml` 生产编排（核心 = postgres/migrate/api/worker/web/backup；观测 = loki/alloy/grafana）
+  - `infra/nginx/create.yxswy.com.conf`、`infra/nginx/logs.yxswy.com.conf` 宿主机 nginx 站点模板
+  - `infra/scripts/setup-host-edge.sh` 宿主机边缘接入（证书 + conf.d，幂等）
   - `infra/loki/loki.yaml`、`infra/alloy/config.alloy`、`infra/grafana/provisioning/` 日志栈
   - `infra/env/.env.production`（应用机密）、`infra/env/.env.prod-infra`（基础设施变量）——均 gitignored
 
@@ -40,8 +43,9 @@ Grafana ──► Loki ◄── Alloy ◄── docker.sock 采集 api/worker/w
    cp infra/env/.env.production.example infra/env/.env.production
    cp infra/env/.env.prod-infra.example infra/env/.env.prod-infra
    ```
-   - 生成日志子域名 basic_auth 密码哈希：`caddy hash-password --plaintext '<密码>'` → 粘入 `CADDY_BASIC_AUTH_HASH`。
+   - `LE_EMAIL` 填你的邮箱（Let's Encrypt 证书通知用）。
    - `POSTGRES_PASSWORD` 必须与 `.env.production` 的 `DATABASE_URL` 内嵌密码一致。
+   - `logs.yxswy.com` 入口的 basic_auth 密码 = `GRAFANA_ADMIN_PASSWORD`（边缘接入时服务器自动生成 apr1 htpasswd）。
    - 两个文件都会被 gitignore（已在 .gitignore 中，勿修改）。
 5. 本机生成 SSH key 并配置免密登录（或用 `DEPLOY_SSH_KEY` 指向私钥）。
 
@@ -58,12 +62,17 @@ pnpm run deploy:prod
 2. 本机构镜像（`bailian-studio-runtime:<sha>` / `bailian-studio-web:<sha>`，不可变 tag）。
 3. `docker save` → rsync 镜像与全部配置到服务器（env 文件服务器侧 `chmod 600`）。
 4. 服务器 `docker load` → `compose pull` 基础镜像 → `run --rm migrate` → `up -d --no-build --pull never`。
-5. 冒烟：等待 api 容器 healthy + 公网 `https://<SITE_DOMAIN>/api/health/ready` 返回 ok（给 Let's Encrypt 首次签发留重试时间）。
+5. 冒烟：等待 api 容器 healthy + 宿主机 nginx 边缘就绪（`setup-host-edge.sh` 已签发
+   create/logs 证书并 reload）+ 公网 `https://<SITE_DOMAIN>/api/health/ready` 返回 ok。
 
 首次部署注意事项：
-- Caddy 首次会向 Let's Encrypt 申请证书，需要 80/443 可达；若冒烟超时，检查 Caddy 日志：
-  `pnpm run prod:logs caddy`（或 `docker compose ... logs caddy`）。
-- 之后增量部署每次都是「重新 load 新 SHA 镜像 → 迁移 → 滚动 up」。
+- 边缘证书由 `setup-host-edge.sh` 用 certbot webroot 签发（需 80/443 可达、两个域名
+  DNS 指向服务器）；该脚本幂等，已存在证书会跳过。
+- **观测栈默认不启动**（`observability` profile）。核心上线稳定后再：
+  ```bash
+  pnpm run prod:observability:up   # 启用 loki/alloy/grafana
+  ```
+- 之后增量部署每次都是「重新 load 新 SHA 镜像 → 迁移 → 滚动 up → 边缘幂等刷新」。
 
 服务器上手动操作（一般不需要，脚本已覆盖）：
 ```bash
@@ -190,9 +199,12 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 pnpm run verify                    # 发布前完整门禁
 pnpm run check:production-env      # 应用 env 预检（需 --env-file）
 pnpm run check:production-env:infra
-pnpm run deploy:prod               # 一键发布
-pnpm run prod:up|down|ps|logs      # 生产栈运维
+pnpm run deploy:prod               # 一键发布（核心栈 + 宿主机 nginx 边缘）
+pnpm run prod:up|down|ps|logs      # 生产核心栈运维
+pnpm run prod:observability:up|down  # 启用/停用日志观测栈（loki/alloy/grafana）
 pnpm run logs:api|worker           # 生产单服务日志
+pnpm run logs:prune                # 清理旧日志（观测栈启用时）
+pnpm run prod:mem                  # 服务器内存 + 容器占用
 pnpm run db:backup:production      # 手动备份
 pnpm run deploy:rehearsal:up|smoke # 本地生产形态演练
 ```

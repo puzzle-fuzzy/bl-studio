@@ -186,7 +186,7 @@ function validInfrastructure(): Record<string, string> {
   return {
     SITE_DOMAIN: 'create.yxswy.com',
     LOGS_DOMAIN: 'logs.yxswy.com',
-    CADDY_BASIC_AUTH_HASH: '$2y$10$abcdefghijklmnopqrstuvwxyz1234567890',
+    LE_EMAIL: 'ops@yxswy.com',
     GRAFANA_ADMIN_USER: 'viewer',
     GRAFANA_ADMIN_PASSWORD: 'a-long-grafana-password',
     POSTGRES_USER: 'bailian-studio',
