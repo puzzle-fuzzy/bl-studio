@@ -16,6 +16,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
+# 无论成功或失败，退出时清理镜像导出 tar，避免遗留大文件污染工作区
+# （预检要求干净工作区，遗留 tar 会让下次部署的 GIT_WORKTREE 检查失败）。
+trap 'rm -f "$REPO_ROOT"/images-*.tar' EXIT
+
 ENV_APP="$REPO_ROOT/infra/env/.env.production"
 ENV_INFRA="$REPO_ROOT/infra/env/.env.prod-infra"
 
