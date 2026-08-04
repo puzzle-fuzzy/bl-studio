@@ -70,6 +70,11 @@ RUN apt-get update \
   && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
+# 剔除构建/测试期依赖（typescript/vite/vitest/playwright/turbo 等），只保留生产依赖 +
+# 运行时工具 tsx/drizzle-kit（已放根 dependencies）。镜像 ~1.97GB → ~1.8GB，
+# docker save 传输 ~440MB → ~370MB。--frozen-lockfile 保证与已提交 lockfile 一致。
+RUN pnpm install --prod --frozen-lockfile
+
 ENV NODE_ENV=production
 ENV FFPROBE_PATH=ffprobe
 

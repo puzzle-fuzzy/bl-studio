@@ -85,6 +85,13 @@ catalogs:
 importers:
 
   .:
+    dependencies:
+      drizzle-kit:
+        specifier: 'catalog:'
+        version: 0.31.10
+      tsx:
+        specifier: ^4.23.5
+        version: 4.23.5
     devDependencies:
       '@bailian-studio/shared':
         specifier: workspace:*
@@ -104,15 +111,9 @@ importers:
       dotenv-cli:
         specifier: ^11.0.0
         version: 11.0.0
-      drizzle-kit:
-        specifier: 'catalog:'
-        version: 0.31.10
       postgres:
         specifier: 'catalog:'
         version: 3.4.9
-      tsx:
-        specifier: ^4.23.5
-        version: 4.23.5
       turbo:
         specifier: ^2.10.8
         version: 2.10.8

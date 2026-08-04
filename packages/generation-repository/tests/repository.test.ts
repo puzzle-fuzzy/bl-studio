@@ -688,6 +688,18 @@ describe('generation repository', () => {
     })
   })
 
+  it('accepts an empty assetRefs map for text-only models (no media bindings)', async () => {
+    // 前端对纯文生图/文生视频模型总是发 assetRefs:{}；空 map 应走纯参数校验而非报错。
+    const result = await repository.createGeneration({
+      userId: 'user_1',
+      modelId: 'qwen-image',
+      params: { prompt: 'a cat' },
+      assetRefs: {},
+    })
+    expect(result.record.id).toBeTruthy()
+    expect(result.record.modelId).toBe('qwen-image')
+  })
+
   it('rejects unknown and non-media asset binding coordinates before writing', async () => {
     await repository.createUserAsset({
       id: 'asset_structural',

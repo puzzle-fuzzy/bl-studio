@@ -308,7 +308,9 @@ function prepareGenerationParams(
   inputParams: Record<string, unknown>,
   rawAssetRefs?: GenerationAssetRefInput,
 ): PreparedGenerationParams {
-  if (rawAssetRefs === undefined) {
+  // 空 assetRefs（{}）等价于无媒体绑定：纯文生图/文生视频模型合法，走纯参数校验。
+  // 不能把 {} 当"有绑定但为空"拒绝——前端对无媒体模型总是发 assetRefs:{}。
+  if (rawAssetRefs === undefined || Object.keys(rawAssetRefs).length === 0) {
     const validation = validateModelParams(manifest, inputParams)
     if (!validation.valid) {
       throw new GenerationRepositoryError(

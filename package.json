@@ -68,6 +68,10 @@
     "prod:mem": "ssh -o ConnectTimeout=10 $(awk -F= '$1==\"DEPLOY_HOST\"{sub(/^[^=]*=/,\"\");print;exit}' infra/env/.env.prod-infra) 'free -h && docker stats --no-stream'",
     "db:backup:production": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml exec -T backup /bin/sh /usr/local/bin/backup-postgres.sh"
   },
+  "dependencies": {
+    "drizzle-kit": "catalog:",
+    "tsx": "^4.23.5"
+  },
   "devDependencies": {
     "@bailian-studio/shared": "workspace:*",
     "@node-rs/argon2": "catalog:",
@@ -75,9 +79,7 @@
     "@types/node": "^26.1.2",
     "@vitest/coverage-v8": "catalog:",
     "dotenv-cli": "^11.0.0",
-    "drizzle-kit": "catalog:",
     "postgres": "catalog:",
-    "tsx": "^4.23.5",
     "turbo": "^2.10.8",
     "typescript": "catalog:",
     "vitest": "catalog:"
