@@ -2,8 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
-import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ModelSelector } from '@/components/create/ModelSelector'
 import { ParameterForm } from '@/components/create/ParameterForm'
@@ -26,7 +24,10 @@ import { userErrorMessage } from '@/lib/user-error'
 
 const ESTIMATE_DEBOUNCE_MS = 350
 
-/** 创作工作台：模型选择 → 动态参数表单 → 费用预估 → 提交（幂等）。 */
+/**
+ * 创作工作台：模型下拉 → 参考素材 → 提示词(@图N) → 动态参数 → 固定预估区 → 提交（幂等）。
+ * 左右两栏 1:1，中间竖分割线；表单内容不套卡片边框。
+ */
 export function CreatePage() {
   const [searchParams] = useSearchParams()
   const models = useModelCatalogStore(state => state.models)
@@ -144,6 +145,10 @@ export function CreatePage() {
   )
   const settingsFields = visibleFormFields(schema.filter(field => field.group === 'settings'), values)
 
+  // 参考素材（media 参数，含参考图）放在提示词上方；其余输入参数在提示词下方。
+  const mediaFields = inputFields.filter(field => field.control === 'media')
+  const textInputFields = inputFields.filter(field => field.control !== 'media')
+
   const handleValueChange = (name: string, value: unknown) => {
     setValues(current => ({ ...current, [name]: value }))
   }
@@ -176,7 +181,7 @@ export function CreatePage() {
     return (
       <div className="mx-auto max-w-7xl space-y-6">
         <Skeleton className="h-40 w-full rounded-xl" />
-        <div className="grid gap-6 xl:grid-cols-[1fr_360px]">
+        <div className="grid gap-6 xl:grid-cols-2">
           <Skeleton className="h-96 w-full rounded-xl" />
           <Skeleton className="h-64 w-full rounded-xl" />
         </div>
@@ -185,69 +190,78 @@ export function CreatePage() {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-6 xl:grid-cols-[1fr_360px]">
+    <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-2">
+      {/* 左栏：模型下拉 + 表单（无卡片边框） */}
       <div className="space-y-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>选择模型</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ModelSelector
-              models={models}
-              selectedId={modelId}
-              onSelect={id => setModelId(id)}
-            />
-          </CardContent>
-        </Card>
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold">选择模型</h2>
+          <ModelSelector models={models} selectedId={modelId} onSelect={id => setModelId(id)} />
+        </section>
 
         {model !== undefined && (
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                {model.displayName}
-                <span className="text-xs font-normal text-muted-foreground">{model.operation}</span>
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <PromptTemplatePanel category={model.category} onApply={prompt => handleValueChange('prompt', prompt)} />
-              <Separator />
+          <section className="space-y-5">
+            <div className="flex items-baseline gap-2">
+              <h2 className="text-sm font-semibold">{model.displayName}</h2>
+              <span className="text-xs text-muted-foreground">{model.operation}</span>
+            </div>
+
+            <PromptTemplatePanel
+              category={model.category}
+              onApply={prompt => handleValueChange('prompt', prompt)}
+            />
+
+            {mediaFields.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">提示词</p>
-                <PromptInput
-                  value={typeof values.prompt === 'string' ? values.prompt : ''}
-                  refs={promptRefs}
-                  onChange={text => handleValueChange('prompt', text)}
-                  onRefsChange={setPromptRefs}
+                <p className="text-sm font-medium">输入参考素材</p>
+                <ParameterForm
+                  fields={mediaFields}
+                  values={values}
+                  onChange={handleValueChange}
+                  errors={fieldErrors}
                 />
               </div>
-              {inputFields.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">输入参数</p>
-                  <ParameterForm
-                    fields={inputFields}
-                    values={values}
-                    onChange={handleValueChange}
-                    errors={fieldErrors}
-                  />
-                </div>
-              )}
-              {settingsFields.length > 0 && (
-                <div className="space-y-2">
-                  <p className="text-sm font-medium">输出参数</p>
-                  <ParameterForm
-                    fields={settingsFields}
-                    values={values}
-                    onChange={handleValueChange}
-                    errors={fieldErrors}
-                    layout="grid"
-                  />
-                </div>
-              )}
-            </CardContent>
-            <CardFooter className="flex flex-col items-stretch gap-3">
+            )}
+
+            <div className="space-y-2">
+              <p className="text-sm font-medium">提示词</p>
+              <PromptInput
+                value={typeof values.prompt === 'string' ? values.prompt : ''}
+                refs={promptRefs}
+                onChange={text => handleValueChange('prompt', text)}
+                onRefsChange={setPromptRefs}
+                supportsReferences={model.referenceFormat !== undefined}
+              />
+            </div>
+
+            {textInputFields.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">输入参数</p>
+                <ParameterForm
+                  fields={textInputFields}
+                  values={values}
+                  onChange={handleValueChange}
+                  errors={fieldErrors}
+                />
+              </div>
+            )}
+
+            {settingsFields.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-sm font-medium">输出参数</p>
+                <ParameterForm
+                  fields={settingsFields}
+                  values={values}
+                  onChange={handleValueChange}
+                  errors={fieldErrors}
+                  layout="grid"
+                />
+              </div>
+            )}
+
+            <div className="space-y-2 pt-1">
               <EstimateSummary estimate={estimate} estimating={estimating} />
               {submitError !== null && <p className="text-sm text-destructive">{submitError}</p>}
-              <Button type="submit" size="lg" disabled={isSubmitting || isRestoring || model === undefined}>
+              <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || isRestoring || model === undefined}>
                 {isSubmitting ? '提交中…' : isRestoring ? '正在还原参数…' : '开始生成'}
               </Button>
               <CreationPresetPanel
@@ -259,14 +273,15 @@ export function CreatePage() {
                   setValues(preset.params)
                 }}
               />
-            </CardFooter>
-          </Card>
+            </div>
+          </section>
         )}
       </div>
 
-      <aside className="space-y-4 xl:sticky xl:top-6 xl:self-start">
+      {/* 右栏：最近任务（与左栏以竖分割线隔开） */}
+      <div className="xl:border-l xl:border-border xl:pl-8">
         <GenerationsPanel variant="embedded" />
-      </aside>
+      </div>
     </form>
   )
 }

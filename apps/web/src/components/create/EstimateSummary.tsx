@@ -3,7 +3,10 @@ import type { GenerationEstimate } from '@bailian-studio/api-client'
 import { formatCents } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
-/** 费用预估摘要：本次预估 + 积分余额 + 今日用量/限额。 */
+/**
+ * 费用预估摘要（固定区域，永不消失）：本次预估 + 可用积分。
+ * 未产生预估时显示占位「—」，避免输入过程反复出现/消失造成跳动。
+ */
 export function EstimateSummary({
   estimate,
   estimating,
@@ -11,37 +14,28 @@ export function EstimateSummary({
   estimate: GenerationEstimate | null
   estimating: boolean
 }) {
-  if (estimate === null && !estimating) return null
+  const cannotAfford = estimate !== null && !estimate.credits.canAfford
 
   return (
-    <div className="space-y-1 rounded-lg border bg-muted/30 p-3 text-sm">
-      <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">本次预估</span>
-        {estimating ? (
-          <span className="inline-flex items-center gap-1 text-muted-foreground">
-            <Loader2 className="size-3 animate-spin" /> 计算中…
-          </span>
-        ) : (
-          <span className="font-medium">{formatCents(estimate?.costEstimate)}</span>
-        )}
-      </div>
-      {estimate !== null && (
-        <>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">可用积分</span>
-            <span className={cn(!estimate.credits.canAfford && 'font-medium text-destructive')}>
-              {formatCents(estimate.credits.availableCents)}
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">本月累计</span>
-            <span>{formatCents(estimate.usage.chargedCents)}</span>
-          </div>
-          {!estimate.credits.canAfford && (
-            <p className="text-xs text-destructive">积分不足，无法发起生成</p>
-          )}
-        </>
+    <div
+      className={cn(
+        'flex items-center justify-between gap-2 rounded-md border px-3 py-2 text-sm',
+        cannotAfford ? 'border-destructive/40 bg-destructive/5' : 'bg-muted/40',
       )}
+    >
+      <span className="flex items-center gap-1.5 text-muted-foreground">
+        {estimating ? <Loader2 className="size-3 animate-spin" /> : null}
+        本次预估
+      </span>
+      <span className="font-medium">
+        {estimate !== null ? formatCents(estimate.costEstimate) : estimating ? '计算中…' : '—'}
+      </span>
+      <span className="text-muted-foreground">
+        可用积分{' '}
+        <span className={cn('font-medium', cannotAfford && 'text-destructive')}>
+          {estimate !== null ? formatCents(estimate.credits.availableCents) : '—'}
+        </span>
+      </span>
     </div>
   )
 }

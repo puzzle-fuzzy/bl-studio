@@ -2,14 +2,35 @@ import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router'
 import { List } from 'react-window'
 import { Button } from '@/components/ui/button'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GenerationRecord } from '@bailian-studio/api-client'
 import { GenerationListItem } from '@/components/generations/GenerationListItem'
 import { GenerationStatusFilter } from '@/components/generations/GenerationStatusFilter'
 import { useGenerationsStore } from '@/stores/generations-store'
+import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
+
+/** 产物类型筛选（嵌入态）。 */
+type KindFilter = 'all' | 'image' | 'video' | 'audio'
+/** 进度筛选（嵌入态）。 */
+type ProgressFilter = 'all' | 'done' | 'running' | 'failed'
+
+const KIND_FILTERS: Array<{ value: KindFilter; label: string }> = [
+  { value: 'all', label: '全部产物' },
+  { value: 'image', label: '图片' },
+  { value: 'video', label: '视频' },
+  { value: 'audio', label: '音乐' },
+]
+
+const PROGRESS_FILTERS: Array<{ value: ProgressFilter; label: string }> = [
+  { value: 'all', label: '全部进度' },
+  { value: 'done', label: '已完成' },
+  { value: 'running', label: '进行中' },
+  { value: 'failed', label: '失败' },
+]
 
 /**
- * 任务面板。embedded 形态展示最近任务（创作页侧栏）；page 形态为完整渲染队列
- * （状态筛选 + react-window 虚拟滚动 + 加载更多）。
+ * 任务面板。embedded 形态展示最近任务（创作页右栏，含产物类型/进度两个筛选下拉）；
+ * page 形态为完整渲染队列（状态筛选 + react-window 虚拟滚动 + 加载更多）。
  */
 export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded' | 'page' }) {
   const navigate = useNavigate()
@@ -25,26 +46,97 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
   const open = (id: string) => navigate(`/generations/${id}`)
 
   if (variant === 'embedded') {
-    const recent = records.slice(0, 5)
-    return (
-      <div className="space-y-2">
-        <p className="text-sm font-medium">最近任务</p>
-        {recent.length === 0 ? (
-          <p className="py-4 text-center text-sm text-muted-foreground">
-            {isLoading ? '加载中…' : '还没有生成任务，开始你的第一个创作吧'}
-          </p>
-        ) : (
-          <div className="space-y-2">
-            {recent.map(record => (
-              <GenerationListItem key={record.id} record={record} onOpen={open} />
-            ))}
-          </div>
-        )}
-      </div>
-    )
+    return <EmbeddedVariant records={records} isLoading={isLoading} onOpen={open} />
   }
 
   return <PageVariant />
+}
+
+/** 嵌入态：最近任务 + 产物类型/进度两个筛选下拉。 */
+function EmbeddedVariant({
+  records,
+  isLoading,
+  onOpen,
+}: {
+  records: readonly GenerationRecord[]
+  isLoading: boolean
+  onOpen: (id: string) => void
+}) {
+  const models = useModelCatalogStore(state => state.models)
+  const [kindFilter, setKindFilter] = useState<KindFilter>('all')
+  const [progressFilter, setProgressFilter] = useState<ProgressFilter>('all')
+
+  const recent = records.slice(0, 8)
+  const filtered = recent.filter(record => {
+    if (kindFilter !== 'all' && recordKind(record, models) !== kindFilter) return false
+    if (progressFilter !== 'all' && !matchesProgress(record.status, progressFilter)) return false
+    return true
+  })
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <p className="text-sm font-medium">最近任务</p>
+        <div className="flex gap-2">
+          <Select value={kindFilter} onValueChange={value => setKindFilter(value as KindFilter)}>
+            <SelectTrigger className="h-8 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {KIND_FILTERS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Select value={progressFilter} onValueChange={value => setProgressFilter(value as ProgressFilter)}>
+            <SelectTrigger className="h-8 w-28 text-xs">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {PROGRESS_FILTERS.map(option => (
+                <SelectItem key={option.value} value={option.value}>
+                  {option.label}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      {filtered.length === 0 ? (
+        <p className="py-4 text-center text-sm text-muted-foreground">
+          {isLoading ? '加载中…' : recent.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
+        </p>
+      ) : (
+        <div className="space-y-2">
+          {filtered.map(record => (
+            <GenerationListItem key={record.id} record={record} onOpen={onOpen} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+/** 任务产物类型：优先取输出首产物 kind，回退模型目录的 category。 */
+function recordKind(
+  record: GenerationRecord,
+  models: ReturnType<typeof useModelCatalogStore.getState>['models'],
+): KindFilter | undefined {
+  const firstKind = record.outputResult?.artifacts?.[0]?.kind
+  if (firstKind === 'image' || firstKind === 'video' || firstKind === 'audio') return firstKind
+  const category = selectModelById(models, record.modelId)?.category
+  if (category === 'image' || category === 'video' || category === 'audio') return category
+  return undefined
+}
+
+/** 任务进度匹配：已完成 / 进行中（排队+处理中）/ 失败（失败+取消）。 */
+function matchesProgress(status: string, filter: ProgressFilter): boolean {
+  if (filter === 'done') return status === 'succeeded'
+  if (filter === 'running') return status === 'queued' || status === 'processing'
+  if (filter === 'failed') return status === 'failed' || status === 'cancelled'
+  return true
 }
 
 function PageVariant() {

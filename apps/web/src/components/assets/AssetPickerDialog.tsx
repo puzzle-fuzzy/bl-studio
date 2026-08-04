@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Link2, Loader2, Upload, X } from 'lucide-react'
+import { Check, Image as ImageIcon, Link2, Loader2, Upload, X } from 'lucide-react'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import {
@@ -103,7 +103,7 @@ export function AssetPickerDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>选择素材</DialogTitle>
         </DialogHeader>
@@ -115,31 +115,39 @@ export function AssetPickerDialog({
           </TabsList>
 
           <TabsContent value="library" className="space-y-3">
-            <div className="grid max-h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
-              {items.map(asset => {
-                const index = selected.findIndex(item => item.id === asset.id)
-                return (
-                  <button
-                    key={asset.id}
-                    type="button"
-                    onClick={() => toggleAsset(asset)}
-                    className={cn(
-                      'relative aspect-square overflow-hidden rounded-md border',
-                      index >= 0 ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-muted-foreground/50',
-                    )}
-                    aria-pressed={index >= 0}
-                  >
-                    <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />
-                    {index >= 0 && (
-                      <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
-                        {multiple ? index + 1 : <Check className="size-2.5" />}
-                      </span>
-                    )}
-                  </button>
-                )
-              })}
-              {assetsState?.nextCursor !== undefined && (
-                <Button variant="ghost" size="sm" onClick={() => void loadMore(query)}>
+            {/* 固定高度资产网格：空态与满载都保持同一占位区域，弹窗不跳动 */}
+            <div className="grid h-72 grid-cols-4 gap-2 overflow-y-auto pr-1 sm:grid-cols-6">
+              {items.length === 0 ? (
+                <div className="col-span-full flex h-full flex-col items-center justify-center gap-2 text-sm text-muted-foreground">
+                  <ImageIcon className="size-8" />
+                  <span>还没有资产，去「上传」或「粘贴链接」添加吧</span>
+                </div>
+              ) : (
+                items.map(asset => {
+                  const index = selected.findIndex(item => item.id === asset.id)
+                  return (
+                    <button
+                      key={asset.id}
+                      type="button"
+                      onClick={() => toggleAsset(asset)}
+                      className={cn(
+                        'relative aspect-square overflow-hidden rounded-md border',
+                        index >= 0 ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-muted-foreground/50',
+                      )}
+                      aria-pressed={index >= 0}
+                    >
+                      <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />
+                      {index >= 0 && (
+                        <span className="absolute top-1 right-1 flex size-4 items-center justify-center rounded-full bg-primary text-[10px] font-medium text-primary-foreground">
+                          {multiple ? index + 1 : <Check className="size-2.5" />}
+                        </span>
+                      )}
+                    </button>
+                  )
+                })
+              )}
+              {items.length > 0 && assetsState?.nextCursor !== undefined && (
+                <Button variant="ghost" size="sm" className="col-span-full" onClick={() => void loadMore(query)}>
                   加载更多
                 </Button>
               )}
