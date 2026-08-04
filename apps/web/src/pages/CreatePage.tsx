@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
+import { ChevronDown } from 'lucide-react'
 import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ModelSelector } from '@/components/create/ModelSelector'
 import { ParameterForm } from '@/components/create/ParameterForm'
@@ -23,6 +25,9 @@ import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 
 const ESTIMATE_DEBOUNCE_MS = 350
+
+/** 不常用的输出参数，收进「高级设置」折叠，默认隐藏。 */
+const ADVANCED_PARAM_NAMES = ['watermark', 'seed']
 
 /**
  * 创作工作台：模型下拉 → 参考素材 → 提示词(@图N) → 动态参数 → 固定预估区 → 提交（幂等）。
@@ -144,6 +149,9 @@ export function CreatePage() {
     field => field.parameter.name !== 'prompt',
   )
   const settingsFields = visibleFormFields(schema.filter(field => field.group === 'settings'), values)
+  // 常规输出参数 vs 高级参数（水印/随机种子默认折叠）。
+  const basicSettingsFields = settingsFields.filter(field => !ADVANCED_PARAM_NAMES.includes(field.parameter.name))
+  const advancedSettingsFields = settingsFields.filter(field => ADVANCED_PARAM_NAMES.includes(field.parameter.name))
 
   // 参考素材（media 参数，含参考图）放在提示词上方；其余输入参数在提示词下方。
   const mediaFields = inputFields.filter(field => field.control === 'media')
@@ -256,17 +264,40 @@ export function CreatePage() {
               </div>
             )}
 
-            {settingsFields.length > 0 && (
+            {basicSettingsFields.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">输出参数</p>
                 <ParameterForm
-                  fields={settingsFields}
+                  fields={basicSettingsFields}
                   values={values}
                   onChange={handleValueChange}
                   errors={fieldErrors}
                   layout="grid"
                 />
               </div>
+            )}
+
+            {advancedSettingsFields.length > 0 && (
+              <Collapsible className="group space-y-2">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    高级设置
+                    <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent>
+                  <ParameterForm
+                    fields={advancedSettingsFields}
+                    values={values}
+                    onChange={handleValueChange}
+                    errors={fieldErrors}
+                    layout="grid"
+                  />
+                </CollapsibleContent>
+              </Collapsible>
             )}
 
             <div className="space-y-2 pt-1">

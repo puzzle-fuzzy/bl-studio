@@ -15,6 +15,7 @@ import {
 } from '@/components/ui/sidebar'
 import { BrandMark } from '@/components/shared/BrandMark'
 import { NotificationMenu } from '@/components/layout/NotificationMenu'
+import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
 import { cn } from '@/lib/utils'
 
@@ -52,9 +53,11 @@ export function Nav() {
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
-      <SidebarFooter className="border-t">
-        <div className="flex items-center gap-1 p-1.5">
+      {/* 侧栏底部：通知一行 / 积分一行 / 头像+邮箱一行，各自独立 */}
+      <SidebarFooter className="border-t p-2">
+        <div className="space-y-1">
           <NotificationMenu />
+          <CreditsBadge layout="row" />
           <UserMenu />
         </div>
       </SidebarFooter>

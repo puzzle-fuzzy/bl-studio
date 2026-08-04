@@ -55,12 +55,14 @@ export function ModelSelector({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
 
-  // 未选中任何模型时，默认选 视频生成 → 第一个子模式 → 第一个模型。
+  // 未选中任何模型时，等目录加载后默认选 视频生成 → 第一个子模式 → 第一个模型。
+  // 注意：models 为空时不能标记 initialized，否则目录加载完成后再也不会触发默认选择。
   const initialized = useRef(false)
   useEffect(() => {
+    if (selectedId !== undefined) return
+    if (models.length === 0) return
     if (initialized.current) return
     initialized.current = true
-    if (selectedId !== undefined || models.length === 0) return
     const firstMode = (availableSubModes(models, 'video')[0] ?? SUB_MODE_ORDER.video[0]) ?? 'r2v'
     const first = modelsInMode(models, 'video', firstMode)[0] ?? models[0]
     if (first !== undefined) onSelect(first.id)
