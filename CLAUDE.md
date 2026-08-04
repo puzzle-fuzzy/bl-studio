@@ -26,6 +26,11 @@ pnpm run check:manifests  # manifest 一致性
 pnpm run db:push / db:push:test
 ```
 
+生产部署/日志/备份见 `docs/03-ops.md`：`pnpm run deploy:prod` 一键发布
+（构建 SHA 镜像 → rsync → docker load → 迁移 → 滚动 up → 冒烟）；日志栈
+Loki + Alloy + Grafana 挂在 `logs.yxswy.com`。`pnpm run check:production-env:infra`
+校验基础设施 env（`.env.prod-infra`）。
+
 测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后 `db:push` + `db:push:test`。
 
 ## 架构与边界

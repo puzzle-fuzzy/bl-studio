@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   checkProductionEnvironment,
+  checkProductionInfrastructure,
   checkProductionReleaseSource,
   formatProductionPreflightFailure,
 } from './check-production-env'
@@ -159,5 +160,71 @@ describe('production environment preflight', () => {
       headSha: undefined,
       worktreeClean: undefined,
     }).map(issue => issue.key)).toEqual(['GIT_HEAD', 'GIT_WORKTREE'])
+  })
+
+  it('allows LOG_FORMAT to be unset (production defaults to json) without issues', () => {
+    expect(checkProductionEnvironment(validEnvironment()).issues.map(issue => issue.key))
+      .not.toContain('LOG_FORMAT')
+  })
+
+  it('rejects an invalid or production-console LOG_FORMAT value', () => {
+    const invalid = checkProductionEnvironment({
+      ...validEnvironment(),
+      LOG_FORMAT: 'pretty',
+    })
+    expect(invalid.issues.map(issue => issue.key)).toContain('LOG_FORMAT')
+
+    const consoleInProduction = checkProductionEnvironment({
+      ...validEnvironment(),
+      LOG_FORMAT: 'console',
+    })
+    expect(consoleInProduction.issues.map(issue => issue.key)).toContain('LOG_FORMAT')
+  })
+})
+
+function validInfrastructure(): Record<string, string> {
+  return {
+    SITE_DOMAIN: 'create.yxswy.com',
+    LOGS_DOMAIN: 'logs.yxswy.com',
+    CADDY_BASIC_AUTH_HASH: '$2y$10$abcdefghijklmnopqrstuvwxyz1234567890',
+    GRAFANA_ADMIN_USER: 'viewer',
+    GRAFANA_ADMIN_PASSWORD: 'a-long-grafana-password',
+    POSTGRES_USER: 'bailian-studio',
+    POSTGRES_PASSWORD: 'a-long-db-password',
+    POSTGRES_DB: 'bailian-studio',
+    BACKUP_DIR: '/backups',
+    BACKUP_RETENTION_DAYS: '14',
+    LOKI_RETENTION_DAYS: '31',
+    DEPLOY_HOST: 'deploy@203.0.113.5',
+  }
+}
+
+describe('production infrastructure preflight', () => {
+  it('accepts a complete infrastructure configuration', () => {
+    const result = checkProductionInfrastructure(validInfrastructure())
+    expect(result.issues).toEqual([])
+    expect(result.warnings).toEqual([])
+  })
+
+  it('rejects placeholder domains, short passwords and non-hostname domains', () => {
+    const result = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      SITE_DOMAIN: 'your-domain.example',
+      LOGS_DOMAIN: 'https://logs.example.com/path',
+      GRAFANA_ADMIN_PASSWORD: 'short',
+      POSTGRES_PASSWORD: 'CHANGE_ME',
+      BACKUP_RETENTION_DAYS: 'abc',
+      DEPLOY_HOST: 'replace-with-user@host',
+    })
+
+    expect(result.issues.map(issue => issue.key)).toEqual([
+      'SITE_DOMAIN',
+      'LOGS_DOMAIN',
+      'GRAFANA_ADMIN_PASSWORD',
+      'POSTGRES_PASSWORD',
+      'BACKUP_RETENTION_DAYS',
+      'DEPLOY_HOST',
+    ])
+    expect(formatProductionPreflightFailure(result)).not.toContain('https://logs.example.com/path')
   })
 })

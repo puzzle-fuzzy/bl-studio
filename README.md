@@ -103,4 +103,4 @@ src/
 
 ## 部署
 
-生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + node/pnpm；API 用 bun，Worker 用 tsx），Nginx 反代 `/api` + SSE，配置模板在 `infra/env/.env.production.example`。发布前运行 `pnpm run verify`。
+单机 Docker Compose + Caddy 自动 HTTPS（Let's Encrypt），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + node/pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署。完整运维手册见 `docs/03-ops.md`。

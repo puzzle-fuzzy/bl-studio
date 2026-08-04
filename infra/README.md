@@ -2,48 +2,65 @@
 
 仓库级运行基础设施统一放在这里，所有命令仍从仓库根目录执行：
 
-- `env/`：环境变量模板，以及本地未提交的 `.env`、`.env.test`、`.env.production`。
+- `env/`：环境变量模板，以及本地未提交的 `.env`（dev）、`.env.test`、`.env.production`（生产应用机密）、`.env.prod-infra`（生产基础设施变量）。
 - `docker/`：Dockerfile 与 Compose 文件。Compose 的 build context 仍是仓库根目录，因此路径使用 `../..`。
-- `nginx/`：生产 Vue Web 容器使用的静态文件与反向代理配置。
-- `scripts/`：数据库、边界检查、生产预检和发布辅助脚本。
+- `nginx/`：生产 Web 容器使用的静态文件与反向代理配置（供 Dockerfile `web` target 烘焙）。
+- `loki/`、`alloy/`、`grafana/`：生产日志栈配置（Loki 存储、Grafana Alloy 采集、Grafana provisioning 数据源与仪表盘）。
+- `scripts/`：数据库、边界检查、生产预检、部署/备份与发布辅助脚本。
 - `docker/docker-compose.rehearsal.yml`：本地生产形态演练栈，包含一次性迁移 job、
   API、Worker、Postgres 和 Nginx Web；只使用临时本地存储，不代表公网部署配置。
 
-常用入口保持不变，例如 `bun run dev`、`bun run verify`、`bun run db:up`；根
+常用入口保持不变，例如 `pnpm run dev`、`pnpm run verify`、`pnpm run db:up`；根
 `package.json` 负责把它们映射到这里的实际文件。Docker 的 `.dockerignore` 特意保留在
 仓库根目录，因为 Docker 只会自动读取 build context 根下的忽略文件。
 
-生产 Docker `web` target 只构建 `@bailian-studio/web`（合并后的 React 前端）并把
-`apps/web/dist` 复制到 Nginx。
-Vue 的隔离浏览器验收入口是 `bun run e2e:vue`。
-
-首次本地配置：
+## 本地开发
 
 ```bash
 cp infra/env/.env.example infra/env/.env
 cp infra/env/.env.test.example infra/env/.env.test
+pnpm run db:up        # dev Postgres :55431 + Mailpit :11025
+pnpm run dev          # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
 ```
 
-生产环境应复制 `infra/env/.env.production.example` 为
-`infra/env/.env.production`，并在启动前运行
-`bun --env-file=infra/env/.env.production run check:production-env`。
+## 生产部署
 
-本地部署演练：
+生产编排为单机 Docker Compose + Caddy 自动 HTTPS，完整手册见 `docs/03-ops.md`。
+
+1. 复制并填写两个 gitignored env：
+   ```bash
+   cp infra/env/.env.production.example infra/env/.env.production
+   cp infra/env/.env.prod-infra.example infra/env/.env.prod-infra
+   ```
+   `CADDY_BASIC_AUTH_HASH` 用 `caddy hash-password --plaintext '<密码>'` 生成。
+2. 预检：
+   ```bash
+   pnpm run check:production-env       # 应用 env（需 --env-file infra/env/.env.production）
+   pnpm run check:production-env:infra
+   ```
+3. 一键发布（构建 SHA 镜像 → rsync → 迁移 → 滚动 up → 冒烟）：
+   ```bash
+   pnpm run verify && pnpm run deploy:prod
+   ```
+
+生产日志查看：`https://logs.yxswy.com`（Grafana，见 `docs/03-ops.md` 第 5 节）。
+
+## 本地生产形态演练
 
 ```bash
-bun run deploy:rehearsal:up
-bun run deploy:rehearsal:ps
+pnpm run deploy:rehearsal:up
+pnpm run deploy:rehearsal:ps
 # Web: http://localhost:5012  API: http://localhost:5013
-bun run deploy:rehearsal:down
+pnpm run deploy:rehearsal:down
 ```
 
-要执行完整的自动化启动、健康、队列、重启恢复和清理检查，使用：
+要执行完整的自动化启动、健康、队列、JSON 日志格式、重启恢复和清理检查，使用：
 
 ```bash
-bun run deploy:rehearsal:smoke
+pnpm run deploy:rehearsal:smoke
 ```
 
-已构建镜像时可使用 `bun run deploy:rehearsal:smoke -- --no-build` 加快重复演练；`--keep` 可在检查结束后保留容器以便排查。
+已构建镜像时可使用 `pnpm run deploy:rehearsal:smoke -- --no-build` 加快重复演练；`--keep` 可在检查结束后保留容器以便排查。
 
 演练栈中的 `migrate` 服务使用已提交的 Drizzle migrations，API/Worker 只有在
 迁移成功后才会启动；`api/health/ready` 还会检查数据库、存储和 Worker 心跳。

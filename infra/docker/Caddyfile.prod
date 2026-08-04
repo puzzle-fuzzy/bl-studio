@@ -1,0 +1,26 @@
+# Caddy 自动 HTTPS（Let's Encrypt 签发/续期）。变量由 compose 以容器环境注入。
+#
+# 注意 X-Forwarded-For 的处理：这里**覆盖**为真实客户端 IP（而非追加客户端可控值），
+# 保证 API 侧（API_TRUST_PROXY=true 时取 XFF 首项做限流身份）拿到可信真实 IP；
+# nginx 再用 $proxy_add_x_forwarded_for 追加本层地址。生产 web 不打 host 端口，
+# 客户端无法绕过本边缘直连 nginx，因此不存在伪造路径。
+
+{$SITE_DOMAIN} {
+  encode zstd gzip
+
+  reverse_proxy web:5002 {
+    header_up X-Forwarded-For {remote_host}
+    header_up X-Real-IP {remote_host}
+    header_up X-Forwarded-Proto https
+  }
+}
+
+# 日志查看入口：Caddy basic_auth 保护，密码 bcrypt 哈希由
+# `caddy hash-password --plaintext '<密码>'` 生成后注入 CADDY_BASIC_AUTH_HASH。
+{$LOGS_DOMAIN} {
+  basic_auth {
+    viewer {$CADDY_BASIC_AUTH_HASH}
+  }
+
+  reverse_proxy grafana:3000
+}

@@ -1,0 +1,142 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (errorCode) (count_over_time({compose_project=\"bailian-studio-prod\"} | json | msg=\"request.failed\" [$__auto]))",
+          "legendFormat": "{{errorCode}}",
+          "refId": "A"
+        }
+      ],
+      "title": "API 失败请求 by errorCode",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (container) (count_over_time({compose_project=\"bailian-studio-prod\"} | json | msg=\"task.threw\" [$__auto]))",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Worker 抛错趋势",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (outcome) (count_over_time({compose_project=\"bailian-studio-prod\"} | json | msg=\"task.outcome\" [$__auto]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "任务结果 by outcome",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "preferVisualisationType": "logs",
+        "showCommonLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "{compose_project=\"bailian-studio-prod\"} | json | level=\"error\"",
+          "refId": "A"
+        }
+      ],
+      "title": "全部 error 日志",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["bailian-studio"],
+  "templating": { "list": [] },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "错误面板",
+  "uid": "bailian-error-panel",
+  "version": 1
+}

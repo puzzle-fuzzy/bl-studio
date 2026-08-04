@@ -20,6 +20,36 @@ export interface RehearsalCommandRunner {
   (args: readonly string[]): Promise<void>
 }
 
+export interface RehearsalCommandCapture {
+  (args: readonly string[]): Promise<string>
+}
+
+/**
+ * 断言容器日志中出现 JSON-lines 结构化条目（LOG_FORMAT=json 生效）。
+ * 逐行剥离 compose 的 `service | ` 前缀后尝试 JSON 解析；命中含
+ * level(info/warn/error) + msg 的记录即通过。用于端到端验证生产日志格式。
+ */
+export function verifyJsonLogLines(logs: string): void {
+  for (const rawLine of logs.split('\n')) {
+    const separatorIndex = rawLine.indexOf(' | ')
+    const candidate = separatorIndex === -1 ? rawLine : rawLine.slice(separatorIndex + 3)
+    const trimmed = candidate.trim()
+    if (trimmed.length === 0) continue
+
+    let parsed: unknown
+    try {
+      parsed = JSON.parse(trimmed)
+    } catch {
+      continue
+    }
+    const record = parsed as { level?: unknown; msg?: unknown }
+    if (['info', 'warn', 'error'].includes(String(record.level)) && typeof record.msg === 'string') {
+      return
+    }
+  }
+  throw new Error('Rehearsal API logs did not contain JSON-lines entries (LOG_FORMAT=json)')
+}
+
 export function parseRehearsalArgs(args: readonly string[]): RehearsalSmokeOptions {
   let build = true
   let keep = false
@@ -49,6 +79,7 @@ export async function runRehearsalSmoke(
   options: RehearsalSmokeOptions,
   runCommand: RehearsalCommandRunner = createDockerCommandRunner(),
   fetchImpl: typeof fetch = fetch,
+  captureCommand: RehearsalCommandCapture = createDockerCaptureCommand(),
 ): Promise<void> {
   let startAttempted = false
   try {
@@ -69,6 +100,10 @@ export async function runRehearsalSmoke(
     await waitForReady(`${options.webOrigin}/api/health/ready`, fetchImpl)
     await waitForHtml(`${options.webOrigin}/`, fetchImpl)
     await verifyWebRelease(`${options.webOrigin}/`, fetchImpl)
+
+    // 端到端验证 LOG_FORMAT=json：api 容器日志必须包含结构化 JSON-lines 条目。
+    verifyJsonLogLines(await captureCommand(['logs', 'api']))
+
     await runCommand(['--profile', 'ops', 'run', '--rm', 'ops-health'])
 
     // 生产形态的 restart 不应让 API 在 worker 进程重启后仍报告过期或
@@ -176,6 +211,30 @@ function createDockerCommandRunner(): RehearsalCommandRunner {
     const exitCode = await process.exited
     if (exitCode !== 0) throw new Error(`docker compose ${args.join(' ')} exited with code ${exitCode}`)
   }
+}
+
+function createDockerCaptureCommand(): RehearsalCommandCapture {
+  return async args => {
+    const process = spawnProcess(['docker', 'compose', '-f', composeFile, ...args], {
+      cwd: repositoryRoot,
+      stdout: 'pipe',
+      stderr: 'pipe',
+    })
+    const exitCode = await process.exited
+    if (exitCode !== 0) throw new Error(`docker compose ${args.join(' ')} exited with code ${exitCode}`)
+    return readWebStream(process.stdout)
+  }
+}
+
+async function readWebStream(stream: ReadableStream<Uint8Array>): Promise<string> {
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    chunks.push(value)
+  }
+  return Buffer.concat(chunks).toString('utf8')
 }
 
 async function main(): Promise<void> {

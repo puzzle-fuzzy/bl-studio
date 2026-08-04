@@ -1,0 +1,73 @@
+// Grafana Alloy 采集配置：自动发现本机 Docker 容器，只采集带
+// bailian-studio.log-format 标签的应用容器（api/worker=json、web/caddy=text），
+// 丢弃 API 健康检查刷屏，其余原始行推送 Loki。
+//
+// 说明：requestId/taskId/recordId/errorCode 等**不设标签**（高基数会撑爆 Loki 索引），
+// 留在日志正文里，用 LogQL `| json` 按字段过滤即可。
+
+// 发现本机运行中的 Docker 容器。
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// 只保留应用容器，并落稳定低基数标签（container / compose_project / log_format）。
+discovery.relabel "app_logs" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_label_bailian_studio_log_format"]
+    regex         = "(json|text)"
+    action        = "keep"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_bailian_studio_log_format"]
+    target_label  = "log_format"
+  }
+}
+
+// 从容器 stdout 流式采集 → 过滤健康检查 → 推送 Loki。
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.app_logs.output
+  forward_to = [loki.process.app_logs.receiver]
+}
+
+loki.process "app_logs" {
+  // json 流：把低基数结构化字段 level/scope 提取为 Loki 标签（仅 3 个级别与
+  // 十几个 scope，不会撑爆索引），供 Grafana 模板变量与仪表盘直接过滤。
+  // requestId/taskId/recordId/errorCode 等**不设标签**，留在正文用 `| json` 查询。
+  stage.json {
+    expressions = {
+      level = "level",
+      scope = "scope",
+    }
+  }
+  stage.labels {
+    values = {
+      level = "level",
+      scope = "scope",
+    }
+  }
+
+  // API 容器健康检查每 10s 打一次 /api/health/(live|ready)，按 JSON 行内的 path 字段丢弃。
+  stage.drop {
+    source     = "message"
+    expression = '"path":"/api/health/(live|ready)"'
+  }
+
+  forward_to = [loki.write.local.receiver]
+}
+
+loki.write "local" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}

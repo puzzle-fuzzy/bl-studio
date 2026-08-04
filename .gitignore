@@ -9,6 +9,8 @@ coverage/
 # 本地环境文件（绝不提交）
 infra/env/.env
 infra/env/.env.test
+infra/env/.env.production
+infra/env/.env.prod-infra
 .env
 .env.local
 .env.*.local

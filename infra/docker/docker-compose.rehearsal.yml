@@ -37,7 +37,9 @@ services:
     image: *runtime-image
     user: root
     entrypoint: ["/bin/sh", "-c"]
-    command: ["mkdir -p /app/var/artifacts/bailian-studio && chown -R node:node /app/var/artifacts"]
+    # 运行时镜像以 bun 用户执行（Dockerfile 末尾 USER bun），产物目录须归属 bun；
+    # 旧实现 chown node:node 在新基座上无 node 用户会失败。
+    command: ["mkdir -p /app/var/artifacts/bailian-studio && chown -R bun:bun /app/var/artifacts"]
     volumes:
       - rehearsal_artifacts:/app/var/artifacts
     restart: "no"
@@ -54,6 +56,8 @@ services:
         BAILIAN_STUDIO_RELEASE_TAG: "${BAILIAN_STUDIO_RELEASE_TAG:-local}"
     environment:
       NODE_ENV: rehearsal
+      # 显式开启 JSON-lines，让演练路径覆盖生产日志格式（NODE_ENV=rehearsal 不会自动切）。
+      LOG_FORMAT: json
       API_HOST: 0.0.0.0
       API_PORT: 5003
       DATABASE_URL: postgres://bailian-studio:bailian-studio@postgres:5432/bailian-studio_rehearsal
@@ -95,6 +99,7 @@ services:
     image: *runtime-image
     environment:
       NODE_ENV: rehearsal
+      LOG_FORMAT: json
       DATABASE_URL: postgres://bailian-studio:bailian-studio@postgres:5432/bailian-studio_rehearsal
       DASHSCOPE_API_KEY: rehearsal-placeholder-not-a-secret
       BAILIAN_CONTRACT_LOCALE: zh-CN

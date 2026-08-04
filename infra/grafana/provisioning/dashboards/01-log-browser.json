@@ -1,0 +1,113 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 15,
+            "lineWidth": 2,
+            "showPoints": "never",
+            "spanNulls": true
+          },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (level) (count_over_time({compose_project=\"bailian-studio-prod\"} [$__auto]))",
+          "legendFormat": "{{level}}",
+          "refId": "A"
+        }
+      ],
+      "title": "日志量 by level",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 8 },
+      "id": 2,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "preferVisualisationType": "logs",
+        "showCommonLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "{compose_project=\"bailian-studio-prod\"} | json | level=~\"$level\" | scope=~\"$scope\"",
+          "refId": "A"
+        }
+      ],
+      "title": "日志流",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["bailian-studio"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "lokiuid" },
+        "definition": "label_values(level)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "级别",
+        "multi": true,
+        "name": "level",
+        "options": [],
+        "query": { "query": "label_values(level)", "refId": "level-var" },
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      },
+      {
+        "allValue": ".*",
+        "current": { "selected": false, "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "lokiuid" },
+        "definition": "label_values(scope)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "来源",
+        "multi": true,
+        "name": "scope",
+        "options": [],
+        "query": { "query": "label_values(scope)", "refId": "scope-var" },
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-1h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "日志浏览器",
+  "uid": "bailian-log-browser",
+  "version": 1
+}

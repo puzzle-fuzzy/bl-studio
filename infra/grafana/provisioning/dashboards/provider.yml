@@ -1,0 +1,14 @@
+# 版本化 dashboards 的 file provider：把本目录下的 JSON 自动加载到 Grafana，
+# 30s 轮询一次，改 dashboard JSON 后无需手动导入。
+apiVersion: 1
+
+providers:
+  - name: 'Bailian Studio'
+    orgId: 1
+    folder: 'Bailian Studio'
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards

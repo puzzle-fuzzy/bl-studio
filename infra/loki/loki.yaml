@@ -1,0 +1,42 @@
+# Loki 单实例单二进制配置。
+#
+# 存储：本机文件系统（命名卷 loki_data 挂到 /loki）；保留期 31 天。
+# 注意 Loki 不支持 YAML 内 ${} 插值，retention 写死默认；如需调整保留期，改这里
+# 并在部署时重启 loki（.env.prod-infra 的 LOKI_RETENTION_DAYS 仅作文档/预检提示）。
+
+auth_enabled: false
+
+server:
+  http_listen_port: 3100
+
+common:
+  path_prefix: /loki
+  storage:
+    filesystem:
+      chunks_directory: /loki/chunks
+      rules_directory: /loki/rules
+  replication_factor: 1
+  ring:
+    kvstore:
+      store: inmemory
+
+schema_config:
+  configs:
+    - from: 2024-01-01
+      store: tsdb
+      object_store: filesystem
+      schema: v13
+      index:
+        prefix: index_
+        period: 24h
+
+limits_config:
+  # 日志保留 744h（≈31 天）。单机个人部署，量级很小。
+  retention_period: 744h
+  # 允许结构化元数据，便于 LogQL 按字段过滤。
+  allow_structured_metadata: true
+
+compactor:
+  # filesystem 存储下，保留期由 compactor 周期性执行删除；必须开启。
+  retention_enabled: true
+  compaction_interval: 10m

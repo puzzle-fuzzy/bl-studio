@@ -6,7 +6,7 @@
  * （errors）。按 package 边界规则，本包不得 import 任何其它 @bailian-studio/* 包。
  */
 
-export { createLogger, type Logger } from './logger'
+export { createLogger, resolveLogFormat, safeJsonStringify, type LogFormat, type Logger } from './logger'
 export { MetricsCollector, type MetricsSnapshot, type TimerSummary } from './metrics'
 export { spawnProcess, spawnSyncResult, sleep } from './process'
 export type { NodeProcessHandle, SpawnProcessOptions, SpawnSyncResult } from './process'

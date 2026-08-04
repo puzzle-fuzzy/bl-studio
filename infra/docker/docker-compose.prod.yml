@@ -1,0 +1,232 @@
+# 生产栈编排（单机 Docker Compose）。
+#
+# 用法：所有命令都带 `--env-file infra/env/.env.prod-infra`，由该文件做变量插值；
+# 应用容器（api/worker/migrate）的运行机密来自 `infra/env/.env.production`（gitignored）。
+# 部署通过 `pnpm run deploy:prod`（infra/scripts/deploy-prod.sh）完成：本机构镜像
+# (commit SHA tag) → rsync 到服务器 → docker load → 迁移 → 滚动 up。
+#
+# 拓扑：Caddy 是唯一公网入口（80/443 自动 HTTPS），反代 web(nginx) 与 grafana；
+# web/api/worker/postgres 只在内部 backend 网互通，不暴露任何 host 端口；
+# loki/alloy/grafana 组成日志采集网。alloy 通过 docker.sock 采集应用容器 stdout
+# 并推送到 loki，grafana 挂 logs.yxswy.com 子域名供日志检索。
+name: bailian-studio-prod
+
+# 公共日志轮转：json-file 驱动、单文件 20 MiB、最多 3 份，防止容器日志无限增长。
+# 采集端（Alloy）从 docker 流式读取 stdout，轮转不丢失新行。
+x-logging: &json-logging
+  driver: json-file
+  options:
+    max-size: "20m"
+    max-file: "3"
+
+networks:
+  # 公网边缘：caddy → web / grafana
+  proxy:
+  # 业务后端：web → api → worker/postgres/migrate/backup
+  backend:
+  # 日志采集：alloy → loki → grafana
+  logging:
+
+volumes:
+  postgres_data:
+  caddy_data:
+  caddy_config:
+  loki_data:
+  alloy_positions:
+  grafana_data:
+  backups:
+
+services:
+  # ── 数据库（容器化，命名卷持久化；如需外部托管库可把应用 DATABASE_URL 指向外部）──
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required in .env.prod-infra}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required in .env.prod-infra}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB required in .env.prod-infra}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    networks: [backend]
+    logging: *json-logging
+
+  # 一次性迁移 job：drizzle-kit 幂等，重复执行会跳过已应用的迁移。
+  migrate:
+    image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
+    pull_policy: never
+    env_file:
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
+    command: ["pnpm", "exec", "drizzle-kit", "migrate", "--config", "packages/db/drizzle.config.ts"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    networks: [backend]
+    logging: *json-logging
+
+  api:
+    # API 与 Worker 必须运行同一份不可变镜像：worker 复用 api 的构建产物。
+    image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
+    pull_policy: never
+    env_file:
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
+    environment:
+      # 生产强制 JSON-lines 日志，供 Alloy 按字段采集解析。
+      LOG_FORMAT: json
+    command: ["bun", "apps/api/src/index.ts"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    # 用 /live（进程存活）而非 /ready（含 worker 心跳）：worker 短暂降级不应阻止
+    # 整个栈（web）启动；就绪态由部署冒烟独立检查。
+    healthcheck:
+      test:
+        - CMD
+        - bun
+        - -e
+        - "fetch('http://127.0.0.1:5003/api/health/live').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"
+      interval: 10s
+      timeout: 5s
+      retries: 6
+      start_period: 15s
+    networks: [backend]
+    labels:
+      # Alloy 按该标签识别容器日志格式（json 字段流 / text 文本流）。
+      bailian-studio.log-format: "json"
+    logging: *json-logging
+
+  worker:
+    # 注意：Worker 用 Node/tsx 启动（运行时约定，勿改用 bun）。
+    image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
+    pull_policy: never
+    env_file:
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
+    environment:
+      LOG_FORMAT: json
+    command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
+    restart: unless-stopped
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    networks: [backend]
+    labels:
+      bailian-studio.log-format: "json"
+    logging: *json-logging
+
+  web:
+    # nginx 静态文件 + /api 反代（apps/web 生产镜像）。
+    image: bailian-studio-web:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
+    pull_policy: never
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_healthy
+    networks: [backend, proxy]
+    labels:
+      bailian-studio.log-format: "text"
+    logging: *json-logging
+
+  # ── TLS 边缘：Caddy 自动 HTTPS（Let's Encrypt 签发/续期）──
+  caddy:
+    image: caddy:2.8.1-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      SITE_DOMAIN: ${SITE_DOMAIN:?SITE_DOMAIN required in .env.prod-infra}
+      LOGS_DOMAIN: ${LOGS_DOMAIN:?LOGS_DOMAIN required in .env.prod-infra}
+      CADDY_BASIC_AUTH_HASH: ${CADDY_BASIC_AUTH_HASH:?CADDY_BASIC_AUTH_HASH required in .env.prod-infra}
+    volumes:
+      - ./Caddyfile.prod:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+    networks: [proxy]
+    labels:
+      bailian-studio.log-format: "text"
+    logging: *json-logging
+
+  # ── 日志栈：Loki（存储/查询） + Alloy（采集） + Grafana（界面）──
+  loki:
+    image: grafana/loki:3.6.12
+    restart: unless-stopped
+    command: ["-config.file=/etc/loki/loki.yaml"]
+    volumes:
+      - ../loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - loki_data:/loki
+    networks: [logging]
+    logging: *json-logging
+
+  alloy:
+    # 采集器用 Grafana Alloy（Promtail 已于 2026-03 EOL 的官方替代）。
+    image: grafana/alloy:v1.17.1
+    restart: unless-stopped
+    command:
+      - run
+      - --storage.path=/var/lib/alloy/data
+      - /etc/alloy/config.alloy
+    volumes:
+      - ../alloy/config.alloy:/etc/alloy/config.alloy:ro
+      - /var/run/docker.sock:/var/run/docker.sock
+      - alloy_positions:/var/lib/alloy
+    depends_on:
+      loki:
+        condition: service_started
+    networks: [logging]
+    logging: *json-logging
+
+  grafana:
+    image: grafana/grafana:12.4.2
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER required in .env.prod-infra}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required in .env.prod-infra}
+      # 挂子域名；Caddy basic_auth 前置，Grafana 关闭匿名与自助注册。
+      GF_SERVER_ROOT_URL: https://${LOGS_DOMAIN:?LOGS_DOMAIN required in .env.prod-infra}
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ../grafana/provisioning:/etc/grafana/provisioning:ro
+      - grafana_data:/var/lib/grafana
+    depends_on:
+      loki:
+        condition: service_started
+    networks: [logging, proxy]
+    labels:
+      bailian-studio.log-format: "text"
+    logging: *json-logging
+
+  # ── 每日备份：pg_dump | gzip 轮转（可选 OSS 上传）──
+  backup:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
+      BACKUP_DIR: ${BACKUP_DIR:-/backups}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_OSS_UPLOAD: ${BACKUP_OSS_UPLOAD:-false}
+    volumes:
+      - ../scripts/backup-postgres.sh:/usr/local/bin/backup-postgres.sh:ro
+      - backups:/backups
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        while true; do
+          /usr/local/bin/backup-postgres.sh
+          sleep 86400
+        done
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [backend]
+    logging: *json-logging

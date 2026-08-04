@@ -3,6 +3,7 @@ import {
   isReadyPayload,
   parseRehearsalArgs,
   runRehearsalSmoke,
+  verifyJsonLogLines,
   verifyWebRelease,
 } from './rehearsal-smoke'
 
@@ -44,10 +45,14 @@ describe('rehearsal smoke command', () => {
     expect(isReadyPayload({ success: true, data: { status: 'ok' } })).toBe(false)
   })
 
-  it('runs the health, queue, restart, and teardown sequence', async () => {
+  it('runs the health, queue, log-format, restart, and teardown sequence', async () => {
     const commands: string[][] = []
     const runCommand = async (args: readonly string[]): Promise<void> => {
       commands.push([...args])
+    }
+    const captureCommand = async (args: readonly string[]): Promise<string> => {
+      commands.push([...args])
+      return 'bailian-studio-rehearsal-api-1  | {"ts":"2026-08-04T00:00:00.000Z","level":"info","scope":"api","msg":"request.completed"}\n'
     }
     const fetchImpl = (async (input: URL | RequestInfo) => {
       const url = String(input)
@@ -76,15 +81,23 @@ describe('rehearsal smoke command', () => {
       }), { status: 200, headers: { 'content-type': 'application/json' } })
     }) as typeof fetch
 
-    await runRehearsalSmoke(parseRehearsalArgs(['--no-build']), runCommand, fetchImpl)
+    await runRehearsalSmoke(parseRehearsalArgs(['--no-build']), runCommand, fetchImpl, captureCommand)
 
     expect(commands).toEqual([
       ['down', '--volumes', '--remove-orphans'],
       ['up', '-d', '--no-build', '--pull', 'never'],
+      ['logs', 'api'],
       ['--profile', 'ops', 'run', '--rm', 'ops-health'],
       ['restart', 'api', 'worker'],
       ['down', '--volumes', '--remove-orphans'],
     ])
+  })
+
+  it('accepts JSON-lines entries with a compose service prefix and rejects plain logs', () => {
+    expect(() => verifyJsonLogLines('plain text startup line\n')).toThrow('JSON-lines')
+    expect(() => verifyJsonLogLines(
+      'bailian-studio-rehearsal-api-1  | {"ts":"2026-08-04T00:00:00Z","level":"error","scope":"api","msg":"request.failed"}',
+    )).not.toThrow()
   })
 
   it('rejects a Web release without immutable asset caching', async () => {

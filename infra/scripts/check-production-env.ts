@@ -132,7 +132,90 @@ export function checkProductionEnvironment(
   checkInteger(value('SMTP_PORT'), 'SMTP_PORT', false, addIssue)
   for (const key of NON_NEGATIVE_INTEGER_KEYS) checkInteger(value(key), key, true, addIssue)
 
+  // LOG_FORMAT 非必填（未设置时生产默认 json，兼容现状）：出现即校验取值，
+  // 且生产环境明确禁止退回 console（会破坏日志采集字段化）。
+  const logFormat = value('LOG_FORMAT')?.toLowerCase()
+  if (logFormat !== undefined && logFormat !== 'json' && logFormat !== 'console') {
+    addIssue('LOG_FORMAT', '只能是 json 或 console')
+  }
+  if (value('NODE_ENV') === 'production' && logFormat === 'console') {
+    addIssue('LOG_FORMAT', '生产环境必须使用 json 格式')
+  }
+
   return { issues, warnings }
+}
+
+/**
+ * 校验基础设施专用环境（infra/env/.env.prod-infra）：Caddy/Postgres/Grafana/
+ * 备份/部署参数。只做格式、占位与强度检查，不联网、不打印任何值。
+ */
+export function checkProductionInfrastructure(
+  source: EnvironmentSource = process.env,
+): ProductionPreflightResult {
+  const issues: ProductionPreflightIssue[] = []
+  const warnings: string[] = []
+  const value = (key: string): string | undefined => {
+    const normalized = source[key]?.trim()
+    return normalized === undefined || normalized.length === 0 ? undefined : normalized
+  }
+  const addIssue = (key: string, message: string): void => {
+    issues.push({ key, message })
+  }
+
+  for (const key of ['SITE_DOMAIN', 'LOGS_DOMAIN'] as const) {
+    const current = value(key)
+    if (current === undefined || looksLikePlaceholder(current)) {
+      addIssue(key, '不能为空或使用模板占位值')
+    } else if (!isHostname(current)) {
+      addIssue(key, '必须是合法主机名（不含 scheme、路径或端口）')
+    }
+  }
+
+  const basicAuthHash = value('CADDY_BASIC_AUTH_HASH')
+  if (basicAuthHash === undefined || looksLikePlaceholder(basicAuthHash)) {
+    addIssue('CADDY_BASIC_AUTH_HASH', '不能为空或使用模板占位值（用 caddy hash-password 生成 bcrypt）')
+  }
+
+  if (value('GRAFANA_ADMIN_USER') === undefined || looksLikePlaceholder(value('GRAFANA_ADMIN_USER')!)) {
+    addIssue('GRAFANA_ADMIN_USER', '不能为空或使用模板占位值')
+  }
+  const grafanaPassword = value('GRAFANA_ADMIN_PASSWORD')
+  if (grafanaPassword === undefined || looksLikePlaceholder(grafanaPassword)) {
+    addIssue('GRAFANA_ADMIN_PASSWORD', '不能为空或使用模板占位值')
+  } else if (grafanaPassword.length < 12) {
+    addIssue('GRAFANA_ADMIN_PASSWORD', '长度至少需要 12 个字符')
+  }
+
+  for (const key of ['POSTGRES_USER', 'POSTGRES_DB'] as const) {
+    if (value(key) === undefined || looksLikePlaceholder(value(key)!)) {
+      addIssue(key, '不能为空或使用模板占位值')
+    }
+  }
+  const postgresPassword = value('POSTGRES_PASSWORD')
+  if (postgresPassword === undefined || looksLikePlaceholder(postgresPassword)) {
+    addIssue('POSTGRES_PASSWORD', '不能为空或使用模板占位值')
+  } else if (postgresPassword.length < 12) {
+    addIssue('POSTGRES_PASSWORD', '长度至少需要 12 个字符')
+  }
+
+  const backupDir = value('BACKUP_DIR')
+  if (backupDir === undefined || looksLikePlaceholder(backupDir)) {
+    addIssue('BACKUP_DIR', '不能为空或使用模板占位值')
+  }
+  for (const key of ['BACKUP_RETENTION_DAYS', 'LOKI_RETENTION_DAYS'] as const) {
+    checkInteger(value(key), key, false, addIssue)
+  }
+
+  if (value('DEPLOY_HOST') === undefined || looksLikePlaceholder(value('DEPLOY_HOST')!)) {
+    addIssue('DEPLOY_HOST', '不能为空或使用模板占位值（格式 user@host）')
+  }
+
+  return { issues, warnings }
+}
+
+function isHostname(host: string): boolean {
+  if (host.length === 0 || host.length > 253) return false
+  return /^(?:[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?\.)*[a-zA-Z0-9](?:[a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?$/.test(host)
 }
 
 export function checkProductionReleaseSource(
@@ -274,19 +357,31 @@ function inspectProductionReleaseSource(): ProductionReleaseSourceState {
 }
 
 if (import.meta.main) {
-  const environmentResult = checkProductionEnvironment()
-  const result: ProductionPreflightResult = {
-    issues: [
-      ...environmentResult.issues,
-      ...checkProductionReleaseSource(process.env, inspectProductionReleaseSource()),
-    ],
-    warnings: environmentResult.warnings,
-  }
-  if (result.issues.length > 0) {
-    console.error(formatProductionPreflightFailure(result))
-    process.exitCode = 1
+  // 子命令 `infra`：只校验基础设施专用 env（.env.prod-infra）。
+  if (process.argv[2] === 'infra') {
+    const result = checkProductionInfrastructure()
+    if (result.issues.length > 0) {
+      console.error(formatProductionPreflightFailure(result))
+      process.exitCode = 1
+    } else {
+      console.log('Production infrastructure preflight passed: infrastructure configuration is present and safe to start.')
+      for (const warning of result.warnings) console.warn(`Warning: ${warning}`)
+    }
   } else {
-    console.log('Production environment preflight passed: required configuration is present and safe to start.')
-    for (const warning of result.warnings) console.warn(`Warning: ${warning}`)
+    const environmentResult = checkProductionEnvironment()
+    const result: ProductionPreflightResult = {
+      issues: [
+        ...environmentResult.issues,
+        ...checkProductionReleaseSource(process.env, inspectProductionReleaseSource()),
+      ],
+      warnings: environmentResult.warnings,
+    }
+    if (result.issues.length > 0) {
+      console.error(formatProductionPreflightFailure(result))
+      process.exitCode = 1
+    } else {
+      console.log('Production environment preflight passed: required configuration is present and safe to start.')
+      for (const warning of result.warnings) console.warn(`Warning: ${warning}`)
+    }
   }
 }

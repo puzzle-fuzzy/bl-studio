@@ -11,10 +11,26 @@
 FROM oven/bun:1.3.14-debian AS workspace
 
 # 依赖安装用 pnpm（需要 node/npm）；Worker 运行时也用 node/tsx。
+# 注意：项目要求 Node ≥24（`import.meta.main` 原生，Node 20 无此特性会让 worker
+# 静默退出），apt 默认 nodejs 是 v20 —— 必须从官方二进制安装 Node LTS。
+# TARGETARCH 是 BuildKit 自动注入的构建参数（amd64/arm64），保证在 x64 与
+# arm64（Apple Silicon 开发机）主机上都能拿到对应架构的 Node。
+ARG NODE_VERSION=24.18.0
+ARG TARGETARCH
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends nodejs npm \
+  && apt-get install -y --no-install-recommends curl xz-utils ca-certificates \
   && rm -rf /var/lib/apt/lists/* \
-  && npm install -g pnpm@10.9.0
+  && case "$TARGETARCH" in \
+       amd64|"") NODE_ARCH="x64";; \
+       arm64) NODE_ARCH="arm64";; \
+       *) echo "Unsupported architecture: $TARGETARCH" >&2; exit 1;; \
+     esac \
+  && curl -fsSL "https://nodejs.org/dist/v${NODE_VERSION}/node-v${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \
+       -o /tmp/node.tar.xz \
+  && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
+  && rm /tmp/node.tar.xz \
+  && npm install -g pnpm@10.9.0 \
+  && node --version
 
 WORKDIR /app
 
