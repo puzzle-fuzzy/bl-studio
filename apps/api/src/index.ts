@@ -40,8 +40,10 @@ async function main(): Promise<void> {
 
   const generationSseHub = new GenerationSseHub()
   const allowedOrigins = getAllowedOrigins(process.env)
+  const githubOAuth = readGithubOAuthConfig(process.env, env.authPublicWebOrigin)
   const dependencies: ApiDependencies = {
     authService: authHandle.authService,
+    ...(githubOAuth !== undefined ? { githubOAuth } : {}),
     creditLedger: creditHandle.ledger,
     generationRepository: generationHandle.repository,
     mediaRepository: mediaHandle.repository,
@@ -87,6 +89,24 @@ async function main(): Promise<void> {
     if (listener !== undefined) await listener.close()
     await Promise.all([generationHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
     throw error
+  }
+}
+
+/** GitHub OAuth 应用配置；缺少 GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET 时返回 undefined（登录禁用）。 */
+function readGithubOAuthConfig(
+  source: Readonly<Record<string, string | undefined>>,
+  webOrigin: string,
+): ApiDependencies['githubOAuth'] {
+  const clientId = source['GITHUB_CLIENT_ID']?.trim()
+  const clientSecret = source['GITHUB_CLIENT_SECRET']?.trim()
+  if (clientId === undefined || clientId.length === 0 || clientSecret === undefined || clientSecret.length === 0) {
+    return undefined
+  }
+  return {
+    clientId,
+    clientSecret,
+    callbackUrl: source['GITHUB_CALLBACK_URL']?.trim() || `${webOrigin}/api/auth/github/callback`,
+    webOrigin,
   }
 }
 

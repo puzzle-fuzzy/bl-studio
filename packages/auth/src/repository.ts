@@ -22,6 +22,7 @@ export interface UserRepositoryRecord {
   displayName: string | null
   role: 'user' | 'admin'
   emailVerifiedAt: Date | null
+  githubId: string | null
 }
 
 function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
@@ -32,6 +33,7 @@ function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
     displayName: row.displayName,
     role: row.role as UserRepositoryRecord['role'],
     emailVerifiedAt: row.emailVerifiedAt,
+    githubId: row.githubId,
   }
 }
 
@@ -44,6 +46,13 @@ export function findActiveUserByEmail(
   email: string,
 ): Promise<UserRepositoryRecord | undefined> {
   return findActiveUserBy(db, eq(users.email, email))
+}
+
+export function findActiveUserByGithubId(
+  db: AuthDatabase,
+  githubId: string,
+): Promise<UserRepositoryRecord | undefined> {
+  return findActiveUserBy(db, eq(users.githubId, githubId))
 }
 
 export function findActiveUserById(
@@ -69,6 +78,9 @@ export interface CreateUserInput {
   email: string
   passwordHash: string
   displayName?: string
+  githubId?: string
+  /** 缺省为 null（未验证）。OAuth 用户传入 now 表示已验证。 */
+  emailVerifiedAt?: Date | null
   now: Date
 }
 
@@ -84,8 +96,9 @@ export async function createUserInTransaction(
       email: input.email,
       passwordHash: input.passwordHash,
       displayName: input.displayName ?? null,
+      githubId: input.githubId ?? null,
       role: 'user',
-      emailVerifiedAt: null,
+      emailVerifiedAt: input.emailVerifiedAt === undefined ? null : input.emailVerifiedAt,
       createdAt: input.now,
       updatedAt: input.now,
     })
@@ -94,6 +107,19 @@ export async function createUserInTransaction(
   if (row === undefined) throw new Error('Failed to create user')
   await ensureCreditAccountInTransaction(tx, { userId: id, now: input.now })
   return toUserRecord(row)
+}
+
+/** 把已存在的邮箱账号与 GitHub 账号绑定（GitHub email 与本地账号冲突时做链接）。 */
+export async function linkGithubId(
+  db: AuthDatabase,
+  userId: string,
+  githubId: string,
+  now: Date,
+): Promise<void> {
+  await db
+    .update(users)
+    .set({ githubId, updatedAt: now, updatedBy: 'auth.github' })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
 }
 
 export function createUser(db: BailianStudioDb, input: CreateUserInput): Promise<UserRepositoryRecord> {

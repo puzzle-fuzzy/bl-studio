@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { authActionTokens, createDb, creditAccounts } from '@bailian-studio/db'
+import { authActionTokens, createDb, creditAccounts, users } from '@bailian-studio/db'
 import { eq } from 'drizzle-orm'
 import {
   AuthError,
@@ -245,5 +245,62 @@ describe('auth service', () => {
       caught = error
     }
     expect(caught).toBeInstanceOf(AuthError)
+  })
+
+  describe('loginWithGithub', () => {
+    it('creates a verified account on first login and reuses it on later logins', async () => {
+      const first = await handle.authService.loginWithGithub({
+        githubId: '10001',
+        email: 'octocat@example.com',
+        displayName: 'Mona Octocat',
+      })
+      expect(first.user.email).toBe('octocat@example.com')
+      expect(first.user.displayName).toBe('Mona Octocat')
+      expect(await handle.authService.verifyToken(first.token)).toMatchObject({
+        user: { id: first.user.id, emailVerifiedAt: expect.any(String) },
+      })
+
+      const second = await handle.authService.loginWithGithub({
+        githubId: '10001',
+        email: 'octocat@example.com',
+      })
+      expect(second.user.id).toBe(first.user.id)
+
+      const db = createDb({ url: handle.databaseUrl, max: 1 })
+      try {
+        const [row] = await db.select().from(users).where(eq(users.id, first.user.id))
+        expect(row?.githubId).toBe('10001')
+        expect(row?.emailVerifiedAt).not.toBeNull()
+      } finally {
+        await db.close()
+      }
+    })
+
+    it('links an existing verified email account to the GitHub identity', async () => {
+      await handle.authService.register({ email: 'link@x.test', password: 'password1' })
+      await handle.authService.verifyEmail(tokenFrom(emailSender.verifications.at(-1)!.url))
+
+      const result = await handle.authService.loginWithGithub({
+        githubId: '10002',
+        email: 'link@x.test',
+      })
+      expect(result.user.email).toBe('link@x.test')
+
+      const db = createDb({ url: handle.databaseUrl, max: 1 })
+      try {
+        const [row] = await db.select().from(users).where(eq(users.id, result.user.id))
+        expect(row?.githubId).toBe('10002')
+      } finally {
+        await db.close()
+      }
+    })
+
+    it('rejects when the email is already bound to a different GitHub account', async () => {
+      await handle.authService.loginWithGithub({ githubId: '10003', email: 'dual@x.test' })
+      await expect(handle.authService.loginWithGithub({
+        githubId: '10004',
+        email: 'dual@x.test',
+      })).rejects.toMatchObject({ code: 'AUTH_EMAIL_TAKEN' })
+    })
   })
 })

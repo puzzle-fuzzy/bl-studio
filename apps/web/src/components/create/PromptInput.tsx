@@ -6,14 +6,14 @@ import { RichPromptEditor } from '@/components/create/RichPromptEditor'
  * 提示词输入。
  *
  * 模型支持参考图（referenceFormat 存在）时使用 RichPromptEditor：文本内以 `@图N`
- * 标记引用素材并渲染为行内缩略图；否则为普通 textarea（无引用能力）。
+ * 标记引用素材（refs 为上方「输入参考素材」的参考池，按 @ 弹出下拉选择并渲染为
+ * 行内缩略图）；否则为普通 textarea（无引用能力）。
  */
 
 export interface PromptInputProps {
   value: string
-  refs: AssetItem[]
+  refs: readonly AssetItem[]
   onChange: (text: string) => void
-  onRefsChange: (refs: AssetItem[]) => void
   placeholder?: string
   maxLength?: number
   disabled?: boolean
@@ -25,7 +25,6 @@ export function PromptInput({
   value,
   refs,
   onChange,
-  onRefsChange,
   placeholder,
   maxLength,
   disabled,
@@ -49,7 +48,6 @@ export function PromptInput({
       value={value}
       refs={refs}
       onChange={onChange}
-      onRefsChange={onRefsChange}
       disabled={disabled}
     />
   )

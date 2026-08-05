@@ -43,10 +43,12 @@ import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, unique
 export const users = pgTable('users', {
   id: text('id').primaryKey(),
   email: text('email').notNull(),
-  /** argon2id 密码哈希（由 @node-rs/argon2 生成），永不存明文。 */
+  /** argon2id 密码哈希（由 @node-rs/argon2 生成），永不存明文。GitHub OAuth 用户存随机不可用哈希。 */
   passwordHash: text('password_hash').notNull(),
   /** 为空表示邮箱尚未验证；已有用户由迁移回填为创建时间。 */
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
+  /** GitHub OAuth 用户 ID（数字），邮箱登录用户为 NULL。 */
+  githubId: text('github_id'),
   displayName: text('display_name'),
   role: text('role').notNull().default('user'),
   createdBy: text('created_by').notNull().default('system'),
@@ -59,6 +61,8 @@ export const users = pgTable('users', {
   check('users_role_check', sql`${table.role} in ('user', 'admin')`),
   // 部分唯一索引：仅对未软删除的邮箱强制唯一，故已删除邮箱可被重新注册。
   uniqueIndex('users_email_idx').on(table.email).where(sql`${table.deletedAt} is null`),
+  // GitHub ID 同样只对未软删除行强制唯一。
+  uniqueIndex('users_github_id_idx').on(table.githubId).where(sql`${table.deletedAt} is null`),
 ])
 
 /**
@@ -137,7 +141,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),

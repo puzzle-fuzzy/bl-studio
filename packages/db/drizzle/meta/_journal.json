@@ -232,6 +232,13 @@
       "when": 1785525233833,
       "tag": "0032_windy_machine_man",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1785901544648,
+      "tag": "0033_secret_demogoblin",
+      "breakpoints": true
     }
   ]
 }

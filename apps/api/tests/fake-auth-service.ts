@@ -22,6 +22,7 @@ export function createFakeAuthService(
     verifyEmail: async () => authResult(),
     resendVerification: async () => ({ accepted: true }),
     login: async () => authResult(),
+    loginWithGithub: async () => authResult(),
     forgotPassword: async () => ({ accepted: true }),
     resetPassword: async () => {},
     changePassword: async () => authResult(),

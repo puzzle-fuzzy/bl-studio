@@ -12,6 +12,7 @@ import {
   type SessionCookieAttributes,
 } from './cookies'
 import { requireAuthUser } from './session'
+import { createGithubOAuthHandlers } from './github-routes'
 
 type CookieJarEntry = SessionCookieAttributes & { value: string }
 
@@ -56,7 +57,10 @@ function requireSessionToken(request: Request): string {
 }
 
 export function createAuthRoutes(deps: ApiDependencies) {
+  const github = createGithubOAuthHandlers(deps)
   return new Elysia({ prefix: '/api/auth' })
+    .get('/github', github.authorize)
+    .get('/github/callback', github.callback)
     .post('/register', async ({ request, body }) => {
       try {
         const registration = await deps.authService.register(validateInput(RegisterSchema, body))

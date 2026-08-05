@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import {
   createIsolatedAuthService,
   type IsolatedAuthService,
@@ -274,5 +274,100 @@ describe('auth routes', () => {
     expect((await app.handle(new Request('http://localhost/api/auth/me', {
       headers: { cookie },
     }))).status).toBe(401)
+  })
+})
+
+describe('github oauth routes', () => {
+  let githubApp: ReturnType<typeof createTestApp>['app']
+
+  beforeAll(() => {
+    githubApp = createTestApp({
+      authService: handle.authService,
+      generationRepository: auditRepository,
+      githubOAuth: {
+        clientId: 'test-client',
+        clientSecret: 'test-secret',
+        callbackUrl: 'https://create.example.test/api/auth/github/callback',
+        webOrigin: 'https://create.example.test',
+      },
+    }).app
+  })
+
+  function mockGithubFetch(): void {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === 'https://github.com/login/oauth/access_token') {
+        return new Response(JSON.stringify({ access_token: 'gho_test_token' }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+      if (url === 'https://api.github.com/user') {
+        return new Response(JSON.stringify({
+          id: 4242,
+          login: 'octocat',
+          name: 'Mona Octocat',
+          email: 'octo@example.com',
+        }), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
+      return new Response(JSON.stringify({ message: 'unexpected url' }), { status: 500 })
+    }))
+  }
+
+  it('redirects to GitHub authorize with a state cookie', async () => {
+    const response = await githubApp.handle(new Request('http://localhost/api/auth/github'))
+    expect(response.status).toBe(302)
+    const location = response.headers.get('location')
+    expect(location).toMatch(/^https:\/\/github\.com\/login\/oauth\/authorize\?/)
+    expect(location).toContain('client_id=test-client')
+    expect(location).toContain('redirect_uri=https%3A%2F%2Fcreate.example.test%2Fapi%2Fauth%2Fgithub%2Fcallback')
+    expect(location).toContain('state=')
+    expect(response.headers.get('set-cookie')).toContain('github_oauth_state=')
+  })
+
+  it('completes the OAuth dance and issues a session cookie', async () => {
+    mockGithubFetch()
+    try {
+      const authorize = await githubApp.handle(new Request('http://localhost/api/auth/github'))
+      const state = new URL(authorize.headers.get('location')!).searchParams.get('state')!
+      const stateCookie = authorize.headers.get('set-cookie')!.split(';')[0]!
+
+      const callback = await githubApp.handle(new Request(
+        `http://localhost/api/auth/github/callback?code=testcode&state=${state}`,
+        { headers: { cookie: stateCookie } },
+      ))
+      expect(callback.status).toBe(302)
+      expect(callback.headers.get('location')).toBe('https://create.example.test/create')
+
+      const setCookie = callback.headers.get('set-cookie')
+      expect(setCookie).toContain('bailian_studio_session=')
+      const sessionValue = setCookie!.split(',')[0]!.split(';')[0]!
+      const me = await githubApp.handle(new Request('http://localhost/api/auth/me', {
+        headers: { cookie: sessionValue },
+      }))
+      expect(me.status).toBe(200)
+      const body = await me.json() as { data: { user: { email: string } } }
+      expect(body.data.user.email).toBe('octo@example.com')
+    } finally {
+      vi.unstubAllGlobals()
+    }
+  })
+
+  it('rejects a state mismatch and redirects to login with oauth_error', async () => {
+    const callback = await githubApp.handle(new Request(
+      'http://localhost/api/auth/github/callback?code=testcode&state=wrong-state-value',
+      { headers: { cookie: 'github_oauth_state=some-other-state' } },
+    ))
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toContain('/auth/login?oauth_error=invalid_state')
+  })
+
+  it('redirects to login when the user cancels (error param, no code)', async () => {
+    const callback = await githubApp.handle(new Request(
+      'http://localhost/api/auth/github/callback?error=access_denied&error_description=denied&state=whatever',
+      { headers: { cookie: 'github_oauth_state=whatever' } },
+    ))
+    expect(callback.status).toBe(302)
+    expect(callback.headers.get('location')).toContain('/auth/login?oauth_error=access_denied')
   })
 })

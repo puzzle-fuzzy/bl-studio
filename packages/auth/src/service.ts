@@ -12,8 +12,10 @@ import {
   createUserInTransaction,
   findActiveSession,
   findActiveUserByEmail,
+  findActiveUserByGithubId,
   findActiveUserById,
   findLatestActiveAuthActionToken,
+  linkGithubId,
   lockAuthTokenScope,
   markUserEmailVerified,
   revokeActiveTokens,
@@ -71,6 +73,7 @@ export interface AuthService {
   verifyEmail(rawToken: string): Promise<AuthResult>
   resendVerification(email: string): Promise<EmailActionAccepted>
   login(input: { email: string; password: string }): Promise<AuthResult>
+  loginWithGithub(input: { githubId: string; email: string; displayName?: string }): Promise<AuthResult>
   forgotPassword(email: string): Promise<EmailActionAccepted>
   resetPassword(rawToken: string, newPassword: string): Promise<void>
   changePassword(input: {
@@ -367,6 +370,47 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (user.emailVerifiedAt === null) {
         throw new AuthError('AUTH_EMAIL_UNVERIFIED', '该邮箱尚未完成验证，请检查验证邮件或重新发送。')
       }
+      return issueSession(user)
+    },
+
+    async loginWithGithub(input) {
+      const email = normalizeEmail(input.email)
+      const issuedAt = now()
+
+      const byGithub = await findActiveUserByGithubId(options.db, input.githubId)
+      if (byGithub !== undefined) return issueSession(byGithub)
+
+      const byEmail = await findActiveUserByEmail(options.db, email)
+      if (byEmail !== undefined) {
+        if (byEmail.githubId !== null && byEmail.githubId !== input.githubId) {
+          throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已绑定其他 GitHub 账号，请使用对应账号登录。', {
+            action: 'login',
+          })
+        }
+        const linkedAt = now()
+        await options.db.transaction(async tx => {
+          await linkGithubId(tx, byEmail.id, input.githubId, linkedAt)
+          // GitHub 已验证该邮箱，绑定后视为已完成邮箱验证（无需验证邮件）。
+          if (byEmail.emailVerifiedAt === null) {
+            await markUserEmailVerified(tx, byEmail.id, linkedAt)
+          }
+        })
+        const user = (await findActiveUserById(options.db, byEmail.id)) ?? byEmail
+        return issueSession(user)
+      }
+
+      // 新用户：OAuth 邮箱已被 GitHub 验证，直接落库为已验证；密码哈希为随机不可用值
+      //（该用户只能通过 GitHub 登录，忘记密码后可用邮箱重设）。
+      const passwordHash = await hashPassword(randomBytes(32).toString('base64url'))
+      const displayName = input.displayName?.trim()
+      const user = await options.db.transaction(tx => createUserInTransaction(tx, {
+        email,
+        passwordHash,
+        githubId: input.githubId,
+        displayName: displayName !== undefined && displayName.length > 0 ? displayName : undefined,
+        emailVerifiedAt: issuedAt,
+        now: issuedAt,
+      }))
       return issueSession(user)
     },
 

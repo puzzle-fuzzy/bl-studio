@@ -21,6 +21,7 @@ try {
         'auth.verify-email',
         'auth.resend-verification',
         'auth.login',
+        'auth.github',
         'auth.forgot-password',
         'auth.reset-password',
         'auth.change-password',

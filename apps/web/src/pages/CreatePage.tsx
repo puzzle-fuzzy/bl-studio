@@ -20,7 +20,7 @@ import { readParameterValidationErrors, type FieldIssue } from '@/lib/parameter-
 import { buildSubmitPayload } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
-import { referenceFormatOf, restorePromptReferences, extractReferenceIndexes } from '@/lib/reference-format'
+import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 
@@ -45,7 +45,6 @@ export function CreatePage() {
     return selected ?? undefined
   })
   const [values, setValues] = useState<Record<string, unknown>>({})
-  const [promptRefs, setPromptRefs] = useState<AssetItem[]>([])
   const [estimate, setEstimate] = useState<GenerationEstimate | null>(null)
   const [estimating, setEstimating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -88,7 +87,6 @@ export function CreatePage() {
         void restoreRecordParams(record.inputParams, record.assetRefs, model).then(restored => {
           if (!cancelled) {
             setValues(restored.values)
-            setPromptRefs(restored.refs)
           }
         })
       })
@@ -112,7 +110,6 @@ export function CreatePage() {
         if (parameter.defaultValue !== undefined) defaults[parameter.name] = parameter.defaultValue
       }
       setValues(defaults)
-      setPromptRefs([])
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId])
@@ -129,7 +126,7 @@ export function CreatePage() {
     }
     setEstimating(true)
     estimateTimer.current = setTimeout(() => {
-      const { params, assetRefs } = buildSubmitPayload(model, values, promptRefs)
+      const { params, assetRefs } = buildSubmitPayload(model, values)
       apiClient
         .estimateGeneration({ modelId: model.id, params, assetRefs })
         .then(result => {
@@ -145,7 +142,7 @@ export function CreatePage() {
     return () => {
       if (estimateTimer.current !== null) clearTimeout(estimateTimer.current)
     }
-  }, [model, values, promptRefs])
+  }, [model, values])
 
   const schema = useMemo(
     () => (model === undefined ? [] : buildParameterFormSchema(model.parameters)),
@@ -163,6 +160,9 @@ export function CreatePage() {
   // 参考素材（media 参数，含参考图）放在提示词上方；其余输入参数在提示词下方。
   const mediaFields = inputFields.filter(field => field.control === 'media')
   const textInputFields = inputFields.filter(field => field.control !== 'media')
+
+  // 提示词 @ 引用的参考池：以 `references` 媒体字段（参考素材）为唯一事实源。
+  const referencePool = Array.isArray(values.references) ? values.references : []
 
   const handleValueChange = (name: string, value: unknown) => {
     setValues(current => ({ ...current, [name]: value }))
@@ -193,7 +193,7 @@ export function CreatePage() {
     }
     setIsSubmitting(true)
     try {
-      const { params, assetRefs } = buildSubmitPayload(model, values, promptRefs)
+      const { params, assetRefs } = buildSubmitPayload(model, values)
       const payload = { modelId: model.id, params, assetRefs }
       const idempotencyKey = idempotencyKeyFor(payload)
       await apiClient.createGeneration({ ...payload, idempotencyKey })
@@ -260,9 +260,8 @@ export function CreatePage() {
               <p className="text-sm font-medium">提示词</p>
               <PromptInput
                 value={typeof values.prompt === 'string' ? values.prompt : ''}
-                refs={promptRefs}
+                refs={referencePool}
                 onChange={text => handleValueChange('prompt', text)}
-                onRefsChange={setPromptRefs}
                 supportsReferences={model.referenceFormat !== undefined}
               />
             </div>
@@ -366,25 +365,12 @@ async function restoreRecordParams(
   inputParams: Record<string, unknown> | undefined,
   assetRefs: Record<string, unknown> | undefined,
   model: ModelCatalogItem,
-): Promise<{ values: Record<string, unknown>; refs: AssetItem[] }> {
+): Promise<{ values: Record<string, unknown> }> {
   const format = referenceFormatOf(model)
   const rawPrompt = typeof inputParams?.prompt === 'string' ? inputParams.prompt : ''
   const restoredPrompt = restorePromptReferences(rawPrompt, format)
-  const refIndexes = extractReferenceIndexes(restoredPrompt)
 
   const refsMap = (assetRefs ?? {}) as Record<string, unknown>
-  const referenceIds = Array.isArray(refsMap.references)
-    ? refsMap.references.filter((id): id is string => typeof id === 'string')
-    : []
-
-  const refs: AssetItem[] = []
-  for (const index of refIndexes) {
-    const assetId = referenceIds[index - 1]
-    if (assetId === undefined) continue
-    const asset = await apiClient.getAsset(assetId).catch(() => null)
-    if (asset !== null) refs.push(asset)
-  }
-
   const values: Record<string, unknown> = { ...(inputParams ?? {}), prompt: restoredPrompt }
   for (const parameter of model.parameters) {
     if (parameter.type !== 'media') continue
@@ -397,5 +383,5 @@ async function restoreRecordParams(
     ).filter((asset): asset is AssetItem => asset !== null)
     if (assets.length > 0) values[parameter.name] = assets
   }
-  return { values, refs }
+  return { values }
 }

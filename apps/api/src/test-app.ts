@@ -40,6 +40,7 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
   const generationSseHub = overrides.generationSseHub ?? new GenerationSseHub()
   const dependencies: ApiDependencies = {
     authService: overrides.authService ?? missing<AuthService>('authService'),
+    ...(overrides.githubOAuth !== undefined ? { githubOAuth: overrides.githubOAuth } : {}),
     creditLedger: overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository: overrides.generationRepository ?? missing<GenerationRepository>('generationRepository'),
     mediaRepository: overrides.mediaRepository ?? missing<MediaRepository>('mediaRepository'),
