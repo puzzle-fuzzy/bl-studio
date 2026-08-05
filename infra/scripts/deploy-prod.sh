@@ -151,7 +151,7 @@ for _ in $(seq 1 24); do
   fi
   sleep 5
 done
-[[ -n "$smoke_ok" ]] || fail "公网冒烟未通过（检查 DNS / 80/443 开放 / Caddy 日志）"
+[[ -n "$smoke_ok" ]] || fail "公网冒烟未通过（检查 DNS / 80/443 开放 / 宿主机 nginx 日志）"
 
 # ── 清理 ─────────────────────────────────────────────────────────
 rm -f "images-$SHA.tar"

@@ -19,5 +19,14 @@
   },
   "devDependencies": {
     "typescript": "catalog:"
+  },
+  "author": {
+    "name": "烟熏三文鱼",
+    "email": "18267094443@163.com",
+    "url": "https://github.com/puzzle-fuzzy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/puzzle-fuzzy/bl-studio"
   }
 }

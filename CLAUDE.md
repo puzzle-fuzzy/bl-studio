@@ -81,6 +81,13 @@ pnpm run db:push / db:push:test
 - 动态参数表单用「索引 token」承载非 string 枚举值（Radix Select 限制）。
 - 提示词参考图：编辑态 `@图N` 中性标记 ↔ 提交时按模型 `referenceFormat` 转 provider 语法。
 
+### apps/admin（管理后台，同源 /admin）
+
+- 与 web 同技术栈（shadcn/ui + zustand + api-client），**同源 `/admin` 挂载**（web 容器 nginx 反代，无需新域名/证书/跨域）。
+- 页面：`/login`、`/`（用户列表：分页/搜索/角色/软删）、`/users/:id`（详情/积分赠送/资产）、`/stats`（调用统计）。
+- 路由守卫：restore 后非 `role === 'admin'` → 403 页；未登录 → `/login`。API 侧一律 `requireAdminUser()`。
+- 复用 `apps/web` 的 shadcn 组件时注意：两 app 的 `components/ui/` 各自独立，新增组件两边都要有（或按需拷贝）。
+
 ## 测试约定
 
 - 后端包测试放 `tests/`（与 `src/` 同级），vitest。曾经是 `bun:test`，已全部迁移。

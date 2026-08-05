@@ -18,6 +18,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本），由 **ba
 | API 框架 | Elysia 1.4 |
 | ORM | Drizzle（Postgres 18 张表） |
 | 前端 | React 19 + Vite 8 + **zustand** + react-router 8 + **shadcn/ui** + Tailwind CSS 4 + **react-window** + sonner |
+| 登录 | 邮箱密码 + **GitHub OAuth**（会话 http-only cookie） |
 | 密码哈希 | @node-rs/argon2（argon2id） |
 | 测试 | **Vitest 4**（后端包 + 前端纯函数层，Node 上运行） |
 | 实时 | Postgres `generation_events` outbox + `NOTIFY` → API `LISTEN` → **SSE** |
@@ -62,9 +63,9 @@ pnpm run e2e              # Playwright（需 test DB）
 ## 架构
 
 ```text
-Web (apps/web, React 19 + zustand + shadcn/ui)
-              │ @bailian-studio/api-client（zod 契约层）
-              ▼
+Web (apps/web, React 19 + zustand + shadcn/ui)   Admin (apps/admin, 同源 /admin，仅 admin 角色)
+              │ @bailian-studio/api-client（zod 契约层）            │
+              ▼                                                 ▼
         apps/api (Elysia, :5003, 由 Bun 启动)
               │ Postgres repository + generation_events outbox + NOTIFY
               ▼
@@ -95,6 +96,10 @@ src/
                   Library / SharedGeneration / auth 五页
 ```
 
+`apps/admin` 是精简的管理后台（同 `apps/web` 的 shadcn/ui + zustand + api-client），
+同源 `/admin` 挂载（nginx 反代，无需新域名/新证书）：`/login`、`/`（用户列表）、
+`/users/:id`（详情/积分/资产）、`/stats`（调用统计）。路由守卫要求 `role === 'admin'`。
+
 ## 测试策略
 
 - **后端包**：vitest（node 环境），覆盖状态机、仓储、provider、路由契约。
@@ -103,4 +108,4 @@ src/
 
 ## 部署
 
-单机 Docker Compose + Caddy 自动 HTTPS（Let's Encrypt），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + node/pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署。完整运维手册见 `docs/03-ops.md`。
+单机 Docker Compose + **宿主机 nginx + certbot** 自动 HTTPS（Let's Encrypt；本仓库不内置 Caddy），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + Node 24 + pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署。完整运维手册见 `docs/03-ops.md`，部署踩坑清单见 `docs/04-deployment-playbook.md`。

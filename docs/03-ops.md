@@ -177,7 +177,7 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 | 症状 | 排查路径 |
 |---|---|
 | 公网打不开 / 证书失败 | 检查 80/443 是否开放、DNS A 记录是否指向服务器、宿主机 nginx 日志（`journalctl -u nginx` / `/var/log/nginx/error.log`）与 certbot 证书是否有效 |
-| `logs.yxswy.com` 401 | `CADDY_BASIC_AUTH_HASH` 是否由 `caddy hash-password` 生成、用户名是否 `viewer` |
+| `logs.yxswy.com` 401 | 服务器 `/etc/nginx/htpasswd.bailian-logs` 是否由 `setup-host-edge.sh` 用 `GRAFANA_ADMIN_PASSWORD` 生成 apr1 htpasswd、用户名是否 `GRAFANA_ADMIN_USER`（默认 `viewer`）；改密后重新跑 `deploy:prod`（边缘脚本幂等重建） |
 | Grafana 打不开/白屏 | `GF_SERVER_ROOT_URL` 是否为 `https://<LOGS_DOMAIN>`；`logs grafana` |
 | Loki 里没有日志 | `logs alloy`（docker.sock 权限、positions 卷）；`logs loki`（receiving 错误）；Grafana datasource `url: http://loki:3100` |
 | 限流/审计按 IP 错乱 | 检查 宿主机 nginx → web nginx → api 的 XFF 链：每层用 `$proxy_add_x_forwarded_for` 追加、`API_TRUST_PROXY=true`（API 取首项=真实 IP） |

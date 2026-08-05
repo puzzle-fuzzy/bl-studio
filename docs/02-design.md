@@ -145,7 +145,7 @@ bl-studio/
 
 ## 五、基础设施
 
-- **Docker**：`node:22-alpine` + pnpm（corepack/standalone）+ tsx 直跑源码 + ffmpeg；单前端构建。
+- **Docker**：`oven/bun:1.3.14-debian` 基座 + 官方二进制 **Node 24**（apt 的 v20 缺 `import.meta.main`，会让 worker 静默退出）+ pnpm + tsx 直跑源码 + ffmpeg；web 单独构建到 nginx:1.27-alpine。**不使用 Caddy**——HTTPS 由宿主机 nginx + certbot 终止。
 - **Nginx**：单 `apps/web/dist`，/api 反代 + SSE 反代配置不变（去掉 5004 相关）。
 - **env 模板**：`AUTH_PUBLIC_WEB_ORIGIN` 默认改为 `http://localhost:5002`；CORS 默认仅 `localhost:5002`。
 - **Compose**：dev/test 双 Postgres（:55431/:55432）+ Mailpit，保留原端口。

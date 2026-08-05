@@ -1,5 +1,9 @@
 # bl-studio 重写评估报告
 
+> **历史记录**：本文件是 2026-08 重写开始前对旧项目的评估，描述的是**当时状态**——
+> `apps/web-vue`（Vue 前端）、`bun:test`、工具链「Node 22」等均已不复存在（重写后：单 React
+> 前端 + apps/admin、全量 vitest、Node ≥24、pnpm + turbo）。仅作「架构由来」参考，勿据此核对现状。
+
 > 重写对象：bailian-studio（AI 媒体生成全栈 monorepo）与 bailian-hub（模型书架/SDK 仓库）
 > 结论先行：**前端从零重写（合并双版本）；后端保留并重构（真实迁移 + 结构性改进）；hub 作为外部依赖保留。**
 
