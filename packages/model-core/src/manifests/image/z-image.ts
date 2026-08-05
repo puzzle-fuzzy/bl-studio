@@ -12,6 +12,7 @@ export const zImage: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'z-image-turbo',
   displayName: 'Z-Image Turbo',
+  description: 'Z-Image 快速文生图，低延迟高性价比',
   category: 'image',
   taskMode: 'sync',
   capabilities: ['text_prompt', 'seed'],

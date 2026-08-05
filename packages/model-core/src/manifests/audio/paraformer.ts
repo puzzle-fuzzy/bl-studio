@@ -11,6 +11,7 @@ export const paraformerV1: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'paraformer-v1',
   displayName: 'Paraformer V1',
+  description: 'Paraformer 语音识别，高精度中文语音转写',
   category: 'audio',
   taskMode: 'provider_async',
   capabilities: ['audio_input'],

@@ -5,6 +5,7 @@ export const qwenOmniScreenplayFlash: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'qwen3.5-omni-flash',
   displayName: '视频生成剧本（快速版）',
+  description: '从视频中快速提取关键信息生成剧本，速度优先',
   category: 'video',
   taskMode: 'stream',
   capabilities: ['video_input', 'streaming'],

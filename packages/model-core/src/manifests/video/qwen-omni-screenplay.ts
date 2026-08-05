@@ -5,6 +5,7 @@ export const qwenOmniScreenplay: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'qwen3.5-omni-plus',
   displayName: '视频生成剧本（精准版）',
+  description: '从视频中提取画面与镜头信息，生成高质量的视频生成剧本',
   category: 'video',
   taskMode: 'stream',
   capabilities: ['video_input', 'streaming'],

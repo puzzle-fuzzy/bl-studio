@@ -27,6 +27,7 @@ function qwenText(options: QwenTextOptions): ModelManifest {
     provider: 'dashscope',
     providerModel: options.providerModel,
     displayName: options.displayName,
+    description: options.description,
     category: 'text',
     taskMode: 'sync',
     capabilities: ['text_prompt', 'seed', 'streaming'],
@@ -37,7 +38,7 @@ function qwenText(options: QwenTextOptions): ModelManifest {
         type: 'text',
         required: true,
         maxLength: 12000,
-        description: options.description,
+        description: '描述你想要生成的内容',
       },
       {
         name: 'maxTokens',

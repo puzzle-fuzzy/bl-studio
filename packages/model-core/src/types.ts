@@ -246,6 +246,8 @@ export interface ModelManifest {
   provider: ModelProvider
   providerModel: string
   displayName: string
+  /** 面向用户的一句话中文介绍（创作页展示在模型名下方）。 */
+  description?: string
   category: ModelCategory
   taskMode: ModelTaskMode
   capabilities: ModelCapability[]

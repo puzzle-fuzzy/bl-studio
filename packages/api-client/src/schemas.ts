@@ -75,6 +75,7 @@ const ModelCatalogItemContractSchema = z.object({
   provider: z.enum(['dashscope']),
   providerModel: z.string(),
   displayName: z.string(),
+  description: z.string().optional(),
   category: z.enum(['image', 'video', 'audio', 'text']),
   operation: ModelOperationSchema,
   taskMode: z.enum(['sync', 'provider_async', 'stream']),

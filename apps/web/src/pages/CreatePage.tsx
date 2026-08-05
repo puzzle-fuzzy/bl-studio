@@ -238,6 +238,9 @@ export function CreatePage() {
               <h2 className="text-sm font-semibold">{model.displayName}</h2>
               <span className="text-xs text-muted-foreground">{model.operation}</span>
             </div>
+            {model.description !== undefined && (
+              <p className="text-xs leading-relaxed text-muted-foreground">{model.description}</p>
+            )}
 
             <PromptTemplatePanel
               category={model.category}

@@ -21,6 +21,7 @@ export const funAsrV1: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'fun-asr',
   displayName: 'Fun-ASR 语音识别',
+  description: 'Fun-ASR 语音识别，将音频转写为文字',
   category: 'audio',
   taskMode: 'provider_async',
   capabilities: ['audio_input'],

@@ -17,6 +17,7 @@ function deepSeekV4(options: DeepSeekV4Options): ModelManifest {
     provider: 'dashscope',
     providerModel: options.id,
     displayName: options.displayName,
+    description: options.description,
     category: 'text',
     taskMode: 'sync',
     capabilities: ['text_prompt', 'seed'],
@@ -26,7 +27,7 @@ function deepSeekV4(options: DeepSeekV4Options): ModelManifest {
         label: '提示词',
         type: 'text',
         required: true,
-        description: options.description,
+        description: '描述你想要生成的内容',
       },
       {
         name: 'maxCompletionTokens',

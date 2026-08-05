@@ -12,6 +12,7 @@ export const funMusicV1: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'fun-music-v1',
   displayName: 'Fun Music V1',
+  description: 'FunAudioLLM 音乐生成，根据歌词与描述生成歌曲',
   category: 'audio',
   taskMode: 'sync',
   capabilities: ['text_prompt'],

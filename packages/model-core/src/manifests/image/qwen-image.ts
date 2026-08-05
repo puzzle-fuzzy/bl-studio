@@ -12,6 +12,7 @@ export const qwenImage: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'qwen-image',
   displayName: 'Qwen Image',
+  description: 'Qwen 文生图模型，根据文字描述生成高质量图片',
   category: 'image',
   taskMode: 'sync',
   capabilities: ['text_prompt', 'negative_prompt', 'seed'],

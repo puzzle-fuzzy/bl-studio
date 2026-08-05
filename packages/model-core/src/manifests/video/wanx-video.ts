@@ -13,6 +13,7 @@ export const wanxTextToVideo: ModelManifest = {
   provider: 'dashscope',
   providerModel: 'wanx2.1-t2v-turbo',
   displayName: 'Wanx Text to Video',
+  description: '通义万相文生视频，根据文字描述生成短视频',
   category: 'video',
   taskMode: 'provider_async',
   capabilities: ['text_prompt', 'negative_prompt', 'seed'],
