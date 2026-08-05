@@ -40,7 +40,10 @@ try {
         'share.create',
         'share.revoke',
         'points.grant',
-        'points.adjustment'
+        'points.adjustment',
+        'admin.user.create',
+        'admin.user.update',
+        'admin.user.delete'
       ))
     `)
   })

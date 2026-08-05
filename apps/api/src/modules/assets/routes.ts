@@ -190,7 +190,7 @@ async function assetWithDownloadUrl(
   }
 }
 
-async function assetWithReadUrl(
+export async function assetWithReadUrl(
   item: UnifiedAssetItem,
   storage: StorageAdapter,
 ) {

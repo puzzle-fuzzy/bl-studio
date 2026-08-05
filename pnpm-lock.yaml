@@ -124,6 +124,76 @@ importers:
         specifier: 'catalog:'
         version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5))
 
+  apps/admin:
+    dependencies:
+      '@bailian-studio/api-client':
+        specifier: workspace:*
+        version: link:../../packages/api-client
+      class-variance-authority:
+        specifier: ^0.7.1
+        version: 0.7.1
+      clsx:
+        specifier: ^2.1.1
+        version: 2.1.1
+      lucide-react:
+        specifier: 'catalog:'
+        version: 1.28.0(react@19.2.8)
+      radix-ui:
+        specifier: ^1.6.7
+        version: 1.6.7(@types/react-dom@19.2.4(@types/react@19.2.18))(@types/react@19.2.18)(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      react:
+        specifier: 'catalog:'
+        version: 19.2.8
+      react-dom:
+        specifier: 'catalog:'
+        version: 19.2.8(react@19.2.8)
+      react-router:
+        specifier: 'catalog:'
+        version: 8.3.0(react-dom@19.2.8(react@19.2.8))(react@19.2.8)
+      tailwind-merge:
+        specifier: ^3.6.0
+        version: 3.6.0
+      zustand:
+        specifier: 'catalog:'
+        version: 5.0.14(@types/react@19.2.18)(immer@11.1.15)(react@19.2.8)(use-sync-external-store@1.6.0(react@19.2.8))
+    devDependencies:
+      '@tailwindcss/vite':
+        specifier: ^4.3.3
+        version: 4.3.3(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5))
+      '@types/node':
+        specifier: ^26.1.2
+        version: 26.1.2
+      '@types/react':
+        specifier: 'catalog:'
+        version: 19.2.18
+      '@types/react-dom':
+        specifier: 'catalog:'
+        version: 19.2.4(@types/react@19.2.18)
+      '@vitejs/plugin-react':
+        specifier: 'catalog:'
+        version: 6.0.5(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5))
+      happy-dom:
+        specifier: ^20.11.1
+        version: 20.11.1
+      shadcn:
+        specifier: ^4.16.1
+        version: 4.16.1(typescript@7.0.2)
+      tailwindcss:
+        specifier: 'catalog:'
+        version: 4.3.3
+      tw-animate-css:
+        specifier: ^1.4.0
+        version: 1.4.0
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vite:
+        specifier: 'catalog:'
+        version: 8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5)
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5))
+
   apps/api:
     dependencies:
       '@bailian-studio/auth':

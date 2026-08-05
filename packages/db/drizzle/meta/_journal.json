@@ -239,6 +239,13 @@
       "when": 1785901544648,
       "tag": "0033_secret_demogoblin",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1785903592465,
+      "tag": "0034_normal_texas_twister",
+      "breakpoints": true
     }
   ]
 }

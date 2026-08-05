@@ -589,3 +589,99 @@ export type AssetCapabilities = z.infer<typeof AssetCapabilitiesSchema>
 export type ListAssetsResult = z.infer<typeof ListAssetsResponseSchema>
 export type UsageSummary = z.infer<typeof UsageSummarySchema>
 export type CreditBalance = z.infer<typeof CreditBalanceSchema>
+
+// ---------------------------------------------------------------------------
+// 管理后台
+// ---------------------------------------------------------------------------
+
+/** 管理后台用户投影（不含密码哈希/GitHub ID）。 */
+export const AdminUserSchema = z.object({
+  id: z.string(),
+  email: z.string().email(),
+  displayName: z.string().nullable(),
+  role: z.enum(['user', 'admin']),
+  emailVerifiedAt: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const AdminListUsersResponseSchema = z.object({
+  items: z.array(AdminUserSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const AdminUserResponseSchema = z.object({
+  user: AdminUserSchema,
+})
+
+export const AdminUserDetailSchema = z.object({
+  user: AdminUserSchema,
+  balance: CreditBalanceSchema,
+})
+
+export const AdminUserDetailResponseSchema = z.object({
+  user: AdminUserSchema,
+  balance: CreditBalanceSchema,
+})
+
+export const AdminCreateUserInputSchema = z.object({
+  email: z.string().trim().email().max(254),
+  password: z.string().min(8).max(256),
+  displayName: z.string().trim().min(1).max(100).optional(),
+  role: z.enum(['user', 'admin']).optional(),
+}).strict()
+
+export const AdminUpdateUserInputSchema = z.object({
+  displayName: z.string().trim().min(1).max(100).optional(),
+  role: z.enum(['user', 'admin']).optional(),
+}).strict()
+
+export const CreditLedgerEntrySchema = z.object({
+  id: z.string(),
+  accountId: z.string(),
+  userId: z.string(),
+  generationId: z.string().optional(),
+  kind: z.enum(['grant', 'recharge', 'reserve', 'settle', 'refund', 'adjustment']),
+  availableDeltaCents: z.number(),
+  reservedDeltaCents: z.number(),
+  availableBalanceCents: z.number(),
+  reservedBalanceCents: z.number(),
+  idempotencyKey: z.string(),
+  reason: z.string().optional(),
+  actorUserId: z.string().optional(),
+  requestId: z.string().optional(),
+  createdAt: z.string(),
+})
+
+export const ListPointsLedgerResponseSchema = z.object({
+  items: z.array(CreditLedgerEntrySchema),
+  nextCursor: z.string().optional(),
+})
+
+export const GrantPointsInputSchema = z.object({
+  amountCents: z.number().int().positive(),
+  reason: z.string().trim().min(1).max(500),
+  idempotencyKey: z.string().trim().min(1).max(256),
+}).strict()
+
+export const AdjustPointsInputSchema = z.object({
+  amountCents: z.number().int().refine(value => value !== 0, 'amountCents cannot be zero'),
+  reason: z.string().trim().min(1).max(500),
+  idempotencyKey: z.string().trim().min(1).max(256),
+}).strict()
+
+export const PointsMutationResponseSchema = z.object({
+  balance: CreditBalanceSchema,
+  entry: CreditLedgerEntrySchema,
+})
+
+export type AdminUser = z.infer<typeof AdminUserSchema>
+export type AdminListUsersResult = z.infer<typeof AdminListUsersResponseSchema>
+export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
+export type AdminCreateUserInput = z.infer<typeof AdminCreateUserInputSchema>
+export type AdminUpdateUserInput = z.infer<typeof AdminUpdateUserInputSchema>
+export type CreditLedgerEntry = z.infer<typeof CreditLedgerEntrySchema>
+export type ListPointsLedgerResult = z.infer<typeof ListPointsLedgerResponseSchema>
+export type GrantPointsInput = z.infer<typeof GrantPointsInputSchema>
+export type AdjustPointsInput = z.infer<typeof AdjustPointsInputSchema>
+export type PointsMutationResult = z.infer<typeof PointsMutationResponseSchema>

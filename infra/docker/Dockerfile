@@ -44,6 +44,7 @@ FROM base AS workspace
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+COPY apps/admin/package.json ./apps/admin/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/auth/package.json ./packages/auth/
@@ -74,6 +75,7 @@ FROM base AS runtime
 COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
 COPY apps/api/package.json ./apps/api/
 COPY apps/web/package.json ./apps/web/
+COPY apps/admin/package.json ./apps/admin/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/auth/package.json ./packages/auth/
@@ -122,13 +124,14 @@ FROM workspace AS web-build
 ARG VITE_API_ORIGIN=
 ENV VITE_API_ORIGIN=${VITE_API_ORIGIN}
 
-# 唯一的 Web 入口是 apps/web（合并后的 React 前端）。
-RUN pnpm --filter @bailian-studio/web build
+# 同源两个前端：主站 apps/web + 管理后台 apps/admin（nginx 以 /admin 前缀服务）。
+RUN pnpm --filter @bailian-studio/web build && pnpm --filter @bailian-studio/admin build
 
 FROM nginx:1.27-alpine AS web
 
 COPY infra/nginx/bailian-studio.conf /etc/nginx/conf.d/default.conf
 COPY --from=web-build /app/apps/web/dist /usr/share/nginx/html
+COPY --from=web-build /app/apps/admin/dist /usr/share/nginx/html-admin
 
 EXPOSE 5002
 

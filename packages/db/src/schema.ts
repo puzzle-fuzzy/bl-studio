@@ -141,7 +141,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),

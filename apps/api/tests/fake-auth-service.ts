@@ -12,6 +12,15 @@ export function createFakeAuthService(
     user: user(),
     expiresAt: new Date('2026-07-26T00:00:00.000Z'),
   })
+  const toAdminUser = (u: PublicUser) => ({
+    id: u.id,
+    email: u.email,
+    displayName: u.displayName,
+    role: u.role,
+    emailVerifiedAt: u.emailVerifiedAt,
+    createdAt: '2026-07-25T00:00:00.000Z',
+    updatedAt: '2026-07-25T00:00:00.000Z',
+  })
 
   return {
     register: async () => ({
@@ -31,5 +40,22 @@ export function createFakeAuthService(
       : undefined,
     revokeSessionByToken: async () => {},
     revokeAllSessionsByToken: async () => {},
+    adminCreateUser: async input => ({
+      id: 'admin-created',
+      email: input.email,
+      displayName: input.displayName ?? null,
+      role: input.role ?? 'user',
+      emailVerifiedAt: user().emailVerifiedAt,
+      createdAt: '2026-07-25T00:00:00.000Z',
+      updatedAt: '2026-07-25T00:00:00.000Z',
+    }),
+    listActiveUsers: async () => ({ items: [toAdminUser(user())], nextCursor: undefined }),
+    adminGetUser: async id => toAdminUser({ ...user(), id }),
+    adminUpdateUser: async (id, input) => ({
+      ...toAdminUser({ ...user(), id }),
+      ...(input.role !== undefined ? { role: input.role } : {}),
+      ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
+    }),
+    softDeleteUser: async () => {},
   }
 }

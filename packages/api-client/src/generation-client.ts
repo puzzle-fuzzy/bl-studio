@@ -11,6 +11,12 @@
 import { z } from 'zod'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
+  AdminCreateUserInputSchema,
+  AdminListUsersResponseSchema,
+  AdminUpdateUserInputSchema,
+  AdminUserDetailResponseSchema,
+  AdminUserResponseSchema,
+  AdjustPointsInputSchema,
   AssetCapabilitiesSchema,
   AssetItemSchema,
   AssetResponseSchema,
@@ -26,19 +32,28 @@ import {
   CreateMediaJobResponseSchema,
   GenerationRecordSchema,
   GenerationShareResponseSchema,
+  GrantPointsInputSchema,
   ListArtifactsResponseSchema,
   ListAssetsResponseSchema,
   ListGenerationArtifactsResponseSchema,
   ListGenerationsResponseSchema,
+  ListPointsLedgerResponseSchema,
   MediaJobResponseSchema,
   ModelCatalogItemSchema,
   ModelCatalogResponseSchema,
+  PointsMutationResponseSchema,
   PublicSharedGenerationResponseSchema,
   RegistrationResponseSchema,
   RetryGenerationResponseSchema,
   UsageSummaryResponseSchema,
 } from './schemas'
 import type {
+  AdminCreateUserInput,
+  AdminListUsersResult,
+  AdminUpdateUserInput,
+  AdminUser,
+  AdminUserDetail,
+  AdjustPointsInput,
   AssetCapabilities,
   AssetItem,
   BailianContractStatus,
@@ -51,12 +66,15 @@ import type {
   CreateMediaJobResult,
   GenerationRecord,
   GenerationShareResult,
+  GrantPointsInput,
   ListArtifactsResult,
   ListAssetsResult,
   ListGenerationArtifactsResult,
   ListGenerationsResult,
+  ListPointsLedgerResult,
   MediaJob,
   ModelCatalogItem,
+  PointsMutationResult,
   PublicSharedGeneration,
   PublicUser,
   RegistrationResult,
@@ -301,6 +319,31 @@ export interface BailianStudioApiClient {
    * 这样前端可以直接用返回值做"是否登录"的判断；其它错误仍照常抛出。
    */
   getCurrentUser(): Promise<PublicUser | null>
+
+  // ---------------------------------------------------------------------------
+  // 管理后台（需 admin 角色；否则 403）
+  // ---------------------------------------------------------------------------
+
+  /** `GET /api/admin/users` —— 分页列用户，支持 q/cursor/limit。 */
+  listAdminUsers(params?: { q?: string; limit?: number; cursor?: string }): Promise<AdminListUsersResult>
+  /** `POST /api/admin/users` —— 创建账户（跳过邮箱验证）。 */
+  adminCreateUser(input: AdminCreateUserInput): Promise<AdminUser>
+  /** `GET /api/admin/users/:userId` —— 用户详情（含积分余额）。 */
+  adminGetUser(userId: string): Promise<AdminUserDetail>
+  /** `PATCH /api/admin/users/:userId` —— 改昵称/角色。 */
+  adminUpdateUser(userId: string, input: AdminUpdateUserInput): Promise<AdminUser>
+  /** `DELETE /api/admin/users/:userId` —— 软删除用户。 */
+  adminDeleteUser(userId: string): Promise<void>
+  /** `GET /api/admin/users/:userId/points` —— 指定用户积分余额。 */
+  adminGetUserPoints(userId: string): Promise<CreditBalance>
+  /** `GET /api/admin/users/:userId/points/ledger` —— 指定用户积分流水。 */
+  adminListUserPointsLedger(userId: string, params?: { limit?: number; cursor?: string }): Promise<ListPointsLedgerResult>
+  /** `POST /api/admin/users/:userId/points/grants` —— 赠送积分。 */
+  adminGrantPoints(userId: string, input: GrantPointsInput): Promise<PointsMutationResult>
+  /** `POST /api/admin/users/:userId/points/adjustments` —— 积分调整（±）。 */
+  adminAdjustPoints(userId: string, input: AdjustPointsInput): Promise<PointsMutationResult>
+  /** `GET /api/admin/users/:userId/assets` —— 指定用户全部资产。 */
+  adminListUserAssets(userId: string, params?: ListAssetsParams): Promise<ListAssetsResult>
 }
 
 /**
@@ -757,6 +800,115 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         if (error instanceof ApiClientError && error.status === 401) return null
         throw error
       }
+    },
+
+    async listAdminUsers(params = {}) {
+      const search = new URLSearchParams()
+      if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/users${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminListUsersResponseSchema,
+      )
+    },
+
+    async adminCreateUser(input) {
+      const data = await unwrapData(
+        `${base}/api/admin/users`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        AdminUserResponseSchema,
+      )
+      return data.user
+    },
+
+    async adminGetUser(userId) {
+      return unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminUserDetailResponseSchema,
+      )
+    },
+
+    async adminUpdateUser(userId, input) {
+      const data = await unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        AdminUserResponseSchema,
+      )
+      return data.user
+    },
+
+    async adminDeleteUser(userId) {
+      await requestNoContent(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+      )
+    },
+
+    async adminGetUserPoints(userId) {
+      const data = await unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/points`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        CreditBalanceResponseSchema,
+      )
+      return data.balance
+    },
+
+    async adminListUserPointsLedger(userId, params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/points/ledger${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListPointsLedgerResponseSchema,
+      )
+    },
+
+    async adminGrantPoints(userId, input) {
+      return unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/points/grants`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        PointsMutationResponseSchema,
+      )
+    },
+
+    async adminAdjustPoints(userId, input) {
+      return unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/points/adjustments`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        PointsMutationResponseSchema,
+      )
+    },
+
+    async adminListUserAssets(userId, params = {}) {
+      const search = new URLSearchParams()
+      if (params.kind !== undefined) search.set('kind', params.kind)
+      if (params.source !== undefined) search.set('source', params.source)
+      if (params.sort !== undefined) search.set('sort', params.sort)
+      if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/assets${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListAssetsResponseSchema,
+      )
     },
   }
 }

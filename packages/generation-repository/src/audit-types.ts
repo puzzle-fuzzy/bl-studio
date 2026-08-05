@@ -29,6 +29,9 @@ export type AuditAction =
   | 'share.revoke'
   | 'points.grant'
   | 'points.adjustment'
+  | 'admin.user.create'
+  | 'admin.user.update'
+  | 'admin.user.delete'
 
 export type AuditOutcome = 'succeeded' | 'failed'
 

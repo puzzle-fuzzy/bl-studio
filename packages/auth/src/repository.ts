@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, desc, eq, gt, isNull, sql } from 'drizzle-orm'
+import { and, desc, eq, gt, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
 import {
   authActionTokens,
   sessions,
@@ -23,6 +23,8 @@ export interface UserRepositoryRecord {
   role: 'user' | 'admin'
   emailVerifiedAt: Date | null
   githubId: string | null
+  createdAt: Date
+  updatedAt: Date
 }
 
 function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
@@ -34,6 +36,8 @@ function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
     role: row.role as UserRepositoryRecord['role'],
     emailVerifiedAt: row.emailVerifiedAt,
     githubId: row.githubId,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
   }
 }
 
@@ -79,6 +83,7 @@ export interface CreateUserInput {
   passwordHash: string
   displayName?: string
   githubId?: string
+  role?: 'user' | 'admin'
   /** 缺省为 null（未验证）。OAuth 用户传入 now 表示已验证。 */
   emailVerifiedAt?: Date | null
   now: Date
@@ -97,7 +102,7 @@ export async function createUserInTransaction(
       passwordHash: input.passwordHash,
       displayName: input.displayName ?? null,
       githubId: input.githubId ?? null,
-      role: 'user',
+      role: input.role ?? 'user',
       emailVerifiedAt: input.emailVerifiedAt === undefined ? null : input.emailVerifiedAt,
       createdAt: input.now,
       updatedAt: input.now,
@@ -120,6 +125,188 @@ export async function linkGithubId(
     .update(users)
     .set({ githubId, updatedAt: now, updatedBy: 'auth.github' })
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+}
+
+// ---------------------------------------------------------------------------
+// 管理后台：用户查询 / 更新 / 软删除。
+//
+// 列表用 (createdAt desc, id desc) keyset 分页，游标为 base64url(JSON)，与
+// generation-repository 的 cursor.ts 同一约定（对外不透明，解析失败统一报错）。
+// 列表只投影非敏感列（不含 passwordHash）；单条查询可含已软删用户，便于管理员
+// 复查被删除账号的历史数据。
+// ---------------------------------------------------------------------------
+
+/** 管理列表的用户投影（不含 passwordHash）。 */
+export interface UserSummaryRecord {
+  id: string
+  email: string
+  displayName: string | null
+  role: 'user' | 'admin'
+  emailVerifiedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+}
+
+export interface ListActiveUsersOptions {
+  /** 每页条数，clamp 到 [1,100]，默认 20。 */
+  limit?: number
+  /** 不透明 keyset 游标（来自上一页 nextCursor）。 */
+  cursor?: string
+  /** 邮箱或昵称的模糊搜索（大小写不敏感）。 */
+  q?: string
+}
+
+export interface ListActiveUsersResult {
+  items: UserSummaryRecord[]
+  nextCursor?: string
+}
+
+interface UserCursorPayload {
+  createdAt: string
+  id: string
+}
+
+function encodeUserCursor(payload: UserCursorPayload): string {
+  return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
+}
+
+function decodeUserCursor(token: string): UserCursorPayload {
+  let json: string
+  try {
+    json = Buffer.from(token, 'base64url').toString('utf8')
+  } catch {
+    throw new AuthError('AUTH_TOKEN_INVALID', 'Invalid pagination cursor')
+  }
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(json)
+  } catch {
+    throw new AuthError('AUTH_TOKEN_INVALID', 'Invalid pagination cursor')
+  }
+  if (
+    typeof parsed === 'object'
+    && parsed !== null
+    && 'createdAt' in parsed
+    && 'id' in parsed
+    && typeof parsed.createdAt === 'string'
+    && typeof parsed.id === 'string'
+  ) {
+    return { createdAt: parsed.createdAt, id: parsed.id }
+  }
+  throw new AuthError('AUTH_TOKEN_INVALID', 'Invalid pagination cursor')
+}
+
+function toUserSummary(row: {
+  id: string
+  email: string
+  displayName: string | null
+  role: string
+  emailVerifiedAt: Date | null
+  createdAt: Date
+  updatedAt: Date
+}): UserSummaryRecord {
+  return {
+    id: row.id,
+    email: row.email,
+    displayName: row.displayName,
+    role: row.role as UserSummaryRecord['role'],
+    emailVerifiedAt: row.emailVerifiedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }
+}
+
+export function clampUserListLimit(limit: number | undefined): number {
+  if (limit === undefined) return 20
+  if (!Number.isFinite(limit)) return 20
+  return Math.max(1, Math.min(100, Math.floor(limit)))
+}
+
+/** 分页列出未软删用户，支持 email/昵称模糊搜索；返回 keyset nextCursor。 */
+export async function listActiveUsers(
+  db: AuthDatabase,
+  options: ListActiveUsersOptions = {},
+): Promise<ListActiveUsersResult> {
+  const limit = clampUserListLimit(options.limit)
+  const cursor = options.cursor !== undefined ? decodeUserCursor(options.cursor) : undefined
+
+  const conditions: SQL[] = [isNull(users.deletedAt)]
+  if (options.q !== undefined && options.q.length > 0) {
+    const pattern = `%${options.q}%`
+    const match = or(ilike(users.email, pattern), ilike(users.displayName, pattern))
+    if (match !== undefined) conditions.push(match)
+  }
+  if (cursor !== undefined) {
+    conditions.push(sql`(${users.createdAt} < ${cursor.createdAt} OR (${users.createdAt} = ${cursor.createdAt} AND ${users.id} < ${cursor.id}))`)
+  }
+
+  const rows = await db
+    .select({
+      id: users.id,
+      email: users.email,
+      displayName: users.displayName,
+      role: users.role,
+      emailVerifiedAt: users.emailVerifiedAt,
+      createdAt: users.createdAt,
+      updatedAt: users.updatedAt,
+    })
+    .from(users)
+    .where(and(...conditions))
+    .orderBy(desc(users.createdAt), desc(users.id))
+    .limit(limit + 1)
+
+  const hasMore = rows.length > limit
+  const page = hasMore ? rows.slice(0, limit) : rows
+  const last = page[page.length - 1]
+  return {
+    items: page.map(toUserSummary),
+    ...(hasMore && last !== undefined
+      ? { nextCursor: encodeUserCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
+      : {}),
+  }
+}
+
+/** 按 id 查询用户（**含已软删**），供管理后台查看历史账号。 */
+export async function findUserById(
+  db: AuthDatabase,
+  id: string,
+): Promise<UserRepositoryRecord | undefined> {
+  const [row] = await db.select().from(users).where(eq(users.id, id)).limit(1)
+  return row === undefined ? undefined : toUserRecord(row)
+}
+
+/** 软删除用户（置 deleted_at）。仅对未删除行生效，返回是否真的删除。 */
+export async function softDeleteUser(db: AuthDatabase, userId: string, now: Date): Promise<boolean> {
+  const [row] = await db
+    .update(users)
+    .set({ deletedAt: now, deletedBy: 'admin.user.delete', updatedAt: now, updatedBy: 'admin.user.delete' })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning({ id: users.id })
+  return row !== undefined
+}
+
+export interface UpdateUserAdminInput {
+  displayName?: string
+  role?: 'user' | 'admin'
+}
+
+/** 管理端更新用户（昵称/角色）；返回更新后的用户，用户不存在或已删除时为 undefined。 */
+export async function updateUserAdmin(
+  db: AuthDatabase,
+  userId: string,
+  input: UpdateUserAdminInput,
+  now: Date,
+): Promise<UserRepositoryRecord | undefined> {
+  const patch: Record<string, unknown> = { updatedAt: now, updatedBy: 'admin.user.update' }
+  if (input.displayName !== undefined) patch.displayName = input.displayName
+  if (input.role !== undefined) patch.role = input.role
+
+  const [row] = await db
+    .update(users)
+    .set(patch)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning()
+  return row === undefined ? undefined : toUserRecord(row)
 }
 
 export function createUser(db: BailianStudioDb, input: CreateUserInput): Promise<UserRepositoryRecord> {

@@ -303,4 +303,84 @@ describe('auth service', () => {
       })).rejects.toMatchObject({ code: 'AUTH_EMAIL_TAKEN' })
     })
   })
+
+  describe('admin user management', () => {
+    it('creates a verified account without requiring email verification', async () => {
+      const created = await handle.authService.adminCreateUser({
+        email: 'admin-made@x.test',
+        password: 'password1',
+        displayName: 'Admin Made',
+        role: 'admin',
+      })
+      expect(created.email).toBe('admin-made@x.test')
+      expect(created.role).toBe('admin')
+      expect(created.emailVerifiedAt).not.toBe('')
+
+      // 直接可用密码登录（无需验证邮件）。
+      const login = await handle.authService.login({ email: 'admin-made@x.test', password: 'password1' })
+      expect(login.user.id).toBe(created.id)
+    })
+
+    it('rejects duplicate emails on admin create', async () => {
+      await handle.authService.adminCreateUser({ email: 'dup@x.test', password: 'password1' })
+      await expect(handle.authService.adminCreateUser({
+        email: 'dup@x.test',
+        password: 'password1',
+      })).rejects.toMatchObject({ code: 'AUTH_EMAIL_TAKEN' })
+    })
+
+    it('lists active users with q filter and pagination', async () => {
+      await handle.authService.adminCreateUser({ email: 'alpha@x.test', password: 'password1', displayName: 'Alice' })
+      await handle.authService.adminCreateUser({ email: 'bravo@x.test', password: 'password1', displayName: 'Bob' })
+      await handle.authService.adminCreateUser({ email: 'charlie@x.test', password: 'password1' })
+
+      const all = await handle.authService.listActiveUsers({ limit: 2 })
+      expect(all.items.length).toBe(2)
+      expect(all.nextCursor).toBeDefined()
+
+      const next = await handle.authService.listActiveUsers({ limit: 2, cursor: all.nextCursor })
+      expect(next.items.length).toBeGreaterThan(0)
+
+      const byName = await handle.authService.listActiveUsers({ q: 'alice' })
+      expect(byName.items.map(item => item.email)).toEqual(['alpha@x.test'])
+
+      const byEmail = await handle.authService.listActiveUsers({ q: 'charlie' })
+      expect(byEmail.items.map(item => item.email)).toEqual(['charlie@x.test'])
+    })
+
+    it('soft-deletes a user and revokes all sessions immediately', async () => {
+      const created = await handle.authService.adminCreateUser({ email: 'delete-me@x.test', password: 'password1' })
+      const login = await handle.authService.login({ email: 'delete-me@x.test', password: 'password1' })
+
+      await handle.authService.softDeleteUser(created.id)
+      expect(await handle.authService.verifyToken(login.token)).toBeUndefined()
+
+      // 密码登录也失败（findActiveUserByEmail 过滤已删除）。
+      await expect(handle.authService.login({
+        email: 'delete-me@x.test',
+        password: 'password1',
+      })).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' })
+    })
+
+    it('updates role/displayName and returns deleted users via adminGetUser', async () => {
+      const created = await handle.authService.adminCreateUser({
+        email: 'edit-me@x.test',
+        password: 'password1',
+        displayName: 'Before',
+      })
+      const updated = await handle.authService.adminUpdateUser(created.id, {
+        displayName: 'After',
+        role: 'admin',
+      })
+      expect(updated.displayName).toBe('After')
+      expect(updated.role).toBe('admin')
+
+      await handle.authService.softDeleteUser(created.id)
+      // 软删后管理端仍可查看该账号。
+      const viewed = await handle.authService.adminGetUser(created.id)
+      expect(viewed.email).toBe('edit-me@x.test')
+
+      await expect(handle.authService.adminGetUser('missing-id')).rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED' })
+    })
+  })
 })

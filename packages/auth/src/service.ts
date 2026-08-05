@@ -15,12 +15,16 @@ import {
   findActiveUserByGithubId,
   findActiveUserById,
   findLatestActiveAuthActionToken,
+  findUserById,
   linkGithubId,
+  listActiveUsers,
   lockAuthTokenScope,
   markUserEmailVerified,
   revokeActiveTokens,
   revokeAllSessions,
   revokeSession,
+  softDeleteUser as softDeleteUserRecord,
+  updateUserAdmin as updateUserAdminRecord,
   updateUserPassword,
   type AuthActionTokenPurpose,
   type UserRepositoryRecord,
@@ -38,6 +42,22 @@ export interface AuthResult {
   token: string
   user: PublicUser
   expiresAt: Date
+}
+
+/** 管理后台看到的用户投影（不含密码哈希/GitHub ID）。 */
+export interface AdminUser {
+  id: string
+  email: string
+  displayName: string | null
+  role: 'user' | 'admin'
+  emailVerifiedAt: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListAdminUsersResult {
+  items: AdminUser[]
+  nextCursor?: string
 }
 
 export interface VerifiedSession {
@@ -84,6 +104,22 @@ export interface AuthService {
   verifyToken(token: string): Promise<VerifiedSession | undefined>
   revokeSessionByToken(token: string): Promise<void>
   revokeAllSessionsByToken(token: string): Promise<void>
+
+  /** 管理后台：创建账户（跳过邮箱验证，直接视为已验证）。 */
+  adminCreateUser(input: {
+    email: string
+    password: string
+    displayName?: string
+    role?: 'user' | 'admin'
+  }): Promise<AdminUser>
+  /** 管理后台：分页列用户（含搜索）。 */
+  listActiveUsers(input?: { limit?: number; cursor?: string; q?: string }): Promise<ListAdminUsersResult>
+  /** 管理后台：查单个用户（含已软删）。 */
+  adminGetUser(id: string): Promise<AdminUser>
+  /** 管理后台：改昵称/角色。 */
+  adminUpdateUser(id: string, input: { displayName?: string; role?: 'user' | 'admin' }): Promise<AdminUser>
+  /** 管理后台：软删除用户（同时吊销全部会话）。 */
+  softDeleteUser(id: string): Promise<void>
 }
 
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -146,10 +182,18 @@ function rawActionToken(): string {
 }
 
 function isUniqueViolation(error: unknown): boolean {
-  return typeof error === 'object'
-    && error !== null
-    && 'code' in error
-    && error.code === '23505'
+  if (typeof error !== 'object' || error === null) return false
+  // drizzle 把 PostgresError 包在 DrizzleQueryError.cause 里，需逐层解包。
+  let current: unknown = error
+  for (let depth = 0; depth < 3 && current !== null; depth += 1) {
+    if (typeof current === 'object' && 'code' in current && (current as { code?: unknown }).code === '23505') {
+      return true
+    }
+    current = typeof current === 'object' && current !== null
+      ? (current as { cause?: unknown }).cause
+      : undefined
+  }
+  return false
 }
 
 function toPublicUser(user: UserRepositoryRecord): PublicUser {
@@ -162,6 +206,22 @@ function toPublicUser(user: UserRepositoryRecord): PublicUser {
     displayName: user.displayName,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt.toISOString(),
+  }
+}
+
+/** 管理后台用户投影：剥离密码哈希与 GitHub ID。 */
+function toAdminUser(user: Pick<
+  UserRepositoryRecord,
+  'id' | 'email' | 'displayName' | 'role' | 'emailVerifiedAt' | 'createdAt' | 'updatedAt'
+>): AdminUser {
+  return {
+    id: user.id,
+    email: user.email,
+    displayName: user.displayName,
+    role: user.role,
+    emailVerifiedAt: user.emailVerifiedAt === null ? '' : user.emailVerifiedAt.toISOString(),
+    createdAt: user.createdAt.toISOString(),
+    updatedAt: user.updatedAt.toISOString(),
   }
 }
 
@@ -518,6 +578,71 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (session !== undefined && session.userId === payload.sub) {
         await revokeAllSessions(options.db, payload.sub, revokedAt)
       }
+    },
+
+    async adminCreateUser(input) {
+      const email = normalizeEmail(input.email)
+      validatePassword(input.password)
+      const passwordHash = await hashPassword(input.password)
+      const createdAt = now()
+      const displayName = input.displayName?.trim()
+      let user: UserRepositoryRecord
+      try {
+        user = await options.db.transaction(tx => createUserInTransaction(tx, {
+          email,
+          passwordHash,
+          displayName: displayName !== undefined && displayName.length > 0 ? displayName : undefined,
+          role: input.role,
+          emailVerifiedAt: createdAt,
+          now: createdAt,
+        }))
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已注册，请使用其他邮箱。', { action: 'admin_create' })
+        }
+        throw error
+      }
+      return toAdminUser(user)
+    },
+
+    async listActiveUsers(input) {
+      const page = await listActiveUsers(options.db, {
+        limit: input?.limit,
+        cursor: input?.cursor,
+        q: input?.q,
+      })
+      return {
+        items: page.items.map(toAdminUser),
+        ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+      }
+    },
+
+    async adminGetUser(id) {
+      const user = await findUserById(options.db, id)
+      if (user === undefined) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在。', { action: 'admin_get' })
+      }
+      return toAdminUser(user)
+    },
+
+    async adminUpdateUser(id, input) {
+      const updated = await updateUserAdminRecord(options.db, id, input, now())
+      if (updated === undefined) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。', { action: 'admin_update' })
+      }
+      return toAdminUser(updated)
+    },
+
+    async softDeleteUser(id) {
+      const deletedAt = now()
+      await options.db.transaction(async tx => {
+        const deleted = await softDeleteUserRecord(tx, id, deletedAt)
+        if (!deleted) {
+          throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。', { action: 'admin_delete' })
+        }
+        // 软删除后吊销全部会话，token 立即失效（verifyToken 本身也会因 deletedAt 拒绝）。
+        await revokeAllSessions(tx, id, deletedAt)
+      })
     },
   }
 }

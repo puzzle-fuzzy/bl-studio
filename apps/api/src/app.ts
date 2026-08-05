@@ -29,6 +29,7 @@ import { createMediaRoutes } from './modules/media'
 import { createShareRoutes } from './modules/shares'
 import { createUsageRoutes } from './modules/usage'
 import { createPointsRoutes } from './modules/points'
+import { createAdminRoutes } from './modules/admin'
 import { appMetrics } from './lib/metrics'
 
 const accessLogger = createLogger('api')
@@ -145,6 +146,7 @@ export function createApp(options: ApiAppOptions) {
   .use(createMediaRoutes(dependencies))
   .use(createUsageRoutes(dependencies))
   .use(createPointsRoutes(dependencies))
+  .use(createAdminRoutes(dependencies))
   .get('/api/health/live', () => ({ success: true, data: { status: 'ok' } }))
   .get('/api/health/ready', async ({ set }) => {
     const checks: {
