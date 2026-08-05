@@ -1,14 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Info } from 'lucide-react'
 import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ModelSelector } from '@/components/create/ModelSelector'
 import { ParameterForm } from '@/components/create/ParameterForm'
 import { PromptInput } from '@/components/create/PromptInput'
-import { PromptTemplatePanel } from '@/components/create/PromptTemplatePanel'
 import { CreationPresetPanel } from '@/components/create/CreationPresetPanel'
 import { EstimateSummary } from '@/components/create/EstimateSummary'
 import { GenerationsPanel } from '@/components/generations/GenerationsPanel'
@@ -20,6 +20,7 @@ import { readParameterValidationErrors, type FieldIssue } from '@/lib/parameter-
 import { buildSubmitPayload } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
+import { modelNameZh } from '@/lib/model-modes'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
@@ -41,8 +42,8 @@ export function CreatePage() {
   const refreshGenerations = useGenerationsStore(state => state.refresh)
 
   const [modelId, setModelId] = useState<string | undefined>(() => {
-    const selected = searchParams.get('select')
-    return selected ?? undefined
+    // `?select=` 空参与无参等同：都视为未选中，由 ModelSelector 级联默认选中第一个模型。
+    return searchParams.get('select') || undefined
   })
   const [values, setValues] = useState<Record<string, unknown>>({})
   const [estimate, setEstimate] = useState<GenerationEstimate | null>(null)
@@ -61,13 +62,6 @@ export function CreatePage() {
   useEffect(() => {
     void loadModels()
   }, [loadModels])
-
-  // 无 ?select=（未选中）时，等目录加载后默认选第一个视频模型（或目录第一个）。
-  useEffect(() => {
-    if (modelId !== undefined || models.length === 0) return
-    const first = models.find(model => model.category === 'video') ?? models[0]
-    if (first !== undefined) setModelId(first.id)
-  }, [models, modelId])
 
   // `?reuse=<id>` 深链：从历史生成记录还原模型与全部参数（含参考图）。
   const reuseId = searchParams.get('reuse')
@@ -242,18 +236,26 @@ export function CreatePage() {
 
         {model !== undefined && (
           <section className="space-y-5">
-            <div className="flex items-baseline gap-2">
-              <h2 className="text-sm font-semibold">{model.displayName}</h2>
-              <span className="text-xs text-muted-foreground">{model.operation}</span>
+            <div className="flex items-center gap-2">
+              <h2 className="text-sm font-semibold">{modelNameZh(model)}</h2>
+              <span className="truncate text-xs text-muted-foreground">{model.displayName}</span>
+              {model.description !== undefined && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground transition-colors hover:text-foreground"
+                      aria-label="查看模型说明"
+                    >
+                      <Info className="size-3.5" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right" className="max-w-64">
+                    <p className="text-xs leading-relaxed">{model.description}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
             </div>
-            {model.description !== undefined && (
-              <p className="text-xs leading-relaxed text-muted-foreground">{model.description}</p>
-            )}
-
-            <PromptTemplatePanel
-              category={model.category}
-              onApply={prompt => handleValueChange('prompt', prompt)}
-            />
 
             {mediaFields.length > 0 && (
               <div className="space-y-2">

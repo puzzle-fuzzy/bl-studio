@@ -76,3 +76,15 @@ export function modelsInMode(
 export function modelsInCategory(models: readonly ModelCatalogItem[], category: ModelCategory): ModelCatalogItem[] {
   return models.filter(model => model.category === category)
 }
+
+/**
+ * 模型中文名：取 description 首个「，/,」前的片段。
+ * 如「快乐马参考生视频，多参考图保持角色一致」→「快乐马参考生视频」；
+ * 无 description 时退回英文 displayName。
+ */
+export function modelNameZh(model: Pick<ModelCatalogItem, 'displayName' | 'description'>): string {
+  const description = model.description
+  if (description === undefined) return model.displayName
+  const first = (description.split(/[，,]/)[0] ?? '').trim()
+  return first.length > 0 ? first : model.displayName
+}

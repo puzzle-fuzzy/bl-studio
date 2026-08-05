@@ -12,6 +12,7 @@ import {
   SUB_MODE_LABELS,
   SUB_MODE_ORDER,
   availableSubModes,
+  modelNameZh,
   modelsInMode,
   subModeOf,
   type ModelCategory,
@@ -54,6 +55,20 @@ export function ModelSelector({
     setSubMode(subModeOf(selected))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
+
+  // 无有效选中模型时（?select= 空参 / 目录刚加载 / 选中 id 失效），
+  // 自动选中当前级联（分类+子模式）下的第一个模型，保证三连下拉始终有选中项。
+  useEffect(() => {
+    if (models.length === 0) return
+    if (selectedId !== undefined && models.some(model => model.id === selectedId)) return
+    const firstMode = availableSubModes(models, category)[0] ?? subMode
+    const first = modelsInMode(models, category, firstMode)[0]
+    if (first !== undefined) {
+      onSelect(first.id)
+      if (subMode !== firstMode) setSubMode(firstMode)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [models, category, subMode, selectedId, onSelect])
 
   const modeModels = modelsInMode(models, category, subMode)
   const modeOptions = availableSubModes(models, category)
@@ -113,15 +128,20 @@ export function ModelSelector({
 
       <Select value={selectedId} onValueChange={handleModelSelect}>
         <SelectTrigger className="w-full">
-          <SelectValue placeholder="选择模型" />
+          <SelectValue placeholder="选择模型">
+            {selected !== undefined ? <span className="truncate">{modelNameZh(selected)}</span> : undefined}
+          </SelectValue>
         </SelectTrigger>
         <SelectContent>
           {modeModels.length === 0 ? (
             <div className="px-2 py-3 text-center text-xs text-muted-foreground">该子模式暂无可用模型</div>
           ) : (
             modeModels.map(model => (
-              <SelectItem key={model.id} value={model.id}>
-                {model.displayName}
+              <SelectItem key={model.id} value={model.id} className="py-1.5 pr-9">
+                <span className="flex min-w-0 flex-col leading-tight">
+                  <span className="truncate text-sm">{modelNameZh(model)}</span>
+                  <span className="truncate text-[11px] text-muted-foreground">{model.displayName}</span>
+                </span>
               </SelectItem>
             ))
           )}
