@@ -97,7 +97,7 @@ export function StatsPage() {
                   <Area
                     key={modelId}
                     dataKey={modelId}
-                    type="natural"
+                    type="monotone"
                     stackId="1"
                     fill={`var(--color-${modelId})`}
                     fillOpacity={0.6}
@@ -106,7 +106,7 @@ export function StatsPage() {
                 ))}
                 <Area
                   dataKey={OTHER_KEY}
-                  type="natural"
+                  type="monotone"
                   stackId="1"
                   fill={`var(--color-${OTHER_KEY})`}
                   fillOpacity={0.6}
@@ -135,7 +135,7 @@ export function StatsPage() {
                   <stop offset="95%" stopColor="var(--color-count)" stopOpacity={0.1} />
                 </linearGradient>
               </defs>
-              <Area dataKey="count" type="natural" fill="url(#fill-registrations)" stroke="var(--color-count)" />
+              <Area dataKey="count" type="monotone" fill="url(#fill-registrations)" stroke="var(--color-count)" />
             </AreaChart>
           </ChartContainer>
         </CardContent>

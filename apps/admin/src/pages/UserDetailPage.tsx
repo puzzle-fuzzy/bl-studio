@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, Gift, Loader2 } from 'lucide-react'
+import { ArrowLeft, Gift, Loader2, Minus } from 'lucide-react'
 import type { AdminUser, AssetItem, CreditBalance } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
@@ -31,6 +31,11 @@ export function UserDetailPage() {
   const [grantReason, setGrantReason] = useState('')
   const [grantBusy, setGrantBusy] = useState(false)
   const [grantError, setGrantError] = useState<string | null>(null)
+  const [deductOpen, setDeductOpen] = useState(false)
+  const [deductCents, setDeductCents] = useState('')
+  const [deductReason, setDeductReason] = useState('')
+  const [deductBusy, setDeductBusy] = useState(false)
+  const [deductError, setDeductError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -90,6 +95,32 @@ export function UserDetailPage() {
       setGrantError(userErrorMessage(err))
     } finally {
       setGrantBusy(false)
+    }
+  }
+
+  const handleDeduct = async () => {
+    const amountCents = Number(deductCents)
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      setDeductError('请输入有效的积分数量')
+      return
+    }
+    setDeductBusy(true)
+    setDeductError(null)
+    try {
+      // 扣除 = 负向调整；余额不足时服务端会返回 POINTS_INSUFFICIENT。
+      const result = await apiClient.adminAdjustPoints(userId, {
+        amountCents: -amountCents,
+        reason: deductReason.trim() || '管理员扣除',
+        idempotencyKey: crypto.randomUUID(),
+      })
+      setBalance(result.balance)
+      setDeductOpen(false)
+      setDeductCents('')
+      setDeductReason('')
+    } catch (err) {
+      setDeductError(userErrorMessage(err))
+    } finally {
+      setDeductBusy(false)
     }
   }
 
@@ -161,10 +192,16 @@ export function UserDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" onClick={() => setGrantOpen(true)}>
-              <Gift data-icon />
-              赠送积分
-            </Button>
+            <div className="flex gap-2">
+              <Button variant="outline" onClick={() => setGrantOpen(true)}>
+                <Gift data-icon />
+                赠送积分
+              </Button>
+              <Button variant="outline" onClick={() => setDeductOpen(true)}>
+                <Minus data-icon />
+                扣除积分
+              </Button>
+            </div>
           </div>
 
           <div className="grid grid-cols-3 gap-4 border-t pt-4 text-center">
@@ -202,7 +239,7 @@ export function UserDetailPage() {
                   className="group relative aspect-square overflow-hidden rounded-md border"
                   title={asset.fileName ?? asset.id}
                 >
-                  {asset.kind === 'image' && (asset.thumbnailUrl ?? asset.url) ? (
+                  {(asset.kind === 'image' || asset.kind === 'video') && (asset.thumbnailUrl ?? asset.url) ? (
                     <img
                       src={resolveApiUrl(asset.thumbnailUrl ?? asset.url)}
                       alt={asset.fileName ?? asset.id}
@@ -241,6 +278,31 @@ export function UserDetailPage() {
             <Button variant="outline" onClick={() => setGrantOpen(false)}>取消</Button>
             <Button onClick={() => void handleGrant()} disabled={grantBusy}>
               {grantBusy ? <Loader2 className="size-4 animate-spin" /> : '赠送'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={deductOpen} onOpenChange={setDeductOpen}>
+        <DialogContent className="sm:max-w-sm">
+          <DialogHeader>
+            <DialogTitle>扣除积分</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="deduct-amount">扣除数量（1 元 = 100 积分，不能超过可用积分）</Label>
+              <Input id="deduct-amount" type="number" min={1} step={1} value={deductCents} onChange={event => setDeductCents(event.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="deduct-reason">备注（可选）</Label>
+              <Input id="deduct-reason" value={deductReason} onChange={event => setDeductReason(event.target.value)} />
+            </div>
+            {deductError !== null && <p className="text-sm text-destructive">{deductError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeductOpen(false)}>取消</Button>
+            <Button variant="destructive" onClick={() => void handleDeduct()} disabled={deductBusy}>
+              {deductBusy ? <Loader2 className="size-4 animate-spin" /> : '扣除'}
             </Button>
           </DialogFooter>
         </DialogContent>

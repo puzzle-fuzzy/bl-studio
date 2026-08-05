@@ -3,8 +3,8 @@ import { Check, Copy } from 'lucide-react'
 import type { GenerationRecord } from '@bailian-studio/api-client'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
+import { PromptSegments } from '@/components/generations/PromptSegments'
 import { formatCents } from '@/lib/money'
-import { resolveApiUrl } from '@/lib/api'
 import { parsePromptReferences } from '@/lib/reference-format'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
@@ -157,28 +157,7 @@ export function GenerationListItem({
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
           <span className="min-w-0 truncate">
             {prompt !== '' ? (
-              segments.map((segment, index) => {
-                if (segment.type === 'text') {
-                  return <span key={index}>{segment.text}</span>
-                }
-                const assetId =
-                  segment.index !== undefined ? referencesPool[segment.index - 1] : undefined
-                const asset = assetId !== undefined ? refAssets[assetId] : undefined
-                const imgSrc = asset?.thumbnailUrl ?? asset?.url ?? undefined
-                if (imgSrc !== undefined && imgSrc !== '') {
-                  return (
-                    <img
-                      key={index}
-                      src={resolveApiUrl(imgSrc)}
-                      alt={`参考图 ${segment.index ?? ''}`}
-                      loading="lazy"
-                      className="inline-block size-4 rounded-sm object-cover align-middle ring-1 ring-border"
-                    />
-                  )
-                }
-                // 资产未就绪/缺失时保留原始标记文本，加载完成后自动替换为缩略图。
-                return <span key={index}>{segment.raw}</span>
-              })
+              <PromptSegments prompt={prompt} format={format} pool={referencesPool} refAssets={refAssets} />
             ) : (
               '(无提示词)'
             )}

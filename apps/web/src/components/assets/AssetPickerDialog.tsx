@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Check, Image as ImageIcon, Link2, Loader2, Upload, X } from 'lucide-react'
+import { Check, Image as ImageIcon, Link2, Loader2, Upload } from 'lucide-react'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,7 +16,6 @@ import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { assetQueryKey, useAssetsStore, type AssetQuery } from '@/stores/assets-store'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
-import { kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 /**
@@ -203,18 +202,6 @@ export function AssetPickerDialog({
           </TabsContent>
         </Tabs>
 
-        {selected.length > 0 && (
-          <div className="flex flex-wrap gap-2">
-            {selected.map(asset => (
-              <span key={asset.id} className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs">
-                {kindLabel(asset.kind)}
-                <button type="button" onClick={() => toggleAsset(asset)} aria-label="移除">
-                  <X className="size-3" />
-                </button>
-              </span>
-            ))}
-          </div>
-        )}
         <DialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             取消

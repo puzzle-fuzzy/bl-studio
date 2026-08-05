@@ -1,22 +1,25 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban } from 'lucide-react'
+import { ArrowLeft, Check, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
-import type { GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
+import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
+import { PromptSegments } from '@/components/generations/PromptSegments'
 import { useGenerationArtifactsStore } from '@/stores/generation-artifacts-store'
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
+import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
+import { parsePromptReferences } from '@/lib/reference-format'
 import { generationStatusLabel, kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
@@ -398,21 +401,87 @@ function ArtifactCard({
 function ParamsCard({ record }: { record: GenerationRecord }) {
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
-  const params = useMemo(() => {
-    return Object.entries(record.inputParams ?? {}).filter(([key]) => !key.startsWith('_'))
-  }, [record.inputParams])
+  const refAssets = useReferenceAssetsStore(state => state.assets)
+  const getRefAssets = useReferenceAssetsStore(state => state.getAssets)
 
-  useEffect(() => {
-    void loadModels()
-  }, [loadModels])
+  const model = selectModelById(models, record.modelId)
+  const format = model?.referenceFormat
+  const assetRefs = record.assetRefs ?? {}
+  const inputParams = record.inputParams ?? {}
 
   // 英文参数名 → manifest 中文 label；未命中的回退显示原 key。
-  const model = selectModelById(models, record.modelId)
   const labelMap = useMemo(() => {
     const map = new Map<string, string>()
     for (const parameter of model?.parameters ?? []) map.set(parameter.name, parameter.label)
     return map
   }, [model])
+
+  // assetRefs → 全部资产 id，拉取到共享参考资产缓存。
+  const refIds = useMemo(() => {
+    const ids: string[] = []
+    for (const list of Object.values(assetRefs)) ids.push(...list)
+    return ids
+  }, [assetRefs])
+
+  useEffect(() => {
+    void loadModels()
+    if (refIds.length > 0) void getRefAssets(refIds)
+  }, [loadModels, getRefAssets, refIds])
+
+  // 提示词标记 → 被引用的参考图序号（references 池下标 N-1）。已内联引用的池条目
+  // 不再单独重复展示（与任务列表一致）。
+  const prompt = typeof inputParams.prompt === 'string' ? inputParams.prompt : ''
+  const referencedIndexes = useMemo(
+    () =>
+      new Set(
+        parsePromptReferences(prompt, format).flatMap(segment =>
+          segment.type === 'image' ? [segment.index ?? -1] : [],
+        ),
+      ),
+    [prompt, format],
+  )
+
+  // 行列表：media 参数（assetRefs）渲染缩略图，其余渲染值；prompt 带内联参考图缩略图。
+  const rows = useMemo(() => {
+    const rows: Array<{ key: string; label: string; kind: 'media' | 'value'; value?: unknown; refIds?: readonly string[] }> = []
+    const shownKeys = new Set<string>()
+    const shownMediaKeys = new Set<string>()
+
+    const shownPoolIds = (ids: readonly string[]): string[] =>
+      ids.filter((_, position) => !referencedIndexes.has(position + 1))
+
+    for (const parameter of model?.parameters ?? []) {
+      if (parameter.type === 'media') {
+        const ids = assetRefs[parameter.name] ?? []
+        const shown = parameter.name === 'references' ? shownPoolIds(ids) : ids
+        if (shown.length > 0) {
+          shownMediaKeys.add(parameter.name)
+          rows.push({ key: parameter.name, label: parameter.label, kind: 'media', refIds: shown })
+        }
+      } else {
+        const value = inputParams[parameter.name]
+        if (value !== undefined) {
+          shownKeys.add(parameter.name)
+          rows.push({ key: parameter.name, label: parameter.label, kind: 'value', value })
+        }
+      }
+    }
+    // 不在目录（历史记录）或目录外的参数：按输入顺序补全。
+    for (const [key, value] of Object.entries(inputParams)) {
+      if (key.startsWith('_') || shownKeys.has(key) || shownMediaKeys.has(key)) continue
+      rows.push({ key, label: labelMap.get(key) ?? key, kind: 'value', value })
+    }
+    for (const [key, ids] of Object.entries(assetRefs)) {
+      if (shownMediaKeys.has(key)) continue
+      if (!Array.isArray(ids) || ids.length === 0) continue
+      const shown = key === 'references' ? shownPoolIds(ids) : ids
+      if (shown.length === 0) continue
+      rows.push({ key, label: labelMap.get(key) ?? key, kind: 'media', refIds: shown })
+    }
+    return rows
+  }, [model, inputParams, assetRefs, labelMap, referencedIndexes])
+
+  const referencesPool = assetRefs.references ?? []
 
   return (
     <Card>
@@ -420,18 +489,55 @@ function ParamsCard({ record }: { record: GenerationRecord }) {
         <CardTitle className="text-base">输入参数</CardTitle>
       </CardHeader>
       <CardContent className="space-y-2">
-        {params.length === 0 ? (
+        {rows.length === 0 ? (
           <p className="text-sm text-muted-foreground">无参数</p>
         ) : (
-          params.map(([key, value]) => (
-            <div key={key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
-              <span className="text-muted-foreground">{labelMap.get(key) ?? key}</span>
-              <span className="min-w-0 break-words">{renderParamValue(value)}</span>
+          rows.map(row => (
+            <div key={row.key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
+              <span className="text-muted-foreground">{row.label}</span>
+              <span className="min-w-0 break-words">
+                {row.kind === 'media' ? (
+                  <RefThumbnails ids={row.refIds ?? []} refAssets={refAssets} />
+                ) : row.key === 'prompt' && typeof row.value === 'string' && row.value !== '' ? (
+                  <PromptSegments prompt={row.value} format={format} pool={referencesPool} refAssets={refAssets} />
+                ) : (
+                  renderParamValue(row.value)
+                )}
+              </span>
             </div>
           ))
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** 参考图缩略图行：按 assetRefs 顺序展示，资产未就绪时先占位。 */
+function RefThumbnails({
+  ids,
+  refAssets,
+}: {
+  ids: readonly string[]
+  refAssets: Record<string, AssetItem>
+}) {
+  return (
+    <div className="flex flex-wrap gap-1">
+      {ids.map(id => {
+        const asset = refAssets[id]
+        const src = asset?.thumbnailUrl ?? asset?.url
+        return src !== undefined ? (
+          <div
+            key={id}
+            title={asset?.fileName ?? asset?.kind}
+            className="size-10 shrink-0 overflow-hidden rounded border bg-muted/30"
+          >
+            <AssetThumbnail kind={asset?.kind ?? 'image'} url={src} />
+          </div>
+        ) : (
+          <div key={id} className="size-10 shrink-0 animate-pulse rounded border bg-muted/30" />
+        )
+      })}
+    </div>
   )
 }
 
@@ -452,16 +558,16 @@ function renderParamValue(value: unknown): React.ReactNode {
 }
 
 function InfoCard({ record }: { record: GenerationRecord }) {
-  const rows: Array<[string, string]> = [
-    ['状态', generationStatusLabel(record.status)],
-    ['模型', record.modelId],
-    ['任务模式', record.providerModel],
-    ['费用预估', formatCents(record.costEstimate)],
-    ['创建时间', new Date(record.createdAt).toLocaleString('zh-CN')],
-    ['幂等键', record.idempotencyKey ?? '—'],
-    ['provider 任务', record.providerTaskId ?? '—'],
-    ['请求 id', record.requestId ?? '—'],
-    ['traceId', record.traceId ?? '—'],
+  const rows: Array<{ key: string; value: string; copyable?: boolean }> = [
+    { key: '状态', value: generationStatusLabel(record.status) },
+    { key: '模型', value: record.modelId },
+    { key: '任务模式', value: record.providerModel },
+    { key: '费用预估', value: formatCents(record.costEstimate) },
+    { key: '创建时间', value: new Date(record.createdAt).toLocaleString('zh-CN') },
+    { key: '幂等键', value: record.idempotencyKey ?? '—', copyable: true },
+    { key: 'provider 任务', value: record.providerTaskId ?? '—', copyable: true },
+    { key: '请求 id', value: record.requestId ?? '—', copyable: true },
+    { key: 'traceId', value: record.traceId ?? '—', copyable: true },
   ]
   return (
     <Card>
@@ -472,15 +578,40 @@ function InfoCard({ record }: { record: GenerationRecord }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-1.5">
-        {rows.map(([key, value]) => (
-          <div key={key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
-            <span className="text-muted-foreground">{key}</span>
-            <span className="min-w-0 truncate" title={value}>
-              {value}
+        {rows.map(row => (
+          <div key={row.key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
+            <span className="text-muted-foreground">{row.key}</span>
+            <span className="flex min-w-0 items-center gap-1">
+              <span className="min-w-0 truncate" title={row.value}>
+                {row.value}
+              </span>
+              {row.copyable === true && row.value !== '—' && row.value !== '' && (
+                <CopyValue value={row.value} label={row.key} />
+              )}
             </span>
           </div>
         ))}
       </CardContent>
     </Card>
+  )
+}
+
+/** 运行信息里的调试标识（幂等键/traceId 等）：一键复制，短暂显示对勾。 */
+function CopyValue({ value, label }: { value: string; label: string }) {
+  const [copied, setCopied] = useState(false)
+  return (
+    <button
+      type="button"
+      aria-label={`复制${label}`}
+      title={`复制${label}`}
+      onClick={() => {
+        void navigator.clipboard?.writeText(value)
+        setCopied(true)
+        setTimeout(() => setCopied(false), 1500)
+      }}
+      className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+    >
+      {copied ? <Check className="size-3 text-primary" /> : <Copy className="size-3" />}
+    </button>
   )
 }
