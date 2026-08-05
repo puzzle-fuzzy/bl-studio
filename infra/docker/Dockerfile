@@ -68,6 +68,7 @@ COPY turbo.json tsconfig.base.json tsconfig.json ./
 COPY apps ./apps
 COPY packages ./packages
 COPY infra/scripts ./infra/scripts
+COPY infra/seed ./infra/seed
 
 # ── runtime：只装生产依赖（不含 devDeps），供 api/worker/migrate ─────────────
 FROM base AS runtime
@@ -101,6 +102,8 @@ RUN pnpm install --prod --frozen-lockfile
 COPY apps ./apps
 COPY packages ./packages
 COPY infra/scripts ./infra/scripts
+# infra/seed 供生产一次性播种（seed-model-costs.ts 的 model-costs.json 源数据）。
+COPY infra/seed ./infra/seed
 
 # Worker 媒体提取与 API 侧上传探测都需要 ffprobe。
 RUN apt-get update \
