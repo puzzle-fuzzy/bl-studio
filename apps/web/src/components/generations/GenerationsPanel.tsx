@@ -38,10 +38,13 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
   const hasLoaded = useGenerationsStore(state => state.hasLoaded)
   const isLoading = useGenerationsStore(state => state.isLoading)
   const load = useGenerationsStore(state => state.load)
+  const loadModels = useModelCatalogStore(state => state.load)
 
   useEffect(() => {
     if (!hasLoaded && !isLoading) void load()
-  }, [hasLoaded, isLoading, load])
+    // 任务行按模型 referenceFormat 解析提示词标记（幂等，页面形态也保证目录就绪）。
+    void loadModels()
+  }, [hasLoaded, isLoading, load, loadModels])
 
   const open = (id: string) => navigate(`/generations/${id}`)
 
@@ -156,7 +159,7 @@ function PageVariant() {
       <div className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden rounded-lg border">
         <List<TaskRowProps>
           rowCount={records.length}
-          rowHeight={80}
+          rowHeight={112}
           rowComponent={TaskRow}
           rowProps={{ records, onOpen: open }}
           overscanCount={6}

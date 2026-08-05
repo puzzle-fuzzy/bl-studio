@@ -21,7 +21,10 @@ export function AssetThumbnail({
   const src = thumbnailUrl ?? url
   const [failed, setFailed] = useState(false)
 
-  if (kind === 'image' && src !== undefined && src !== null && src !== '' && !failed) {
+  // 图片与视频都可渲染位图缩略图：视频的 src 应为 OSS video/snapshot 抽帧图；
+  // 若只有原始视频 URL（缩略图未就绪），<img> 加载失败会回退到 kind 图标。
+  const renderable = src !== undefined && src !== null && src !== '' && !failed
+  if (renderable && (kind === 'image' || kind === 'video')) {
     return (
       <img
         src={resolveApiUrl(src)}

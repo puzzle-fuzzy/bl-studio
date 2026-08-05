@@ -6,6 +6,7 @@ import {
   restorePromptReferences,
   extractReferenceIndexes,
   resolvedPromptLength,
+  parsePromptReferences,
 } from './reference-format'
 
 describe('reference-format', () => {
@@ -40,5 +41,54 @@ describe('reference-format', () => {
     expect(resolvedPromptLength('一只猫 @图1', 'angle-bracket')).toBe(
       '一只猫 <<<image_1>>>'.length,
     )
+  })
+
+  describe('parsePromptReferences', () => {
+    it('splits text and image-bracket markers', () => {
+      expect(parsePromptReferences('缓缓站起身来 [Image 1] 然后转身', 'image-bracket')).toEqual([
+        { type: 'text', text: '缓缓站起身来 ' },
+        { type: 'image', raw: '[Image 1]', index: 1 },
+        { type: 'text', text: ' 然后转身' },
+      ])
+    })
+
+    it('splits angle-bracket and chinese markers', () => {
+      expect(parsePromptReferences('主角 <<<image_2>>> 走路', 'angle-bracket')).toEqual([
+        { type: 'text', text: '主角 ' },
+        { type: 'image', raw: '<<<image_2>>>', index: 2 },
+        { type: 'text', text: ' 走路' },
+      ])
+      expect(parsePromptReferences('图1 从图2 身后走出', 'chinese')).toEqual([
+        { type: 'image', raw: '图1', index: 1 },
+        { type: 'text', text: ' 从' },
+        { type: 'image', raw: '图2', index: 2 },
+        { type: 'text', text: ' 身后走出' },
+      ])
+    })
+
+    it('unknown format still parses unambiguous markers', () => {
+      expect(parsePromptReferences('人物 [Image 3] 奔跑', undefined)).toEqual([
+        { type: 'text', text: '人物 ' },
+        { type: 'image', raw: '[Image 3]', index: 3 },
+        { type: 'text', text: ' 奔跑' },
+      ])
+      expect(parsePromptReferences('猫 <<<image_1>>> 跳', undefined)).toEqual([
+        { type: 'text', text: '猫 ' },
+        { type: 'image', raw: '<<<image_1>>>', index: 1 },
+        { type: 'text', text: ' 跳' },
+      ])
+    })
+
+    it('unknown format does not treat 图N as a reference', () => {
+      expect(parsePromptReferences('参考图1 的样式', undefined)).toEqual([
+        { type: 'text', text: '参考图1 的样式' },
+      ])
+    })
+
+    it('returns a single text segment for prompt without markers', () => {
+      expect(parsePromptReferences('一只奔跑的猫', 'image-bracket')).toEqual([
+        { type: 'text', text: '一只奔跑的猫' },
+      ])
+    })
   })
 })

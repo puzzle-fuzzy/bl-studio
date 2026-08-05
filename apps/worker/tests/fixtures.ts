@@ -17,6 +17,7 @@ import type {
   FailAssetThumbnailInput,
   FinishProviderRequestInput,
   GenerationArtifact,
+  GenerationCallStats,
   GenerationEvent,
   GenerationInputAsset,
   GenerationRecord,
@@ -137,6 +138,10 @@ export class FakeRepository implements GenerationRepository {
   getGenerationInputAssets(recordId: string): Promise<GenerationInputAsset[]> {
     this.generationInputAssetReads.push(recordId)
     return Promise.resolve([...(this.generationInputAssets.get(recordId) ?? [])])
+  }
+
+  countGenerationCallsBetween(_since: string, _until: string): Promise<GenerationCallStats> {
+    return Promise.resolve({ total: 0, byModel: [], byHour: [] })
   }
 
   startProviderRequest(input: StartProviderRequestInput): Promise<ProviderRequestAudit> {

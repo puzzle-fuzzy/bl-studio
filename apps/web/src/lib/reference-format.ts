@@ -74,3 +74,43 @@ export function extractReferenceIndexes(prompt: string): number[] {
   }
   return indexes
 }
+
+export interface PromptSegment {
+  type: 'text' | 'image'
+  /** text 段的内容。 */
+  text?: string
+  /** image 段：provider 语法原文（资产未就绪时按原样回退展示）。 */
+  raw?: string
+  /** image 段：1-based 参考图序号（对应 references 池下标 index-1）。 */
+  index?: number
+}
+
+/**
+ * 把 provider 语法提示词拆成「文本 + 参考图」段，供任务列表把 [Image N] 等标记
+ * 渲染成内联缩略图。format 已知时按该格式解析；模型未知（历史记录不在目录中）
+ * 时只识别无歧义的方括号/尖括号两种语法，避免把自然文本里的「图N」误判为引用。
+ */
+export function parsePromptReferences(
+  prompt: string,
+  format: ReferenceFormat | undefined,
+): PromptSegment[] {
+  const pattern =
+    format === 'angle-bracket' ? /<<<image_(\d+)>>>/g
+      : format === 'image-bracket' ? /\[Image (\d+)\]/g
+        : format === 'chinese' ? /图(\d+)/g
+          : /\[Image (\d+)\]|<<<image_(\d+)>>>/g
+  const segments: PromptSegment[] = []
+  let cursor = 0
+  for (const match of prompt.matchAll(pattern)) {
+    if (match.index > cursor) {
+      segments.push({ type: 'text', text: prompt.slice(cursor, match.index) })
+    }
+    const rawIndex = [match[1], match[2], match[3]].find(value => value !== undefined)
+    segments.push({ type: 'image', raw: match[0], index: Number(rawIndex) })
+    cursor = match.index + match[0].length
+  }
+  if (cursor < prompt.length) {
+    segments.push({ type: 'text', text: prompt.slice(cursor) })
+  }
+  return segments
+}

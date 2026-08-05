@@ -1,15 +1,16 @@
-import { useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Check, Copy } from 'lucide-react'
 import type { GenerationRecord } from '@bailian-studio/api-client'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { formatCents } from '@/lib/money'
+import { resolveApiUrl } from '@/lib/api'
+import { parsePromptReferences } from '@/lib/reference-format'
+import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
+import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { cn } from '@/lib/utils'
 
-/**
- * 生成任务行：缩略图（多产物扇形堆叠）+ 状态 + 模型 + 费用 + 提示词 + 复制。
- * 无卡片边框（列表用分割线划分，见 GenerationsPanel）。
- */
+/** 一条生成任务：结果缩略图（多产物扇形堆叠）+ 状态 + 模型 + 费用 + 参考图 + 提示词 + 复制。 */
 export function GenerationListItem({
   record,
   onOpen,
@@ -22,7 +23,59 @@ export function GenerationListItem({
   const mediaArtifacts = (record.outputResult?.artifacts ?? []).filter(artifact => artifact.kind !== 'text')
   const stack = mediaArtifacts.slice(0, 3)
   const prompt = typeof record.inputParams?.prompt === 'string' ? record.inputParams.prompt : ''
+  const assetRefs = record.assetRefs ?? {}
   const [copied, setCopied] = useState(false)
+
+  const models = useModelCatalogStore(state => state.models)
+  const refAssets = useReferenceAssetsStore(state => state.assets)
+  const getRefAssets = useReferenceAssetsStore(state => state.getAssets)
+
+  // 模型已知时用其 referenceFormat 解析标记；未知（历史记录不在目录）走无歧义回退解析。
+  const format = useMemo(() => {
+    const model = selectModelById(models, record.modelId)
+    return model?.referenceFormat
+  }, [models, record.modelId])
+
+  // assetRefs → 扁平化的参考条目（按参数名 + 位置），供上方参考图行与内联标记取图。
+  const refEntries = useMemo(() => {
+    const entries: Array<{ id: string; parameterName: string; position: number }> = []
+    for (const [parameterName, ids] of Object.entries(assetRefs)) {
+      ids.forEach((id, position) => entries.push({ id, parameterName, position }))
+    }
+    return entries
+  }, [assetRefs])
+
+  const refIds = useMemo(() => refEntries.map(entry => entry.id), [refEntries])
+
+  useEffect(() => {
+    if (refIds.length === 0) return
+    void getRefAssets(refIds)
+  }, [getRefAssets, refIds])
+
+  // 提示词拆成「文本 + 参考图」段：标记序号 N 对应 references 池下标 N-1。
+  const segments = useMemo(() => parsePromptReferences(prompt, format), [prompt, format])
+  const referencedIndexes = useMemo(
+    () => new Set(segments.flatMap(segment => (segment.type === 'image' ? [segment.index ?? -1] : []))),
+    [segments],
+  )
+  const referencesPool = assetRefs.references ?? []
+
+  // 单独传输的参考图（不在提示词标记内）：非 references 参数的媒体，或 references
+  // 池中未被标记引用的条目。放在提示词上方单独展示。
+  const separateRefs = useMemo(
+    () =>
+      refEntries.filter(entry => {
+        if (entry.parameterName !== 'references') return true
+        return !referencedIndexes.has(entry.position + 1)
+      }),
+    [refEntries, referencedIndexes],
+  )
+
+  const assetImg = (entry: { id: string }): string | undefined => {
+    const asset = refAssets[entry.id]
+    if (asset === undefined) return undefined
+    return asset.thumbnailUrl ?? asset.url ?? undefined
+  }
 
   const handleCopyPrompt = (event: React.MouseEvent) => {
     event.stopPropagation()
@@ -81,8 +134,55 @@ export function GenerationListItem({
           <span aria-hidden>·</span>
           <span className="shrink-0 text-xs text-muted-foreground">{formatCents(record.costEstimate)}</span>
         </div>
+
+        {separateRefs.length > 0 && (
+          <div className="flex items-center gap-1">
+            {separateRefs.slice(0, 3).map(entry => {
+              const imgSrc = assetImg(entry)
+              const asset = refAssets[entry.id]
+              if (imgSrc === undefined) return null
+              return (
+                <div
+                  key={entry.id}
+                  title={asset?.fileName ?? asset?.kind}
+                  className="size-6 shrink-0 overflow-hidden rounded border bg-muted/30"
+                >
+                  <AssetThumbnail kind={asset?.kind ?? 'image'} url={imgSrc} />
+                </div>
+              )
+            })}
+          </div>
+        )}
+
         <div className="flex items-center gap-1 text-xs text-muted-foreground">
-          <span className="min-w-0 truncate">{prompt !== '' ? prompt : '(无提示词)'}</span>
+          <span className="min-w-0 truncate">
+            {prompt !== '' ? (
+              segments.map((segment, index) => {
+                if (segment.type === 'text') {
+                  return <span key={index}>{segment.text}</span>
+                }
+                const assetId =
+                  segment.index !== undefined ? referencesPool[segment.index - 1] : undefined
+                const asset = assetId !== undefined ? refAssets[assetId] : undefined
+                const imgSrc = asset?.thumbnailUrl ?? asset?.url ?? undefined
+                if (imgSrc !== undefined && imgSrc !== '') {
+                  return (
+                    <img
+                      key={index}
+                      src={resolveApiUrl(imgSrc)}
+                      alt={`参考图 ${segment.index ?? ''}`}
+                      loading="lazy"
+                      className="inline-block size-4 rounded-sm object-cover align-middle ring-1 ring-border"
+                    />
+                  )
+                }
+                // 资产未就绪/缺失时保留原始标记文本，加载完成后自动替换为缩略图。
+                return <span key={index}>{segment.raw}</span>
+              })
+            ) : (
+              '(无提示词)'
+            )}
+          </span>
           {prompt !== '' && (
             <span
               role="button"
