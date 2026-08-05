@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Grid } from 'react-window'
-import { Download, Loader2, X } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
+import { MediaLightbox, isLightboxKind } from '@/components/shared/MediaLightbox'
 import { assetQueryKey, useAssetsStore, type AssetQuery } from '@/stores/assets-store'
 import { usePendingThumbnailRefresh, hasPendingThumbnails } from '@/hooks/use-thumbnail-refresh'
 import { kindLabel, sourceLabel } from '@/lib/labels'
@@ -18,6 +19,7 @@ const SOURCES = ['upload', 'link', 'generation', 'derived'] as const
 export function LibraryPage() {
   const [kind, setKind] = useState<string>('all')
   const [source, setSource] = useState<string>('all')
+  const [layout, setLayout] = useState<'grid' | 'timeline'>('grid')
   const query: AssetQuery = useMemo(() => {
     const q: AssetQuery = {}
     if (kind !== 'all') q.kind = kind
@@ -29,9 +31,8 @@ export function LibraryPage() {
   const state = useAssetsStore(store => store.queries[queryKey])
   const load = useAssetsStore(store => store.load)
   const loadMore = useAssetsStore(store => store.loadMore)
-  const getFreshAsset = useAssetsStore(store => store.getFreshAsset)
 
-  const [preview, setPreview] = useState<AssetItem | null>(null)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const { ref, size } = useContainerSize<HTMLDivElement>()
 
   useEffect(() => {
@@ -50,7 +51,16 @@ export function LibraryPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-2xl font-semibold">作品库</h1>
+        <h1 className="mr-auto text-2xl font-semibold">资产</h1>
+        <Select value={layout} onValueChange={value => setLayout(value as 'grid' | 'timeline')}>
+          <SelectTrigger className="w-28">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="grid">网格布局</SelectItem>
+            <SelectItem value="timeline">时间线</SelectItem>
+          </SelectContent>
+        </Select>
         <Select value={kind} onValueChange={setKind}>
           <SelectTrigger className="w-28">
             <SelectValue />
@@ -85,25 +95,37 @@ export function LibraryPage() {
         )}
       </div>
 
-      <div ref={ref} className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden">
-        {size.width > 0 && items.length > 0 && (
-          <Grid<AssetCellProps>
-            columnCount={columns}
-            columnWidth={columnWidth}
-            rowCount={rowCount}
-            rowHeight={rowHeight}
-            cellComponent={AssetCell}
-            cellProps={{ items, columns, onPreview: setPreview }}
-            overscanCount={4}
-            className="h-full"
-          />
-        )}
-        {items.length === 0 && (
-          <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
-            {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
-          </p>
-        )}
-      </div>
+      {layout === 'grid' ? (
+        <div ref={ref} className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden">
+          {size.width > 0 && items.length > 0 && (
+            <Grid<AssetCellProps>
+              columnCount={columns}
+              columnWidth={columnWidth}
+              rowCount={rowCount}
+              rowHeight={rowHeight}
+              cellComponent={AssetCell}
+              cellProps={{ items, columns, onPreview: setPreviewIndex }}
+              overscanCount={4}
+              className="h-full"
+            />
+          )}
+          {items.length === 0 && (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="h-[calc(100vh-16rem)] min-h-64 overflow-y-auto pr-1">
+          {items.length === 0 ? (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
+            </p>
+          ) : (
+            <TimelineView items={items} onPreview={setPreviewIndex} />
+          )}
+        </div>
+      )}
 
       {state?.nextCursor !== undefined && (
         <div className="flex justify-center">
@@ -113,11 +135,24 @@ export function LibraryPage() {
         </div>
       )}
 
-      {preview !== null && (
-        <AssetPreviewDialog
-          asset={preview}
-          onClose={() => setPreview(null)}
-          onRefresh={() => void getFreshAsset(preview.id)}
+      {previewIndex !== null && items[previewIndex] !== undefined && (
+        <MediaLightbox
+          items={items.map(asset => ({
+            key: asset.id,
+            kind: isLightboxKind(asset.kind) ? asset.kind : 'image',
+            url: asset.url ?? asset.downloadUrl,
+            thumbnailUrl: asset.thumbnailUrl,
+            fileName: asset.fileName ?? `${kindLabel(asset.kind)}素材`,
+            text: asset.text,
+          }))}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          downloadUrl={
+            (items[previewIndex]?.url ?? items[previewIndex]?.downloadUrl) !== undefined
+              ? resolveApiUrl(items[previewIndex].url ?? items[previewIndex].downloadUrl ?? '')
+              : undefined
+          }
         />
       )}
     </div>
@@ -127,7 +162,7 @@ export function LibraryPage() {
 interface AssetCellProps {
   items: readonly AssetItem[]
   columns: number
-  onPreview: (asset: AssetItem) => void
+  onPreview: (index: number) => void
 }
 
 function AssetCell({
@@ -149,7 +184,7 @@ function AssetCell({
     <div style={style} className="p-1.5">
       <button
         type="button"
-        onClick={() => onPreview(item)}
+        onClick={() => onPreview(index)}
         className="group relative block aspect-square w-full overflow-hidden rounded-lg border hover:border-primary/50"
       >
         <AssetThumbnail kind={item.kind} url={item.url} thumbnailUrl={item.thumbnailUrl} />
@@ -170,113 +205,84 @@ export function columnsForWidth(width: number): number {
   return 5
 }
 
-function AssetPreviewDialog({
-  asset,
-  onClose,
-  onRefresh,
-}: {
-  asset: AssetItem
-  onClose: () => void
-  onRefresh: () => void
-}) {
-  const [imgFailed, setImgFailed] = useState(false)
-  const src = asset.url ?? asset.downloadUrl
-  const url = src !== undefined ? resolveApiUrl(src) : undefined
+/** 时间线分桶：今天 / 近三天 / 本周 / 本月 / 以往（按 createdAt）。 */
+function timelineBuckets(items: readonly AssetItem[]): Array<{ label: string; items: AssetItem[] }> {
+  const now = new Date()
+  const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const startOfThreeDays = new Date(startOfDay.getTime() - 2 * 86_400_000)
+  // 本周从周一开始。
+  const startOfWeek = new Date(startOfDay.getTime() - ((now.getDay() + 6) % 7) * 86_400_000)
+  const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
 
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
+  const buckets: { today: AssetItem[]; days3: AssetItem[]; week: AssetItem[]; month: AssetItem[]; older: AssetItem[] } = {
+    today: [],
+    days3: [],
+    week: [],
+    month: [],
+    older: [],
+  }
+  for (const item of items) {
+    const created = new Date(item.createdAt)
+    if (Number.isNaN(created.getTime())) {
+      buckets.older.push(item)
+      continue
     }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+    if (created >= startOfDay) buckets.today.push(item)
+    else if (created >= startOfThreeDays) buckets.days3.push(item)
+    else if (created >= startOfWeek) buckets.week.push(item)
+    else if (created >= startOfMonth) buckets.month.push(item)
+    else buckets.older.push(item)
+  }
+  const order: Array<[keyof typeof buckets, string]> = [
+    ['today', '今天'],
+    ['days3', '近三天'],
+    ['week', '本周'],
+    ['month', '本月'],
+    ['older', '以往'],
+  ]
+  return order
+    .flatMap(([key, label]) => (buckets[key].length > 0 ? [{ label, items: buckets[key] }] : []))
+}
 
+/** 时间线视图：按 今天/近三天/本周/本月/以往 分组，组间分割线；item 保持方形与网格一致。 */
+function TimelineView({
+  items,
+  onPreview,
+}: {
+  items: readonly AssetItem[]
+  onPreview: (index: number) => void
+}) {
+  const buckets = timelineBuckets(items)
   return (
-    // 全屏查看：黑色遮罩，点击遮罩或 Esc 关闭；底部带下载按钮。
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-6"
-      onClick={onClose}
-    >
-      <div className="mb-3 flex max-w-full items-center gap-2 text-sm text-white/90">
-        <span className="max-w-64 truncate">{asset.fileName ?? `${kindLabel(asset.kind)}素材`}</span>
-        <span className="shrink-0 text-white/60">
-          {kindLabel(asset.kind)} · {sourceLabel(asset.source)}
-        </span>
-      </div>
-
-      <div
-        className="flex max-h-[65vh] max-w-full items-center justify-center"
-        onClick={event => event.stopPropagation()}
-      >
-        {asset.kind === 'image' && url !== undefined && !imgFailed && (
-          <img
-            src={url}
-            alt=""
-            className="max-h-[65vh] max-w-full object-contain"
-            onError={() => setImgFailed(true)}
-          />
-        )}
-        {asset.kind === 'video' && url !== undefined && (
-          <video src={url} controls autoPlay className="max-h-[65vh] max-w-full" />
-        )}
-        {asset.kind === 'audio' && url !== undefined && (
-          <audio src={url} controls autoPlay className="w-full max-w-lg" />
-        )}
-        {asset.kind === 'text' && (
-          <p className="max-h-[65vh] max-w-2xl overflow-y-auto whitespace-pre-wrap text-sm text-white/90">
-            {asset.text ?? (url !== undefined ? <TextFetchFallback url={url} /> : '(空文本)')}
-          </p>
-        )}
-        {imgFailed && (
-          <button type="button" className="text-sm text-white/90 underline" onClick={onRefresh}>
-            图片加载失败，点击刷新
-          </button>
-        )}
-      </div>
-
-      {url !== undefined && (
-        <a
-          href={url}
-          target="_blank"
-          rel="noreferrer"
-          download
-          onClick={event => event.stopPropagation()}
-          className="mt-4 inline-flex items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm text-white/90 hover:bg-white/20"
-        >
-          <Download className="size-4" />
-          下载
-        </a>
-      )}
-
-      <button
-        type="button"
-        aria-label="关闭"
-        onClick={onClose}
-        className="absolute top-4 right-4 flex size-9 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
-      >
-        <X className="size-5" />
-      </button>
+    <div className="space-y-6">
+      {buckets.map(bucket => (
+        <div key={bucket.label}>
+          <div className="mb-2 flex items-center gap-2">
+            <span className="shrink-0 text-sm font-medium">{bucket.label}</span>
+            <span className="shrink-0 text-xs text-muted-foreground">{bucket.items.length} 个</span>
+            <div className="h-px flex-1 bg-border" />
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {bucket.items.map(item => {
+              const index = items.findIndex(candidate => candidate.id === item.id)
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => onPreview(index)}
+                  className="group relative block aspect-square w-24 overflow-hidden rounded-lg border hover:border-primary/50"
+                >
+                  <AssetThumbnail kind={item.kind} url={item.url} thumbnailUrl={item.thumbnailUrl} />
+                  <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1 py-0.5 text-[10px] text-foreground">
+                    {kindLabel(item.kind)}
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
 
-function TextFetchFallback({ url }: { url: string }) {
-  const [text, setText] = useState<string | null>(null)
-  useEffect(() => {
-    let cancelled = false
-    fetch(resolveApiUrl(url))
-      .then(response => (response.ok ? response.text() : ''))
-      .then(body => {
-        if (!cancelled) setText(body)
-      })
-      .catch(() => {
-        if (!cancelled) setText('(无法读取文本内容)')
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [url])
-  return <>{text ?? '加载中…'}</>
-}

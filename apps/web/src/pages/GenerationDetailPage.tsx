@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban, X } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban } from 'lucide-react'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import type { GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -16,7 +17,7 @@ import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
-import { generationStatusLabel } from '@/lib/labels'
+import { generationStatusLabel, kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 /** 生成详情页：成品 + 输入参数 + 操作（取消/重跑/分享/移除）+ 诊断。 */
@@ -294,13 +295,22 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ArtifactsSection({ recordId }: { recordId: string }) {
   const entry = useGenerationArtifactsStore(state => state.entries[recordId])
   const load = useGenerationArtifactsStore(state => state.load)
-  const [preview, setPreview] = useState<GenerationArtifact | null>(null)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   useEffect(() => {
     void load(recordId)
   }, [recordId, load])
 
   const items = entry?.items ?? []
+
+  const lightboxItems: LightboxMedia[] = items.map(artifact => ({
+    key: artifact.id,
+    kind: isLightboxKind(artifact.kind) ? artifact.kind : 'image',
+    url: artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl,
+    thumbnailUrl: artifact.thumbnailUrl,
+    fileName: `${kindLabel(artifact.kind)}产物`,
+    text: artifact.text,
+  }))
 
   return (
     <>
@@ -315,14 +325,21 @@ function ArtifactsSection({ recordId }: { recordId: string }) {
             </p>
           ) : (
             <div className="grid gap-3 sm:grid-cols-2">
-              {items.map(artifact => (
-                <ArtifactCard key={artifact.id} artifact={artifact} onPreview={setPreview} />
+              {items.map((artifact, index) => (
+                <ArtifactCard key={artifact.id} artifact={artifact} onPreview={() => setPreviewIndex(index)} />
               ))}
             </div>
           )}
         </CardContent>
       </Card>
-      {preview !== null && <MediaLightbox artifact={preview} onClose={() => setPreview(null)} />}
+      {previewIndex !== null && (
+        <MediaLightbox
+          items={lightboxItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+        />
+      )}
     </>
   )
 }
@@ -332,7 +349,7 @@ function ArtifactCard({
   onPreview,
 }: {
   artifact: GenerationArtifact
-  onPreview: (artifact: GenerationArtifact) => void
+  onPreview: () => void
 }) {
   const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
   if (artifact.kind === 'text') {
@@ -349,7 +366,7 @@ function ArtifactCard({
           type="button"
           className="block size-full cursor-zoom-in"
           aria-label="全屏查看"
-          onClick={() => onPreview(artifact)}
+          onClick={onPreview}
         >
           <img src={resolveApiUrl(src)} alt="" className="size-full object-cover" loading="lazy" />
         </button>
@@ -358,7 +375,7 @@ function ArtifactCard({
           type="button"
           className="block size-full cursor-zoom-in"
           aria-label="全屏播放"
-          onClick={() => onPreview(artifact)}
+          onClick={onPreview}
         >
           <video src={resolveApiUrl(src)} className="size-full object-cover" muted playsInline preload="metadata" />
         </button>
@@ -374,54 +391,6 @@ function ArtifactCard({
       >
         <ExternalLink className="size-3.5" />
       </a>
-    </div>
-  )
-}
-
-/** 全屏查看图片/视频：黑色遮罩，点击遮罩或 Esc 关闭。 */
-function MediaLightbox({ artifact, onClose }: { artifact: GenerationArtifact; onClose: () => void }) {
-  const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
-  const url = resolveApiUrl(src ?? '')
-
-  useEffect(() => {
-    const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
-      onClick={onClose}
-    >
-      {artifact.kind === 'image' ? (
-        <img
-          src={url}
-          alt="全屏预览"
-          className="max-h-full max-w-full object-contain"
-          onClick={event => event.stopPropagation()}
-        />
-      ) : (
-        <video
-          src={url}
-          controls
-          autoPlay
-          className="max-h-full max-w-full"
-          onClick={event => event.stopPropagation()}
-        />
-      )}
-      <button
-        type="button"
-        aria-label="关闭"
-        onClick={onClose}
-        className="absolute top-4 right-4 flex size-9 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
-      >
-        <X className="size-5" />
-      </button>
     </div>
   )
 }
@@ -477,6 +446,7 @@ function renderParamValue(value: unknown): React.ReactNode {
     }
     return <pre className="text-xs">{JSON.stringify(value)}</pre>
   }
+  if (typeof value === 'boolean') return value ? '是' : '否'
   if (value === null || value === undefined) return '(空)'
   return String(value)
 }

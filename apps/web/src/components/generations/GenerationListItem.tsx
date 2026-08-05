@@ -52,14 +52,14 @@ export function GenerationListItem({
           )}
         </div>
       ) : (
-        // 多产物：底部对齐的扇形展开缩略图，hover 整体微放大。
-        <div className="relative h-12 w-16 shrink-0 transition-transform duration-300 group-hover:scale-110">
+        // 多产物：底部对齐的扇形缩略图；hover 时 --fan 放大 → 扇形微微展开。
+        <div className="relative h-12 w-16 shrink-0">
           {stack.map((artifact, index) => (
             <div
               key={index}
-              className="absolute bottom-0 left-1/2 size-11 origin-bottom overflow-hidden rounded-md border bg-muted/30 shadow-sm"
+              className="absolute bottom-0 left-1/2 size-11 origin-bottom overflow-hidden rounded-md border bg-muted/30 shadow-sm transition-transform duration-300 group-hover:[--fan:1.6]"
               style={{
-                transform: `translateX(-50%) rotate(${(index - (stack.length - 1) / 2) * 12}deg)`,
+                transform: `translateX(-50%) rotate(calc(${(index - (stack.length - 1) / 2) * 12}deg * var(--fan, 1)))`,
                 zIndex: index,
               }}
             >
