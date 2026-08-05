@@ -16,7 +16,9 @@ if (databaseUrl === undefined || databaseUrl.length === 0) {
   throw new Error('DATABASE_URL is required for model costs seeding')
 }
 
-const defaults = seedCosts as Record<string, number>
+// JSON 含 `_comment` 说明键，与 `Record<string, number>` 不兼容，经 unknown 中转；
+// 下方循环按 `_` 前缀跳过说明键，只处理模型成本数字。
+const defaults = seedCosts as unknown as Record<string, number>
 
 const sql = postgres(databaseUrl, { max: 1 })
 try {

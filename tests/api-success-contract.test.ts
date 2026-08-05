@@ -93,6 +93,7 @@ const contractAuthService: AuthService = {
     emailVerifiedAt: CONTRACT_USER.emailVerifiedAt,
     createdAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
+    bannedAt: CONTRACT_USER.bannedAt,
   }),
   listActiveUsers: async () => ({
     items: [{
@@ -103,6 +104,7 @@ const contractAuthService: AuthService = {
       emailVerifiedAt: CONTRACT_USER.emailVerifiedAt,
       createdAt: '2026-07-25T00:00:00.000Z',
       updatedAt: '2026-07-25T00:00:00.000Z',
+      bannedAt: CONTRACT_USER.bannedAt,
     }],
     nextCursor: undefined,
   }),
@@ -115,6 +117,7 @@ const contractAuthService: AuthService = {
     emailVerifiedAt: CONTRACT_USER.emailVerifiedAt,
     createdAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
+    bannedAt: CONTRACT_USER.bannedAt,
   }),
   adminUpdateUser: async (id, input) => ({
     id,
@@ -124,8 +127,14 @@ const contractAuthService: AuthService = {
     emailVerifiedAt: CONTRACT_USER.emailVerifiedAt,
     createdAt: '2026-07-25T00:00:00.000Z',
     updatedAt: '2026-07-25T00:00:00.000Z',
+    bannedAt: CONTRACT_USER.bannedAt,
   }),
   softDeleteUser: async () => {},
+  adminBanUser: async () => {},
+  adminUnbanUser: async () => {},
+  adminBatchBanUsers: async () => {},
+  adminBatchUnbanUsers: async () => {},
+  adminBatchDeleteUsers: async () => {},
 }
 
 class ContractStorage implements StorageAdapter {
