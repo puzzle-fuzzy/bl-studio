@@ -1,13 +1,15 @@
+import { useState } from 'react'
+import { Check, Copy } from 'lucide-react'
 import type { GenerationRecord } from '@bailian-studio/api-client'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { formatCents } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
-/** 堆叠缩略图 hover 时按索引向右摊开的静态类（tailwind 需静态类名才能生成）。 */
-const HOVER_SPREAD = ['group-hover:translate-x-0', 'group-hover:translate-x-1', 'group-hover:translate-x-2']
-
-/** 生成任务卡片：首产物缩略图 + 状态 + 模型 + 费用 + 时间。 */
+/**
+ * 生成任务行：缩略图（多产物扇形堆叠）+ 状态 + 模型 + 费用 + 提示词 + 复制。
+ * 无卡片边框（列表用分割线划分，见 GenerationsPanel）。
+ */
 export function GenerationListItem({
   record,
   onOpen,
@@ -19,13 +21,23 @@ export function GenerationListItem({
 }) {
   const mediaArtifacts = (record.outputResult?.artifacts ?? []).filter(artifact => artifact.kind !== 'text')
   const stack = mediaArtifacts.slice(0, 3)
+  const prompt = typeof record.inputParams?.prompt === 'string' ? record.inputParams.prompt : ''
+  const [copied, setCopied] = useState(false)
+
+  const handleCopyPrompt = (event: React.MouseEvent) => {
+    event.stopPropagation()
+    if (prompt === '') return
+    void navigator.clipboard?.writeText(prompt)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
 
   return (
     <button
       type="button"
       onClick={() => onOpen(record.id)}
       className={cn(
-        'group flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-colors hover:bg-muted/40',
+        'group flex w-full items-center gap-3 p-2 text-left transition-colors hover:bg-muted/40',
         className,
       )}
     >
@@ -40,40 +52,51 @@ export function GenerationListItem({
           )}
         </div>
       ) : (
-        // 多产物：左侧堆叠卡片，hover 时按索引向右摊开（tailwind translate 属性与 inline transform 叠加）。
-        <div className="relative h-12 w-16 shrink-0">
+        // 多产物：底部对齐的扇形展开缩略图，hover 整体微放大。
+        <div className="relative h-12 w-16 shrink-0 transition-transform duration-300 group-hover:scale-110">
           {stack.map((artifact, index) => (
             <div
               key={index}
-              className={cn(
-                'absolute top-0 left-0 size-12 overflow-hidden rounded-md border bg-muted/30 shadow-sm transition-all duration-300',
-                HOVER_SPREAD[index] ?? '',
-              )}
+              className="absolute bottom-0 left-1/2 size-11 origin-bottom overflow-hidden rounded-md border bg-muted/30 shadow-sm"
               style={{
-                transform: `translateX(${index * 5}px)`,
-                zIndex: stack.length - index,
+                transform: `translateX(-50%) rotate(${(index - (stack.length - 1) / 2) * 12}deg)`,
+                zIndex: index,
               }}
             >
               <AssetThumbnail kind={artifact.kind} url={artifact.thumbnailUrl ?? artifact.sourceUrl} />
             </div>
           ))}
           {mediaArtifacts.length > 1 && (
-            <span className="absolute right-0 bottom-0 z-10 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
+            <span className="absolute top-0 right-0 z-10 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
               {mediaArtifacts.length}
             </span>
           )}
         </div>
       )}
+
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center gap-2">
           <StatusBadge status={record.status} className="shrink-0" />
           <span className="truncate text-sm font-medium">{record.modelId}</span>
-        </div>
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span>{formatCents(record.costEstimate)}</span>
           <span aria-hidden>·</span>
-          <span className="truncate">{relativeTime(record.createdAt)}</span>
+          <span className="shrink-0 text-xs text-muted-foreground">{formatCents(record.costEstimate)}</span>
         </div>
+        <div className="flex items-center gap-1 text-xs text-muted-foreground">
+          <span className="min-w-0 truncate">{prompt !== '' ? prompt : '(无提示词)'}</span>
+          {prompt !== '' && (
+            <span
+              role="button"
+              tabIndex={-1}
+              aria-label="复制提示词"
+              title="复制提示词"
+              onClick={handleCopyPrompt}
+              className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+            >
+              {copied ? <Check className="size-3 text-primary" /> : <Copy className="size-3" />}
+            </span>
+          )}
+        </div>
+        <div className="text-xs text-muted-foreground/70">{relativeTime(record.createdAt)}</div>
       </div>
     </button>
   )

@@ -34,7 +34,7 @@ const ADVANCED_PARAM_NAMES = ['watermark', 'seed']
  * 左右两栏 1:1，中间竖分割线；表单内容不套卡片边框。
  */
 export function CreatePage() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const showMessage = useNotificationsStore(state => state.showMessage)
@@ -62,6 +62,13 @@ export function CreatePage() {
   useEffect(() => {
     void loadModels()
   }, [loadModels])
+
+  // 无 ?select=（未选中）时，等目录加载后默认选第一个视频模型（或目录第一个）。
+  useEffect(() => {
+    if (modelId !== undefined || models.length === 0) return
+    const first = models.find(model => model.category === 'video') ?? models[0]
+    if (first !== undefined) setModelId(first.id)
+  }, [models, modelId])
 
   // `?reuse=<id>` 深链：从历史生成记录还原模型与全部参数（含参考图）。
   const reuseId = searchParams.get('reuse')
@@ -161,6 +168,14 @@ export function CreatePage() {
     setValues(current => ({ ...current, [name]: value }))
   }
 
+  // 选中模型：更新状态 + 写入 ?select=，刷新/分享后选中模型不丢失。
+  const handleModelSelect = (nextId: string) => {
+    setModelId(nextId)
+    const next = new URLSearchParams(searchParams)
+    next.set('select', nextId)
+    setSearchParams(next, { replace: true })
+  }
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (model === undefined || isSubmitting) return
@@ -214,7 +229,7 @@ export function CreatePage() {
       <div className="space-y-6">
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">选择模型</h2>
-          <ModelSelector models={models} selectedId={modelId} onSelect={id => setModelId(id)} />
+          <ModelSelector models={models} selectedId={modelId} onSelect={handleModelSelect} />
         </section>
 
         {model !== undefined && (

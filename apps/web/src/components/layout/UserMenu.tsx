@@ -58,7 +58,7 @@ export function UserMenu() {
             </span>
           </SidebarMenuButton>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
+        <DropdownMenuContent align="end" className="w-60 p-1.5">
           <DropdownMenuLabel className="space-y-0.5">
             <span className="block truncate text-sm">{user.displayName ?? user.email}</span>
             <span className="block truncate text-xs font-normal text-muted-foreground">{user.email}</span>
@@ -68,15 +68,16 @@ export function UserMenu() {
             <CreditsBadge />
           </div>
           <DropdownMenuSeparator />
-          <DropdownMenuItem onClick={() => setTheme(isDark ? 'light' : 'dark')}>
+          <DropdownMenuItem className="py-2" onClick={() => setTheme(isDark ? 'light' : 'dark')}>
             {isDark ? <Sun data-icon /> : <Moon data-icon />}
             {isDark ? '浅色模式' : '深色模式'}
           </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => setChangeOpen(true)}>
+          <DropdownMenuItem className="py-2" onClick={() => setChangeOpen(true)}>
             <KeyRound data-icon />
             修改密码
           </DropdownMenuItem>
           <DropdownMenuItem
+            className="py-2"
             onClick={() => {
               void logout()
               navigate('/create')
@@ -86,6 +87,7 @@ export function UserMenu() {
             退出登录
           </DropdownMenuItem>
           <DropdownMenuItem
+            className="py-2"
             onClick={() => {
               void logoutAll()
               navigate('/create')

@@ -109,7 +109,8 @@ function EmbeddedVariant({
           {isLoading ? '加载中…' : recent.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
         </p>
       ) : (
-        <div className="space-y-2">
+        // 无卡片包裹：列表项之间用分割线划分。
+        <div className="divide-y divide-border">
           {filtered.map(record => (
             <GenerationListItem key={record.id} record={record} onOpen={onOpen} />
           ))}
@@ -182,7 +183,7 @@ function TaskRow({ index, style, records, onOpen }: { index: number; style: CSSP
   const record = records[index]
   if (record === undefined) return null
   return (
-    <div style={style} className="px-1.5 pb-1.5">
+    <div style={style} className="border-b border-border px-1.5 pb-1.5">
       <GenerationListItem record={record} onOpen={onOpen} className="h-full" />
     </div>
   )

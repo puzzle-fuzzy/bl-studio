@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import {
   Select,
@@ -45,7 +45,7 @@ export function ModelSelector({
     selected !== undefined ? subModeOf(selected) : SUB_MODE_ORDER.video[0] ?? 'r2v',
   )
 
-  // 外部 selectedId 变化（?reuse= / 预设应用）时同步分类与子模式。
+  // 外部 selectedId 变化（?select= / ?reuse= / 预设应用）时同步分类与子模式。
   useEffect(() => {
     if (selected === undefined) return
     if (selected.category === 'video' || selected.category === 'image' || selected.category === 'audio') {
@@ -54,20 +54,6 @@ export function ModelSelector({
     setSubMode(subModeOf(selected))
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedId])
-
-  // 未选中任何模型时，等目录加载后默认选 视频生成 → 第一个子模式 → 第一个模型。
-  // 注意：models 为空时不能标记 initialized，否则目录加载完成后再也不会触发默认选择。
-  const initialized = useRef(false)
-  useEffect(() => {
-    if (selectedId !== undefined) return
-    if (models.length === 0) return
-    if (initialized.current) return
-    initialized.current = true
-    const firstMode = (availableSubModes(models, 'video')[0] ?? SUB_MODE_ORDER.video[0]) ?? 'r2v'
-    const first = modelsInMode(models, 'video', firstMode)[0] ?? models[0]
-    if (first !== undefined) onSelect(first.id)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [models, selectedId])
 
   const modeModels = modelsInMode(models, category, subMode)
   const modeOptions = availableSubModes(models, category)

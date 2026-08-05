@@ -1,17 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { ArrowRight, Sparkles } from 'lucide-react'
-import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { categoryLabel } from '@/lib/labels'
+import { modelDescription } from '@/lib/model-description'
 
 const CATEGORIES = ['all', 'image', 'video', 'audio', 'text'] as const
 type Category = (typeof CATEGORIES)[number]
 
-/** 模型目录：分类 Tab + 模型卡片（能力徽章 + 去创作）。 */
+/** 全部模型：分类 Tab + 模型卡片（中文描述 + 去创作）。 */
 export function CatalogPage() {
   const models = useModelCatalogStore(state => state.models)
   const load = useModelCatalogStore(state => state.load)
@@ -27,7 +27,7 @@ export function CatalogPage() {
   return (
     <div className="mx-auto max-w-6xl space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold">模型目录</h1>
+        <h1 className="text-2xl font-semibold">全部模型</h1>
         <p className="text-sm text-muted-foreground">
           当前可用生成模型 {models.length} 个，全部由百炼契约驱动。
         </p>
@@ -52,17 +52,8 @@ export function CatalogPage() {
                 {model.displayName}
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 space-y-3">
-              <p className="text-xs text-muted-foreground">
-                {categoryLabel(model.category)} · {model.operation}
-              </p>
-              <div className="flex flex-wrap gap-1.5">
-                {model.capabilities.slice(0, 4).map(capability => (
-                  <Badge key={capability} variant="outline" className="text-xs font-normal">
-                    {capability}
-                  </Badge>
-                ))}
-              </div>
+            <CardContent className="flex-1">
+              <p className="text-sm text-muted-foreground">{modelDescription(model)}</p>
             </CardContent>
             <CardFooter>
               <Button

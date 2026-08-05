@@ -1,14 +1,8 @@
 import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { Grid } from 'react-window'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Loader2, X } from 'lucide-react'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { assetQueryKey, useAssetsStore, type AssetQuery } from '@/stores/assets-store'
@@ -16,7 +10,6 @@ import { usePendingThumbnailRefresh, hasPendingThumbnails } from '@/hooks/use-th
 import { kindLabel, sourceLabel } from '@/lib/labels'
 import { resolveApiUrl } from '@/lib/api'
 import { useContainerSize } from '@/components/generations/GenerationsPanel'
-import { cn } from '@/lib/utils'
 
 const KINDS = ['image', 'video', 'audio', 'text', 'archive'] as const
 const SOURCES = ['upload', 'link', 'generation', 'derived'] as const
@@ -92,7 +85,7 @@ export function LibraryPage() {
         )}
       </div>
 
-      <div ref={ref} className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden rounded-lg border">
+      <div ref={ref} className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden">
         {size.width > 0 && items.length > 0 && (
           <Grid<AssetCellProps>
             columnCount={columns}
@@ -188,55 +181,84 @@ function AssetPreviewDialog({
 }) {
   const [imgFailed, setImgFailed] = useState(false)
   const src = asset.url ?? asset.downloadUrl
-  const isMedia = asset.kind === 'image' || asset.kind === 'video' || asset.kind === 'audio'
+  const url = src !== undefined ? resolveApiUrl(src) : undefined
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
 
   return (
-    <Dialog open onOpenChange={open => !open && onClose()}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <span>{asset.fileName ?? `${kindLabel(asset.kind)}素材`}</span>
-            <span className="text-xs font-normal text-muted-foreground">
-              {kindLabel(asset.kind)} · {sourceLabel(asset.source)}
-            </span>
-          </DialogTitle>
-        </DialogHeader>
-        <div className={cn('space-y-3', isMedia && 'space-y-4')}>
-          {asset.kind === 'image' && src !== undefined && !imgFailed && (
-            <img
-              src={resolveApiUrl(src)}
-              alt=""
-              className="mx-auto max-h-96 rounded-lg object-contain"
-              onError={() => setImgFailed(true)}
-            />
-          )}
-          {asset.kind === 'video' && src !== undefined && (
-            <video src={resolveApiUrl(src)} controls className="mx-auto max-h-96 rounded-lg" />
-          )}
-          {asset.kind === 'audio' && src !== undefined && (
-            <audio src={resolveApiUrl(src)} controls className="w-full" />
-          )}
-          {asset.kind === 'text' && (
-            <p className="max-h-96 overflow-y-auto rounded-lg border bg-muted/30 p-3 text-sm">
-              {asset.text ?? (src !== undefined ? <TextFetchFallback url={src} /> : '(空文本)')}
-            </p>
-          )}
-          {imgFailed && (
-            <button type="button" className="text-sm text-primary hover:underline" onClick={onRefresh}>
-              图片加载失败，点击刷新
-            </button>
-          )}
-        </div>
-        {src !== undefined && (
-          <Button className="w-full" asChild>
-            <a href={resolveApiUrl(src)} target="_blank" rel="noreferrer">
-              <Download data-icon />
-              打开 / 下载
-            </a>
-          </Button>
+    // 全屏查看：黑色遮罩，点击遮罩或 Esc 关闭；底部带下载按钮。
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/90 p-6"
+      onClick={onClose}
+    >
+      <div className="mb-3 flex max-w-full items-center gap-2 text-sm text-white/90">
+        <span className="max-w-64 truncate">{asset.fileName ?? `${kindLabel(asset.kind)}素材`}</span>
+        <span className="shrink-0 text-white/60">
+          {kindLabel(asset.kind)} · {sourceLabel(asset.source)}
+        </span>
+      </div>
+
+      <div
+        className="flex max-h-[65vh] max-w-full items-center justify-center"
+        onClick={event => event.stopPropagation()}
+      >
+        {asset.kind === 'image' && url !== undefined && !imgFailed && (
+          <img
+            src={url}
+            alt=""
+            className="max-h-[65vh] max-w-full object-contain"
+            onError={() => setImgFailed(true)}
+          />
         )}
-      </DialogContent>
-    </Dialog>
+        {asset.kind === 'video' && url !== undefined && (
+          <video src={url} controls autoPlay className="max-h-[65vh] max-w-full" />
+        )}
+        {asset.kind === 'audio' && url !== undefined && (
+          <audio src={url} controls autoPlay className="w-full max-w-lg" />
+        )}
+        {asset.kind === 'text' && (
+          <p className="max-h-[65vh] max-w-2xl overflow-y-auto whitespace-pre-wrap text-sm text-white/90">
+            {asset.text ?? (url !== undefined ? <TextFetchFallback url={url} /> : '(空文本)')}
+          </p>
+        )}
+        {imgFailed && (
+          <button type="button" className="text-sm text-white/90 underline" onClick={onRefresh}>
+            图片加载失败，点击刷新
+          </button>
+        )}
+      </div>
+
+      {url !== undefined && (
+        <a
+          href={url}
+          target="_blank"
+          rel="noreferrer"
+          download
+          onClick={event => event.stopPropagation()}
+          className="mt-4 inline-flex items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm text-white/90 hover:bg-white/20"
+        >
+          <Download className="size-4" />
+          下载
+        </a>
+      )}
+
+      <button
+        type="button"
+        aria-label="关闭"
+        onClick={onClose}
+        className="absolute top-4 right-4 flex size-9 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
+      >
+        <X className="size-5" />
+      </button>
+    </div>
   )
 }
 

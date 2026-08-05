@@ -12,26 +12,29 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { BrandMark } from '@/components/shared/BrandMark'
 import { NotificationMenu } from '@/components/layout/NotificationMenu'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
 
-// 主导航：任务列表已并入创作页「最新任务」，不再单独占菜单项；作品库改名「资产」。
+// 主导航：任务列表已并入创作页「最新任务」；作品库改名「资产」；模型目录改名「全部模型」。
 const NAV_ITEMS = [
   { to: '/create', label: '创作', icon: Brush },
-  { to: '/catalog', label: '模型目录', icon: Sparkles },
+  { to: '/catalog', label: '全部模型', icon: Sparkles },
   { to: '/functions', label: '辅助工具', icon: Wrench },
   { to: '/library', label: '资产', icon: Library },
 ]
 
-/** 主导航侧栏。底部固定通知 + 账户（头像 + 完整邮箱）。 */
+/** 主导航侧栏。折叠按钮 absolute 相对侧边栏（随其移动）；底部通知/积分/账户。 */
 export function Nav() {
   const { pathname } = useLocation()
 
   return (
     <Sidebar>
+      {/* 折叠按钮相对侧边栏定位，侧边栏收缩时随之平移（不再是 fixed） */}
+      <SidebarTrigger className="absolute top-3 right-2 z-10" />
       <SidebarHeader>
         <BrandMark className="px-2 py-1" />
       </SidebarHeader>
@@ -39,7 +42,7 @@ export function Nav() {
         <SidebarGroup>
           <SidebarGroupLabel>工作台</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu>
+            <SidebarMenu className="space-y-1">
               {NAV_ITEMS.map(item => (
                 <SidebarMenuItem key={item.to}>
                   {/* 选中态由当前路径判断（含子路由前缀，如 /generations/:id） */}
