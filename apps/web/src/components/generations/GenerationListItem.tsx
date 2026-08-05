@@ -4,6 +4,9 @@ import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { formatCents } from '@/lib/money'
 import { cn } from '@/lib/utils'
 
+/** 堆叠缩略图 hover 时按索引向右摊开的静态类（tailwind 需静态类名才能生成）。 */
+const HOVER_SPREAD = ['group-hover:translate-x-0', 'group-hover:translate-x-1', 'group-hover:translate-x-2']
+
 /** 生成任务卡片：首产物缩略图 + 状态 + 模型 + 费用 + 时间。 */
 export function GenerationListItem({
   record,
@@ -14,27 +17,53 @@ export function GenerationListItem({
   onOpen: (id: string) => void
   className?: string
 }) {
-  const artifact = record.outputResult?.artifacts?.[0]
-  const thumbnailSrc = artifact?.thumbnailUrl ?? artifact?.sourceUrl
+  const mediaArtifacts = (record.outputResult?.artifacts ?? []).filter(artifact => artifact.kind !== 'text')
+  const stack = mediaArtifacts.slice(0, 3)
 
   return (
     <button
       type="button"
       onClick={() => onOpen(record.id)}
       className={cn(
-        'flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-colors hover:bg-muted/40',
+        'group flex w-full items-center gap-3 rounded-lg border p-2.5 text-left transition-colors hover:bg-muted/40',
         className,
       )}
     >
-      <div className="relative size-12 shrink-0 overflow-hidden rounded-md border bg-muted/30">
-        {artifact !== undefined && artifact.kind !== 'text' && thumbnailSrc !== undefined ? (
-          <AssetThumbnail kind={artifact.kind} url={thumbnailSrc} />
-        ) : (
-          <span className="flex size-full items-center justify-center text-xs text-muted-foreground">
-            {record.status}
-          </span>
-        )}
-      </div>
+      {stack.length <= 1 ? (
+        <div className="relative size-12 shrink-0 overflow-hidden rounded-md border bg-muted/30">
+          {stack[0] !== undefined ? (
+            <AssetThumbnail kind={stack[0].kind} url={stack[0].thumbnailUrl ?? stack[0].sourceUrl} />
+          ) : (
+            <span className="flex size-full items-center justify-center text-xs text-muted-foreground">
+              {record.status}
+            </span>
+          )}
+        </div>
+      ) : (
+        // 多产物：左侧堆叠卡片，hover 时按索引向右摊开（tailwind translate 属性与 inline transform 叠加）。
+        <div className="relative h-12 w-16 shrink-0">
+          {stack.map((artifact, index) => (
+            <div
+              key={index}
+              className={cn(
+                'absolute top-0 left-0 size-12 overflow-hidden rounded-md border bg-muted/30 shadow-sm transition-all duration-300',
+                HOVER_SPREAD[index] ?? '',
+              )}
+              style={{
+                transform: `translateX(${index * 5}px)`,
+                zIndex: stack.length - index,
+              }}
+            >
+              <AssetThumbnail kind={artifact.kind} url={artifact.thumbnailUrl ?? artifact.sourceUrl} />
+            </div>
+          ))}
+          {mediaArtifacts.length > 1 && (
+            <span className="absolute right-0 bottom-0 z-10 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
+              {mediaArtifacts.length}
+            </span>
+          )}
+        </div>
+      )}
       <div className="min-w-0 flex-1 space-y-0.5">
         <div className="flex items-center gap-2">
           <StatusBadge status={record.status} className="shrink-0" />

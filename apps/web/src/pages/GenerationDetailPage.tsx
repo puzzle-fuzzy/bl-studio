@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban } from 'lucide-react'
+import { ArrowLeft, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban, X } from 'lucide-react'
 import type { GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +11,7 @@ import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { useGenerationArtifactsStore } from '@/stores/generation-artifacts-store'
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
+import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { formatCents } from '@/lib/money'
@@ -293,6 +294,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 function ArtifactsSection({ recordId }: { recordId: string }) {
   const entry = useGenerationArtifactsStore(state => state.entries[recordId])
   const load = useGenerationArtifactsStore(state => state.load)
+  const [preview, setPreview] = useState<GenerationArtifact | null>(null)
 
   useEffect(() => {
     void load(recordId)
@@ -301,28 +303,37 @@ function ArtifactsSection({ recordId }: { recordId: string }) {
   const items = entry?.items ?? []
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">生成产物</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {items.length === 0 ? (
-          <p className="py-8 text-center text-sm text-muted-foreground">
-            {entry?.isLoading ? '加载中…' : '暂无产物'}
-          </p>
-        ) : (
-          <div className="grid gap-3 sm:grid-cols-2">
-            {items.map(artifact => (
-              <ArtifactCard key={artifact.id} artifact={artifact} />
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
+    <>
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">生成产物</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {items.length === 0 ? (
+            <p className="py-8 text-center text-sm text-muted-foreground">
+              {entry?.isLoading ? '加载中…' : '暂无产物'}
+            </p>
+          ) : (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {items.map(artifact => (
+                <ArtifactCard key={artifact.id} artifact={artifact} onPreview={setPreview} />
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+      {preview !== null && <MediaLightbox artifact={preview} onClose={() => setPreview(null)} />}
+    </>
   )
 }
 
-function ArtifactCard({ artifact }: { artifact: GenerationArtifact }) {
+function ArtifactCard({
+  artifact,
+  onPreview,
+}: {
+  artifact: GenerationArtifact
+  onPreview: (artifact: GenerationArtifact) => void
+}) {
   const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
   if (artifact.kind === 'text') {
     return (
@@ -334,9 +345,23 @@ function ArtifactCard({ artifact }: { artifact: GenerationArtifact }) {
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border">
       {src !== undefined && artifact.kind === 'image' ? (
-        <img src={resolveApiUrl(src)} alt="" className="size-full object-cover" loading="lazy" />
+        <button
+          type="button"
+          className="block size-full cursor-zoom-in"
+          aria-label="全屏查看"
+          onClick={() => onPreview(artifact)}
+        >
+          <img src={resolveApiUrl(src)} alt="" className="size-full object-cover" loading="lazy" />
+        </button>
       ) : src !== undefined ? (
-        <video src={resolveApiUrl(src)} className="size-full object-cover" controls preload="metadata" />
+        <button
+          type="button"
+          className="block size-full cursor-zoom-in"
+          aria-label="全屏播放"
+          onClick={() => onPreview(artifact)}
+        >
+          <video src={resolveApiUrl(src)} className="size-full object-cover" muted playsInline preload="metadata" />
+        </button>
       ) : (
         <div className="flex size-full items-center justify-center text-xs text-muted-foreground">暂无文件</div>
       )}
@@ -353,10 +378,72 @@ function ArtifactCard({ artifact }: { artifact: GenerationArtifact }) {
   )
 }
 
+/** 全屏查看图片/视频：黑色遮罩，点击遮罩或 Esc 关闭。 */
+function MediaLightbox({ artifact, onClose }: { artifact: GenerationArtifact; onClose: () => void }) {
+  const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
+  const url = resolveApiUrl(src ?? '')
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [onClose])
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4"
+      onClick={onClose}
+    >
+      {artifact.kind === 'image' ? (
+        <img
+          src={url}
+          alt="全屏预览"
+          className="max-h-full max-w-full object-contain"
+          onClick={event => event.stopPropagation()}
+        />
+      ) : (
+        <video
+          src={url}
+          controls
+          autoPlay
+          className="max-h-full max-w-full"
+          onClick={event => event.stopPropagation()}
+        />
+      )}
+      <button
+        type="button"
+        aria-label="关闭"
+        onClick={onClose}
+        className="absolute top-4 right-4 flex size-9 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
+      >
+        <X className="size-5" />
+      </button>
+    </div>
+  )
+}
+
 function ParamsCard({ record }: { record: GenerationRecord }) {
+  const models = useModelCatalogStore(state => state.models)
+  const loadModels = useModelCatalogStore(state => state.load)
   const params = useMemo(() => {
     return Object.entries(record.inputParams ?? {}).filter(([key]) => !key.startsWith('_'))
   }, [record.inputParams])
+
+  useEffect(() => {
+    void loadModels()
+  }, [loadModels])
+
+  // 英文参数名 → manifest 中文 label；未命中的回退显示原 key。
+  const model = selectModelById(models, record.modelId)
+  const labelMap = useMemo(() => {
+    const map = new Map<string, string>()
+    for (const parameter of model?.parameters ?? []) map.set(parameter.name, parameter.label)
+    return map
+  }, [model])
 
   return (
     <Card>
@@ -369,8 +456,8 @@ function ParamsCard({ record }: { record: GenerationRecord }) {
         ) : (
           params.map(([key, value]) => (
             <div key={key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
-              <span className="text-muted-foreground">{key}</span>
-              <span className={cn('min-w-0 break-words')}>{renderParamValue(value)}</span>
+              <span className="text-muted-foreground">{labelMap.get(key) ?? key}</span>
+              <span className="min-w-0 break-words">{renderParamValue(value)}</span>
             </div>
           ))
         )}
