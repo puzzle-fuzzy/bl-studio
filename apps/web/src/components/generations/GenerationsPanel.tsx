@@ -78,7 +78,7 @@ function EmbeddedVariant({
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between xl:sticky xl:top-0 xl:z-10 xl:bg-background">
         <p className="text-sm font-medium">最近任务</p>
         <div className="flex gap-2">
           <Select value={kindFilter} onValueChange={value => setKindFilter(value as KindFilter)}>

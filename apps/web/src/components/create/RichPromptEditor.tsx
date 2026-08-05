@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { createPortal } from 'react-dom'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { referenceMarker } from '@/lib/reference-format'
@@ -36,7 +37,7 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
   const pickerRef = useRef<HTMLDivElement>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [pickerAnchor, setPickerAnchor] = useState<{ top: number; left: number } | null>(null)
+  const [pickerAnchor, setPickerAnchor] = useState<{ style: CSSProperties } | null>(null)
   const [activeIndex, setActiveIndex] = useState(0)
 
   // 外部 value/refs 变化时同步 DOM（用户输入产生的变化 text 已一致而跳过，保留光标）。
@@ -85,10 +86,15 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
       event.preventDefault()
       const selection = window.getSelection()
       const editor = editorRef.current
-      if (selection !== null && selection.rangeCount > 0 && editor !== null) {
-        const range = selection.getRangeAt(0)
-        savedRangeRef.current = range.cloneRange()
-        setPickerAnchor(anchorForRange(range, editor))
+      if (editor !== null) {
+        if (selection !== null && selection.rangeCount > 0) {
+          const range = selection.getRangeAt(0)
+          savedRangeRef.current = range.cloneRange()
+          setPickerAnchor(anchorForRange(range, editor))
+        } else {
+          savedRangeRef.current = null
+          setPickerAnchor(anchorForEditor(editor))
+        }
       } else {
         savedRangeRef.current = null
         setPickerAnchor(null)
@@ -171,18 +177,19 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
           disabled && 'cursor-not-allowed opacity-60',
         )}
       />
-      {pickerOpen && (
-        <div
-          ref={pickerRef}
-          id={PICKER_ID}
-          role="listbox"
-          onMouseDown={event => event.stopPropagation()}
-          style={pickerAnchor !== null ? { top: pickerAnchor.top, left: pickerAnchor.left } : undefined}
-          className={cn(
-            'absolute z-50 mt-1 max-h-56 w-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md',
-            pickerAnchor === null && 'top-full left-0',
-          )}
-        >
+      {pickerOpen &&
+        createPortal(
+          <div
+            ref={pickerRef}
+            id={PICKER_ID}
+            role="listbox"
+            onMouseDown={event => event.stopPropagation()}
+            style={pickerAnchor?.style}
+            className={cn(
+              'fixed z-50 max-h-56 w-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md',
+              pickerAnchor === null && 'hidden',
+            )}
+          >
           <p className="px-2 pt-1 pb-0.5 text-xs text-muted-foreground">选择要引用的参考图</p>
           {refs.length === 0 ? (
             <p className="px-2 py-1.5 text-xs text-muted-foreground">暂无参考图，请先在上方「输入参考素材」添加</p>
@@ -208,26 +215,47 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
               </button>
             ))
           )}
-        </div>
-      )}
+          </div>,
+          document.body,
+        )}
     </div>
   )
 }
 
 /**
- * 计算 @ 面板锚点：光标（Range）在编辑器内的相对坐标，使下拉贴住光标而不是固定在输入框底部。
- * 光标矩形全 0（无法定位）时返回 null，退回输入框下方。左边缘做钳制，避免面板超出编辑区右侧。
+ * 计算 @ 面板锚点：以 viewport 坐标 + fixed 定位渲染在 body portal 中，避免被创作页
+ * xl 两栏独立滚动容器裁剪。光标矩形全 0（无法定位）时退回编辑器底部。左边缘钳制在
+ * 视口内；上方空间不足时向上展开，防止面板底部超出视口。
  */
-function anchorForRange(range: Range, editor: HTMLDivElement): { top: number; left: number } | null {
+function anchorForRange(range: Range, editor: HTMLDivElement): { style: CSSProperties } {
   const rect = range.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) return null
-  const editorRect = editor.getBoundingClientRect()
+  if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
+    return pickerStyle(editor.getBoundingClientRect())
+  }
+  return pickerStyle(rect)
+}
+
+/** 无选区兜底：贴编辑器底部（如点击空区域后按 @）。 */
+function anchorForEditor(editor: HTMLDivElement): { style: CSSProperties } {
+  return pickerStyle(editor.getBoundingClientRect())
+}
+
+function pickerStyle(anchorRect: DOMRect): { style: CSSProperties } {
+  const viewportWidth = window.innerWidth
+  const viewportHeight = window.innerHeight
   const pickerWidth = 288 // w-72
+  const pickerMaxHeight = 224 // max-h-56
   const gap = 4
-  const maxLeft = Math.max(editorRect.width - pickerWidth - gap, gap)
-  const left = Math.min(Math.max(rect.left - editorRect.left, gap), maxLeft)
-  const top = rect.bottom - editorRect.top + gap
-  return { top, left }
+  const style: CSSProperties = {}
+  // 水平：左边缘钳制在视口内（gap 留白），避免面板超出右侧。
+  style.left = Math.min(Math.max(anchorRect.left, gap), Math.max(viewportWidth - pickerWidth - gap, gap))
+  // 垂直：下方空间不足时向上展开（贴光标上方）。
+  if (anchorRect.bottom + gap + pickerMaxHeight <= viewportHeight) {
+    style.top = anchorRect.bottom + gap
+  } else {
+    style.bottom = viewportHeight - anchorRect.top + gap
+  }
+  return { style }
 }
 
 /** 把 value+refs 渲染进 contenteditable：文本节点 + 缩略图 chip。 */
