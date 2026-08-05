@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
-import { Loader2, Search, UserPlus } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Loader2, Search, UserPlus } from 'lucide-react'
 import type { AdminUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
@@ -25,7 +25,8 @@ export function UserListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') ?? ''
   const [items, setItems] = useState<AdminUser[]>([])
-  const [nextCursor, setNextCursor] = useState<string | undefined>()
+  const [total, setTotal] = useState(0)
+  const [page, setPage] = useState(1)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(q)
@@ -38,13 +39,14 @@ export function UserListPage() {
   const [deleting, setDeleting] = useState<AdminUser | null>(null)
   const [deletingBusy, setDeletingBusy] = useState(false)
 
-  const load = useCallback(async (cursor?: string) => {
+  const load = useCallback(async (pageNo: number) => {
     setLoading(true)
     setError(null)
     try {
-      const page = await apiClient.listAdminUsers({ q: q || undefined, limit: PAGE_SIZE, cursor })
-      setItems(page.items)
-      setNextCursor(page.nextCursor)
+      const result = await apiClient.listAdminUsers({ q: q || undefined, page: pageNo, pageSize: PAGE_SIZE })
+      setItems(result.items)
+      setTotal(result.total ?? 0)
+      setPage(pageNo)
     } catch (err) {
       setError(userErrorMessage(err))
     } finally {
@@ -52,9 +54,12 @@ export function UserListPage() {
     }
   }, [q])
 
+  // q 变化（搜索/清空）时回到第一页。
   useEffect(() => {
-    void load()
+    void load(1)
   }, [load])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
@@ -76,7 +81,7 @@ export function UserListPage() {
       })
       setCreateOpen(false)
       setCreateForm({ email: '', password: '', displayName: '', role: 'user' })
-      void load()
+      void load(1)
     } catch (err) {
       setCreateError(userErrorMessage(err))
     } finally {
@@ -90,7 +95,7 @@ export function UserListPage() {
     try {
       await apiClient.adminDeleteUser(deleting.id)
       setDeleting(null)
-      void load()
+      void load(page)
     } catch (err) {
       setError(userErrorMessage(err))
       setDeleting(null)
@@ -119,7 +124,7 @@ export function UserListPage() {
             className="pl-8"
           />
         </div>
-        <Button type="submit" variant="outline" size="sm">搜索</Button>
+        <Button type="submit" variant="outline">搜索</Button>
       </form>
 
       {error !== null && <p className="text-sm text-destructive">{error}</p>}
@@ -138,6 +143,7 @@ export function UserListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-14 text-muted-foreground">序号</TableHead>
                   <TableHead>邮箱</TableHead>
                   <TableHead>昵称</TableHead>
                   <TableHead>角色</TableHead>
@@ -146,8 +152,9 @@ export function UserListPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map(user => (
+                {items.map((user, index) => (
                   <TableRow key={user.id}>
+                    <TableCell className="text-muted-foreground">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
                     <TableCell>
                       <Link to={`/users/${user.id}`} className="font-medium hover:underline">
                         {user.email}
@@ -176,12 +183,8 @@ export function UserListPage() {
         </CardContent>
       </Card>
 
-      {nextCursor !== undefined && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" onClick={() => void load(nextCursor)} disabled={loading}>
-            加载更多
-          </Button>
-        </div>
+      {totalPages > 1 && (
+        <PaginationBar page={page} totalPages={totalPages} loading={loading} onPageChange={pageNo => void load(pageNo)} />
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>
@@ -245,4 +248,61 @@ export function UserListPage() {
       </AlertDialog>
     </div>
   )
+}
+
+/** 页码分页条：上一页 / 页码窗口 / 下一页。 */
+function PaginationBar({
+  page,
+  totalPages,
+  loading,
+  onPageChange,
+}: {
+  page: number
+  totalPages: number
+  loading: boolean
+  onPageChange: (page: number) => void
+}) {
+  const pages = pageWindow(page, totalPages)
+  return (
+    <div className="flex items-center justify-center gap-1">
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page <= 1 || loading}
+        onClick={() => onPageChange(page - 1)}
+      >
+        <ChevronLeft data-icon />
+        上一页
+      </Button>
+      {pages.map(p => (
+        <Button
+          key={p}
+          variant={p === page ? 'default' : 'outline'}
+          size="sm"
+          disabled={loading}
+          onClick={() => onPageChange(p)}
+        >
+          {p}
+        </Button>
+      ))}
+      <Button
+        variant="outline"
+        size="sm"
+        disabled={page >= totalPages || loading}
+        onClick={() => onPageChange(page + 1)}
+      >
+        下一页
+        <ChevronRight data-icon />
+      </Button>
+    </div>
+  )
+}
+
+/** 页码窗口：当前页居中，至多 5 个页码。 */
+function pageWindow(page: number, totalPages: number): number[] {
+  const width = 5
+  let start = Math.max(1, page - Math.floor(width / 2))
+  const end = Math.min(totalPages, start + width - 1)
+  start = Math.max(1, end - width + 1)
+  return Array.from({ length: end - start + 1 }, (_, i) => start + i)
 }

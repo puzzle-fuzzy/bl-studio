@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { createBrowserRouter, Navigate } from 'react-router'
 import { AdminShell } from '@/components/AdminShell'
 import { ProtectedAdminRoute } from '@/components/ProtectedAdminRoute'
@@ -5,6 +6,9 @@ import { RedirectIfAuthed } from '@/components/RedirectIfAuthed'
 import { LoginPage } from '@/pages/LoginPage'
 import { UserListPage } from '@/pages/UserListPage'
 import { UserDetailPage } from '@/pages/UserDetailPage'
+
+// 调用统计页含 recharts，懒加载以拆分主包。
+const StatsPage = lazy(() => import('@/pages/StatsPage').then(module => ({ default: module.StatsPage })))
 
 /**
  * 管理后台路由（basename /admin）。
@@ -32,6 +36,14 @@ export const router = createBrowserRouter(
             { index: true, element: <Navigate to="/users" replace /> },
             { path: 'users', element: <UserListPage /> },
             { path: 'users/:userId', element: <UserDetailPage /> },
+            {
+              path: 'stats',
+              element: (
+                <Suspense fallback={null}>
+                  <StatsPage />
+                </Suspense>
+              ),
+            },
           ],
         },
       ],

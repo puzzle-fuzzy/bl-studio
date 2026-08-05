@@ -595,6 +595,13 @@ export interface DailyGenerationUsageInput {
 export type GenerationUsage = DailyGenerationUsage
 export type GenerationUsageInput = DailyGenerationUsageInput
 
+/** 管理后台调用统计：窗口内调用总数，按模型、按(小时, 模型)聚合。 */
+export interface GenerationCallStats {
+  total: number
+  byModel: Array<{ modelId: string; count: number }>
+  byHour: Array<{ hour: number; modelId: string; count: number }>
+}
+
 /**
  * 生成 repository 的对外契约。
  *
@@ -673,6 +680,9 @@ export interface GenerationRepository {
 
   /** 只读用量聚合，支持任意报表时间窗口，包括当月。 */
   getGenerationUsage?: (input: GenerationUsageInput) => Promise<GenerationUsage>
+
+  /** 管理后台调用统计：时间窗口内的调用总数 + 按模型 / 按(小时,模型) 聚合。 */
+  countGenerationCallsBetween(since: string, until: string): Promise<GenerationCallStats>
 
   startProviderRequest(input: StartProviderRequestInput): Promise<ProviderRequestAudit>
   finishProviderRequest(input: FinishProviderRequestInput): Promise<ProviderRequestAudit | undefined>
@@ -1218,6 +1228,48 @@ async function readGenerationUsage(
   }
 }
 
+async function readGenerationCallStats(
+  db: BailianStudioDb | BailianStudioTx,
+  since: Date,
+  until: Date,
+): Promise<GenerationCallStats> {
+  const where = and(
+    gte(generationRecords.createdAt, since),
+    lt(generationRecords.createdAt, until),
+  )
+  const hourExpr = sql`extract(hour from ${generationRecords.createdAt})::int`
+  const [byModel, byHour, [totalRow]] = await Promise.all([
+    db
+      .select({
+        modelId: generationRecords.modelId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(generationRecords)
+      .where(where)
+      .groupBy(generationRecords.modelId)
+      .orderBy(sql`count(*) desc`),
+    db
+      .select({
+        hour: sql<number>`${hourExpr}`,
+        modelId: generationRecords.modelId,
+        count: sql<number>`count(*)::int`,
+      })
+      .from(generationRecords)
+      .where(where)
+      .groupBy(hourExpr, generationRecords.modelId)
+      .orderBy(hourExpr),
+    db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(generationRecords)
+      .where(where),
+  ])
+  return {
+    total: totalRow?.count ?? 0,
+    byModel,
+    byHour: byHour.map(row => ({ hour: row.hour, modelId: row.modelId, count: row.count })),
+  }
+}
+
 async function readPendingGenerationCount(
   db: BailianStudioDb | BailianStudioTx,
   input: GenerationUsageInput,
@@ -1392,6 +1444,10 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
 
     async getGenerationUsage(input) {
       return readGenerationUsage(db, input)
+    },
+
+    async countGenerationCallsBetween(since, until) {
+      return readGenerationCallStats(db, new Date(since), new Date(until))
     },
 
     /**

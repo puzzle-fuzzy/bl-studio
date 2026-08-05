@@ -609,6 +609,29 @@ export const AdminUserSchema = z.object({
 export const AdminListUsersResponseSchema = z.object({
   items: z.array(AdminUserSchema),
   nextCursor: z.string().optional(),
+  /** offset 分页模式（请求带 page）返回的总条数。 */
+  total: z.number().optional(),
+})
+
+/** 管理后台调用统计概览（今日调用 + 近 14 天注册）。 */
+export const AdminStatsOverviewSchema = z.object({
+  todayCalls: z.number(),
+  callsByModel: z.array(z.object({
+    modelId: z.string(),
+    label: z.string(),
+    count: z.number(),
+  })),
+  callsByHour: z.array(z.object({
+    hour: z.number(),
+    modelId: z.string(),
+    count: z.number(),
+  })),
+  registrationsByDay: z.array(z.object({
+    date: z.string(),
+    count: z.number(),
+  })),
+  todayNewUsers: z.number(),
+  totalUsers: z.number(),
 })
 
 export const AdminUserResponseSchema = z.object({
@@ -678,6 +701,7 @@ export const PointsMutationResponseSchema = z.object({
 
 export type AdminUser = z.infer<typeof AdminUserSchema>
 export type AdminListUsersResult = z.infer<typeof AdminListUsersResponseSchema>
+export type AdminStatsOverview = z.infer<typeof AdminStatsOverviewSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
 export type AdminCreateUserInput = z.infer<typeof AdminCreateUserInputSchema>
 export type AdminUpdateUserInput = z.infer<typeof AdminUpdateUserInputSchema>

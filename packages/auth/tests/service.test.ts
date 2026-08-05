@@ -346,6 +346,18 @@ describe('auth service', () => {
 
       const byEmail = await handle.authService.listActiveUsers({ q: 'charlie' })
       expect(byEmail.items.map(item => item.email)).toEqual(['charlie@x.test'])
+
+      // offset 分页模式：page/pageSize 返回 total，两页无重叠，total 与全量一致。
+      const countAll = await handle.authService.listActiveUsers({ limit: 100 })
+      const page1 = await handle.authService.listActiveUsers({ page: 1, pageSize: 2 })
+      expect(page1.items.length).toBe(2)
+      expect(page1.total).toBe(countAll.items.length)
+      expect(page1.nextCursor).toBeUndefined()
+
+      const page2 = await handle.authService.listActiveUsers({ page: 2, pageSize: 2 })
+      expect(page2.items.length).toBeGreaterThan(0)
+      const ids = new Set([...page1.items, ...page2.items].map(item => item.id))
+      expect(ids.size).toBe(page1.items.length + page2.items.length)
     })
 
     it('soft-deletes a user and revokes all sessions immediately', async () => {

@@ -7,6 +7,8 @@ import { signJwt, verifyJwt } from './jwt'
 import { hashPassword, verifyPassword } from './password'
 import {
   consumeAuthActionToken,
+  countActiveUsersTotal,
+  countRegistrationsPerDayBetween,
   createAuthActionToken,
   createSession,
   createUserInTransaction,
@@ -58,6 +60,8 @@ export interface AdminUser {
 export interface ListAdminUsersResult {
   items: AdminUser[]
   nextCursor?: string
+  /** offset 分页模式（传 page）返回的总条数。 */
+  total?: number
 }
 
 export interface VerifiedSession {
@@ -112,8 +116,19 @@ export interface AuthService {
     displayName?: string
     role?: 'user' | 'admin'
   }): Promise<AdminUser>
-  /** 管理后台：分页列用户（含搜索）。 */
-  listActiveUsers(input?: { limit?: number; cursor?: string; q?: string }): Promise<ListAdminUsersResult>
+  /** 管理后台：分页列用户（含搜索）。cursor 走 keyset；传 page/pageSize 走 offset 并返回 total。 */
+  listActiveUsers(input?: {
+    limit?: number
+    cursor?: string
+    q?: string
+    page?: number
+    pageSize?: number
+  }): Promise<ListAdminUsersResult>
+  /** 管理后台：注册统计（近 N 天每日新增注册数）+ 总用户数。 */
+  adminStats(input: { since: string; until: string }): Promise<{
+    registrationsByDay: Array<{ date: string; count: number }>
+    totalUsers: number
+  }>
   /** 管理后台：查单个用户（含已软删）。 */
   adminGetUser(id: string): Promise<AdminUser>
   /** 管理后台：改昵称/角色。 */
@@ -610,11 +625,24 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
         limit: input?.limit,
         cursor: input?.cursor,
         q: input?.q,
+        ...(input?.page !== undefined ? { page: input.page } : {}),
+        ...(input?.pageSize !== undefined ? { pageSize: input.pageSize } : {}),
       })
       return {
         items: page.items.map(toAdminUser),
         ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        ...(page.total !== undefined ? { total: page.total } : {}),
       }
+    },
+
+    async adminStats(input) {
+      const since = new Date(input.since)
+      const until = new Date(input.until)
+      const [registrationsByDay, totalUsers] = await Promise.all([
+        countRegistrationsPerDayBetween(options.db, since, until),
+        countActiveUsersTotal(options.db),
+      ])
+      return { registrationsByDay, totalUsers }
     },
 
     async adminGetUser(id) {

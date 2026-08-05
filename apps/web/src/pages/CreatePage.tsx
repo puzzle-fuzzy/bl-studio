@@ -166,6 +166,14 @@ export function CreatePage() {
 
   const handleValueChange = (name: string, value: unknown) => {
     setValues(current => ({ ...current, [name]: value }))
+    // 字段值一旦变化，立即清除该字段的旧校验错误（如选完参考图后「为必填」红字应消失）。
+    setFieldErrors(current => {
+      if (current.size === 0 || !current.has(name)) return current
+      const next = new Map(current)
+      next.delete(name)
+      return next
+    })
+    setSubmitError(null)
   }
 
   // 选中模型：更新状态 + 写入 ?select=，刷新/分享后选中模型不丢失。

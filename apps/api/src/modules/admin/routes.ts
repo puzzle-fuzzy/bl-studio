@@ -132,4 +132,31 @@ export function createAdminRoutes(deps: ApiDependencies) {
       const items = await Promise.all(data.items.map(item => assetWithReadUrl(item, deps.storage)))
       return { success: true, data: { ...data, items } }
     })
+    .get('/api/admin/stats/overview', async ({ request }) => {
+      await requireAdminUser(request, deps.authService)
+      const now = new Date()
+      const startOfToday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+      const since14d = new Date(startOfToday.getTime() - 13 * 86_400_000)
+      const [calls, userStats] = await Promise.all([
+        deps.generationRepository.countGenerationCallsBetween(startOfToday.toISOString(), now.toISOString()),
+        deps.authService.adminStats({ since: since14d.toISOString(), until: now.toISOString() }),
+      ])
+      const modelLabels = new Map(listModels().map(model => [model.id, model.displayName]))
+      const todayStr = startOfToday.toISOString().slice(0, 10)
+      return {
+        success: true,
+        data: {
+          todayCalls: calls.total,
+          callsByModel: calls.byModel.map(({ modelId, count }) => ({
+            modelId,
+            label: modelLabels.get(modelId) ?? modelId,
+            count,
+          })),
+          callsByHour: calls.byHour,
+          registrationsByDay: userStats.registrationsByDay,
+          todayNewUsers: userStats.registrationsByDay.find(row => row.date === todayStr)?.count ?? 0,
+          totalUsers: userStats.totalUsers,
+        },
+      }
+    })
 }

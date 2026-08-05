@@ -18,6 +18,7 @@ export {
   type ClaimNextQueuedTaskInput,
   type DailyGenerationUsage,
   type DailyGenerationUsageInput,
+  type GenerationCallStats,
   type GenerationUsage,
   type GenerationUsageInput,
   type GenerationEstimate,

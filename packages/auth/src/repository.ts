@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, desc, eq, gt, ilike, isNull, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gte, gt, ilike, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import {
   authActionTokens,
   sessions,
@@ -154,11 +154,17 @@ export interface ListActiveUsersOptions {
   cursor?: string
   /** 邮箱或昵称的模糊搜索（大小写不敏感）。 */
   q?: string
+  /** 页码模式：提供后走 offset 分页并返回 total（供管理后台翻页），与 cursor 互斥。 */
+  page?: number
+  /** offset 分页的每页条数，clamp 同 limit，默认 20。 */
+  pageSize?: number
 }
 
 export interface ListActiveUsersResult {
   items: UserSummaryRecord[]
   nextCursor?: string
+  /** 仅 offset 分页模式（page 已提供）返回的总条数。 */
+  total?: number
 }
 
 interface UserCursorPayload {
@@ -240,18 +246,33 @@ export async function listActiveUsers(
     conditions.push(sql`(${users.createdAt} < ${cursor.createdAt} OR (${users.createdAt} = ${cursor.createdAt} AND ${users.id} < ${cursor.id}))`)
   }
 
+  const projection = {
+    id: users.id,
+    email: users.email,
+    displayName: users.displayName,
+    role: users.role,
+    emailVerifiedAt: users.emailVerifiedAt,
+    createdAt: users.createdAt,
+    updatedAt: users.updatedAt,
+  }
+  const where = and(...conditions)
+
+  // offset 分页模式（管理后台翻页）：page 从 1 开始，额外返回总条数。
+  if (options.page !== undefined) {
+    const pageSize = clampUserListLimit(options.pageSize)
+    const offset = Math.max(0, options.page - 1) * pageSize
+    const [rows, [totalRow]] = await Promise.all([
+      db.select(projection).from(users).where(where).orderBy(desc(users.createdAt), desc(users.id))
+        .limit(pageSize).offset(offset),
+      db.select({ count: sql<number>`count(*)::int` }).from(users).where(where),
+    ])
+    return { items: rows.map(toUserSummary), total: totalRow?.count ?? 0 }
+  }
+
   const rows = await db
-    .select({
-      id: users.id,
-      email: users.email,
-      displayName: users.displayName,
-      role: users.role,
-      emailVerifiedAt: users.emailVerifiedAt,
-      createdAt: users.createdAt,
-      updatedAt: users.updatedAt,
-    })
+    .select(projection)
     .from(users)
-    .where(and(...conditions))
+    .where(where)
     .orderBy(desc(users.createdAt), desc(users.id))
     .limit(limit + 1)
 
@@ -264,6 +285,34 @@ export async function listActiveUsers(
       ? { nextCursor: encodeUserCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
       : {}),
   }
+}
+
+/** 注册统计：按自然日分组计数（YYYY-MM-DD，UTC）。含已软删用户（历史注册事实）。 */
+export async function countRegistrationsPerDayBetween(
+  db: AuthDatabase,
+  since: Date,
+  until: Date,
+): Promise<Array<{ date: string; count: number }>> {
+  const dayExpr = sql`to_char(${users.createdAt}, 'YYYY-MM-DD')`
+  const rows = await db
+    .select({
+      date: sql<string>`${dayExpr}`,
+      count: sql<number>`count(*)::int`,
+    })
+    .from(users)
+    .where(and(gte(users.createdAt, since), lt(users.createdAt, until)))
+    .groupBy(dayExpr)
+    .orderBy(dayExpr)
+  return rows.map(row => ({ date: row.date, count: row.count }))
+}
+
+/** 统计当前未软删用户总数（管理后台概览）。 */
+export async function countActiveUsersTotal(db: AuthDatabase): Promise<number> {
+  const [row] = await db
+    .select({ count: sql<number>`count(*)::int` })
+    .from(users)
+    .where(isNull(users.deletedAt))
+  return row?.count ?? 0
 }
 
 /** 按 id 查询用户（**含已软删**），供管理后台查看历史账号。 */

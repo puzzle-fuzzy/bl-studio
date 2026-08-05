@@ -18,6 +18,9 @@ export const ListUsersQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().trim().min(1).max(1024).optional(),
   q: z.string().trim().min(1).max(120).optional(),
+  /** offset 分页：传 page 后返回 total，供管理后台翻页。 */
+  page: z.coerce.number().int().min(1).max(100000).optional(),
+  pageSize: z.coerce.number().int().min(1).max(100).optional(),
 }).strict()
 
 export const TargetUserSchema = z.object({ userId: z.string().trim().min(1).max(256) }).strict()

@@ -62,6 +62,7 @@ export type {
   AdminUser,
   AdminListUsersResult,
   AdminUserDetail,
+  AdminStatsOverview,
   AdminCreateUserInput,
   AdminUpdateUserInput,
   CreditLedgerEntry,

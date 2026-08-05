@@ -13,6 +13,7 @@ import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
   AdminCreateUserInputSchema,
   AdminListUsersResponseSchema,
+  AdminStatsOverviewSchema,
   AdminUpdateUserInputSchema,
   AdminUserDetailResponseSchema,
   AdminUserResponseSchema,
@@ -50,6 +51,7 @@ import {
 import type {
   AdminCreateUserInput,
   AdminListUsersResult,
+  AdminStatsOverview,
   AdminUpdateUserInput,
   AdminUser,
   AdminUserDetail,
@@ -324,8 +326,16 @@ export interface BailianStudioApiClient {
   // 管理后台（需 admin 角色；否则 403）
   // ---------------------------------------------------------------------------
 
-  /** `GET /api/admin/users` —— 分页列用户，支持 q/cursor/limit。 */
-  listAdminUsers(params?: { q?: string; limit?: number; cursor?: string }): Promise<AdminListUsersResult>
+  /** `GET /api/admin/users` —— 分页列用户，支持 q/cursor/limit 或 page/pageSize。 */
+  listAdminUsers(params?: {
+    q?: string
+    limit?: number
+    cursor?: string
+    page?: number
+    pageSize?: number
+  }): Promise<AdminListUsersResult>
+  /** `GET /api/admin/stats/overview` —— 今日调用 + 近 14 天注册统计概览。 */
+  adminGetStatsOverview(): Promise<AdminStatsOverview>
   /** `POST /api/admin/users` —— 创建账户（跳过邮箱验证）。 */
   adminCreateUser(input: AdminCreateUserInput): Promise<AdminUser>
   /** `GET /api/admin/users/:userId` —— 用户详情（含积分余额）。 */
@@ -807,12 +817,23 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
       if (params.limit !== undefined) search.set('limit', String(params.limit))
       if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.page !== undefined) search.set('page', String(params.page))
+      if (params.pageSize !== undefined) search.set('pageSize', String(params.pageSize))
       const query = search.toString()
       return unwrapData(
         `${base}/api/admin/users${query.length > 0 ? `?${query}` : ''}`,
         { method: 'GET', credentials: 'include' },
         fetchImpl,
         AdminListUsersResponseSchema,
+      )
+    },
+
+    async adminGetStatsOverview() {
+      return unwrapData(
+        `${base}/api/admin/stats/overview`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminStatsOverviewSchema,
       )
     },
 

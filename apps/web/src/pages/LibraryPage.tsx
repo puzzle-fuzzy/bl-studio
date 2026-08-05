@@ -19,7 +19,7 @@ const SOURCES = ['upload', 'link', 'generation', 'derived'] as const
 export function LibraryPage() {
   const [kind, setKind] = useState<string>('all')
   const [source, setSource] = useState<string>('all')
-  const [layout, setLayout] = useState<'grid' | 'timeline'>('grid')
+  const [layout, setLayout] = useState<'grid' | 'timeline' | 'project'>('grid')
   const query: AssetQuery = useMemo(() => {
     const q: AssetQuery = {}
     if (kind !== 'all') q.kind = kind
@@ -33,6 +33,7 @@ export function LibraryPage() {
   const loadMore = useAssetsStore(store => store.loadMore)
 
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const [groupPreview, setGroupPreview] = useState<{ assets: AssetItem[]; index: number } | null>(null)
   const { ref, size } = useContainerSize<HTMLDivElement>()
 
   useEffect(() => {
@@ -52,12 +53,13 @@ export function LibraryPage() {
     <div className="mx-auto max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-2xl font-semibold">资产</h1>
-        <Select value={layout} onValueChange={value => setLayout(value as 'grid' | 'timeline')}>
+        <Select value={layout} onValueChange={value => setLayout(value as 'grid' | 'timeline' | 'project')}>
           <SelectTrigger className="w-28">
             <SelectValue />
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="grid">网格布局</SelectItem>
+            <SelectItem value="project">按项目</SelectItem>
             <SelectItem value="timeline">时间线</SelectItem>
           </SelectContent>
         </Select>
@@ -115,6 +117,16 @@ export function LibraryPage() {
             </p>
           )}
         </div>
+      ) : layout === 'project' ? (
+        <div className="h-[calc(100vh-16rem)] min-h-64 overflow-y-auto pr-1">
+          {items.length === 0 ? (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
+            </p>
+          ) : (
+            <ProjectView items={items} onPreviewGroup={setGroupPreview} />
+          )}
+        </div>
       ) : (
         <div className="h-[calc(100vh-16rem)] min-h-64 overflow-y-auto pr-1">
           {items.length === 0 ? (
@@ -151,6 +163,31 @@ export function LibraryPage() {
           downloadUrl={
             (items[previewIndex]?.url ?? items[previewIndex]?.downloadUrl) !== undefined
               ? resolveApiUrl(items[previewIndex].url ?? items[previewIndex].downloadUrl ?? '')
+              : undefined
+          }
+        />
+      )}
+
+      {groupPreview !== null && groupPreview.assets.length > 0 && (
+        <MediaLightbox
+          items={groupPreview.assets.map(asset => ({
+            key: asset.id,
+            kind: isLightboxKind(asset.kind) ? asset.kind : 'image',
+            url: asset.url ?? asset.downloadUrl,
+            thumbnailUrl: asset.thumbnailUrl,
+            fileName: asset.fileName ?? `${kindLabel(asset.kind)}素材`,
+            text: asset.text,
+          }))}
+          index={groupPreview.index}
+          onIndexChange={index => setGroupPreview(current => (current === null ? null : { ...current, index }))}
+          onClose={() => setGroupPreview(null)}
+          downloadUrl={
+            (groupPreview.assets[groupPreview.index]?.url ?? groupPreview.assets[groupPreview.index]?.downloadUrl) !== undefined
+              ? resolveApiUrl(
+                  groupPreview.assets[groupPreview.index]?.url ??
+                    groupPreview.assets[groupPreview.index]?.downloadUrl ??
+                    '',
+                )
               : undefined
           }
         />
@@ -284,5 +321,90 @@ function TimelineView({
       ))}
     </div>
   )
+}
+
+/**
+ * 按项目视图：把同一次生成（recordId 相同）的多个资产合并成一组，
+ * 组内渲染成任务列表同款的扇形堆叠；上传/链接导入的单个资产自成一组
+ * （recordId 为空），退化为普通方形缩略图。
+ */
+function ProjectView({
+  items,
+  onPreviewGroup,
+}: {
+  items: readonly AssetItem[]
+  onPreviewGroup: (group: { assets: AssetItem[]; index: number }) => void
+}) {
+  const groups = groupAssetsByProject(items)
+  if (groups.length === 0) {
+    return <p className="py-10 text-center text-sm text-muted-foreground">还没有作品，去创作吧</p>
+  }
+  return (
+    <div className="flex flex-wrap gap-3">
+      {groups.map(group => {
+        const primary = group.items[0]
+        if (primary === undefined) return null
+        const count = group.items.length
+        const thumbs = group.items.slice(0, 3)
+        return (
+          <button
+            key={primary.id}
+            type="button"
+            onClick={() => onPreviewGroup({ assets: group.items, index: 0 })}
+            className="group relative block aspect-square w-28 overflow-hidden rounded-lg border hover:border-primary/50"
+            title={count > 1 ? `同一次生成的 ${count} 个素材` : kindLabel(primary.kind)}
+          >
+            {count === 1 ? (
+              <>
+                <AssetThumbnail kind={primary.kind} url={primary.url} thumbnailUrl={primary.thumbnailUrl} />
+                <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-foreground">
+                  {kindLabel(primary.kind)}
+                </span>
+              </>
+            ) : (
+              <>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="relative h-16 w-24">
+                    {thumbs.map((asset, index) => (
+                      <div
+                        key={asset.id}
+                        className="absolute bottom-0 left-1/2 size-14 origin-bottom overflow-hidden rounded-md border bg-muted/30 shadow-sm transition-transform duration-300 group-hover:[--fan:1.6]"
+                        style={{
+                          transform: `translateX(-50%) rotate(calc(${(index - (thumbs.length - 1) / 2) * 12}deg * var(--fan, 1)))`,
+                          zIndex: index,
+                        }}
+                      >
+                        <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <span className="absolute top-1 right-1 z-10 flex size-4 items-center justify-center rounded-full bg-primary text-[9px] font-medium text-primary-foreground">
+                  {count}
+                </span>
+              </>
+            )}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+/** 按 recordId 分组（同一次生成 = 一组），组内已按时间倒序；无 recordId 的资产各自成组。 */
+function groupAssetsByProject(items: readonly AssetItem[]): Array<{ items: AssetItem[] }> {
+  const groups = new Map<string, AssetItem[]>()
+  for (const item of items) {
+    const key = item.recordId ?? `asset:${item.id}`
+    const list = groups.get(key)
+    if (list !== undefined) list.push(item)
+    else groups.set(key, [item])
+  }
+  return [...groups.values()]
+    .map(items => ({ items }))
+    .sort(
+      (a, b) =>
+        new Date(b.items[0]?.createdAt ?? 0).getTime() - new Date(a.items[0]?.createdAt ?? 0).getTime(),
+    )
 }
 

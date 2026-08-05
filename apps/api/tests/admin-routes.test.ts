@@ -54,6 +54,18 @@ const fakeGenerationRepository = {
       })),
     }
   },
+  countGenerationCallsBetween: async () => ({
+    total: 5,
+    byModel: [
+      { modelId: 'qwen-image', count: 3 },
+      { modelId: 'vidu-reference-video', count: 2 },
+    ],
+    byHour: [
+      { hour: 9, modelId: 'qwen-image', count: 2 },
+      { hour: 10, modelId: 'qwen-image', count: 1 },
+      { hour: 10, modelId: 'vidu-reference-video', count: 2 },
+    ],
+  }),
 } as unknown as GenerationRepository
 
 const app = createTestApp({
@@ -85,6 +97,7 @@ describe('admin routes', () => {
       ['PATCH', '/api/admin/users/u1'],
       ['DELETE', '/api/admin/users/u1'],
       ['GET', '/api/admin/users/u1/assets'],
+      ['GET', '/api/admin/stats/overview'],
     ] as const
     for (const [method, path] of paths) {
       const response = await app.handle(adminRequest(path, { method }))
@@ -97,6 +110,37 @@ describe('admin routes', () => {
     expect(response.status).toBe(200)
     const body = await response.json() as { data: { items: unknown[] } }
     expect(Array.isArray(body.data.items)).toBe(true)
+  })
+
+  it('supports offset pagination (page/pageSize) and returns total', async () => {
+    const response = await app.handle(adminRequest('/api/admin/users?page=2&pageSize=20'))
+    expect(response.status).toBe(200)
+    const body = await response.json() as { data: { total?: number } }
+    expect(body.data.total).toBe(37)
+  })
+
+  it('returns a stats overview with model labels and registrations', async () => {
+    const response = await app.handle(adminRequest('/api/admin/stats/overview'))
+    expect(response.status).toBe(200)
+    const body = await response.json() as {
+      data: {
+        todayCalls: number
+        callsByModel: Array<{ modelId: string; label: string; count: number }>
+        callsByHour: Array<{ hour: number; modelId: string; count: number }>
+        registrationsByDay: Array<{ date: string; count: number }>
+        todayNewUsers: number
+        totalUsers: number
+      }
+    }
+    expect(body.data.todayCalls).toBe(5)
+    expect(body.data.callsByModel[0]).toMatchObject({ modelId: 'qwen-image', count: 3 })
+    // modelId 应被 enrich 成模型展示名（至少非空字符串）
+    expect(typeof body.data.callsByModel[0]?.label).toBe('string')
+    expect(body.data.callsByModel[0]?.label.length ?? 0).toBeGreaterThan(0)
+    expect(body.data.callsByHour.some(row => row.hour === 10 && row.modelId === 'vidu-reference-video' && row.count === 2)).toBe(true)
+    expect(body.data.totalUsers).toBe(1)
+    expect(body.data.todayNewUsers).toBe(0)
+    expect(Array.isArray(body.data.registrationsByDay)).toBe(true)
   })
 
   it('creates a user and records an audit event', async () => {

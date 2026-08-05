@@ -10,13 +10,15 @@ import { cn } from '@/lib/utils'
  * 参考池（refs）来自上方「输入参考素材」媒体字段，是**稳定列表**（外部唯一事实源，
  * 编辑器只引用、不增删）。文本以 `@图N` 中性标记承载引用（N 为 1-based 序号，见
  * lib/reference-format），DOM 内标记渲染为**行内缩略图 chip**（contentEditable=false）。
- * 按 `@` 弹出已选参考图下拉，点一张在光标处插入 `@图N`。
+ * 按 `@` 在**输入框下方**弹出已选参考图下拉（固定在输入框底部，不做 caret 浮动，
+ * 对齐 lobehub mention 菜单做法），键盘 ArrowUp/Down + Enter 选择，WAI-ARIA combobox
+ * 模式。点选后在光标处**直接插入 chip 节点**（不整块重建），光标保持在 chip 之后。
  *
  * 核心约定：
  * - 编辑期间以 DOM 为唯一事实源，`onInput` 时序列化回文本（不做重排编号）；
  * - 外部变化（回显、重新还原）由 `value`/`refs` 变化触发整块重渲染；
- * - 纯文本输入不触碰标记时不会重渲染，光标得以保留；
- * - 插入标记后立即 `renderInto` 转成 chip，避免停留在纯文本形态。
+ * - 插入 chip 用 Range API 原位插入 + 手动复位 caret，纯文本输入不触碰 DOM 时
+ *   光标得以保留（undo/删除/粘贴都交给浏览器原生行为）。
  */
 
 interface RichPromptEditorProps {
@@ -27,11 +29,14 @@ interface RichPromptEditorProps {
 }
 
 const MARKER_RE = /@图(\d+)/g
+const PICKER_ID = 'prompt-ref-picker'
 
 export function RichPromptEditor({ value, refs, onChange, disabled }: RichPromptEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
+  const pickerRef = useRef<HTMLDivElement>(null)
   const savedRangeRef = useRef<Range | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
+  const [activeIndex, setActiveIndex] = useState(0)
 
   // 外部 value/refs 变化时同步 DOM（用户输入产生的变化 text 已一致而跳过，保留光标）。
   useEffect(() => {
@@ -43,20 +48,25 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, refs])
 
-  // 下拉打开时：点击外部 / Esc / 滚动关闭。
+  // 下拉打开时：点击外部 / Esc / 页面滚动关闭（下拉自身滚动不关闭，允许滚长列表）。
   useEffect(() => {
     if (!pickerOpen) return
     const close = () => setPickerOpen(false)
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close()
     }
+    const onScroll = (event: Event) => {
+      if (!(event.target instanceof Node) || pickerRef.current?.contains(event.target) !== true) {
+        close()
+      }
+    }
     document.addEventListener('mousedown', close)
     document.addEventListener('keydown', onKeyDown)
-    window.addEventListener('scroll', close, true)
+    window.addEventListener('scroll', onScroll, true)
     return () => {
       document.removeEventListener('mousedown', close)
       document.removeEventListener('keydown', onKeyDown)
-      window.removeEventListener('scroll', close, true)
+      window.removeEventListener('scroll', onScroll, true)
     }
   }, [pickerOpen])
 
@@ -68,13 +78,31 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
-    if (event.key !== '@' || disabled) return
-    event.preventDefault()
-    const selection = window.getSelection()
-    if (selection !== null && selection.rangeCount > 0) {
-      savedRangeRef.current = selection.getRangeAt(0).cloneRange()
+    if (disabled) return
+    // @ 触发下拉：记下当前光标，弹出前不输入字符。
+    if (event.key === '@') {
+      event.preventDefault()
+      const selection = window.getSelection()
+      if (selection !== null && selection.rangeCount > 0) {
+        savedRangeRef.current = selection.getRangeAt(0).cloneRange()
+      }
+      setActiveIndex(0)
+      setPickerOpen(true)
+      return
     }
-    setPickerOpen(true)
+    if (!pickerOpen || refs.length === 0) return
+    // 下拉打开时键盘导航（combobox 模式）：方向键移动高亮，Enter 选中。
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault()
+      const delta = event.key === 'ArrowDown' ? 1 : -1
+      setActiveIndex(current => (current + delta + refs.length) % refs.length)
+      return
+    }
+    if (event.key === 'Enter') {
+      event.preventDefault()
+      const asset = refs[activeIndex]
+      if (asset !== undefined) handlePick(asset)
+    }
   }
 
   const handlePick = (asset: AssetItem) => {
@@ -85,24 +113,34 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
     if (index <= 0) return
 
     editor.focus()
-    // 恢复光标并在原位置插入 @图N 标记；无保存范围则追加到末尾。
-    if (savedRangeRef.current !== null) {
-      const selection = window.getSelection()
-      if (selection !== null) {
-        selection.removeAllRanges()
-        selection.addRange(savedRangeRef.current)
-      }
-    } else {
-      savedRangeRef.current = null
-    }
-    insertTextAtCaret(editor, referenceMarker(index))
+    const saved = savedRangeRef.current
     savedRangeRef.current = null
 
-    // 立即把文本标记渲染为 chip（reconcile 守卫会因 text 已一致而跳过重渲染）。
+    // 直接 DOM 插入 chip（不 execCommand、不整块重建），光标由下面手动复位到 chip 后。
+    const chip = createChip(asset, index)
+    const caretPoint = saved !== null && editor.contains(saved.startContainer) ? saved : null
+    const selection = window.getSelection()
+    if (caretPoint !== null) {
+      caretPoint.deleteContents()
+      caretPoint.insertNode(chip)
+    } else {
+      editor.appendChild(chip)
+    }
+
+    const caret = document.createRange()
+    caret.setStartAfter(chip)
+    caret.collapse(true)
+    if (selection !== null) {
+      selection.removeAllRanges()
+      selection.addRange(caret)
+    }
+
     const text = serializeText(editor)
-    renderInto(editor, text, refs)
-    onChange(text)
+    if (text !== value) onChange(text)
   }
+
+  const activeDescendant =
+    pickerOpen && refs[activeIndex] !== undefined ? `prompt-ref-option-${activeIndex}` : undefined
 
   return (
     <div className="relative space-y-2">
@@ -110,6 +148,13 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
         ref={editorRef}
         contentEditable={!disabled}
         suppressContentEditableWarning
+        role="combobox"
+        aria-expanded={pickerOpen}
+        aria-haspopup="listbox"
+        aria-controls={pickerOpen ? PICKER_ID : undefined}
+        aria-autocomplete="list"
+        aria-activedescendant={activeDescendant}
+        aria-label="提示词"
         data-placeholder="描述你想要生成的内容…（输入 @ 可引用图片）"
         onInput={handleInput}
         onKeyDown={handleKeyDown}
@@ -121,8 +166,11 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
       />
       {pickerOpen && (
         <div
+          ref={pickerRef}
+          id={PICKER_ID}
+          role="listbox"
           onMouseDown={event => event.stopPropagation()}
-          className="absolute z-50 mt-1 max-h-56 w-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
+          className="absolute top-full left-0 z-50 mt-1 max-h-56 w-72 overflow-y-auto rounded-md border bg-popover p-1 shadow-md"
         >
           <p className="px-2 pt-1 pb-0.5 text-xs text-muted-foreground">选择要引用的参考图</p>
           {refs.length === 0 ? (
@@ -132,8 +180,15 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
               <button
                 key={asset.id}
                 type="button"
+                role="option"
+                id={`prompt-ref-option-${index}`}
+                aria-selected={index === activeIndex}
                 onClick={() => handlePick(asset)}
-                className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent"
+                onMouseEnter={() => setActiveIndex(index)}
+                className={cn(
+                  'flex w-full items-center gap-2 rounded px-2 py-1.5 text-sm hover:bg-accent',
+                  index === activeIndex && 'bg-accent',
+                )}
               >
                 <span className="size-6 shrink-0 overflow-hidden rounded">
                   <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />
@@ -156,32 +211,36 @@ function renderInto(editor: HTMLDivElement, value: string, refs: readonly AssetI
       editor.appendChild(document.createTextNode(segment))
       continue
     }
-    const ref = refs[segment - 1]
-    const chip = document.createElement('span')
-    chip.contentEditable = 'false'
-    chip.dataset.marker = referenceMarker(segment)
-    chip.dataset.assetId = ref?.id ?? ''
-    chip.className =
-      'mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1.5 pl-0.5 text-xs align-middle'
-
-    const thumb = document.createElement('span')
-    thumb.className = 'size-5 shrink-0 overflow-hidden rounded'
-    const source = ref?.thumbnailUrl ?? ref?.url
-    if (source !== undefined) {
-      const img = document.createElement('img')
-      img.src = source
-      img.alt = ''
-      img.className = 'size-full object-cover'
-      thumb.appendChild(img)
-    } else {
-      thumb.className = cn(thumb.className, 'bg-muted-foreground/20')
-    }
-    const label = document.createElement('span')
-    label.textContent = `图${segment}`
-    chip.appendChild(thumb)
-    chip.appendChild(label)
-    editor.appendChild(chip)
+    editor.appendChild(createChip(refs[segment - 1], segment))
   }
+}
+
+/** 构建单个引用 chip 节点（行内缩略图 + 图N 标签，contentEditable=false）。 */
+function createChip(ref: AssetItem | undefined, index: number): HTMLSpanElement {
+  const chip = document.createElement('span')
+  chip.contentEditable = 'false'
+  chip.dataset.marker = referenceMarker(index)
+  chip.dataset.assetId = ref?.id ?? ''
+  chip.className =
+    'mx-0.5 inline-flex cursor-pointer items-center gap-1 rounded-md border bg-muted/40 py-0.5 pr-1.5 pl-0.5 text-xs align-middle'
+
+  const thumb = document.createElement('span')
+  thumb.className = 'size-5 shrink-0 overflow-hidden rounded'
+  const source = ref?.thumbnailUrl ?? ref?.url
+  if (source !== undefined) {
+    const img = document.createElement('img')
+    img.src = source
+    img.alt = ''
+    img.className = 'size-full object-cover'
+    thumb.appendChild(img)
+  } else {
+    thumb.className = cn(thumb.className, 'bg-muted-foreground/20')
+  }
+  const label = document.createElement('span')
+  label.textContent = `图${index}`
+  chip.appendChild(thumb)
+  chip.appendChild(label)
+  return chip
 }
 
 /**
@@ -212,13 +271,4 @@ function splitTextAndMarkers(text: string): Array<string | number> {
   }
   if (last < text.length) parts.push(text.slice(last))
   return parts
-}
-
-function insertTextAtCaret(editor: HTMLDivElement, text: string): void {
-  const selection = window.getSelection()
-  if (selection !== null && selection.rangeCount > 0 && editor.contains(selection.anchorNode)) {
-    document.execCommand('insertText', false, text)
-    return
-  }
-  editor.appendChild(document.createTextNode(text))
 }

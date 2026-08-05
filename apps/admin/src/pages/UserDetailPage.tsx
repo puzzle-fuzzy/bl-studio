@@ -161,7 +161,7 @@ export function UserDetailPage() {
                 </SelectContent>
               </Select>
             </div>
-            <Button variant="outline" size="sm" onClick={() => setGrantOpen(true)}>
+            <Button variant="outline" onClick={() => setGrantOpen(true)}>
               <Gift data-icon />
               赠送积分
             </Button>

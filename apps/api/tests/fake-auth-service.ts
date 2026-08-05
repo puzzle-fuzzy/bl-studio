@@ -49,7 +49,12 @@ export function createFakeAuthService(
       createdAt: '2026-07-25T00:00:00.000Z',
       updatedAt: '2026-07-25T00:00:00.000Z',
     }),
-    listActiveUsers: async () => ({ items: [toAdminUser(user())], nextCursor: undefined }),
+    listActiveUsers: async input => ({
+      items: [toAdminUser(user())],
+      nextCursor: undefined,
+      // offset 分页模式（带 page）返回总条数，供前端翻页。
+      ...(input?.page !== undefined ? { total: 37 } : {}),
+    }),
     adminGetUser: async id => toAdminUser({ ...user(), id }),
     adminUpdateUser: async (id, input) => ({
       ...toAdminUser({ ...user(), id }),
@@ -57,5 +62,6 @@ export function createFakeAuthService(
       ...(input.displayName !== undefined ? { displayName: input.displayName } : {}),
     }),
     softDeleteUser: async () => {},
+    adminStats: async () => ({ registrationsByDay: [], totalUsers: 1 }),
   }
 }
