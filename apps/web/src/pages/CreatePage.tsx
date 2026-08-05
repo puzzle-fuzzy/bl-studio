@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ChevronDown, Info } from 'lucide-react'
+import { ChevronDown, Info, Loader2, X } from 'lucide-react'
 import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ModelSelector } from '@/components/create/ModelSelector'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ParameterForm } from '@/components/create/ParameterForm'
 import { PromptInput } from '@/components/create/PromptInput'
 import { CreationPresetPanel } from '@/components/create/CreationPresetPanel'
@@ -22,6 +23,7 @@ import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
 import { modelNameZh } from '@/lib/model-modes'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
+import { decodeDeepLinkParams } from '@/lib/deeplink-params'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 
@@ -52,6 +54,10 @@ export function CreatePage() {
   const [isRestoring, setIsRestoring] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Map<string, FieldIssue>>(new Map())
+
+  // 对比生成：同提示词多模型各提交一条（同一 batchId 分组）。
+  const [compareModels, setCompareModels] = useState<ModelCatalogItem[]>([])
+  const [compareBusy, setCompareBusy] = useState(false)
 
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const estimateEpoch = useRef(0)
@@ -107,6 +113,46 @@ export function CreatePage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [modelId])
+
+  // `?params=<base64url JSON>` 深链：画廊/提示词库复用 —— 按 manifest 校验后把
+  // 纯文本参数预载进表单（媒体值已在编码侧剔除，这里再兜底过滤）。
+  const deepLinkParamsToken = searchParams.get('params')
+  useEffect(() => {
+    if (model === undefined || deepLinkParamsToken === null) return
+    const restored = decodeDeepLinkParams(model, deepLinkParamsToken)
+    if (Object.keys(restored).length > 0) {
+      setValues(current => ({ ...current, ...restored }))
+    }
+  }, [model, deepLinkParamsToken])
+
+  // `?edit=<assetId>`（图生图编辑） / `?ref=<assetId>`（参考图生成变体）：
+  // 拉取该资产并预载到选中模型的第一个图片媒体参数。
+  const editAssetId = searchParams.get('edit')
+  const refAssetId = searchParams.get('ref')
+  useEffect(() => {
+    if (model === undefined) return
+    const assetId = editAssetId ?? refAssetId
+    if (assetId === null) return
+    let cancelled = false
+    apiClient
+      .getAsset(assetId)
+      .then(asset => {
+        if (cancelled) return
+        const mediaParameter = model.parameters.find(
+          parameter => parameter.type === 'media' && parameter.mediaKind === 'image',
+        )
+        if (mediaParameter === undefined) return
+        setValues(current => {
+          const existing: AssetItem[] = Array.isArray(current[mediaParameter.name])
+            ? (current[mediaParameter.name] as AssetItem[])
+            : []
+          if (existing.some(item => item.id === asset.id)) return current
+          return { ...current, [mediaParameter.name]: [...existing, asset] }
+        })
+      })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [model, editAssetId, refAssetId])
 
   // 参数变化 → 防抖费用预估。必填项缺失（如图生图缺输入图像）时跳过请求，避免无效报错。
   useEffect(() => {
@@ -211,6 +257,31 @@ export function CreatePage() {
     } finally {
       setIsSubmitting(false)
     }
+  }
+
+  /** 对比生成：用当前表单的提示词/文本参数，对选中的每个模型各提交一条（同 batchId）。 */
+  const handleCompareSubmit = async () => {
+    if (compareModels.length === 0 || compareBusy) return
+    setCompareBusy(true)
+    const batchId = crypto.randomUUID()
+    let submitted = 0
+    for (const compareModel of compareModels) {
+      const { params, assetRefs } = buildSubmitPayload(compareModel, values)
+      const payload = { modelId: compareModel.id, params, assetRefs }
+      const idempotencyKey = idempotencyKeyFor(payload)
+      try {
+        await apiClient.createGeneration({ ...payload, idempotencyKey, batchId })
+        clearIdempotencyKey(payload)
+        submitted += 1
+      } catch (error) {
+        showMessage({ title: `${modelNameZh(compareModel)}：${userErrorMessage(error)}`, tone: 'warning' })
+      }
+    }
+    if (submitted > 0) {
+      void refreshGenerations()
+      showMessage({ title: `已提交 ${submitted} 个对比任务`, tone: 'success' })
+    }
+    setCompareBusy(false)
   }
 
   if (models.length === 0) {
@@ -343,6 +414,51 @@ export function CreatePage() {
                   setValues(preset.params)
                 }}
               />
+
+              {/* 对比生成：同提示词多模型并行提交（同一 batchId）。 */}
+              <Collapsible className="group space-y-2 rounded-lg border border-dashed p-3">
+                <CollapsibleTrigger asChild>
+                  <button
+                    type="button"
+                    className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground"
+                  >
+                    对比生成（同提示词多模型）
+                    <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
+                  </button>
+                </CollapsibleTrigger>
+                <CollapsibleContent className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    用当前提示词/文本参数对多个模型各提交一条对比任务。参考图/媒体参数不跨模型复用；请选择同一类模型以获得可比结果。
+                  </p>
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    {compareModels.map(candidate => (
+                      <span key={candidate.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs">
+                        {modelNameZh(candidate)}
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-destructive"
+                          onClick={() => setCompareModels(current => current.filter(item => item.id !== candidate.id))}
+                          aria-label={`移除 ${candidate.id}`}
+                        >
+                          <X className="size-3" />
+                        </button>
+                      </span>
+                    ))}
+                    {compareModels.length < 4 && (
+                      <ModelCompareAdd models={models} compareIds={compareModels.map(item => item.id)} onAdd={model => setCompareModels(current => [...current, model])} />
+                    )}
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    disabled={compareModels.length === 0 || compareBusy}
+                    onClick={() => void handleCompareSubmit()}
+                  >
+                    {compareBusy ? <Loader2 className="size-4 animate-spin" /> : `开始对比（${compareModels.length} 个模型）`}
+                  </Button>
+                </CollapsibleContent>
+              </Collapsible>
             </div>
           </section>
         )}
@@ -353,6 +469,33 @@ export function CreatePage() {
         <GenerationsPanel variant="embedded" />
       </div>
     </form>
+  )
+}
+
+/** 对比生成：从模型目录挑选一个尚未加入对比列表的模型。 */
+function ModelCompareAdd({
+  models,
+  compareIds,
+  onAdd,
+}: {
+  models: readonly ModelCatalogItem[]
+  compareIds: readonly string[]
+  onAdd: (model: ModelCatalogItem) => void
+}) {
+  const available = models.filter(model => !compareIds.includes(model.id))
+  if (available.length === 0) return null
+  return (
+    <Select value="" onValueChange={modelId => {
+      const selected = available.find(model => model.id === modelId)
+      if (selected !== undefined) onAdd(selected)
+    }}>
+      <SelectTrigger className="h-7 w-36 text-xs"><SelectValue placeholder="+ 添加模型" /></SelectTrigger>
+      <SelectContent>
+        {available.map(model => (
+          <SelectItem key={model.id} value={model.id}>{modelNameZh(model)}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 

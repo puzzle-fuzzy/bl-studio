@@ -21,6 +21,9 @@ import {
 } from './lib/request-guards'
 import type { ApiDependencies } from './dependencies'
 import { createGenerationRoutes } from './modules/generations/routes'
+import { createGalleryRoutes } from './modules/gallery/routes'
+import { createPromptLibraryRoutes } from './modules/prompt-library/routes'
+import { createFeedbackRoutes } from './modules/feedback/routes'
 import { modelRoutes } from './modules/models/routes'
 import { createArtifactRoutes } from './modules/artifacts/routes'
 import { createAssetRoutes } from './modules/assets'
@@ -140,6 +143,9 @@ export function createApp(options: ApiAppOptions) {
   .use(modelRoutes)
   .use(createAuthRoutes(dependencies))
   .use(createGenerationRoutes(dependencies))
+  .use(createGalleryRoutes(dependencies))
+  .use(createPromptLibraryRoutes(dependencies))
+  .use(createFeedbackRoutes(dependencies))
   .use(createShareRoutes(dependencies))
   .use(createArtifactRoutes(dependencies))
   .use(createAssetRoutes(dependencies))

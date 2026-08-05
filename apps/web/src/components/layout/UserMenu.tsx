@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { LogIn, LogOut, KeyRound, Moon, Sun } from 'lucide-react'
+import { LogIn, LogOut, KeyRound, MessageSquare, Moon, Sun } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useTheme } from 'next-themes'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton } from '@/components/ui/sidebar'
 import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
+import { FeedbackDialog } from '@/components/feedback/FeedbackDialog'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { useAuthStore } from '@/stores/auth-store'
 import { useAuthDialogStore } from '@/stores/auth-dialog-store'
@@ -31,6 +32,7 @@ export function UserMenu() {
   const { resolvedTheme, setTheme } = useTheme()
   const navigate = useNavigate()
   const [changeOpen, setChangeOpen] = useState(false)
+  const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   if (status !== 'authenticated' || user === null) {
     return (
@@ -76,6 +78,10 @@ export function UserMenu() {
             <KeyRound data-icon />
             修改密码
           </DropdownMenuItem>
+          <DropdownMenuItem className="py-2" onClick={() => setFeedbackOpen(true)}>
+            <MessageSquare data-icon />
+            意见反馈
+          </DropdownMenuItem>
           <DropdownMenuItem
             className="py-2"
             onClick={() => {
@@ -99,6 +105,7 @@ export function UserMenu() {
         </DropdownMenuContent>
       </DropdownMenu>
       <ChangePasswordDialog open={changeOpen} onOpenChange={setChangeOpen} />
+      <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
   )
 }

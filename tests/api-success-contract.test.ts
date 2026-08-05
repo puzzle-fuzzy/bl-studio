@@ -59,6 +59,7 @@ const CONTRACT_USER = {
   displayName: 'API Contract',
   role: 'user' as const,
   emailVerifiedAt: '2026-07-25T00:00:00.000Z',
+  bannedAt: null,
 }
 
 let generationHandle: IsolatedGenerationRepository

@@ -19,6 +19,7 @@ const record = (userId: string): GenerationRecord => ({
   providerModel: 'qwen-image',
   category: 'image',
   inputParams: { prompt: 'lantern' },
+  visibility: 'private',
   status: 'succeeded',
   costEstimate: 20,
   currency: 'CNY',

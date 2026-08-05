@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, desc, eq, gte, gt, ilike, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gte, gt, ilike, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import {
   authActionTokens,
   sessions,
@@ -23,6 +23,9 @@ export interface UserRepositoryRecord {
   role: 'user' | 'admin'
   emailVerifiedAt: Date | null
   githubId: string | null
+  /** 非空即封禁；封禁 ≠ 软删除（保留邮箱占用），只是禁止登录/签发会话。 */
+  bannedAt: Date | null
+  bannedBy: string | null
   createdAt: Date
   updatedAt: Date
 }
@@ -36,6 +39,8 @@ function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
     role: row.role as UserRepositoryRecord['role'],
     emailVerifiedAt: row.emailVerifiedAt,
     githubId: row.githubId,
+    bannedAt: row.bannedAt,
+    bannedBy: row.bannedBy,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -143,6 +148,8 @@ export interface UserSummaryRecord {
   displayName: string | null
   role: 'user' | 'admin'
   emailVerifiedAt: Date | null
+  /** 非空即封禁。 */
+  bannedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }
@@ -208,6 +215,7 @@ function toUserSummary(row: {
   displayName: string | null
   role: string
   emailVerifiedAt: Date | null
+  bannedAt: Date | null
   createdAt: Date
   updatedAt: Date
 }): UserSummaryRecord {
@@ -217,6 +225,7 @@ function toUserSummary(row: {
     displayName: row.displayName,
     role: row.role as UserSummaryRecord['role'],
     emailVerifiedAt: row.emailVerifiedAt,
+    bannedAt: row.bannedAt,
     createdAt: row.createdAt,
     updatedAt: row.updatedAt,
   }
@@ -252,6 +261,7 @@ export async function listActiveUsers(
     displayName: users.displayName,
     role: users.role,
     emailVerifiedAt: users.emailVerifiedAt,
+    bannedAt: users.bannedAt,
     createdAt: users.createdAt,
     updatedAt: users.updatedAt,
   }
@@ -332,6 +342,75 @@ export async function softDeleteUser(db: AuthDatabase, userId: string, now: Date
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning({ id: users.id })
   return row !== undefined
+}
+
+/**
+ * 批量软删除用户。仅对未删除行生效；返回实际生效行数。删用户会级联清理其
+ * 生成记录/会话/资产等（FK cascade），调用方需在 API 层剔除当前 admin 自身。
+ */
+export async function softDeleteUsers(db: AuthDatabase, userIds: string[], now: Date): Promise<number> {
+  const rows = await db
+    .update(users)
+    .set({ deletedAt: now, deletedBy: 'admin.user.delete', updatedAt: now, updatedBy: 'admin.user.delete' })
+    .where(and(inArray(users.id, userIds), isNull(users.deletedAt)))
+    .returning({ id: users.id })
+  return rows.length
+}
+
+/** 封禁用户（置 banned_at）。仅对未删除行生效，返回是否真的更新。 */
+export async function setUserBanned(
+  db: AuthDatabase,
+  input: { userId: string; bannedAt: Date; bannedBy: string },
+): Promise<boolean> {
+  const [row] = await db
+    .update(users)
+    .set({
+      bannedAt: input.bannedAt,
+      bannedBy: input.bannedBy,
+      updatedAt: input.bannedAt,
+      updatedBy: input.bannedBy,
+    })
+    .where(and(eq(users.id, input.userId), isNull(users.deletedAt)))
+    .returning({ id: users.id })
+  return row !== undefined
+}
+
+/** 批量封禁。仅对未删除且未封禁的行生效，返回实际生效行数。 */
+export async function setUsersBanned(
+  db: AuthDatabase,
+  input: { userIds: string[]; bannedAt: Date; bannedBy: string },
+): Promise<number> {
+  const rows = await db
+    .update(users)
+    .set({
+      bannedAt: input.bannedAt,
+      bannedBy: input.bannedBy,
+      updatedAt: input.bannedAt,
+      updatedBy: input.bannedBy,
+    })
+    .where(and(inArray(users.id, input.userIds), isNull(users.deletedAt), isNull(users.bannedAt)))
+    .returning({ id: users.id })
+  return rows.length
+}
+
+/** 解除封禁（清空 banned_at/banned_by）。仅对未删除行生效，返回是否真的更新。 */
+export async function clearUserBanned(db: AuthDatabase, userId: string, now: Date): Promise<boolean> {
+  const [row] = await db
+    .update(users)
+    .set({ bannedAt: null, bannedBy: null, updatedAt: now, updatedBy: 'admin.user.unban' })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning({ id: users.id })
+  return row !== undefined
+}
+
+/** 批量解除封禁。返回实际生效行数。 */
+export async function clearUsersBanned(db: AuthDatabase, userIds: string[], now: Date): Promise<number> {
+  const rows = await db
+    .update(users)
+    .set({ bannedAt: null, bannedBy: null, updatedAt: now, updatedBy: 'admin.user.unban' })
+    .where(and(inArray(users.id, userIds), isNull(users.deletedAt)))
+    .returning({ id: users.id })
+  return rows.length
 }
 
 export interface UpdateUserAdminInput {
@@ -523,7 +602,8 @@ export async function consumeAuthActionToken(
   }
 
   const user = await findActiveUserById(db, token.userId)
-  if (user === undefined) {
+  if (user === undefined || user.bannedAt !== null) {
+    // 已软删或已封禁的用户：验证/重置链接统一失效（不区分，避免状态泄露）。
     throw new AuthError('AUTH_TOKEN_INVALID', '验证链接无效，请重新申请。')
   }
 

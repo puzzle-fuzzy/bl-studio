@@ -51,6 +51,13 @@ export const users = pgTable('users', {
   githubId: text('github_id'),
   displayName: text('display_name'),
   role: text('role').notNull().default('user'),
+  /**
+   * 封禁时间，非空即封禁。封禁 ≠ 软删除：封禁保留邮箱占用与账号数据，
+   * 只是禁止登录/签发新会话/提交新生成；在途任务放行完成。见
+   * `docs/05-community-features.md` B 节。
+   */
+  bannedAt: timestamp('banned_at', { withTimezone: true }),
+  bannedBy: text('banned_by'),
   createdBy: text('created_by').notNull().default('system'),
   updatedBy: text('updated_by').notNull().default('system'),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
@@ -141,7 +148,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),
@@ -208,6 +215,17 @@ export const generationRecords = pgTable('generation_records', {
    */
   parentRecordId: text('parent_record_id').references((): AnyPgColumn => generationRecords.id, { onDelete: 'set null' }),
   /**
+   * 作品可见性：'private'（仅本人可见）| 'public'（出现在社区画廊，所有
+   * 登录同事可见）。默认 private，用户主动公开。画廊查询只展示 status 为
+   * succeeded、未删未藏且 visibility='public' 的记录。
+   */
+  visibility: text('visibility').notNull().default('private'),
+  /**
+   * 对比批次 ID：同一次"同 prompt 多模型对比生成"提交的多条记录共用同一
+   * batchId，供前端"本次对比"分组筛选。非对比提交为空。
+   */
+  batchId: text('batch_id'),
+  /**
    * 幂等键，由客户端提供。配合下方的部分唯一索引，保证同一用户同一 key
    * 不会被重复提交成两条记录。
    */
@@ -243,6 +261,11 @@ export const generationRecords = pgTable('generation_records', {
   ),
   // 衍生关系反查：由父记录找其衍生物。
   index('generation_records_parent_record_idx').on(table.parentRecordId),
+  check('generation_records_visibility_check', sql`${table.visibility} in ('private', 'public')`),
+  // 社区画廊主查询路径：公开 + 成功 + 未删未藏，按创建时间倒序 keyset 分页。
+  index('generation_records_public_gallery_idx').on(table.visibility, table.status, table.deletedAt, table.createdAt),
+  // 对比批次反查：一次对比生成的 N 条记录分组。
+  index('generation_records_batch_id_idx').on(table.batchId),
 ])
 
 /**
@@ -466,6 +489,93 @@ export const generationInputAssets = pgTable('generation_input_assets', {
 }, table => [
   uniqueIndex('generation_input_assets_parameter_idx').on(table.generationId, table.parameterName, table.position),
   index('generation_input_assets_asset_idx').on(table.assetId),
+])
+
+/**
+ * 社区画廊点赞 —— 对公开作品的公开互动（计数 + 已赞态）。
+ * 仅允许对 visibility='public' 的记录点赞（API 层校验）；复合唯一索引让
+ * toggle 幂等（onConflictDoNothing）。删用户/记录时级联清理。
+ */
+export const generationLikes = pgTable('generation_likes', {
+  recordId: text('record_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  uniqueIndex('generation_likes_record_user_idx').on(table.recordId, table.userId),
+  index('generation_likes_user_created_idx').on(table.userId, table.createdAt),
+])
+
+/**
+ * 个人收藏 —— 书签语义：可收藏自己或他人、公开或私有的作品，仅本人可见。
+ */
+export const generationFavorites = pgTable('generation_favorites', {
+  recordId: text('record_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  uniqueIndex('generation_favorites_record_user_idx').on(table.recordId, table.userId),
+  index('generation_favorites_user_created_idx').on(table.userId, table.createdAt),
+])
+
+/**
+ * 提示词资产库 —— 服务端命名库：存"提示词 + 模型 + 文本参数"，
+ * 媒体/参考图参数不入库（跨用户复用不泄露个人素材）。
+ */
+export const promptLibrary = pgTable('prompt_library', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(),
+  modelId: text('model_id').notNull(),
+  prompt: text('prompt').notNull(),
+  paramsJson: jsonb('params_json').$type<Record<string, unknown>>().notNull(),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  index('prompt_library_user_updated_idx').on(table.userId, table.updatedAt),
+])
+
+/**
+ * 用户反馈 —— 应用内意见反馈通道（提建议/报 bug 等），admin 在后台流转状态。
+ */
+export const userFeedback = pgTable('user_feedback', {
+  id: text('id').primaryKey(),
+  /** 提交者；用户被删后保留（set null），不破坏反馈时间线。 */
+  userId: text('user_id').references(() => users.id, { onDelete: 'set null' }),
+  kind: text('kind').notNull(),
+  content: text('content').notNull(),
+  /** open | reviewing | resolved | closed。 */
+  status: text('status').notNull().default('open'),
+  resolvedBy: text('resolved_by'),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('user_feedback_kind_check', sql`${table.kind} in ('feedback', 'bug', 'suggestion', 'complaint')`),
+  check('user_feedback_status_check', sql`${table.status} in ('open', 'reviewing', 'resolved', 'closed')`),
+  index('user_feedback_status_created_idx').on(table.status, table.createdAt),
+])
+
+/**
+ * 每模型成本单价（admin 维护）—— 供成本毛利分析：成本 = 调用数 × unitCostCents。
+ * 播种脚本 infra/scripts/seed-model-costs.ts 从 infra/seed/model-costs.json 初始化。
+ */
+export const modelCosts = pgTable('model_costs', {
+  modelId: text('model_id').primaryKey(),
+  unitCostCents: integer('unit_cost_cents').notNull(),
+  currency: text('currency').notNull().default('CNY'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('model_costs_unit_cost_non_negative', sql`${table.unitCostCents} >= 0`),
 ])
 
 export const mediaJobs = pgTable('media_jobs', {

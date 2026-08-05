@@ -6,6 +6,8 @@ import { AuthError } from './errors'
 import { signJwt, verifyJwt } from './jwt'
 import { hashPassword, verifyPassword } from './password'
 import {
+  clearUserBanned,
+  clearUsersBanned,
   consumeAuthActionToken,
   countActiveUsersTotal,
   countRegistrationsPerDayBetween,
@@ -25,7 +27,10 @@ import {
   revokeActiveTokens,
   revokeAllSessions,
   revokeSession,
+  setUserBanned,
+  setUsersBanned,
   softDeleteUser as softDeleteUserRecord,
+  softDeleteUsers as softDeleteUsersRecord,
   updateUserAdmin as updateUserAdminRecord,
   updateUserPassword,
   type AuthActionTokenPurpose,
@@ -38,6 +43,8 @@ export interface PublicUser {
   displayName: string | null
   role: 'user' | 'admin'
   emailVerifiedAt: string
+  /** 非空即封禁（正常会话下恒为 null —— 封禁用户会被 verifyToken 拒绝）。 */
+  bannedAt: string | null
 }
 
 export interface AuthResult {
@@ -53,6 +60,8 @@ export interface AdminUser {
   displayName: string | null
   role: 'user' | 'admin'
   emailVerifiedAt: string
+  /** 非空即封禁。 */
+  bannedAt: string | null
   createdAt: string
   updatedAt: string
 }
@@ -135,6 +144,16 @@ export interface AuthService {
   adminUpdateUser(id: string, input: { displayName?: string; role?: 'user' | 'admin' }): Promise<AdminUser>
   /** 管理后台：软删除用户（同时吊销全部会话）。 */
   softDeleteUser(id: string): Promise<void>
+  /** 管理后台：封禁用户（吊销全部会话；禁登录/禁新提交，在途任务放行完成）。 */
+  adminBanUser(id: string): Promise<void>
+  /** 管理后台：解除封禁。 */
+  adminUnbanUser(id: string): Promise<void>
+  /** 管理后台：批量封禁（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。 */
+  adminBatchBanUsers(ids: string[]): Promise<void>
+  /** 管理后台：批量解除封禁。 */
+  adminBatchUnbanUsers(ids: string[]): Promise<void>
+  /** 管理后台：批量软删除（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。 */
+  adminBatchDeleteUsers(ids: string[]): Promise<void>
 }
 
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -221,13 +240,14 @@ function toPublicUser(user: UserRepositoryRecord): PublicUser {
     displayName: user.displayName,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt.toISOString(),
+    bannedAt: user.bannedAt === null ? null : user.bannedAt.toISOString(),
   }
 }
 
 /** 管理后台用户投影：剥离密码哈希与 GitHub ID。 */
 function toAdminUser(user: Pick<
   UserRepositoryRecord,
-  'id' | 'email' | 'displayName' | 'role' | 'emailVerifiedAt' | 'createdAt' | 'updatedAt'
+  'id' | 'email' | 'displayName' | 'role' | 'emailVerifiedAt' | 'bannedAt' | 'createdAt' | 'updatedAt'
 >): AdminUser {
   return {
     id: user.id,
@@ -235,8 +255,19 @@ function toAdminUser(user: Pick<
     displayName: user.displayName,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt === null ? '' : user.emailVerifiedAt.toISOString(),
+    bannedAt: user.bannedAt === null ? null : user.bannedAt.toISOString(),
     createdAt: user.createdAt.toISOString(),
     updatedAt: user.updatedAt.toISOString(),
+  }
+}
+
+/**
+ * 封禁门：所有"发放新会话"的入口（login / loginWithGithub / verifyEmail）在
+ * 签发 token 前必须经过此检查。已封禁用户抛 AUTH_BANNED，绝不签发新会话。
+ */
+function ensureNotBanned(user: UserRepositoryRecord): void {
+  if (user.bannedAt !== null) {
+    throw new AuthError('AUTH_BANNED', '该账号已被封禁，请联系管理员。')
   }
 }
 
@@ -404,6 +435,7 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
           purpose: 'email_verification',
           now: issuedAt,
         })
+        ensureNotBanned(tokenUser)
         const user = tokenUser.emailVerifiedAt === null
           ? await markUserEmailVerified(tx, tokenUser.id, issuedAt)
           : tokenUser
@@ -420,7 +452,8 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
     async resendVerification(emailInput) {
       const email = normalizeEmail(emailInput)
       const user = await findActiveUserByEmail(options.db, email)
-      if (user === undefined || user.emailVerifiedAt !== null) return { accepted: true }
+      // 已封禁用户静默不重发（保持防枚举语义，不透露封禁状态）。
+      if (user === undefined || user.emailVerifiedAt !== null || user.bannedAt !== null) return { accepted: true }
 
       const token = await replaceActionToken({
         user,
@@ -445,6 +478,7 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (user.emailVerifiedAt === null) {
         throw new AuthError('AUTH_EMAIL_UNVERIFIED', '该邮箱尚未完成验证，请检查验证邮件或重新发送。')
       }
+      ensureNotBanned(user)
       return issueSession(user)
     },
 
@@ -453,10 +487,14 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       const issuedAt = now()
 
       const byGithub = await findActiveUserByGithubId(options.db, input.githubId)
-      if (byGithub !== undefined) return issueSession(byGithub)
+      if (byGithub !== undefined) {
+        ensureNotBanned(byGithub)
+        return issueSession(byGithub)
+      }
 
       const byEmail = await findActiveUserByEmail(options.db, email)
       if (byEmail !== undefined) {
+        ensureNotBanned(byEmail)
         if (byEmail.githubId !== null && byEmail.githubId !== input.githubId) {
           throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已绑定其他 GitHub 账号，请使用对应账号登录。', {
             action: 'login',
@@ -492,7 +530,8 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
     async forgotPassword(emailInput) {
       const email = normalizeEmail(emailInput)
       const user = await findActiveUserByEmail(options.db, email)
-      if (user === undefined || user.emailVerifiedAt === null) return { accepted: true }
+      // 已封禁用户静默不发送重置邮件（保持防枚举语义）。
+      if (user === undefined || user.emailVerifiedAt === null || user.bannedAt !== null) return { accepted: true }
 
       // 启用冷却，防止对同一已验证账号的重置邮件轰炸；路由会把
       // AUTH_EMAIL_RATE_LIMITED 映射为 202，保持防枚举语义。
@@ -575,7 +614,9 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       const session = await findActiveSession(options.db, payload.sid, checkedAt)
       if (session === undefined || session.userId !== payload.sub) return undefined
       const user = await findActiveUserById(options.db, payload.sub)
-      if (user === undefined || user.emailVerifiedAt === null) return undefined
+      // 已封禁/已删/未验证的用户：会话一律失效 —— 这是所有已认证路由的单点卡口
+      //（生成提交、预估、SSE 都经由 requireAuthUser → verifyToken）。
+      if (user === undefined || user.emailVerifiedAt === null || user.bannedAt !== null) return undefined
       return { user: toPublicUser(user), sessionId: payload.sid }
     },
 
@@ -670,6 +711,48 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
         }
         // 软删除后吊销全部会话，token 立即失效（verifyToken 本身也会因 deletedAt 拒绝）。
         await revokeAllSessions(tx, id, deletedAt)
+      })
+    },
+
+    async adminBanUser(id) {
+      const bannedAt = now()
+      await options.db.transaction(async tx => {
+        const banned = await setUserBanned(tx, { userId: id, bannedAt, bannedBy: 'admin.user.ban' })
+        if (!banned) {
+          throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。', { action: 'admin_ban' })
+        }
+        // 封禁立即吊销全部会话：已登录态被强制注销（verifyToken 的 bannedAt 检查兜底）。
+        await revokeAllSessions(tx, id, bannedAt)
+      })
+    },
+
+    async adminUnbanUser(id) {
+      const unbanned = await clearUserBanned(options.db, id, now())
+      if (!unbanned) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。', { action: 'admin_unban' })
+      }
+    },
+
+    async adminBatchBanUsers(ids) {
+      if (ids.length === 0) return
+      const bannedAt = now()
+      await options.db.transaction(async tx => {
+        await setUsersBanned(tx, { userIds: ids, bannedAt, bannedBy: 'admin.user.ban' })
+        for (const id of ids) await revokeAllSessions(tx, id, bannedAt)
+      })
+    },
+
+    async adminBatchUnbanUsers(ids) {
+      if (ids.length === 0) return
+      await clearUsersBanned(options.db, ids, now())
+    },
+
+    async adminBatchDeleteUsers(ids) {
+      if (ids.length === 0) return
+      const deletedAt = now()
+      await options.db.transaction(async tx => {
+        await softDeleteUsersRecord(tx, ids, deletedAt)
+        for (const id of ids) await revokeAllSessions(tx, id, deletedAt)
       })
     },
   }

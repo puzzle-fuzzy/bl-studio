@@ -1,4 +1,4 @@
-import { Brush, Library, Sparkles, Wrench } from 'lucide-react'
+import { Bookmark, Brush, Images, Library, Sparkles, Wrench } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -23,6 +23,8 @@ import { UserMenu } from '@/components/layout/UserMenu'
 const NAV_ITEMS = [
   { to: '/create', label: '创作', icon: Brush },
   { to: '/catalog', label: '全部模型', icon: Sparkles },
+  { to: '/gallery', label: '社区', icon: Images },
+  { to: '/prompts', label: '提示词', icon: Bookmark },
   { to: '/functions', label: '辅助工具', icon: Wrench },
   { to: '/library', label: '资产', icon: Library },
 ]

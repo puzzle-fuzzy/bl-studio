@@ -43,7 +43,15 @@ try {
         'points.adjustment',
         'admin.user.create',
         'admin.user.update',
-        'admin.user.delete'
+        'admin.user.delete',
+        'admin.user.ban',
+        'admin.user.unban',
+        'gallery.like',
+        'gallery.favorite',
+        'feedback.submit',
+        'feedback.update',
+        'prompt-library.create',
+        'prompt-library.delete'
       ))
     `)
   })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MAX_CREDIT_AMOUNT_CENTS } from '@bailian-studio/credit-ledger'
 
 /** 创建账户（无邮箱验证）：管理员直接指定密码与角色。 */
 export const CreateUserSchema = z.object({
@@ -24,3 +25,43 @@ export const ListUsersQuerySchema = z.object({
 }).strict()
 
 export const TargetUserSchema = z.object({ userId: z.string().trim().min(1).max(256) }).strict()
+
+/** 批量用户操作（封禁/解封/删除）：1~100 个用户 ID。 */
+export const BatchUsersSchema = z.object({
+  userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+}).strict()
+
+export type BatchUsersInput = z.infer<typeof BatchUsersSchema>
+
+/**
+ * 批量赠送积分：每个目标用户各加 amountCents。idempotencyKey 为整批共享的
+ * 幂等键（前端用 crypto.randomUUID() 生成），按 `key:userId` 派生到每个用户，
+ * 网络重试不重复加。
+ */
+export const BatchGrantPointsSchema = z.object({
+  userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+  amountCents: z.number().int().positive().max(MAX_CREDIT_AMOUNT_CENTS),
+  reason: z.string().trim().min(1).max(500),
+  idempotencyKey: z.string().trim().min(1).max(256),
+}).strict()
+
+export type BatchGrantPointsInput = z.infer<typeof BatchGrantPointsSchema>
+
+/** 批量维护每模型成本单价。 */
+export const UpsertModelCostsSchema = z.object({
+  entries: z.array(z.object({
+    modelId: z.string().trim().min(1).max(256),
+    unitCostCents: z.number().int().min(0),
+  })).min(1).max(200),
+}).strict()
+
+export type UpsertModelCostsInput = z.infer<typeof UpsertModelCostsSchema>
+
+/** 分析窗口：from/to 或 days（默认近 30 天）。 */
+export const AnalyticsQuerySchema = z.object({
+  from: z.string().datetime({ offset: true }).optional(),
+  to: z.string().datetime({ offset: true }).optional(),
+  days: z.coerce.number().int().min(1).max(90).optional(),
+}).strict()
+
+export type AnalyticsQueryInput = z.infer<typeof AnalyticsQuerySchema>

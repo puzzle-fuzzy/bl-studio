@@ -26,6 +26,9 @@ export const CreateGenerationSchema = z.object({
     ]),
   ).optional(),
   idempotencyKey: z.string().optional(),
+  // 对比批次 ID：同一次"同 prompt 多模型对比生成"的多条提交共用。注意本 schema
+  // 是【非 strict】的 z.object——未声明字段会被静默剥离，因此必须显式声明。
+  batchId: z.string().trim().min(1).max(128).optional(),
 })
 
 export type CreateGenerationInput = z.infer<typeof CreateGenerationSchema>

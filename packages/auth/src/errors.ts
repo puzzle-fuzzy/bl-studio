@@ -17,6 +17,7 @@ export type AuthErrorCode =
   | 'EMAIL_DELIVERY_FAILED'
   | 'AUTH_UNAUTHORIZED'
   | 'AUTH_FORBIDDEN'
+  | 'AUTH_BANNED'
   | 'AUTH_PROVIDER_NOT_CONFIGURED'
 
 /** 认证错误。code 供 API 层做 HTTP 状态码与错误响应体映射，message 仅用于人类阅读。 */

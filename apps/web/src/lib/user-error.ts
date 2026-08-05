@@ -20,6 +20,7 @@ const CODE_MESSAGES: Record<string, string> = {
   EMAIL_DELIVERY_FAILED: '验证邮件发送失败，请稍后再试',
   AUTH_UNAUTHORIZED: '请先登录',
   AUTH_FORBIDDEN: '没有权限执行此操作',
+  AUTH_BANNED: '该账号已被封禁，请联系管理员',
   // 生成
   MODEL_NOT_FOUND: '模型不存在或已下线',
   GENERATION_NOT_FOUND: '生成记录不存在',

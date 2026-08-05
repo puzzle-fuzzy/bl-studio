@@ -22,6 +22,10 @@ const fakeCreditLedger = {
     reservedCents: 0,
     totalCents: 5000,
   }),
+  grant: async ({ userId, amountCents }: { userId: string; amountCents: number }) => ({
+    balance: { userId, availableCents: amountCents, reservedCents: 0, totalCents: amountCents },
+    entry: { id: 'entry-1', userId, availableDeltaCents: amountCents, reservedDeltaCents: 0 },
+  }),
 } as unknown as CreditLedger
 
 const fakeStorage: StorageAdapter = {
@@ -86,6 +90,7 @@ describe('admin routes', () => {
   beforeEach(() => {
     currentUser = { id: 'admin-1', role: 'admin' }
     audits.length = 0
+    fakeAuthService.__setBanned(false)
   })
 
   it('returns 403 for non-admin users on every admin endpoint', async () => {
@@ -96,8 +101,14 @@ describe('admin routes', () => {
       ['GET', '/api/admin/users/u1'],
       ['PATCH', '/api/admin/users/u1'],
       ['DELETE', '/api/admin/users/u1'],
+      ['POST', '/api/admin/users/u1/ban'],
+      ['POST', '/api/admin/users/u1/unban'],
+      ['POST', '/api/admin/users/batch-ban'],
+      ['POST', '/api/admin/users/batch-grant-points'],
       ['GET', '/api/admin/users/u1/assets'],
       ['GET', '/api/admin/stats/overview'],
+      ['GET', '/api/admin/model-costs'],
+      ['GET', '/api/admin/stats/analytics'],
     ] as const
     for (const [method, path] of paths) {
       const response = await app.handle(adminRequest(path, { method }))
@@ -195,5 +206,46 @@ describe('admin routes', () => {
     expect(response.status).toBe(200)
     const body = await response.json() as { data: { items: Array<{ url: string }> } }
     expect(body.data.items[0]?.url).toContain('/signed/')
+  })
+
+  it('bans and unbans a user via admin endpoints with audit', async () => {
+    const ban = await app.handle(adminRequest('/api/admin/users/u9/ban', { method: 'POST' }))
+    expect(ban.status).toBe(200)
+    expect(audits.some(a => a.action === 'admin.user.ban' && a.outcome === 'succeeded')).toBe(true)
+    // 封禁使 fake 的共享会话状态置为封禁，恢复后再验证解封端点。
+    fakeAuthService.__setBanned(false)
+
+    const unban = await app.handle(adminRequest('/api/admin/users/u9/unban', { method: 'POST' }))
+    expect(unban.status).toBe(200)
+    expect(audits.some(a => a.action === 'admin.user.unban' && a.outcome === 'succeeded')).toBe(true)
+  })
+
+  it('batch-bans / batch-unbans / batch-deletes users and refuses all-self batch', async () => {
+    const ban = await app.handle(adminRequest('/api/admin/users/batch-ban', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userIds: ['u1', 'admin-1'] }),
+    }))
+    expect(ban.status).toBe(200)
+    const banBody = await ban.json() as { data: { affected: number } }
+    // 自动剔除当前 admin 自身（admin-1），只处理 u1。
+    expect(banBody.data.affected).toBe(1)
+    expect(audits.some(a => a.action === 'admin.user.ban' && a.outcome === 'succeeded')).toBe(true)
+    fakeAuthService.__setBanned(false)
+
+    const allSelfDelete = await app.handle(adminRequest('/api/admin/users/batch-delete', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userIds: ['admin-1'] }),
+    }))
+    expect(allSelfDelete.status).toBe(403)
+
+    const grant = await app.handle(adminRequest('/api/admin/users/batch-grant-points', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userIds: ['u1', 'u2'], amountCents: 100, reason: 'test', idempotencyKey: 'batch-test' }),
+    }))
+    expect(grant.status).toBe(200)
+    expect(audits.some(a => a.action === 'points.grant' && a.outcome === 'succeeded')).toBe(true)
   })
 })

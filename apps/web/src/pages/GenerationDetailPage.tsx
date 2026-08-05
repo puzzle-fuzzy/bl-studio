@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Check, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Ban } from 'lucide-react'
+import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Switch } from '@/components/ui/switch'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { PromptSegments } from '@/components/generations/PromptSegments'
@@ -20,6 +22,7 @@ import { userErrorMessage } from '@/lib/user-error'
 import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
 import { parsePromptReferences } from '@/lib/reference-format'
+import { encodeDeepLinkParams } from '@/lib/deeplink-params'
 import { generationStatusLabel, kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
@@ -77,8 +80,76 @@ function DetailContent({
   const id = record.id
   const [shareUrl, setShareUrl] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [visibility, setVisibility] = useState<'private' | 'public'>(record.visibility ?? 'private')
+  const [favorited, setFavorited] = useState(false)
+  const [favoriteBusy, setFavoriteBusy] = useState(false)
+
+  // 加载收藏状态（仅本人可见的作品；详情页记录通常对 owner 可见）。
+  useEffect(() => {
+    let cancelled = false
+    apiClient
+      .getGenerationFavorite(id)
+      .then(result => { if (!cancelled) setFavorited(result.favorited) })
+      .catch(() => undefined)
+    return () => { cancelled = true }
+  }, [id])
 
   const isActive = ['draft', 'submitting', 'processing', 'provider_processing', 'saving_output'].includes(record.status)
+
+  const handleVisibilityToggle = async () => {
+    const next: 'private' | 'public' = visibility === 'private' ? 'public' : 'private'
+    if (next === 'public') {
+      const ok = window.confirm('公开后，所有同事都能在社区画廊看到该作品及其提示词。确定公开吗？')
+      if (!ok) return
+    }
+    setBusy(true)
+    try {
+      const result = await apiClient.setGenerationVisibility(id, next)
+      setVisibility(result.visibility)
+      onRefreshed({ ...record, visibility: result.visibility })
+      showMessage({ title: result.visibility === 'public' ? '已公开到社区' : '已设为私密', tone: 'info' })
+    } catch (err) {
+      showMessage({ title: userErrorMessage(err), tone: 'warning' })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const handleFavoriteToggle = async () => {
+    setFavoriteBusy(true)
+    try {
+      const next = !favorited
+      if (next) {
+        await apiClient.favoriteGeneration(id)
+      } else {
+        await apiClient.unfavoriteGeneration(id)
+      }
+      setFavorited(next)
+      showMessage({ title: next ? '已收藏' : '已取消收藏', tone: 'info' })
+    } catch (err) {
+      showMessage({ title: userErrorMessage(err), tone: 'warning' })
+    } finally {
+      setFavoriteBusy(false)
+    }
+  }
+
+  const handleSavePrompt = async () => {
+    setBusy(true)
+    try {
+      const prompt = typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : ''
+      await apiClient.createPromptLibraryItem({
+        name: `${record.modelId} 作品`,
+        modelId: record.modelId,
+        prompt: prompt.length > 0 ? prompt : '（空提示词）',
+        params: record.inputParams,
+      })
+      showMessage({ title: '已保存到提示词库', tone: 'success' })
+    } catch (err) {
+      showMessage({ title: userErrorMessage(err), tone: 'warning' })
+    } finally {
+      setBusy(false)
+    }
+  }
 
   const handleCancel = async () => {
     setBusy(true)
@@ -160,6 +231,28 @@ function DetailContent({
           </Button>
           <Button variant="outline" size="sm" onClick={() => navigate(`/create?reuse=${id}`)}>
             用同参数新建
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={favoriteBusy}
+            onClick={() => void handleFavoriteToggle()}
+            aria-label={favorited ? '取消收藏' : '收藏'}
+          >
+            {favorited ? <BookmarkCheck data-icon className="text-primary" /> : <Bookmark data-icon />}
+            {favorited ? '已收藏' : '收藏'}
+          </Button>
+          <Button variant="ghost" size="sm" disabled={busy} onClick={() => void handleSavePrompt()}>
+            保存为提示词
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={busy || record.status !== 'succeeded'}
+            onClick={() => void handleVisibilityToggle()}
+            className={visibility === 'public' ? 'text-primary' : undefined}
+          >
+            {visibility === 'public' ? '取消公开' : '公开到社区'}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void handleLibraryState('hidden')}>
             隐藏
@@ -354,6 +447,7 @@ function ArtifactCard({
   artifact: GenerationArtifact
   onPreview: () => void
 }) {
+  const navigate = useNavigate()
   const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
   if (artifact.kind === 'text') {
     return (
@@ -362,6 +456,9 @@ function ArtifactCard({
       </div>
     )
   }
+  // 生成产物会镜像成 user_asset（id = asset_generation_<artifact>），可作编辑/参考图输入。
+  const assetId = `asset_generation_${artifact.id}`
+  const upscaleParams = encodeDeepLinkParams({ prompt: '高清重绘放大', size: '2048*2048' })
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border">
       {src !== undefined && artifact.kind === 'image' ? (
@@ -394,6 +491,29 @@ function ArtifactCard({
       >
         <ExternalLink className="size-3.5" />
       </a>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button
+            type="button"
+            className="absolute top-2 left-2 flex size-7 items-center justify-center rounded-md bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
+            aria-label="以图继续创作"
+          >
+            <Wand2 className="size-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="start">
+          <DropdownMenuLabel>以图继续创作</DropdownMenuLabel>
+          <DropdownMenuItem onClick={() => navigate(`/create?select=qwen-image-edit&edit=${assetId}`)}>
+            图像编辑（重绘/换背景/增删物体）
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate(`/create?ref=${assetId}`)}>
+            用作参考图生成变体
+          </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => navigate(`/create?select=qwen-image-edit&edit=${assetId}&params=${upscaleParams}`)}>
+            放大（编辑模型重绘到 2048×2048）
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   )
 }

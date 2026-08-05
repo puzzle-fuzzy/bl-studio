@@ -43,6 +43,7 @@ import {
   getModelById,
   validateModelParams,
   type FrozenModelManifest,
+  type ModelCategory,
   type ModelManifest,
 } from '@bailian-studio/model-core'
 import { transitionTask, type TaskRecord, type TaskError } from '@bailian-studio/task-engine'
@@ -55,6 +56,7 @@ import {
   type GenerationListView,
 } from './cursor'
 import { GenerationRepositoryError } from './errors'
+import { createContentRepository } from './content'
 import { assetCursorFilters, decodeAssetCursor, encodeAssetCursor } from './asset-cursor'
 import { nextArtifactId, nextAssetDerivativeId, nextAuditLogId, nextGenerationEventId, nextGenerationRecordId, nextGenerationShareId, nextProviderRequestAuditId, nextTaskRecordId, nextUsageRecordId } from './id'
 import {
@@ -70,8 +72,20 @@ import {
   type TaskRecordRow,
 } from './mappers'
 import type {
+  CostMarginRow,
+  FeedbackKind,
+  FeedbackStatus,
+  GalleryDetail,
+  GalleryVisibility,
   GenerationArtifact,
   GenerationEvent,
+  ListFeedbackResult,
+  ListGalleryResult,
+  ListPromptLibraryResult,
+  ModelCost,
+  PromptLibraryItem,
+  RetentionAnalytics,
+  UserFeedback,
   CancelGenerationInput,
   CompleteGenerationInput,
   CompleteGenerationResult,
@@ -711,6 +725,61 @@ export interface GenerationRepository {
     assetId: string
     now?: string
   }): Promise<boolean>
+
+  // -------------------------------------------------------------------------
+  // 社区画廊（content.ts 实现）：作品可见性 / 画廊 / 收藏点赞。
+  // -------------------------------------------------------------------------
+  setGenerationVisibility(input: {
+    userId: string
+    recordId: string
+    visibility: GalleryVisibility
+    now?: string
+  }): Promise<GenerationRecord>
+  listGalleryGenerations(input: {
+    cursor?: string
+    limit?: number
+    category?: ModelCategory
+    modelId?: string
+    viewerId?: string
+  }): Promise<ListGalleryResult>
+  getGalleryGeneration(input: { recordId: string; viewerId?: string }): Promise<GalleryDetail | undefined>
+  getGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined>
+  setGenerationLike(input: {
+    userId: string
+    recordId: string
+    liked: boolean
+  }): Promise<{ liked: boolean; likeCount: number }>
+  setGenerationFavorite(input: {
+    userId: string
+    recordId: string
+    favorited: boolean
+  }): Promise<{ favorited: boolean }>
+  /** 查询 viewer 是否已收藏某记录；记录对 viewer 不可见时返回 undefined。 */
+  getGenerationFavorited(input: { userId: string; recordId: string }): Promise<boolean | undefined>
+  listGenerationFavorites(input: { userId: string; cursor?: string; limit?: number }): Promise<ListGalleryResult>
+  listPromptLibrary(input: { userId: string; cursor?: string; limit?: number; q?: string }): Promise<ListPromptLibraryResult>
+  createPromptLibraryItem(input: {
+    userId: string
+    name: string
+    modelId: string
+    prompt: string
+    params: Record<string, unknown>
+  }): Promise<PromptLibraryItem>
+  updatePromptLibraryItem(input: {
+    userId: string
+    itemId: string
+    name?: string
+    prompt?: string
+    params?: Record<string, unknown>
+  }): Promise<PromptLibraryItem>
+  deletePromptLibraryItem(input: { userId: string; itemId: string }): Promise<void>
+  listModelCosts(): Promise<ModelCost[]>
+  upsertModelCosts(entries: Array<{ modelId: string; unitCostCents: number }>): Promise<void>
+  getCostMarginAnalytics(input: { from: string; to: string }): Promise<CostMarginRow[]>
+  getRetentionAnalytics(input: { since: string }): Promise<RetentionAnalytics>
+  submitFeedback(input: { userId: string; kind: FeedbackKind; content: string }): Promise<UserFeedback>
+  listFeedback(input: { cursor?: string; limit?: number; status?: FeedbackStatus }): Promise<ListFeedbackResult>
+  updateFeedbackStatus(input: { itemId: string; status: FeedbackStatus; resolvedBy: string }): Promise<UserFeedback>
 }
 
 type BailianStudioTx = Parameters<Parameters<BailianStudioDb['transaction']>[0]>[0]
@@ -1629,6 +1698,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             traceId,
             providerCancelStatus: 'not_requested',
             idempotencyKey: input.idempotencyKey ?? null,
+            batchId: input.batchId ?? null,
             createdAt: new Date(createdAt),
             updatedAt: new Date(createdAt),
           } satisfies typeof generationRecords.$inferInsert
@@ -3558,6 +3628,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             updatedAt: new Date(now),
             updatedBy: input.userId,
           })
+
           .where(and(
             eq(assetDerivatives.assetId, input.assetId),
             eq(assetDerivatives.userId, input.userId),
@@ -3591,6 +3662,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
         return true
       })
     },
+
+    ...createContentRepository(db),
   }
 }
 

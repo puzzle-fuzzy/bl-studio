@@ -4,10 +4,20 @@ import { validateInput } from '@bailian-studio/shared'
 import { listModels } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { auditErrorCode, recordApiAuditEvent } from '../../lib/audit'
+import { getRequestTrace } from '../../lib/middleware'
 import { requireAdminUser } from '../auth/session'
 import { ListAssetsQuerySchema } from '../assets/service'
 import { assetWithReadUrl } from '../assets/routes'
-import { CreateUserSchema, ListUsersQuerySchema, TargetUserSchema, UpdateUserSchema } from './schemas'
+import {
+  AnalyticsQuerySchema,
+  BatchGrantPointsSchema,
+  BatchUsersSchema,
+  CreateUserSchema,
+  ListUsersQuerySchema,
+  TargetUserSchema,
+  UpdateUserSchema,
+  UpsertModelCostsSchema,
+} from './schemas'
 
 /**
  * 管理后台模块：用户管理（创建/列表/详情/改/软删）+ 查看指定用户全部资产。
@@ -111,6 +121,156 @@ export function createAdminRoutes(deps: ApiDependencies) {
         throw error
       }
     })
+    .post('/api/admin/users/:userId/ban', async ({ request, params }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { userId } = validateInput(TargetUserSchema, params)
+      if (actor.id === userId) {
+        throw new AuthError('AUTH_FORBIDDEN', '不能封禁自己的账号')
+      }
+      try {
+        await deps.authService.adminBanUser(userId)
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.ban',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: userId,
+        })
+        return { success: true, data: null }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.ban',
+          outcome: 'failed',
+          targetType: 'user',
+          targetId: userId,
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/users/:userId/unban', async ({ request, params }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { userId } = validateInput(TargetUserSchema, params)
+      try {
+        await deps.authService.adminUnbanUser(userId)
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.unban',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: userId,
+        })
+        return { success: true, data: null }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.unban',
+          outcome: 'failed',
+          targetType: 'user',
+          targetId: userId,
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/users/batch-ban', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { userIds } = validateInput(BatchUsersSchema, body)
+      const targets = userIds.filter(id => id !== actor.id)
+      if (targets.length === 0) {
+        throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
+      }
+      await deps.authService.adminBatchBanUsers(targets)
+      await recordApiAuditEvent(deps.generationRepository, request, {
+        userId: actor.id,
+        action: 'admin.user.ban',
+        outcome: 'succeeded',
+        targetType: 'user',
+        metadata: { count: targets.length, excludedSelf: userIds.length - targets.length },
+      })
+      return { success: true, data: { affected: targets.length } }
+    })
+    .post('/api/admin/users/batch-unban', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { userIds } = validateInput(BatchUsersSchema, body)
+      const targets = userIds.filter(id => id !== actor.id)
+      if (targets.length === 0) {
+        throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
+      }
+      await deps.authService.adminBatchUnbanUsers(targets)
+      await recordApiAuditEvent(deps.generationRepository, request, {
+        userId: actor.id,
+        action: 'admin.user.unban',
+        outcome: 'succeeded',
+        targetType: 'user',
+        metadata: { count: targets.length },
+      })
+      return { success: true, data: { affected: targets.length } }
+    })
+    .post('/api/admin/users/batch-delete', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { userIds } = validateInput(BatchUsersSchema, body)
+      const targets = userIds.filter(id => id !== actor.id)
+      if (targets.length === 0) {
+        throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
+      }
+      try {
+        await deps.authService.adminBatchDeleteUsers(targets)
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.delete',
+          outcome: 'succeeded',
+          targetType: 'user',
+          metadata: { count: targets.length, excludedSelf: userIds.length - targets.length },
+        })
+        return { success: true, data: { affected: targets.length } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.user.delete',
+          outcome: 'failed',
+          targetType: 'user',
+          metadata: { count: targets.length, errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/users/batch-grant-points', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const input = validateInput(BatchGrantPointsSchema, body)
+      const requestId = getRequestTrace(request)?.requestId
+      try {
+        const results = await Promise.all(input.userIds.map(async userId => {
+          const result = await deps.creditLedger.grant({
+            userId,
+            amountCents: input.amountCents,
+            reason: input.reason,
+            idempotencyKey: `${input.idempotencyKey}:${userId}`,
+            actorUserId: actor.id,
+            ...(requestId !== undefined ? { requestId } : {}),
+          })
+          return { userId, balance: result.balance }
+        }))
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'points.grant',
+          outcome: 'succeeded',
+          targetType: 'user',
+          metadata: { count: input.userIds.length, amountCents: input.amountCents },
+        })
+        return { success: true, data: { granted: input.userIds.length, results } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'points.grant',
+          outcome: 'failed',
+          targetType: 'user',
+          metadata: { count: input.userIds.length, amountCents: input.amountCents, errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
     .get('/api/admin/users/:userId/assets', async ({ request, params, query }) => {
       await requireAdminUser(request, deps.authService)
       const { userId } = validateInput(TargetUserSchema, params)
@@ -156,6 +316,44 @@ export function createAdminRoutes(deps: ApiDependencies) {
           registrationsByDay: userStats.registrationsByDay,
           todayNewUsers: userStats.registrationsByDay.find(row => row.date === todayStr)?.count ?? 0,
           totalUsers: userStats.totalUsers,
+        },
+      }
+    })
+    .get('/api/admin/model-costs', async ({ request }) => {
+      await requireAdminUser(request, deps.authService)
+      const costs = await deps.generationRepository.listModelCosts()
+      return { success: true, data: { costs } }
+    })
+    .put('/api/admin/model-costs', async ({ request, body }) => {
+      await requireAdminUser(request, deps.authService)
+      const { entries } = validateInput(UpsertModelCostsSchema, body)
+      await deps.generationRepository.upsertModelCosts(entries)
+      return { success: true, data: { updated: entries.length } }
+    })
+    .get('/api/admin/stats/analytics', async ({ request, query }) => {
+      await requireAdminUser(request, deps.authService)
+      const input = validateInput(AnalyticsQuerySchema, query)
+      const to = input.to !== undefined ? new Date(input.to) : new Date()
+      const days = input.days ?? 30
+      const from = input.from !== undefined ? new Date(input.from) : new Date(to.getTime() - (days - 1) * 86_400_000)
+      const sinceIso = from.toISOString()
+      const toIso = to.toISOString()
+      const [costMargin, retention, userStats] = await Promise.all([
+        deps.generationRepository.getCostMarginAnalytics({ from: sinceIso, to: toIso }),
+        deps.generationRepository.getRetentionAnalytics({ since: sinceIso }),
+        deps.authService.adminStats({ since: sinceIso, until: toIso }),
+      ])
+      const registered = userStats.registrationsByDay.reduce((sum, row) => sum + row.count, 0)
+      const modelLabels = new Map(listModels().map(model => [model.id, model.displayName]))
+      return {
+        success: true,
+        data: {
+          window: { from: sinceIso, to: toIso },
+          costMargin: costMargin.map(row => ({
+            ...row,
+            label: modelLabels.get(row.modelId) ?? row.modelId,
+          })),
+          retention: { registered, ...retention },
         },
       }
     })

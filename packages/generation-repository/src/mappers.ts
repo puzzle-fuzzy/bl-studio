@@ -54,6 +54,8 @@ export function toGenerationRecord(
     ...(assetRefs !== undefined && Object.keys(assetRefs).length > 0
       ? { assetRefs }
       : {}),
+    visibility: row.visibility as GenerationRecord['visibility'],
+    ...(row.batchId !== null ? { batchId: row.batchId } : {}),
     status: row.status as GenerationRecord['status'],
     statusReason: row.statusReason ?? undefined,
     providerTaskId: row.providerTaskId ?? undefined,

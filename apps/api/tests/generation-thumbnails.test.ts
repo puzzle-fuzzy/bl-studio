@@ -24,6 +24,7 @@ const record: GenerationRecord = {
   providerModel: 'qwen-image',
   category: 'image',
   inputParams: { prompt: 'portrait' },
+  visibility: 'private',
   status: 'succeeded',
   outputResult: {
     artifacts: [{ kind: 'image', sourceUrl: 'https://provider.example/full.png' }],

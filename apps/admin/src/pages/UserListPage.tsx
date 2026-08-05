@@ -4,12 +4,14 @@ import { ChevronLeft, ChevronRight, Loader2, Search, UserPlus } from 'lucide-rea
 import type { AdminUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { useAdminAuthStore } from '@/stores/admin-auth-store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
@@ -31,6 +33,12 @@ export function UserListPage() {
   const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(q)
 
+  const currentAdminId = useAdminAuthStore(state => state.user?.id)
+
+  // 多选：当前页可勾选用户集合 + 选中状态。
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchBusy, setBatchBusy] = useState(false)
+
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ email: '', password: '', displayName: '', role: 'user' as 'user' | 'admin' })
   const [creating, setCreating] = useState(false)
@@ -38,10 +46,17 @@ export function UserListPage() {
 
   const [deleting, setDeleting] = useState<AdminUser | null>(null)
   const [deletingBusy, setDeletingBusy] = useState(false)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+
+  const [grantOpen, setGrantOpen] = useState(false)
+  const [grantForm, setGrantForm] = useState({ amountCents: '', reason: '' })
+  const [grantBusy, setGrantBusy] = useState(false)
+  const [grantError, setGrantError] = useState<string | null>(null)
 
   const load = useCallback(async (pageNo: number) => {
     setLoading(true)
     setError(null)
+    setSelected(new Set())
     try {
       const result = await apiClient.listAdminUsers({ q: q || undefined, page: pageNo, pageSize: PAGE_SIZE })
       setItems(result.items)
@@ -61,12 +76,39 @@ export function UserListPage() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  // 当前页可选中的行（剔除当前 admin 自身 —— 服务器也禁止批量处理自己）。
+  const selectableRows = items.filter(user => user.id !== currentAdminId)
+  const allSelected = selectableRows.length > 0 && selectableRows.every(user => selected.has(user.id))
+  const someSelected = selectableRows.some(user => selected.has(user.id))
+  const selectedCount = selected.size
+
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
     const next = new URLSearchParams(searchParams)
     if (searchInput.trim().length > 0) next.set('q', searchInput.trim())
     else next.delete('q')
     setSearchParams(next, { replace: true })
+  }
+
+  const toggleSelect = (id: string) => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (allSelected) {
+        for (const user of selectableRows) next.delete(user.id)
+      } else {
+        for (const user of selectableRows) next.add(user.id)
+      }
+      return next
+    })
   }
 
   const handleCreate = async () => {
@@ -104,6 +146,100 @@ export function UserListPage() {
     }
   }
 
+  const runBatch = async (op: () => Promise<unknown>, okMessage: string) => {
+    if (selectedCount === 0) return
+    setBatchBusy(true)
+    setError(null)
+    try {
+      const result = await op()
+      const affected = typeof result === 'object' && result !== null && 'affected' in result
+        ? String((result as { affected: number }).affected)
+        : String(selectedCount)
+      setError(`${okMessage}：${affected} 位用户`)
+      void load(page)
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handleBatchBan = () => {
+    void runBatch(
+      () => apiClient.adminBatchBanUsers({ userIds: [...selected] }),
+      '已封禁',
+    )
+  }
+
+  const handleBatchUnban = () => {
+    void runBatch(
+      () => apiClient.adminBatchUnbanUsers({ userIds: [...selected] }),
+      '已解封',
+    )
+  }
+
+  const handleBatchDelete = () => {
+    setBatchDeleteOpen(false)
+    void runBatch(
+      () => apiClient.adminBatchDeleteUsers({ userIds: [...selected] }),
+      '已删除',
+    )
+  }
+
+  const handleBatchGrant = async () => {
+    const amountCents = Number(grantForm.amountCents)
+    if (!Number.isInteger(amountCents) || amountCents <= 0) {
+      setGrantError('请输入有效的积分数量（正整数）')
+      return
+    }
+    if (grantForm.reason.trim().length === 0) {
+      setGrantError('请填写赠送原因')
+      return
+    }
+    setGrantBusy(true)
+    setGrantError(null)
+    try {
+      await apiClient.adminBatchGrantPoints({
+        userIds: [...selected],
+        amountCents,
+        reason: grantForm.reason.trim(),
+        idempotencyKey: crypto.randomUUID(),
+      })
+      setGrantOpen(false)
+      setGrantForm({ amountCents: '', reason: '' })
+      setError(`已赠送 ${selectedCount} 位用户各 ${amountCents} 积分`)
+      void load(page)
+    } catch (err) {
+      setGrantError(userErrorMessage(err))
+    } finally {
+      setGrantBusy(false)
+    }
+  }
+
+  const handleRowBan = async (user: AdminUser) => {
+    setBatchBusy(true)
+    try {
+      await apiClient.adminBanUser(user.id)
+      void load(page)
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handleRowUnban = async (user: AdminUser) => {
+    setBatchBusy(true)
+    try {
+      await apiClient.adminUnbanUser(user.id)
+      void load(page)
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
@@ -127,7 +263,26 @@ export function UserListPage() {
         <Button type="submit" variant="outline">搜索</Button>
       </form>
 
-      {error !== null && <p className="text-sm text-destructive">{error}</p>}
+      {error !== null && <p className="text-sm text-muted-foreground">{error}</p>}
+
+      {/* 批量操作工具栏：选中行后出现。 */}
+      {selectedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+          <span className="text-sm">已选 {selectedCount} 位用户</span>
+          <Button size="sm" variant="destructive" disabled={batchBusy} onClick={handleBatchBan}>
+            {batchBusy ? <Loader2 className="size-4 animate-spin" /> : '批量封禁'}
+          </Button>
+          <Button size="sm" variant="outline" disabled={batchBusy} onClick={handleBatchUnban}>
+            批量解封
+          </Button>
+          <Button size="sm" variant="outline" disabled={batchBusy} onClick={() => setGrantOpen(true)}>
+            赠送积分
+          </Button>
+          <Button size="sm" variant="destructive" disabled={batchBusy} onClick={() => setBatchDeleteOpen(true)}>
+            批量删除
+          </Button>
+        </div>
+      )}
 
       <Card>
         <CardContent className="p-0">
@@ -143,40 +298,73 @@ export function UserListPage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox
+                      aria-label="全选当前页"
+                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                      onCheckedChange={toggleSelectAll}
+                      disabled={selectableRows.length === 0}
+                    />
+                  </TableHead>
                   <TableHead className="w-14 text-muted-foreground">序号</TableHead>
                   <TableHead>邮箱</TableHead>
                   <TableHead>昵称</TableHead>
+                  <TableHead>状态</TableHead>
                   <TableHead>角色</TableHead>
                   <TableHead>注册时间</TableHead>
                   <TableHead className="text-right">操作</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((user, index) => (
-                  <TableRow key={user.id}>
-                    <TableCell className="text-muted-foreground">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
-                    <TableCell>
-                      <Link to={`/users/${user.id}`} className="font-medium hover:underline">
-                        {user.email}
-                      </Link>
-                    </TableCell>
-                    <TableCell>{user.displayName ?? '—'}</TableCell>
-                    <TableCell>
-                      <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
-                        {user.role === 'admin' ? '管理员' : '用户'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
-                    <TableCell className="text-right">
-                      <Button asChild variant="ghost" size="sm">
-                        <Link to={`/users/${user.id}`}>详情</Link>
-                      </Button>
-                      <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(user)}>
-                        删除
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {items.map((user, index) => {
+                  const isSelf = user.id === currentAdminId
+                  const banned = user.bannedAt !== null
+                  return (
+                    <TableRow key={user.id} className={banned ? 'bg-destructive/5' : undefined}>
+                      <TableCell>
+                        <Checkbox
+                          aria-label={`选择 ${user.email}`}
+                          checked={selected.has(user.id)}
+                          onCheckedChange={() => toggleSelect(user.id)}
+                          disabled={isSelf}
+                        />
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{(page - 1) * PAGE_SIZE + index + 1}</TableCell>
+                      <TableCell>
+                        <Link to={`/users/${user.id}`} className="font-medium hover:underline">
+                          {user.email}
+                        </Link>
+                      </TableCell>
+                      <TableCell>{user.displayName ?? '—'}</TableCell>
+                      <TableCell>
+                        {banned
+                          ? <Badge variant="destructive">已封禁</Badge>
+                          : <Badge variant="outline">正常</Badge>}
+                      </TableCell>
+                      <TableCell>
+                        <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
+                          {user.role === 'admin' ? '管理员' : '用户'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-muted-foreground">{formatDate(user.createdAt)}</TableCell>
+                      <TableCell className="text-right">
+                        <Button asChild variant="ghost" size="sm">
+                          <Link to={`/users/${user.id}`}>详情</Link>
+                        </Button>
+                        {!isSelf && (
+                          banned
+                            ? <Button variant="ghost" size="sm" disabled={batchBusy} onClick={() => void handleRowUnban(user)}>解封</Button>
+                            : <Button variant="ghost" size="sm" className="text-destructive" disabled={batchBusy} onClick={() => void handleRowBan(user)}>封禁</Button>
+                        )}
+                        {!isSelf && (
+                          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => setDeleting(user)}>
+                            删除
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
               </TableBody>
             </Table>
           )}
@@ -226,6 +414,36 @@ export function UserListPage() {
         </DialogContent>
       </Dialog>
 
+      {/* 批量赠送积分 */}
+      <Dialog open={grantOpen} onOpenChange={open => { if (!open) setGrantOpen(false) }}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>批量赠送积分</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              将给选中的 {selectedCount} 位用户各赠送等额积分（1 元 = 100 积分），写入积分账本可审计。
+            </p>
+            <div className="space-y-1.5">
+              <Label htmlFor="grant-amount">积分数量（正整数）</Label>
+              <Input id="grant-amount" type="number" min={1} value={grantForm.amountCents} onChange={event => setGrantForm({ ...grantForm, amountCents: event.target.value })} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="grant-reason">原因</Label>
+              <Input id="grant-reason" value={grantForm.reason} onChange={event => setGrantForm({ ...grantForm, reason: event.target.value })} placeholder="如：内测奖励" />
+            </div>
+            {grantError !== null && <p className="text-sm text-destructive">{grantError}</p>}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGrantOpen(false)}>取消</Button>
+            <Button onClick={() => void handleBatchGrant()} disabled={grantBusy}>
+              {grantBusy ? <Loader2 className="size-4 animate-spin" /> : '确认赠送'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* 单行删除确认 */}
       <AlertDialog open={deleting !== null} onOpenChange={open => { if (!open) setDeleting(null) }}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -242,6 +460,28 @@ export function UserListPage() {
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               {deletingBusy ? <Loader2 className="size-4 animate-spin" /> : '确认删除'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* 批量删除确认 */}
+      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>批量删除用户</AlertDialogTitle>
+            <AlertDialogDescription>
+              将软删除选中的 {selectedCount} 位用户，其会话立即失效，历史数据保留可查。当前登录的管理员不会被删除。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchBusy}>取消</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={event => { event.preventDefault(); handleBatchDelete() }}
+              disabled={batchBusy}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {batchBusy ? <Loader2 className="size-4 animate-spin" /> : '确认删除'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

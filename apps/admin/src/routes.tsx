@@ -7,8 +7,10 @@ import { LoginPage } from '@/pages/LoginPage'
 import { UserListPage } from '@/pages/UserListPage'
 import { UserDetailPage } from '@/pages/UserDetailPage'
 
-// 调用统计页含 recharts，懒加载以拆分主包。
+// 含 recharts 的页面懒加载以拆分主包。
 const StatsPage = lazy(() => import('@/pages/StatsPage').then(module => ({ default: module.StatsPage })))
+const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })))
+const FeedbackPage = lazy(() => import('@/pages/FeedbackPage').then(module => ({ default: module.FeedbackPage })))
 
 /**
  * 管理后台路由（basename /admin）。
@@ -41,6 +43,22 @@ export const router = createBrowserRouter(
               element: (
                 <Suspense fallback={null}>
                   <StatsPage />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'analytics',
+              element: (
+                <Suspense fallback={null}>
+                  <AnalyticsPage />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'feedback',
+              element: (
+                <Suspense fallback={null}>
+                  <FeedbackPage />
                 </Suspense>
               ),
             },

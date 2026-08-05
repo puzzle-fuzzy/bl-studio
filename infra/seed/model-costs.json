@@ -1,0 +1,12 @@
+{
+  "_comment": "每模型成本单价（整数分 CNY，DashScope 官方价）。占位值仅供初始化，管理员可在 admin「分析」页按实际账单调整。未列出的模型默认 0。",
+  "qwen-image": 20,
+  "qwen-image-2": 25,
+  "qwen-image-edit": 30,
+  "qwen-image-edit-plus": 20,
+  "qwen-image-edit-max": 50,
+  "wanx-image": 15,
+  "wanx-video": 100,
+  "wanx-27-video": 150,
+  "qwen-omni-screenplay": 30
+}

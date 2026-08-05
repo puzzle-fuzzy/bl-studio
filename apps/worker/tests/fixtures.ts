@@ -9,6 +9,7 @@ import type {
   CompleteGenerationInput,
   CompleteGenerationResult,
   CompleteAssetThumbnailInput,
+  CostMarginRow,
   CreateGenerationInput,
   CreateGenerationResult,
   CreateGenerationShareInput,
@@ -16,6 +17,7 @@ import type {
   FailGenerationInput,
   FailAssetThumbnailInput,
   FinishProviderRequestInput,
+  GalleryDetail,
   GenerationArtifact,
   GenerationCallStats,
   GenerationEvent,
@@ -25,14 +27,21 @@ import type {
   GenerationShare,
   GetOwnedStorageObjectInput,
   GetGenerationShareForRecordInput,
+  ListFeedbackResult,
+  ListGalleryResult,
   ListGenerationArtifactsOptions,
   ListGenerationArtifactsResult,
   ListGenerationRecordsOptions,
   ListGenerationRecordsResult,
+  ListPromptLibraryResult,
   ListUnifiedAssetsOptions,
   ListUnifiedAssetsResult,
   MarkArtifactFailedInput,
   MarkArtifactStoredInput,
+  ModelCost,
+  PromptLibraryItem,
+  RetentionAnalytics,
+  UserFeedback,
   MarkAssetThumbnailProcessingInput,
   MarkGenerationProcessingInput,
   PublicSharedGeneration,
@@ -464,6 +473,64 @@ export class FakeRepository implements GenerationRepository {
   }): Promise<boolean> {
     return Promise.resolve(false)
   }
+  // ---- 社区/内容域方法：worker 不使用，按需返回占位值以满足接口。 ----
+  setGenerationVisibility(): Promise<GenerationRecord> {
+    throw new Error('FakeRepository.setGenerationVisibility is not used')
+  }
+  listGalleryGenerations(): Promise<ListGalleryResult> {
+    return Promise.resolve({ items: [] })
+  }
+  getGalleryGeneration(): Promise<GalleryDetail | undefined> {
+    return Promise.resolve(undefined)
+  }
+  getGalleryArtifact(): Promise<GenerationArtifact | undefined> {
+    return Promise.resolve(undefined)
+  }
+  setGenerationLike(): Promise<{ liked: boolean; likeCount: number }> {
+    return Promise.resolve({ liked: false, likeCount: 0 })
+  }
+  setGenerationFavorite(): Promise<{ favorited: boolean }> {
+    return Promise.resolve({ favorited: false })
+  }
+  getGenerationFavorited(): Promise<boolean | undefined> {
+    return Promise.resolve(undefined)
+  }
+  listGenerationFavorites(): Promise<ListGalleryResult> {
+    return Promise.resolve({ items: [] })
+  }
+  listPromptLibrary(): Promise<ListPromptLibraryResult> {
+    return Promise.resolve({ items: [] })
+  }
+  createPromptLibraryItem(): Promise<PromptLibraryItem> {
+    throw new Error('FakeRepository.createPromptLibraryItem is not used')
+  }
+  updatePromptLibraryItem(): Promise<PromptLibraryItem> {
+    throw new Error('FakeRepository.updatePromptLibraryItem is not used')
+  }
+  deletePromptLibraryItem(): Promise<void> {
+    return Promise.resolve()
+  }
+  listModelCosts(): Promise<ModelCost[]> {
+    return Promise.resolve([])
+  }
+  upsertModelCosts(): Promise<void> {
+    return Promise.resolve()
+  }
+  getCostMarginAnalytics(): Promise<CostMarginRow[]> {
+    return Promise.resolve([])
+  }
+  getRetentionAnalytics(): Promise<RetentionAnalytics> {
+    return Promise.resolve({ firstGeneration: 0, firstSuccess: 0, activeTwoDays: 0 })
+  }
+  submitFeedback(): Promise<UserFeedback> {
+    throw new Error('FakeRepository.submitFeedback is not used')
+  }
+  listFeedback(): Promise<ListFeedbackResult> {
+    return Promise.resolve({ items: [] })
+  }
+  updateFeedbackStatus(): Promise<UserFeedback> {
+    throw new Error('FakeRepository.updateFeedbackStatus is not used')
+  }
 }
 
 /** 按顺序返回队列中输出的 ProviderRunner，被武装（设置 throwError）时抛错。 */
@@ -539,6 +606,7 @@ export function makeRecord(overrides: Partial<GenerationRecord> = {}): Generatio
     providerModel: 'qwen-image',
     category: 'image',
     inputParams: { prompt: 'lantern', n: 1, size: '1024*1024' },
+    visibility: 'private',
     status: 'processing',
     costEstimate: 20,
     currency: 'CNY',

@@ -45,6 +45,10 @@ export interface GenerationRecord {
   inputParams: Record<string, unknown>
   /** 以 Manifest 媒体参数名为键的稳定 user-asset 绑定。 */
   assetRefs?: GenerationAssetRefs
+  /** 作品可见性：'private'（仅本人）| 'public'（社区画廊可见）。默认 private。 */
+  visibility: GalleryVisibility
+  /** 对比批次 ID：同一次"同 prompt 多模型对比生成"的多条记录共用。 */
+  batchId?: string
   status: RepositoryGenerationStatus
   statusReason?: string
   providerTaskId?: string
@@ -86,6 +90,8 @@ export interface CreateGenerationInput {
   params: Record<string, unknown>
   assetRefs?: GenerationAssetRefInput
   idempotencyKey?: string
+  /** 对比批次 ID：一次"同 prompt 多模型对比生成"的多条记录共用（可空）。 */
+  batchId?: string
   /** API 创建请求可传入的链路 ID；缺省时由 repository 生成。 */
   traceId?: string
   /** 在创建事务内部做原子校验的准入限额。 */
@@ -479,4 +485,119 @@ export interface PublicSharedGeneration {
   share: { id: string; recordId: string; expiresAt?: string; createdAt: string; updatedAt: string }
   record: PublicSharedGenerationRecord
   artifacts: PublicSharedGenerationArtifact[]
+}
+
+// ---------------------------------------------------------------------------
+// 社区画廊：作品可见性 / 画廊列表 / 收藏点赞。
+// ---------------------------------------------------------------------------
+
+/** 作品可见性：'private'（仅本人可见）| 'public'（出现在社区画廊）。 */
+export type GalleryVisibility = 'private' | 'public'
+
+/** 画廊条目（列表卡片）：author + 精选脱敏参数 + 封面产物 + 交互状态。 */
+export interface GalleryItem {
+  id: string
+  modelId: string
+  category: ModelCategory
+  author: { id: string; displayName: string | null }
+  /**
+   * 精选脱敏参数：仅文本参数（媒体/参考图值在入库时已进 assetRefs，不在
+   * inputParamsJson 中），供跨用户"用同参数生成"。
+   */
+  inputParams: Record<string, unknown>
+  /** 封面产物（该记录首个已存 artifact，含 storage 坐标；API 层拼 readUrl 后脱敏）。 */
+  cover?: GenerationArtifact
+  likeCount: number
+  likedByViewer: boolean
+  favoritedByViewer: boolean
+  createdAt: string
+}
+
+export interface ListGalleryResult {
+  items: GalleryItem[]
+  nextCursor?: string
+}
+
+/** 画廊详情：记录脱敏投影 + 全部产物 + 交互状态。 */
+export interface GalleryDetail {
+  record: PublicSharedGenerationRecord
+  artifacts: GenerationArtifact[]
+  author: { id: string; displayName: string | null }
+  likeCount: number
+  likedByViewer: boolean
+  favoritedByViewer: boolean
+}
+
+// ---------------------------------------------------------------------------
+// 提示词资产库（服务端命名库）。
+// ---------------------------------------------------------------------------
+
+/** 提示词库条目：提示词 + 模型 + 文本参数（媒体/参考图值不入库）。 */
+export interface PromptLibraryItem {
+  id: string
+  userId: string
+  name: string
+  modelId: string
+  prompt: string
+  params: Record<string, unknown>
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListPromptLibraryResult {
+  items: PromptLibraryItem[]
+  nextCursor?: string
+}
+
+// ---------------------------------------------------------------------------
+// 管理分析：每模型成本毛利 + 留存漏斗。
+// ---------------------------------------------------------------------------
+
+/** admin 维护的每模型成本单价。 */
+export interface ModelCost {
+  modelId: string
+  unitCostCents: number
+  currency: string
+  updatedAt: string
+}
+
+/** 成本毛利一行：某模型在窗口内成功生成的成本/收入/毛利（分）。 */
+export interface CostMarginRow {
+  modelId: string
+  calls: number
+  revenueCents: number
+  unitCostCents: number
+  costCents: number
+  marginCents: number
+}
+
+/** 留存漏斗（窗口内）：注册→首生成→首成功→活跃（≥2 个不同日）。 */
+export interface RetentionAnalytics {
+  firstGeneration: number
+  firstSuccess: number
+  activeTwoDays: number
+}
+
+// ---------------------------------------------------------------------------
+// 用户反馈通道。
+// ---------------------------------------------------------------------------
+
+export type FeedbackKind = 'feedback' | 'bug' | 'suggestion' | 'complaint'
+export type FeedbackStatus = 'open' | 'reviewing' | 'resolved' | 'closed'
+
+export interface UserFeedback {
+  id: string
+  userId: string | null
+  kind: FeedbackKind
+  content: string
+  status: FeedbackStatus
+  resolvedBy?: string
+  resolvedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListFeedbackResult {
+  items: UserFeedback[]
+  nextCursor?: string
 }

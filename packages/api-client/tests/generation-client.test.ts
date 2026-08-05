@@ -90,6 +90,7 @@ const user = {
   displayName: null,
   role: 'user' as const,
   emailVerifiedAt: '2026-07-25T00:00:00.000Z',
+  bannedAt: null,
 }
 
 describe('createApiClient', () => {

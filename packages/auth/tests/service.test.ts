@@ -394,5 +394,36 @@ describe('auth service', () => {
 
       await expect(handle.authService.adminGetUser('missing-id')).rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED' })
     })
+
+    it('bans a user: existing sessions die, login is rejected with AUTH_BANNED, unban restores login', async () => {
+      const created = await handle.authService.adminCreateUser({ email: 'ban-me@x.test', password: 'password1' })
+      const login = await handle.authService.login({ email: 'ban-me@x.test', password: 'password1' })
+      expect(await handle.authService.verifyToken(login.token)).toBeDefined()
+
+      await handle.authService.adminBanUser(created.id)
+      // 封禁后既有会话立即失效（单点卡口 verifyToken）。
+      expect(await handle.authService.verifyToken(login.token)).toBeUndefined()
+      // 重新登录抛 AUTH_BANNED（不发新会话）。
+      await expect(handle.authService.login({ email: 'ban-me@x.test', password: 'password1' }))
+        .rejects.toMatchObject({ code: 'AUTH_BANNED' })
+
+      await handle.authService.adminUnbanUser(created.id)
+      const relogin = await handle.authService.login({ email: 'ban-me@x.test', password: 'password1' })
+      expect(relogin.user.email).toBe('ban-me@x.test')
+    })
+
+    it('batch-bans several users and batch-deletes without touching self semantics', async () => {
+      const a = await handle.authService.adminCreateUser({ email: 'batch-a@x.test', password: 'password1' })
+      const b = await handle.authService.adminCreateUser({ email: 'batch-b@x.test', password: 'password1' })
+      await handle.authService.adminBatchBanUsers([a.id, b.id])
+      await expect(handle.authService.login({ email: 'batch-a@x.test', password: 'password1' }))
+        .rejects.toMatchObject({ code: 'AUTH_BANNED' })
+      await expect(handle.authService.login({ email: 'batch-b@x.test', password: 'password1' }))
+        .rejects.toMatchObject({ code: 'AUTH_BANNED' })
+
+      await handle.authService.adminBatchUnbanUsers([a.id, b.id])
+      expect((await handle.authService.login({ email: 'batch-a@x.test', password: 'password1' })).user.email)
+        .toBe('batch-a@x.test')
+    })
   })
 })

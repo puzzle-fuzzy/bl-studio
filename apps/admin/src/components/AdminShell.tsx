@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router'
-import { BarChart3, LogOut, Users } from 'lucide-react'
+import { BarChart3, ChartPie, LogOut, MessageSquare, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 
@@ -31,6 +31,18 @@ export function AdminShell() {
                 <Link to="/stats">
                   <BarChart3 data-icon />
                   调用统计
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/analytics">
+                  <ChartPie data-icon />
+                  分析
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/feedback">
+                  <MessageSquare data-icon />
+                  反馈
                 </Link>
               </Button>
             </nav>

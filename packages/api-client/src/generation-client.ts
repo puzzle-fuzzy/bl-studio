@@ -19,6 +19,10 @@ import {
   AdminUserResponseSchema,
   AdjustPointsInputSchema,
   AssetCapabilitiesSchema,
+  BatchAffectedResponseSchema,
+  BatchGrantPointsRequestSchema,
+  BatchGrantPointsResponseSchema,
+  BatchUsersRequestSchema,
   AssetItemSchema,
   AssetResponseSchema,
   ApiErrorSchema,
@@ -33,8 +37,26 @@ import {
   CreateMediaJobResponseSchema,
   GenerationRecordSchema,
   GenerationShareResponseSchema,
+  AdminAnalyticsSchema,
+  AdminModelCostsResponseSchema,
+  AdminModelCostsUpdateInputSchema,
+  AdminModelCostsUpdateResponseSchema,
+  FeedbackItemResponseSchema,
+  ListFeedbackResponseSchema,
+  SubmitFeedbackInputSchema,
+  UpdateFeedbackStatusInputSchema,
+  CreatePromptLibraryInputSchema,
+  FavoriteMutationResponseSchema,
+  GalleryDetailSchema,
   GrantPointsInputSchema,
+  ListPromptLibraryResponseSchema,
+  PromptLibraryItemResponseSchema,
+  UpdatePromptLibraryInputSchema,
+  LikeMutationResponseSchema,
   ListArtifactsResponseSchema,
+  ListGalleryResponseSchema,
+  SetVisibilityInputSchema,
+  SetVisibilityResponseSchema,
   ListAssetsResponseSchema,
   ListGenerationArtifactsResponseSchema,
   ListGenerationsResponseSchema,
@@ -56,6 +78,21 @@ import type {
   AdminUser,
   AdminUserDetail,
   AdjustPointsInput,
+  BatchAffectedResult,
+  BatchGrantPointsRequest,
+  BatchGrantPointsResult,
+  BatchUsersRequest,
+  AdminAnalytics,
+  AdminModelCostsResult,
+  ListFeedbackResult,
+  SubmitFeedbackInput,
+  UpdateFeedbackStatusInput,
+  UserFeedback,
+  CreatePromptLibraryInput,
+  ListPromptLibraryResult,
+  ModelCost,
+  PromptLibraryItem,
+  UpdatePromptLibraryInput,
   AssetCapabilities,
   AssetItem,
   BailianContractStatus,
@@ -68,8 +105,13 @@ import type {
   CreateMediaJobResult,
   GenerationRecord,
   GenerationShareResult,
+  FavoriteMutationResult,
+  GalleryDetail,
   GrantPointsInput,
+  LikeMutationResult,
   ListArtifactsResult,
+  ListGalleryResult,
+  SetVisibilityInput,
   ListAssetsResult,
   ListGenerationArtifactsResult,
   ListGenerationsResult,
@@ -171,6 +213,8 @@ export interface CreateGenerationRequest {
   params: Record<string, unknown>
   assetRefs?: Record<string, string | string[]>
   idempotencyKey?: string
+  /** 对比批次 ID：同一次"同提示词多模型对比"的多条提交共用。 */
+  batchId?: string
 }
 
 export interface UploadAssetInput {
@@ -344,6 +388,18 @@ export interface BailianStudioApiClient {
   adminUpdateUser(userId: string, input: AdminUpdateUserInput): Promise<AdminUser>
   /** `DELETE /api/admin/users/:userId` —— 软删除用户。 */
   adminDeleteUser(userId: string): Promise<void>
+  /** `POST /api/admin/users/:userId/ban` —— 封禁用户（吊销会话，禁登录/禁新生成）。 */
+  adminBanUser(userId: string): Promise<void>
+  /** `POST /api/admin/users/:userId/unban` —— 解除封禁。 */
+  adminUnbanUser(userId: string): Promise<void>
+  /** `POST /api/admin/users/batch-ban` —— 批量封禁（自动剔除当前 admin 自身）。 */
+  adminBatchBanUsers(input: BatchUsersRequest): Promise<BatchAffectedResult>
+  /** `POST /api/admin/users/batch-unban` —— 批量解封。 */
+  adminBatchUnbanUsers(input: BatchUsersRequest): Promise<BatchAffectedResult>
+  /** `POST /api/admin/users/batch-delete` —— 批量软删除（自动剔除当前 admin 自身）。 */
+  adminBatchDeleteUsers(input: BatchUsersRequest): Promise<BatchAffectedResult>
+  /** `POST /api/admin/users/batch-grant-points` —— 批量赠送积分（整批共享幂等键）。 */
+  adminBatchGrantPoints(input: BatchGrantPointsRequest): Promise<BatchGrantPointsResult>
   /** `GET /api/admin/users/:userId/points` —— 指定用户积分余额。 */
   adminGetUserPoints(userId: string): Promise<CreditBalance>
   /** `GET /api/admin/users/:userId/points/ledger` —— 指定用户积分流水。 */
@@ -354,6 +410,61 @@ export interface BailianStudioApiClient {
   adminAdjustPoints(userId: string, input: AdjustPointsInput): Promise<PointsMutationResult>
   /** `GET /api/admin/users/:userId/assets` —— 指定用户全部资产。 */
   adminListUserAssets(userId: string, params?: ListAssetsParams): Promise<ListAssetsResult>
+
+  // 社区画廊（需登录；公开可见性由作品 owner 决定）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/gallery` —— 社区画廊公开作品列表（keyset + category/modelId 过滤）。 */
+  listGallery(params?: {
+    limit?: number
+    cursor?: string
+    category?: 'image' | 'video' | 'audio' | 'text'
+    modelId?: string
+  }): Promise<ListGalleryResult>
+  /** `GET /api/gallery/favorites` —— 我的收藏列表。 */
+  listMyFavorites(params?: { limit?: number; cursor?: string }): Promise<ListGalleryResult>
+  /** `GET /api/gallery/generations/:id` —— 跨用户画廊详情（脱敏）。 */
+  getGalleryGeneration(recordId: string): Promise<GalleryDetail>
+  /** `PATCH /api/gallery/generations/:id/visibility` —— 作品公开/私有切换（owner）。 */
+  setGenerationVisibility(recordId: string, visibility: SetVisibilityInput['visibility']): Promise<{ visibility: 'private' | 'public' }>
+  /** `POST /api/gallery/generations/:id/like` —— 点赞公开作品。 */
+  likeGeneration(recordId: string): Promise<LikeMutationResult>
+  /** `DELETE /api/gallery/generations/:id/like` —— 取消点赞。 */
+  unlikeGeneration(recordId: string): Promise<LikeMutationResult>
+  /** `POST /api/gallery/generations/:id/favorite` —— 收藏（本人可见作品）。 */
+  favoriteGeneration(recordId: string): Promise<FavoriteMutationResult>
+  /** `DELETE /api/gallery/generations/:id/favorite` —— 取消收藏。 */
+  unfavoriteGeneration(recordId: string): Promise<FavoriteMutationResult>
+  /** `GET /api/gallery/generations/:id/favorite` —— 查询收藏状态（本人可见作品）。 */
+  getGenerationFavorite(recordId: string): Promise<{ favorited: boolean }>
+
+  // 提示词资产库（owner 限定）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/prompt-library` —— 我的提示词库（keyset + 名称/内容搜索）。 */
+  listPromptLibrary(params?: { limit?: number; cursor?: string; q?: string }): Promise<ListPromptLibraryResult>
+  /** `POST /api/prompt-library` —— 保存一条提示词（含模型与文本参数）。 */
+  createPromptLibraryItem(input: CreatePromptLibraryInput): Promise<PromptLibraryItem>
+  /** `PATCH /api/prompt-library/:id` —— 更新名称/提示词/参数。 */
+  updatePromptLibraryItem(itemId: string, input: UpdatePromptLibraryInput): Promise<PromptLibraryItem>
+  /** `DELETE /api/prompt-library/:id` —— 删除一条提示词。 */
+  deletePromptLibraryItem(itemId: string): Promise<void>
+
+  // 管理分析（需 admin）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/admin/model-costs` —— 每模型成本单价列表。 */
+  adminListModelCosts(): Promise<AdminModelCostsResult>
+  /** `PUT /api/admin/model-costs` —— 批量维护成本单价。 */
+  adminUpdateModelCosts(entries: Array<{ modelId: string; unitCostCents: number }>): Promise<{ updated: number }>
+  /** `GET /api/admin/stats/analytics` —— 成本毛利 + 留存漏斗。 */
+  adminGetAnalytics(params?: { from?: string; to?: string; days?: number }): Promise<AdminAnalytics>
+
+  // 反馈通道
+  // ---------------------------------------------------------------------------
+  /** `POST /api/feedback` —— 提交意见反馈。 */
+  submitFeedback(input: SubmitFeedbackInput): Promise<UserFeedback>
+  /** `GET /api/admin/feedback` —— admin 列表反馈（状态过滤）。 */
+  adminListFeedback(params?: { limit?: number; cursor?: string; status?: 'open' | 'reviewing' | 'resolved' | 'closed' }): Promise<ListFeedbackResult>
+  /** `PATCH /api/admin/feedback/:id` —— admin 更新反馈状态。 */
+  adminUpdateFeedbackStatus(itemId: string, status: UpdateFeedbackStatusInput['status']): Promise<UserFeedback>
 }
 
 /**
@@ -874,6 +985,58 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       )
     },
 
+    async adminBanUser(userId) {
+      await requestNoContent(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/ban`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+      )
+    },
+
+    async adminUnbanUser(userId) {
+      await requestNoContent(
+        `${base}/api/admin/users/${encodeURIComponent(userId)}/unban`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+      )
+    },
+
+    async adminBatchBanUsers(input) {
+      return unwrapData(
+        `${base}/api/admin/users/batch-ban`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
+      )
+    },
+
+    async adminBatchUnbanUsers(input) {
+      return unwrapData(
+        `${base}/api/admin/users/batch-unban`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
+      )
+    },
+
+    async adminBatchDeleteUsers(input) {
+      return unwrapData(
+        `${base}/api/admin/users/batch-delete`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
+      )
+    },
+
+    async adminBatchGrantPoints(input) {
+      return unwrapData(
+        `${base}/api/admin/users/batch-grant-points`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchGrantPointsResponseSchema,
+      )
+    },
+
     async adminGetUserPoints(userId) {
       const data = await unwrapData(
         `${base}/api/admin/users/${encodeURIComponent(userId)}/points`,
@@ -930,6 +1093,205 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         fetchImpl,
         ListAssetsResponseSchema,
       )
+    },
+
+    async listGallery(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.category !== undefined) search.set('category', params.category)
+      if (params.modelId !== undefined && params.modelId.length > 0) search.set('modelId', params.modelId)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/gallery${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListGalleryResponseSchema,
+      )
+    },
+
+    async listMyFavorites(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/gallery/favorites${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListGalleryResponseSchema,
+      )
+    },
+
+    async getGalleryGeneration(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        GalleryDetailSchema,
+      )
+    },
+
+    async setGenerationVisibility(recordId, visibility) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/visibility`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ visibility }), credentials: 'include' },
+        fetchImpl,
+        SetVisibilityResponseSchema,
+      )
+    },
+
+    async likeGeneration(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/like`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        LikeMutationResponseSchema,
+      )
+    },
+
+    async unlikeGeneration(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/like`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+        LikeMutationResponseSchema,
+      )
+    },
+
+    async favoriteGeneration(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/favorite`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        FavoriteMutationResponseSchema,
+      )
+    },
+
+    async unfavoriteGeneration(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/favorite`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+        FavoriteMutationResponseSchema,
+      )
+    },
+
+    async getGenerationFavorite(recordId) {
+      return unwrapData(
+        `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/favorite`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        FavoriteMutationResponseSchema,
+      )
+    },
+
+    async listPromptLibrary(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/prompt-library${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListPromptLibraryResponseSchema,
+      )
+    },
+
+    async createPromptLibraryItem(input) {
+      const data = await unwrapData(
+        `${base}/api/prompt-library`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        PromptLibraryItemResponseSchema,
+      )
+      return data.item
+    },
+
+    async updatePromptLibraryItem(itemId, input) {
+      const data = await unwrapData(
+        `${base}/api/prompt-library/${encodeURIComponent(itemId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        PromptLibraryItemResponseSchema,
+      )
+      return data.item
+    },
+
+    async deletePromptLibraryItem(itemId) {
+      await requestNoContent(
+        `${base}/api/prompt-library/${encodeURIComponent(itemId)}`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+      )
+    },
+
+    async adminListModelCosts() {
+      return unwrapData(
+        `${base}/api/admin/model-costs`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminModelCostsResponseSchema,
+      )
+    },
+
+    async adminUpdateModelCosts(entries) {
+      return unwrapData(
+        `${base}/api/admin/model-costs`,
+        { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ entries }), credentials: 'include' },
+        fetchImpl,
+        AdminModelCostsUpdateResponseSchema,
+      )
+    },
+
+    async adminGetAnalytics(params = {}) {
+      const search = new URLSearchParams()
+      if (params.from !== undefined) search.set('from', params.from)
+      if (params.to !== undefined) search.set('to', params.to)
+      if (params.days !== undefined) search.set('days', String(params.days))
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/stats/analytics${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminAnalyticsSchema,
+      )
+    },
+
+    async submitFeedback(input) {
+      const data = await unwrapData(
+        `${base}/api/feedback`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        FeedbackItemResponseSchema,
+      )
+      return data.item
+    },
+
+    async adminListFeedback(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.status !== undefined) search.set('status', params.status)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/feedback${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListFeedbackResponseSchema,
+      )
+    },
+
+    async adminUpdateFeedbackStatus(itemId, status) {
+      const data = await unwrapData(
+        `${base}/api/admin/feedback/${encodeURIComponent(itemId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ status }), credentials: 'include' },
+        fetchImpl,
+        FeedbackItemResponseSchema,
+      )
+      return data.item
     },
   }
 }

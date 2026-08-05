@@ -184,6 +184,8 @@ export const GenerationRecordSchema = z.object({
   providerStatus: z.string().optional(),
   requestId: z.string().optional(),
   traceId: z.string().optional(),
+  visibility: z.enum(['private', 'public']).default('private'),
+  batchId: z.string().optional(),
   outputResult: OutputResultSchema.optional(),
   errorJson: GenerationErrorJsonSchema.optional(),
   costEstimate: z.number(),
@@ -425,6 +427,8 @@ export const PublicUserSchema = z.object({
   displayName: z.string().nullable(),
   role: z.enum(['user', 'admin']),
   emailVerifiedAt: z.string(),
+  /** 非空即封禁（正常会话下恒为 null）。 */
+  bannedAt: z.string().nullable(),
 })
 
 export const AuthResponseSchema = z.object({
@@ -602,6 +606,8 @@ export const AdminUserSchema = z.object({
   displayName: z.string().nullable(),
   role: z.enum(['user', 'admin']),
   emailVerifiedAt: z.string(),
+  /** 非空即封禁。 */
+  bannedAt: z.string().nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -660,6 +666,31 @@ export const AdminUpdateUserInputSchema = z.object({
   role: z.enum(['user', 'admin']).optional(),
 }).strict()
 
+/** 批量用户操作请求（封禁/解封/删除）：1~100 个用户 ID。 */
+export const BatchUsersRequestSchema = z.object({
+  userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+}).strict()
+
+/** 批量赠送积分请求：idempotencyKey 为整批共享幂等键（前端 crypto.randomUUID()）。 */
+export const BatchGrantPointsRequestSchema = z.object({
+  userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+  amountCents: z.number().int().positive(),
+  reason: z.string().trim().min(1).max(500),
+  idempotencyKey: z.string().trim().min(1).max(256),
+}).strict()
+
+export const BatchAffectedResponseSchema = z.object({
+  affected: z.number(),
+})
+
+export const BatchGrantPointsResponseSchema = z.object({
+  granted: z.number(),
+  results: z.array(z.object({
+    userId: z.string(),
+    balance: CreditBalanceSchema,
+  })),
+})
+
 export const CreditLedgerEntrySchema = z.object({
   id: z.string(),
   accountId: z.string(),
@@ -702,6 +733,201 @@ export const PointsMutationResponseSchema = z.object({
 export type AdminUser = z.infer<typeof AdminUserSchema>
 export type AdminListUsersResult = z.infer<typeof AdminListUsersResponseSchema>
 export type AdminStatsOverview = z.infer<typeof AdminStatsOverviewSchema>
+export type BatchUsersRequest = z.infer<typeof BatchUsersRequestSchema>
+export type BatchGrantPointsRequest = z.infer<typeof BatchGrantPointsRequestSchema>
+export type BatchAffectedResult = z.infer<typeof BatchAffectedResponseSchema>
+export type BatchGrantPointsResult = z.infer<typeof BatchGrantPointsResponseSchema>
+
+// ---------------------------------------------------------------------------
+// 社区画廊（/api/gallery）。
+// ---------------------------------------------------------------------------
+
+/** 画廊封面的公开投影（不含 storage 坐标）。 */
+export const GalleryCoverSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  readUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+})
+
+export const GalleryItemSchema = z.object({
+  id: z.string(),
+  modelId: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  author: z.object({ id: z.string(), displayName: z.string().nullable() }),
+  /** 精选脱敏参数（仅文本参数，不含媒体/参考图值）。 */
+  inputParams: z.record(z.string(), z.unknown()),
+  cover: GalleryCoverSchema.optional(),
+  likeCount: z.number(),
+  likedByViewer: z.boolean(),
+  favoritedByViewer: z.boolean(),
+  createdAt: z.string(),
+})
+
+export const ListGalleryResponseSchema = z.object({
+  items: z.array(GalleryItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const GalleryArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  readUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+})
+
+export const GalleryRecordSchema = z.object({
+  id: z.string(),
+  modelId: z.string(),
+  provider: z.string(),
+  providerModel: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  inputParams: z.record(z.string(), z.unknown()),
+  status: z.string(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const GalleryDetailSchema = z.object({
+  record: GalleryRecordSchema,
+  author: z.object({ id: z.string(), displayName: z.string().nullable() }),
+  likeCount: z.number(),
+  likedByViewer: z.boolean(),
+  favoritedByViewer: z.boolean(),
+  artifacts: z.array(GalleryArtifactSchema),
+})
+
+export const SetVisibilityInputSchema = z.object({
+  visibility: z.enum(['private', 'public']),
+}).strict()
+
+// ---------------------------------------------------------------------------
+// 管理分析（model_costs + 成本毛利 + 留存漏斗）。
+// ---------------------------------------------------------------------------
+
+export const ModelCostSchema = z.object({
+  modelId: z.string(),
+  unitCostCents: z.number(),
+  currency: z.string(),
+  updatedAt: z.string(),
+})
+
+export const AdminModelCostsResponseSchema = z.object({ costs: z.array(ModelCostSchema) })
+
+export const AdminModelCostsUpdateInputSchema = z.object({
+  entries: z.array(z.object({
+    modelId: z.string().trim().min(1).max(256),
+    unitCostCents: z.number().int().min(0),
+  })).min(1).max(200),
+}).strict()
+
+export const AdminModelCostsUpdateResponseSchema = z.object({ updated: z.number() })
+
+export const UserFeedbackSchema = z.object({
+  id: z.string(),
+  userId: z.string().nullable(),
+  kind: z.enum(['feedback', 'bug', 'suggestion', 'complaint']),
+  content: z.string(),
+  status: z.enum(['open', 'reviewing', 'resolved', 'closed']),
+  resolvedBy: z.string().optional(),
+  resolvedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const ListFeedbackResponseSchema = z.object({
+  items: z.array(UserFeedbackSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const FeedbackItemResponseSchema = z.object({ item: UserFeedbackSchema })
+
+export const SubmitFeedbackInputSchema = z.object({
+  kind: z.enum(['feedback', 'bug', 'suggestion', 'complaint']),
+  content: z.string().trim().min(1).max(2000),
+}).strict()
+
+export const UpdateFeedbackStatusInputSchema = z.object({
+  status: z.enum(['open', 'reviewing', 'resolved', 'closed']),
+}).strict()
+
+export const AdminAnalyticsSchema = z.object({
+  window: z.object({ from: z.string(), to: z.string() }),
+  costMargin: z.array(z.object({
+    modelId: z.string(),
+    label: z.string(),
+    calls: z.number(),
+    revenueCents: z.number(),
+    unitCostCents: z.number(),
+    costCents: z.number(),
+    marginCents: z.number(),
+  })),
+  retention: z.object({
+    registered: z.number(),
+    firstGeneration: z.number(),
+    firstSuccess: z.number(),
+    activeTwoDays: z.number(),
+  }),
+})
+
+// ---------------------------------------------------------------------------
+// 提示词资产库（/api/prompt-library）。
+// ---------------------------------------------------------------------------
+
+export const PromptLibraryItemSchema = z.object({
+  id: z.string(),
+  userId: z.string(),
+  name: z.string(),
+  modelId: z.string(),
+  prompt: z.string(),
+  params: z.record(z.string(), z.unknown()),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const ListPromptLibraryResponseSchema = z.object({
+  items: z.array(PromptLibraryItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const PromptLibraryItemResponseSchema = z.object({ item: PromptLibraryItemSchema })
+
+export const CreatePromptLibraryInputSchema = z.object({
+  name: z.string().trim().min(1).max(100),
+  modelId: z.string().trim().min(1).max(256),
+  prompt: z.string().trim().min(1).max(4000),
+  params: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+
+export const UpdatePromptLibraryInputSchema = z.object({
+  name: z.string().trim().min(1).max(100).optional(),
+  prompt: z.string().trim().min(1).max(4000).optional(),
+  params: z.record(z.string(), z.unknown()).optional(),
+}).strict()
+
+export const SetVisibilityResponseSchema = z.object({ visibility: z.enum(['private', 'public']) })
+
+export const LikeMutationResponseSchema = z.object({ liked: z.boolean(), likeCount: z.number() })
+
+export const FavoriteMutationResponseSchema = z.object({ favorited: z.boolean() })
+
+export type GalleryItem = z.infer<typeof GalleryItemSchema>
+export type GalleryDetail = z.infer<typeof GalleryDetailSchema>
+export type ListGalleryResult = z.infer<typeof ListGalleryResponseSchema>
+export type SetVisibilityInput = z.infer<typeof SetVisibilityInputSchema>
+export type LikeMutationResult = z.infer<typeof LikeMutationResponseSchema>
+export type FavoriteMutationResult = z.infer<typeof FavoriteMutationResponseSchema>
+export type PromptLibraryItem = z.infer<typeof PromptLibraryItemSchema>
+export type ListPromptLibraryResult = z.infer<typeof ListPromptLibraryResponseSchema>
+export type CreatePromptLibraryInput = z.infer<typeof CreatePromptLibraryInputSchema>
+export type UpdatePromptLibraryInput = z.infer<typeof UpdatePromptLibraryInputSchema>
+export type ModelCost = z.infer<typeof ModelCostSchema>
+export type AdminModelCostsResult = z.infer<typeof AdminModelCostsResponseSchema>
+export type AdminAnalytics = z.infer<typeof AdminAnalyticsSchema>
+export type UserFeedback = z.infer<typeof UserFeedbackSchema>
+export type ListFeedbackResult = z.infer<typeof ListFeedbackResponseSchema>
+export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackInputSchema>
+export type UpdateFeedbackStatusInput = z.infer<typeof UpdateFeedbackStatusInputSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
 export type AdminCreateUserInput = z.infer<typeof AdminCreateUserInputSchema>
 export type AdminUpdateUserInput = z.infer<typeof AdminUpdateUserInputSchema>
