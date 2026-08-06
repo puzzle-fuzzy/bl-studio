@@ -27,12 +27,14 @@ import type {
   GenerationShare,
   GetOwnedStorageObjectInput,
   GetGenerationShareForRecordInput,
+  ListAdminGalleryResult,
   ListFeedbackResult,
   ListGalleryResult,
   ListGenerationArtifactsOptions,
   ListGenerationArtifactsResult,
   ListGenerationRecordsOptions,
   ListGenerationRecordsResult,
+  ListNotificationsResult,
   ListPromptLibraryResult,
   ListUnifiedAssetsOptions,
   ListUnifiedAssetsResult,
@@ -530,6 +532,40 @@ export class FakeRepository implements GenerationRepository {
   }
   updateFeedbackStatus(): Promise<UserFeedback> {
     throw new Error('FakeRepository.updateFeedbackStatus is not used')
+  }
+  listMyFeedback(): Promise<ListFeedbackResult> {
+    return Promise.resolve({ items: [] })
+  }
+  // ---- 社区治理（admin）+ 社交通知方法：worker 不使用，按需返回占位值以满足接口。 ----
+  listAdminGalleryGenerations(): Promise<ListAdminGalleryResult> {
+    return Promise.resolve({ items: [] })
+  }
+  getAdminGalleryArtifact(): Promise<GenerationArtifact | undefined> {
+    return Promise.resolve(undefined)
+  }
+  setGalleryRecordHidden(): Promise<void> {
+    return Promise.resolve()
+  }
+  hideUserPublicWorks(): Promise<number> {
+    return Promise.resolve(0)
+  }
+  getGenerationOwner(): Promise<string | undefined> {
+    return Promise.resolve(undefined)
+  }
+  createSocialNotification(): Promise<void> {
+    return Promise.resolve()
+  }
+  listNotifications(): Promise<ListNotificationsResult> {
+    return Promise.resolve({ items: [] })
+  }
+  countUnreadNotifications(): Promise<number> {
+    return Promise.resolve(0)
+  }
+  markNotificationRead(): Promise<boolean> {
+    return Promise.resolve(false)
+  }
+  markAllNotificationsRead(): Promise<number> {
+    return Promise.resolve(0)
   }
 }
 
