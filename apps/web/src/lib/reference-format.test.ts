@@ -7,6 +7,7 @@ import {
   extractReferenceIndexes,
   resolvedPromptLength,
   parsePromptReferences,
+  filterReferenceAssets,
 } from './reference-format'
 
 describe('reference-format', () => {
@@ -41,6 +42,34 @@ describe('reference-format', () => {
     expect(resolvedPromptLength('一只猫 @图1', 'angle-bracket')).toBe(
       '一只猫 <<<image_1>>>'.length,
     )
+  })
+
+  describe('filterReferenceAssets', () => {
+    const assets = [
+      { fileName: '猫的参考.png' },
+      { fileName: 'Sunset.png' },
+      { fileName: null },
+    ]
+
+    it('空查询返回全量（顺序不变）', () => {
+      expect(filterReferenceAssets(assets, '')).toEqual(assets)
+      expect(filterReferenceAssets(assets, '   ')).toEqual(assets)
+    })
+
+    it('按「图N」序号匹配', () => {
+      expect(filterReferenceAssets(assets, '图1')).toEqual([assets[0]])
+      expect(filterReferenceAssets(assets, '图2')).toEqual([assets[1]])
+      expect(filterReferenceAssets(assets, '图3')).toEqual([assets[2]])
+    })
+
+    it('按文件名匹配（不区分大小写）', () => {
+      expect(filterReferenceAssets(assets, '猫')).toEqual([assets[0]])
+      expect(filterReferenceAssets(assets, 'sunset')).toEqual([assets[1]])
+    })
+
+    it('无匹配返回空数组', () => {
+      expect(filterReferenceAssets(assets, '不存在')).toEqual([])
+    })
   })
 
   describe('parsePromptReferences', () => {

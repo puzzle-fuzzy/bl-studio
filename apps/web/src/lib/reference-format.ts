@@ -23,6 +23,22 @@ export function referenceMarker(index: number): string {
   return `@图${index}`
 }
 
+/**
+ * 按用户输入的过滤文本筛选参考池（供 @ 引用面板使用）。
+ * 空查询返回全量；匹配「图N」序号标签与资产文件名（fileName），不区分大小写。
+ */
+export function filterReferenceAssets<T extends { fileName?: string | null }>(
+  assets: readonly T[],
+  query: string,
+): T[] {
+  const q = query.trim().toLowerCase()
+  if (q === '') return [...assets]
+  return assets.filter((asset, index) => {
+    if (`图${index + 1}`.toLowerCase().includes(q)) return true
+    return asset.fileName !== undefined && asset.fileName !== null && asset.fileName.toLowerCase().includes(q)
+  })
+}
+
 export function referenceFormatOf(model: Pick<ModelCatalogItem, 'referenceFormat'> | undefined): ReferenceFormat {
   return model?.referenceFormat ?? 'angle-bracket'
 }

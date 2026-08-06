@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import { createPortal } from 'react-dom'
 import type { AssetItem } from '@bailian-studio/api-client'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
-import { referenceMarker } from '@/lib/reference-format'
+import { filterReferenceAssets, referenceMarker } from '@/lib/reference-format'
 import { cn } from '@/lib/utils'
 
 /**
@@ -11,15 +11,22 @@ import { cn } from '@/lib/utils'
  * 参考池（refs）来自上方「输入参考素材」媒体字段，是**稳定列表**（外部唯一事实源，
  * 编辑器只引用、不增删）。文本以 `@图N` 中性标记承载引用（N 为 1-based 序号，见
  * lib/reference-format），DOM 内标记渲染为**行内缩略图 chip**（contentEditable=false）。
- * 按 `@` 在**光标处**弹出已选参考图下拉（面板锚点 = 光标所在行，左边缘钳制在编辑区内，
- * 对齐 lobehub mention 菜单做法），键盘 ArrowUp/Down + Enter 选择，WAI-ARIA combobox
- * 模式。点选后在光标处**直接插入 chip 节点**（不整块重建），光标保持在 chip 之后。
+ *
+ * 引用交互对齐 Notion/飞书类 mention：
+ * - 按 `@` 时输入框里**出现 `@` 字符**、光标停在 `@` 之后，并在光标处弹参考图下拉；
+ * - `@` 与光标之间插入一个零宽锚点（query marker），继续输入即成为过滤词，面板
+ *   跟随光标移动并实时过滤（匹配「图N」与文件名）；
+ * - 键盘 ArrowUp/Down + Enter 选择，WAI-ARIA combobox 模式；
+ * - 点选/回车后，把 `@` + 过滤词整体替换为缩略图 chip，光标停在 chip 之后。
  *
  * 核心约定：
  * - 编辑期间以 DOM 为唯一事实源，`onInput` 时序列化回文本（不做重排编号）；
  * - 外部变化（回显、重新还原）由 `value`/`refs` 变化触发整块重渲染；
  * - 插入 chip 用 Range API 原位插入 + 手动复位 caret，纯文本输入不触碰 DOM 时
- *   光标得以保留（undo/删除/粘贴都交给浏览器原生行为）。
+ *   光标得以保留（undo/删除/粘贴都交给浏览器原生行为）；
+ * - 面板以 viewport 坐标 + fixed 渲染在 body portal，锚点用光标行矩形
+ *   （getClientRects），零矩形时退回 query marker / 编辑器兜底，避免被创作页
+ *   xl 两栏独立滚动容器裁剪。
  */
 
 interface RichPromptEditorProps {
@@ -35,17 +42,25 @@ const PICKER_ID = 'prompt-ref-picker'
 export function RichPromptEditor({ value, refs, onChange, disabled }: RichPromptEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
-  const savedRangeRef = useRef<Range | null>(null)
+  // query 会话跟踪：`@` 文本节点 + 零宽锚点 span + 最近一次光标位置。
+  const atTextNodeRef = useRef<Text | null>(null)
+  const queryMarkerRef = useRef<HTMLSpanElement | null>(null)
+  const caretRangeRef = useRef<Range | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pickerAnchor, setPickerAnchor] = useState<{ style: CSSProperties } | null>(null)
+  const [query, setQuery] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
 
+  const visibleRefs = useMemo(() => filterReferenceAssets(refs, query), [refs, query])
+
   // 外部 value/refs 变化时同步 DOM（用户输入产生的变化 text 已一致而跳过，保留光标）。
+  // 若整块重建发生在 query 会话中，锚点与 `@` 节点一并失效，须关闭面板。
   useEffect(() => {
     const editor = editorRef.current
     if (editor === null) return
     if (serializeText(editor) !== value) {
       renderInto(editor, value, refs)
+      if (atTextNodeRef.current !== null) closePicker()
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, refs])
@@ -53,7 +68,7 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
   // 下拉打开时：点击外部 / Esc / 页面滚动关闭（下拉自身滚动不关闭，允许滚长列表）。
   useEffect(() => {
     if (!pickerOpen) return
-    const close = () => setPickerOpen(false)
+    const close = () => closePicker()
     const onKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') close()
     }
@@ -72,88 +87,162 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
     }
   }, [pickerOpen])
 
+  /** 关闭面板并清理 query 会话。`@` 与已输入文字保留为普通文本（Notion 行为）。 */
+  const closePicker = () => {
+    queryMarkerRef.current?.remove()
+    queryMarkerRef.current = null
+    atTextNodeRef.current = null
+    caretRangeRef.current = null
+    setQuery('')
+    setActiveIndex(0)
+    setPickerOpen(false)
+  }
+
+  /** 开始一次引用输入：插入 `@` + 零宽锚点，光标停在锚点后，并在光标处弹面板。 */
+  const startMention = () => {
+    const editor = editorRef.current
+    if (editor === null) return
+    const sel = window.getSelection()
+    const atNode = document.createTextNode('@')
+    if (sel !== null && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+      const range = sel.getRangeAt(0).cloneRange()
+      range.deleteContents()
+      range.insertNode(atNode)
+    } else {
+      editor.appendChild(atNode)
+    }
+    // 零宽锚点：`@` 与光标之间的标记，用于提取过滤文本与作为定位兜底。
+    const marker = document.createElement('span')
+    marker.dataset.mentionMarker = 'query-start'
+    marker.style.display = 'inline-block'
+    marker.style.width = '0'
+    marker.style.overflow = 'hidden'
+    atNode.after(marker)
+    const caret = document.createRange()
+    caret.setStartAfter(marker)
+    caret.collapse(true)
+    if (sel !== null) {
+      sel.removeAllRanges()
+      sel.addRange(caret)
+    }
+    atTextNodeRef.current = atNode
+    queryMarkerRef.current = marker
+    caretRangeRef.current = caret.cloneRange()
+    setQuery('')
+    setActiveIndex(0)
+    setPickerAnchor(anchorForCaret(editor, marker))
+    setPickerOpen(true)
+    const text = serializeText(editor)
+    if (text !== value) onChange(text)
+  }
+
   const handleInput = () => {
     const editor = editorRef.current
     if (editor === null) return
     const text = serializeText(editor)
     if (text !== value) onChange(text)
+    const sel = window.getSelection()
+    if (sel !== null && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+      caretRangeRef.current = sel.getRangeAt(0).cloneRange()
+    }
+    // query 会话中：提取 `@` 后的过滤词、跟随光标重定位；`@` 被删或光标移走则收尾。
+    const atNode = atTextNodeRef.current
+    const caret = caretRangeRef.current
+    if (atNode !== null) {
+      if (editor.contains(atNode) && caret !== null && editor.contains(caret.startContainer)) {
+        const mention = document.createRange()
+        mention.setStartBefore(atNode)
+        mention.setEnd(caret.endContainer, caret.endOffset)
+        if (mention.toString().startsWith('@')) {
+          setQuery(mention.toString().slice(1))
+          setActiveIndex(0)
+          setPickerAnchor(anchorForCaret(editor, queryMarkerRef.current))
+        } else {
+          closePicker()
+        }
+      } else {
+        closePicker()
+      }
+    }
   }
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (disabled) return
-    // @ 触发下拉：记下当前光标并算出面板锚点（贴光标），弹出前不输入字符。
-    if (event.key === '@') {
+    // @ 触发引用：先让 `@` 进入输入框，再在光标处弹面板（不阻止字符输入）。
+    if (event.key === '@' && !pickerOpen) {
       event.preventDefault()
-      const selection = window.getSelection()
-      const editor = editorRef.current
-      if (editor !== null) {
-        if (selection !== null && selection.rangeCount > 0) {
-          const range = selection.getRangeAt(0)
-          savedRangeRef.current = range.cloneRange()
-          setPickerAnchor(anchorForRange(range, editor))
-        } else {
-          savedRangeRef.current = null
-          setPickerAnchor(anchorForEditor(editor))
-        }
-      } else {
-        savedRangeRef.current = null
-        setPickerAnchor(null)
-      }
-      setActiveIndex(0)
-      setPickerOpen(true)
+      startMention()
       return
     }
-    if (!pickerOpen || refs.length === 0) return
+    if (!pickerOpen || visibleRefs.length === 0) return
     // 下拉打开时键盘导航（combobox 模式）：方向键移动高亮，Enter 选中。
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault()
       const delta = event.key === 'ArrowDown' ? 1 : -1
-      setActiveIndex(current => (current + delta + refs.length) % refs.length)
+      setActiveIndex(current => (current + delta + visibleRefs.length) % visibleRefs.length)
       return
     }
     if (event.key === 'Enter') {
       event.preventDefault()
-      const asset = refs[activeIndex]
+      const asset = visibleRefs[activeIndex]
       if (asset !== undefined) handlePick(asset)
     }
   }
 
   const handlePick = (asset: AssetItem) => {
     const editor = editorRef.current
-    setPickerOpen(false)
-    if (editor === null) return
-    const index = refs.findIndex(ref => ref.id === asset.id) + 1
-    if (index <= 0) return
-
-    editor.focus()
-    const saved = savedRangeRef.current
-    savedRangeRef.current = null
-
-    // 直接 DOM 插入 chip（不 execCommand、不整块重建），光标由下面手动复位到 chip 后。
-    const chip = createChip(asset, index)
-    const caretPoint = saved !== null && editor.contains(saved.startContainer) ? saved : null
-    const selection = window.getSelection()
-    if (caretPoint !== null) {
-      caretPoint.deleteContents()
-      caretPoint.insertNode(chip)
-    } else {
-      editor.appendChild(chip)
+    const atNode = atTextNodeRef.current
+    const caretRange = caretRangeRef.current
+    if (editor === null) {
+      closePicker()
+      return
     }
-
+    const index = refs.findIndex(ref => ref.id === asset.id) + 1
+    if (index <= 0) {
+      closePicker()
+      return
+    }
+    const chip = createChip(asset, index)
+    let inserted = false
+    // 正常路径：把 `@` + 锚点 + 过滤词整体替换为 chip。须在 closePicker 移除锚点
+    // 之前完成——先移除锚点会让已存 caretRange 边界回移，导致区间塌缩删不掉 `@`。
+    if (atNode !== null && editor.contains(atNode) && caretRange !== null && editor.contains(caretRange.startContainer)) {
+      const mention = document.createRange()
+      mention.setStartBefore(atNode)
+      mention.setEnd(caretRange.endContainer, caretRange.endOffset)
+      if (mention.toString().startsWith('@')) {
+        mention.deleteContents()
+        mention.insertNode(chip)
+        inserted = true
+      }
+    }
+    closePicker()
+    if (!inserted) {
+      // 兜底：贴当前光标插入，光标不在编辑器里则追加到末尾。
+      const sel = window.getSelection()
+      if (sel !== null && sel.rangeCount > 0 && editor.contains(sel.getRangeAt(0).startContainer)) {
+        const caret = sel.getRangeAt(0).cloneRange()
+        caret.deleteContents()
+        caret.insertNode(chip)
+      } else {
+        editor.appendChild(chip)
+      }
+    }
+    editor.focus()
     const caret = document.createRange()
     caret.setStartAfter(chip)
     caret.collapse(true)
-    if (selection !== null) {
-      selection.removeAllRanges()
-      selection.addRange(caret)
+    const sel = window.getSelection()
+    if (sel !== null) {
+      sel.removeAllRanges()
+      sel.addRange(caret)
     }
-
     const text = serializeText(editor)
     if (text !== value) onChange(text)
   }
 
   const activeDescendant =
-    pickerOpen && refs[activeIndex] !== undefined ? `prompt-ref-option-${activeIndex}` : undefined
+    pickerOpen && visibleRefs[activeIndex] !== undefined ? `prompt-ref-option-${activeIndex}` : undefined
 
   return (
     <div className="relative space-y-2">
@@ -191,10 +280,12 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
             )}
           >
           <p className="px-2 pt-1 pb-0.5 text-xs text-muted-foreground">选择要引用的参考图</p>
-          {refs.length === 0 ? (
-            <p className="px-2 py-1.5 text-xs text-muted-foreground">暂无参考图，请先在上方「输入参考素材」添加</p>
+          {visibleRefs.length === 0 ? (
+            <p className="px-2 py-1.5 text-xs text-muted-foreground">
+              {refs.length === 0 ? '暂无参考图，请先在上方「输入参考素材」添加' : `没有匹配“${query}”的参考图`}
+            </p>
           ) : (
-            refs.map((asset, index) => (
+            visibleRefs.map((asset, index) => (
               <button
                 key={asset.id}
                 type="button"
@@ -211,7 +302,10 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
                 <span className="size-6 shrink-0 overflow-hidden rounded">
                   <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />
                 </span>
-                <span>图{index + 1}</span>
+                <span>图{refs.findIndex(ref => ref.id === asset.id) + 1}</span>
+                {asset.fileName !== undefined && (
+                  <span className="truncate text-xs text-muted-foreground">{asset.fileName}</span>
+                )}
               </button>
             ))
           )}
@@ -224,20 +318,38 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
 
 /**
  * 计算 @ 面板锚点：以 viewport 坐标 + fixed 定位渲染在 body portal 中，避免被创作页
- * xl 两栏独立滚动容器裁剪。光标矩形全 0（无法定位）时退回编辑器底部。左边缘钳制在
- * 视口内；上方空间不足时向上展开，防止面板底部超出视口。
+ * xl 两栏独立滚动容器裁剪。优先取光标行矩形（getClientRects，对空行/行尾比
+ * getBoundingClientRect 可靠），全 0 矩形时退回 query marker，最后兜底编辑器矩形。
+ * 左边缘钳制在视口内；上方空间不足时向上展开，防止面板底部超出视口。
  */
-function anchorForRange(range: Range, editor: HTMLDivElement): { style: CSSProperties } {
-  const rect = range.getBoundingClientRect()
-  if (rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0) {
-    return pickerStyle(editor.getBoundingClientRect())
+function anchorForCaret(
+  editor: HTMLDivElement,
+  fallbackMarker: HTMLSpanElement | null,
+): { style: CSSProperties } {
+  let rect: DOMRect | null = null
+  const sel = window.getSelection()
+  if (sel !== null && sel.rangeCount > 0) {
+    const range = sel.getRangeAt(0)
+    if (editor.contains(range.startContainer)) {
+      const rects = range.getClientRects()
+      if (rects.length > 0) {
+        rect = rects[0] ?? null
+      } else {
+        const fallback = range.getBoundingClientRect()
+        if (!isZeroRect(fallback)) rect = fallback
+      }
+    }
   }
+  if (rect === null && fallbackMarker?.isConnected === true) {
+    const markerRect = fallbackMarker.getBoundingClientRect()
+    if (!isZeroRect(markerRect)) rect = markerRect
+  }
+  if (rect === null) rect = editor.getBoundingClientRect()
   return pickerStyle(rect)
 }
 
-/** 无选区兜底：贴编辑器底部（如点击空区域后按 @）。 */
-function anchorForEditor(editor: HTMLDivElement): { style: CSSProperties } {
-  return pickerStyle(editor.getBoundingClientRect())
+function isZeroRect(rect: DOMRect): boolean {
+  return rect.width === 0 && rect.height === 0 && rect.top === 0 && rect.left === 0
 }
 
 function pickerStyle(anchorRect: DOMRect): { style: CSSProperties } {
@@ -301,14 +413,20 @@ function createChip(ref: AssetItem | undefined, index: number): HTMLSpanElement 
 /**
  * 序列化 contenteditable 为纯文本：按 DOM 顺序拼接文本节点与 chip 的标记文本
  * （`@图N` 保持原序号，不重排；refs 由外部参考池维护，编辑器不重建）。
+ * 块级子元素（回车换行产生的 <div> 等）递归收集文本，避免第二行以后被丢弃。
+ * query 锚点是零宽 span 且无 data-marker，递归为空，不参与序列化。
  */
-function serializeText(editor: HTMLDivElement): string {
+function serializeText(editor: HTMLElement): string {
   let text = ''
   for (const node of Array.from(editor.childNodes)) {
     if (node.nodeType === Node.TEXT_NODE) {
       text += node.textContent ?? ''
-    } else if (node instanceof HTMLElement && node.dataset.marker !== undefined) {
-      text += node.dataset.marker
+    } else if (node instanceof HTMLElement) {
+      if (node.dataset.marker !== undefined) {
+        text += node.dataset.marker
+      } else if (node.contentEditable !== 'false') {
+        text += serializeText(node)
+      }
     }
   }
   return text
