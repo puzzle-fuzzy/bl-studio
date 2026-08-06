@@ -212,12 +212,14 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     if (row === undefined) return undefined
 
     const record = toGenerationRecord(row.record)
+    // 注意：这里过滤的是「产物持久化状态」（pending|stored|failed），不是记录状态。
+    // generation_records 用 'succeeded'，generation_artifacts 用 'stored'——别写混。
     const artifactRows = await db
       .select()
       .from(generationArtifacts)
       .where(and(
         eq(generationArtifacts.recordId, input.recordId),
-        eq(generationArtifacts.status, 'succeeded'),
+        eq(generationArtifacts.status, 'stored'),
         isNull(generationArtifacts.deletedAt),
       ))
       .orderBy(asc(generationArtifacts.createdAt), asc(generationArtifacts.id))
@@ -247,7 +249,8 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
       .where(and(
         eq(generationArtifacts.id, input.artifactId),
         eq(generationArtifacts.recordId, input.recordId),
-        eq(generationArtifacts.status, 'succeeded'),
+        // 产物用 'stored'（不是记录的 'succeeded'，见 getGalleryGeneration 注释）。
+        eq(generationArtifacts.status, 'stored'),
         isNull(generationArtifacts.deletedAt),
         eq(generationRecords.visibility, 'public'),
         eq(generationRecords.status, 'succeeded'),
@@ -690,13 +693,14 @@ async function hydrateGalleryItems(db: BailianStudioDb, rows: readonly GalleryRo
 
   const recordIds = rows.map(row => row.record.id)
 
-  // 每个记录取首个已存 artifact 作为封面。
+  // 每个记录取首个已存 artifact 作为封面。产物状态是 'stored'
+  // （记录才用 'succeeded'，两表枚举不同，见 getGalleryGeneration 注释）。
   const artifactRows = await db
     .select()
     .from(generationArtifacts)
     .where(and(
       inArray(generationArtifacts.recordId, recordIds),
-      eq(generationArtifacts.status, 'succeeded'),
+      eq(generationArtifacts.status, 'stored'),
       isNull(generationArtifacts.deletedAt),
     ))
     .orderBy(asc(generationArtifacts.createdAt), asc(generationArtifacts.id))

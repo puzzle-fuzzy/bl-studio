@@ -239,7 +239,7 @@ function GalleryCard({
           <img src={thumbUrl} alt="" className="size-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         ) : item.category === 'video' && videoUrl.length > 0 ? (
           <video src={videoUrl} muted playsInline preload="metadata" className="size-full object-cover transition-transform group-hover:scale-105" />
-        ) : coverUrl.length > 0 ? (
+        ) : item.category !== 'audio' && coverUrl.length > 0 ? (
           <img src={coverUrl} alt="" className="size-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
         ) : (
           <span className="flex size-full items-center justify-center text-xs text-muted-foreground">{item.category}</span>
@@ -311,9 +311,13 @@ function GalleryDetailView({ detail, onLike }: { detail: GalleryDetail; onLike: 
       <div className="grid gap-3 sm:grid-cols-2">
         {detail.artifacts.map(artifact => {
           const url = resolveApiUrl(artifact.readUrl ?? artifact.thumbnailUrl)
-          return artifact.kind === 'video'
-            ? <video key={artifact.id} src={url} controls className="aspect-video w-full rounded-lg bg-black" />
-            : <img key={artifact.id} src={url} alt="" className="w-full rounded-lg object-contain" loading="lazy" />
+          if (artifact.kind === 'video') {
+            return <video key={artifact.id} src={url} controls className="aspect-video w-full rounded-lg bg-black" />
+          }
+          if (artifact.kind === 'audio') {
+            return <audio key={artifact.id} src={url} controls className="w-full rounded-lg bg-muted" />
+          }
+          return <img key={artifact.id} src={url} alt="" className="w-full rounded-lg object-contain" loading="lazy" />
         })}
       </div>
     </>

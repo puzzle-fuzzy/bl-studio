@@ -1669,6 +1669,67 @@ describe('generation repository', () => {
     expect((await db.select().from(taskRecords)).filter(task => task.type === 'media.thumbnail')).toHaveLength(1)
   })
 
+  it('画廊公开后：列表带已存储产物封面、详情返回产物（回归：产物状态是 stored 不是 succeeded）', async () => {
+    const created = await repository.createGeneration({
+      userId: 'user_1',
+      modelId: 'qwen-image',
+      params: { prompt: 'gallery cover regression', n: 1, size: '1328*1328' },
+    })
+    await repository.completeGeneration({
+      recordId: created.record.id,
+      costFinal: 20,
+      output: { artifacts: [{ kind: 'image', sourceUrl: 'https://provider.test/cover.png' }] },
+      enqueueArtifactPersist: true,
+      now: '2026-07-20T00:00:00.000Z',
+    })
+    const [artifact] = await repository.listPendingArtifactsForRecord(created.record.id)
+    if (artifact === undefined) throw new Error('expected artifact')
+    await repository.markArtifactStored({
+      artifactId: artifact.id,
+      storageProvider: 'oss',
+      storageKey: 'generations/user_1/cover.png',
+      storageUrl: 'https://signed-storage.test/cover.png',
+      byteSize: 1024,
+      mimeType: 'image/png',
+      now: '2026-07-20T00:01:00.000Z',
+    })
+
+    // 私有阶段：画廊不可见。
+    const beforePublic = await repository.listGalleryGenerations({ viewerId: 'user_page' })
+    expect(beforePublic.items).toHaveLength(0)
+
+    await repository.setGenerationVisibility({
+      userId: 'user_1',
+      recordId: created.record.id,
+      visibility: 'public',
+      now: '2026-07-20T00:02:00.000Z',
+    })
+
+    // 列表：公开记录应带封面（首个已存储产物）。回归点：若过滤写成 'succeeded'，
+    // cover 恒为 undefined，卡片首帧/封面不展示。
+    const page = await repository.listGalleryGenerations({ viewerId: 'user_page' })
+    expect(page.items).toHaveLength(1)
+    expect(page.items[0]?.id).toBe(created.record.id)
+    expect(page.items[0]?.cover).toBeDefined()
+    expect(page.items[0]?.cover?.status).toBe('stored')
+
+    // 详情：应返回已存储产物（供弹窗渲染图片/视频）。同样回归点：'succeeded' 过滤
+    // 会让 artifacts 恒空，弹窗无内容。
+    const detail = await repository.getGalleryGeneration({ recordId: created.record.id, viewerId: 'user_page' })
+    expect(detail).toBeDefined()
+    expect(detail?.artifacts).toHaveLength(1)
+    expect(detail?.artifacts[0]?.status).toBe('stored')
+    expect(detail?.artifacts[0]?.storageKey).toBe('generations/user_1/cover.png')
+
+    // 跨用户取单个产物也应命中（产物状态 stored）。
+    const crossUserArtifact = await repository.getGalleryArtifact({
+      recordId: created.record.id,
+      artifactId: artifact.id,
+    })
+    expect(crossUserArtifact).toBeDefined()
+    expect(crossUserArtifact?.status).toBe('stored')
+  })
+
   it('does not revive a soft-deleted generated asset when artifact persistence retries', async () => {
     const created = await repository.createGeneration({
       userId: 'user_store',
