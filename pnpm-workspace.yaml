@@ -5,7 +5,7 @@ packages:
 # 共享依赖版本中心。取 npm 最新稳定版；新增共享依赖时在此登记，包内引用 "catalog:"。
 catalog:
   # bailian-hub SDK 由集成链路精确锁定（bailian-adapter 的 coverage 基线绑定该版本）。
-  "@puzzle-fuzzy/bailian-sdk": 2.0.0-beta.8
+  "@puzzle-fuzzy/bailian-sdk": 2.0.0-beta.11
   "@node-rs/argon2": ^2.0.2
   "@types/ali-oss": ^6.23.3
   "@types/nodemailer": 8.0.1

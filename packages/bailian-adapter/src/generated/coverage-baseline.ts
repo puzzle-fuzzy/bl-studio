@@ -3,9 +3,9 @@
  * installed @puzzle-fuzzy/bailian-sdk. Do not edit these values by hand.
  */
 export const BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE = Object.freeze({
-  sdkVersion: "2.0.0-beta.8",
-  catalogRevision: "2026-08-06.5804aacadda2",
-  catalogHash: "sha256:5804aacadda2ebc6b71ef1fcfe18554330ecd7f8925cf195138b43e6126f8fd9",
+  sdkVersion: "2.0.0-beta.11",
+  catalogRevision: "2026-08-07.29d7d8d65d49",
+  catalogHash: "sha256:29d7d8d65d49aa824842c265b264f445c63d0a61e825254507ceb2219baa0f75",
   requirementsHash: "sha256:88649610f1e017397c2dc491aa060dd9fa5ad989517f8a255147a10dd093d84f",
   totalRequirements: 45,
   coveredRequirements: 45,
