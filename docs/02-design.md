@@ -90,6 +90,8 @@ bl-studio/
 | `/generations/:id` | 需登录 | 详情（成品/输入/诊断/分享/取消/重跑） |
 | `/functions` | 需登录 | 辅助工具（剧本/提取音频/转写） |
 | `/library` | 需登录 | 资产库（虚拟网格 + 上传进度 + 预览） |
+| `/gallery` | 需登录 | 社区画廊（点赞/收藏/同参数生成/详情预览）——社区化特性后新增 |
+| `/prompts` | 需登录 | 提示词库（服务端命名库，保存/复用）——社区化特性后新增 |
 | `/login` | 访客 | 登录/注册（全局 AuthDialog） |
 | `/auth/verify-email` / `/auth/check-email` | 访客 | 邮箱验证 |
 | `/auth/forgot-password` / `/auth/reset-password` | 访客 | 密码重置 |
@@ -141,7 +143,7 @@ bl-studio/
 
 ### 4.3 保留不变
 - 包边界门禁、manifest 注册表、outbox+SSE 管线、keyset 游标、账务模型、安全姿态（IDOR/CSRF/body guard）。
-- drizzle schema 与 33 个迁移（数据兼容是硬约束）。
+- drizzle schema 与全部已提交迁移（数据兼容是硬约束）。当前迁移已到 `0035`（36 个，`0000–0035`）；生产只走 `drizzle-kit migrate`（已提交迁移文件），schema 变更一律以**追加迁移**实现，不跑 `db:push`。
 
 ## 五、基础设施
 

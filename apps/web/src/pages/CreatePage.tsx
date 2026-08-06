@@ -300,7 +300,7 @@ export function CreatePage() {
     <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-2">
       {/* 左栏：模型下拉 + 表单（无卡片边框）。xl 下两栏各自独立滚动，表单很长时不连带滚走最近任务。
           relative 让内部 Select 的原生 <select> 以本列为定位上下文，随列裁剪，避免漏出撑高文档。 */}
-      <div className="space-y-6 xl:relative xl:max-h-[calc(100svh-3rem)] xl:overflow-y-auto xl:pr-1 xl:pb-8">
+      <div className="space-y-6 xl:relative xl:max-h-[calc(100svh-3rem)] xl:overflow-y-auto xl:px-1 xl:pb-8">
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">选择模型</h2>
           <ModelSelector models={models} selectedId={modelId} onSelect={handleModelSelect} />

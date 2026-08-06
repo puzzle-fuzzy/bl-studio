@@ -1,10 +1,9 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Bookmark, BookmarkCheck, Heart, Loader2, Sparkles } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Check, Copy, Heart, Loader2, Sparkles } from 'lucide-react'
 import type { GalleryDetail, GalleryItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -229,27 +228,36 @@ function GalleryCard({
   onFavorite: () => void
   onReuse: () => void
 }) {
+  // 封面：优先用已生成的首帧缩略图（<img>，轻量）；视频无缩略图时退化为 <video preload="metadata"> 展示首帧。
+  const thumbUrl = resolveApiUrl(item.cover?.thumbnailUrl)
+  const videoUrl = item.category === 'video' ? resolveApiUrl(item.cover?.readUrl) : ''
   const coverUrl = resolveApiUrl(item.cover?.readUrl ?? item.cover?.thumbnailUrl)
   return (
-    <Card className="group overflow-hidden">
+    <div className="group flex flex-col overflow-hidden rounded-xl bg-card text-sm text-card-foreground ring-1 ring-foreground/10">
       <button type="button" onClick={onOpen} className="relative block aspect-square w-full overflow-hidden bg-muted">
-        {coverUrl.length > 0
-          ? <img src={coverUrl} alt="" className="size-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
-          : <span className="flex size-full items-center justify-center text-xs text-muted-foreground">{item.category}</span>}
+        {thumbUrl.length > 0 ? (
+          <img src={thumbUrl} alt="" className="size-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+        ) : item.category === 'video' && videoUrl.length > 0 ? (
+          <video src={videoUrl} muted playsInline preload="metadata" className="size-full object-cover transition-transform group-hover:scale-105" />
+        ) : coverUrl.length > 0 ? (
+          <img src={coverUrl} alt="" className="size-full object-cover transition-transform group-hover:scale-105" loading="lazy" />
+        ) : (
+          <span className="flex size-full items-center justify-center text-xs text-muted-foreground">{item.category}</span>
+        )}
         <div className="absolute inset-0 flex items-end justify-end gap-1 bg-linear-to-t from-black/60 to-transparent p-2 opacity-0 transition-opacity group-hover:opacity-100">
           <Button size="sm" variant="secondary" onClick={event => { event.stopPropagation(); onReuse() }}>
             <Sparkles data-icon />
             同参数
           </Button>
-          <Button size="icon" variant="secondary" onClick={event => { event.stopPropagation(); onFavorite() }} aria-label="收藏">
+          <Button size="icon-sm" variant="secondary" onClick={event => { event.stopPropagation(); onFavorite() }} aria-label="收藏">
             {item.favoritedByViewer ? <BookmarkCheck data-icon className="text-primary" /> : <Bookmark data-icon />}
           </Button>
-          <Button size="icon" variant="secondary" onClick={event => { event.stopPropagation(); onLike() }} aria-label="点赞">
+          <Button size="icon-sm" variant="secondary" onClick={event => { event.stopPropagation(); onLike() }} aria-label="点赞">
             <Heart data-icon className={item.likedByViewer ? 'fill-current text-destructive' : undefined} />
           </Button>
         </div>
       </button>
-      <CardContent className="space-y-1 p-3">
+      <div className="space-y-1 p-3">
         <div className="flex items-center gap-2">
           <Badge variant="secondary" className="max-w-[60%] truncate">{modelLabel}</Badge>
           <span className="ml-auto flex items-center gap-0.5 text-xs text-muted-foreground">
@@ -257,20 +265,27 @@ function GalleryCard({
             {item.likeCount}
           </span>
         </div>
-        <p className="line-clamp-2 min-h-8 text-xs text-muted-foreground">
-          {typeof item.inputParams.prompt === 'string' ? item.inputParams.prompt : ''}
-        </p>
         <p className="text-xs text-muted-foreground">{item.author.displayName ?? item.author.id.slice(0, 8)} · {formatTime(item.createdAt)}</p>
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }
 
 function GalleryDetailView({ detail, onLike }: { detail: GalleryDetail; onLike: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const prompt = typeof detail.record.inputParams.prompt === 'string' ? detail.record.inputParams.prompt : ''
+
+  const handleCopyPrompt = async () => {
+    await navigator.clipboard?.writeText(prompt).catch(() => undefined)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="flex flex-wrap items-center gap-2">
+        {/* pr-8 给右上角关闭按钮让位，避免点赞按钮与关闭按钮重叠。 */}
+        <DialogTitle className="flex flex-wrap items-center gap-2 pr-8">
           <Badge variant="secondary">{detail.record.modelId}</Badge>
           <span className="text-sm font-normal text-muted-foreground">{detail.author.displayName ?? detail.author.id.slice(0, 8)}</span>
           <button
@@ -282,9 +297,16 @@ function GalleryDetailView({ detail, onLike }: { detail: GalleryDetail; onLike: 
             {detail.likeCount}
           </button>
         </DialogTitle>
-        <DialogDescription className="line-clamp-4 text-left">
-          {typeof detail.record.inputParams.prompt === 'string' ? detail.record.inputParams.prompt : '无提示词'}
-        </DialogDescription>
+        {prompt.length > 0 && (
+          <div className="flex items-start gap-2">
+            <DialogDescription className="flex-1 line-clamp-4 text-left whitespace-pre-wrap">
+              {prompt}
+            </DialogDescription>
+            <Button size="icon-sm" variant="ghost" onClick={() => void handleCopyPrompt()} aria-label="复制提示词" className="mt-0.5 shrink-0">
+              {copied ? <Check data-icon className="text-primary" /> : <Copy data-icon />}
+            </Button>
+          </div>
+        )}
       </DialogHeader>
       <div className="grid gap-3 sm:grid-cols-2">
         {detail.artifacts.map(artifact => {

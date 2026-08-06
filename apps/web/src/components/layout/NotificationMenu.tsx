@@ -41,7 +41,7 @@ export function NotificationMenu() {
           )}
         </SidebarMenuButton>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-80">
+      <DropdownMenuContent side="right" align="start" className="w-80">
         <DropdownMenuLabel className="flex items-center justify-between">
           <span>通知</span>
           {unreadCount > 0 && (

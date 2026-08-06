@@ -615,7 +615,7 @@ function ParamsCard({ record }: { record: GenerationRecord }) {
           rows.map(row => (
             <div key={row.key} className="grid grid-cols-[96px_1fr] gap-2 text-sm">
               <span className="text-muted-foreground">{row.label}</span>
-              <span className="min-w-0 break-words">
+              <span className="min-w-0 wrap-break-word">
                 {row.kind === 'media' ? (
                   <RefThumbnails ids={row.refIds ?? []} refAssets={refAssets} />
                 ) : row.key === 'prompt' && typeof row.value === 'string' && row.value !== '' ? (

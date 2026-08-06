@@ -16,7 +16,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本），由 **ba
 | API 运行时 | **Bun**（唯一例外：Elysia 用 `bun apps/api/src/index.ts` 启动） |
 | Worker 运行时 | Node + **tsx** |
 | API 框架 | Elysia 1.4 |
-| ORM | Drizzle（Postgres 18 张表） |
+| ORM | Drizzle（Postgres 23 张表） |
 | 前端 | React 19 + Vite 8 + **zustand** + react-router 8 + **shadcn/ui** + Tailwind CSS 4 + **react-window** + sonner |
 | 登录 | 邮箱密码 + **GitHub OAuth**（会话 http-only cookie） |
 | 密码哈希 | @node-rs/argon2（argon2id） |
@@ -87,18 +87,21 @@ Web (apps/web, React 19 + zustand + shadcn/ui)   Admin (apps/admin, 同源 /admi
 ```text
 src/
 ├── lib/          纯函数（可单测）：parameter-form-schema / reference-format /
-│                 creation-presets / idempotency / user-error / labels / money
-├── stores/       zustand：auth / model-catalog / generations / assets / credits /
+│                 creation-presets / idempotency / deeplink-params / generation-submit /
+│                 user-error / labels / money
+├── stores/       zustand：auth（含 auth-dialog）/ model-catalog / generations /
+│                 generation-artifacts / assets / reference-assets / credits /
 │                 notifications（登出统一 resetPrivateData）
 ├── hooks/        use-generation-events（SSE 失效驱动）/ use-media-job / 缩略图轮询
 ├── components/   ui/（shadcn 60+ 组件）+ layout / auth / create / generations / assets / shared
 └── pages/        Create / Catalog / Generations / GenerationDetail / Functions /
-                  Library / SharedGeneration / auth 五页
+                  Library / Gallery / Prompts / SharedGeneration / auth 五页
 ```
 
 `apps/admin` 是精简的管理后台（同 `apps/web` 的 shadcn/ui + zustand + api-client），
-同源 `/admin` 挂载（nginx 反代，无需新域名/新证书）：`/login`、`/`（用户列表）、
-`/users/:id`（详情/积分/资产）、`/stats`（调用统计）。路由守卫要求 `role === 'admin'`。
+同源 `/admin` 挂载（nginx 反代，无需新域名/新证书）：`/login`、`/users`（用户列表，
+含多选批量封禁/解封/赠送/删除）、`/users/:id`（详情/积分/资产）、`/stats`（调用统计）、
+`/analytics`（成本毛利 + 留存漏斗）、`/feedback`（反馈管理）。路由守卫要求 `role === 'admin'`。
 
 ## 测试策略
 
@@ -108,4 +111,4 @@ src/
 
 ## 部署
 
-单机 Docker Compose + **宿主机 nginx + certbot** 自动 HTTPS（Let's Encrypt；本仓库不内置 Caddy），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + Node 24 + pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署。完整运维手册见 `docs/03-ops.md`，部署踩坑清单见 `docs/04-deployment-playbook.md`。
+单机 Docker Compose + **宿主机 nginx + certbot** 自动 HTTPS（Let's Encrypt；本仓库不内置 Caddy），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + Node 24 + pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署；只改前端时用 `pnpm run deploy:prod:web` 走 web-only 快速发版（约 20MB，不动 api/worker）。新库首次部署后需一次性播种模型成本：`pnpm run db:seed:model-costs`（生产用 `docker compose run --rm migrate pnpm exec tsx infra/scripts/seed-model-costs.ts`）。完整运维手册见 `docs/03-ops.md`，部署踩坑清单见 `docs/04-deployment-playbook.md`。

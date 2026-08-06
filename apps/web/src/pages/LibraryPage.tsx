@@ -222,7 +222,7 @@ function AssetCell({
       <button
         type="button"
         onClick={() => onPreview(index)}
-        className="group relative block aspect-square w-full overflow-hidden rounded-lg border hover:border-primary/50"
+        className="group relative block aspect-square w-full overflow-hidden rounded-lg border transition-transform duration-200 hover:scale-105"
       >
         <AssetThumbnail kind={item.kind} url={item.url} thumbnailUrl={item.thumbnailUrl} />
         <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1.5 py-0.5 text-[10px] text-foreground">
@@ -307,7 +307,7 @@ function TimelineView({
                   key={item.id}
                   type="button"
                   onClick={() => onPreview(index)}
-                  className="group relative block aspect-square w-24 overflow-hidden rounded-lg border hover:border-primary/50"
+                  className="group relative block aspect-square w-24 overflow-hidden rounded-lg border transition-transform duration-200 hover:scale-105"
                 >
                   <AssetThumbnail kind={item.kind} url={item.url} thumbnailUrl={item.thumbnailUrl} />
                   <span className="absolute bottom-1 left-1 rounded bg-background/80 px-1 py-0.5 text-[10px] text-foreground">
@@ -351,7 +351,7 @@ function ProjectView({
             key={primary.id}
             type="button"
             onClick={() => onPreviewGroup({ assets: group.items, index: 0 })}
-            className="group relative block aspect-square w-28 overflow-hidden rounded-lg border hover:border-primary/50"
+            className="group relative block aspect-square w-28 overflow-hidden rounded-lg border transition-transform duration-200 hover:scale-105"
             title={count > 1 ? `同一次生成的 ${count} 个素材` : kindLabel(primary.kind)}
           >
             {count === 1 ? (

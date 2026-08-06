@@ -200,6 +200,8 @@ pnpm run verify                    # 发布前完整门禁
 pnpm run check:production-env      # 应用 env 预检（需 --env-file）
 pnpm run check:production-env:infra
 pnpm run deploy:prod               # 一键发布（核心栈 + 宿主机 nginx 边缘）
+pnpm run deploy:prod:web           # web-only 快速发版（约 20MB，不动 api/worker）
+pnpm run db:seed:model-costs       # 播种 model_costs 默认成本（新库首次部署后执行）
 pnpm run prod:up|down|ps|logs      # 生产核心栈运维
 pnpm run prod:observability:up|down  # 启用/停用日志观测栈（loki/alloy/grafana）
 pnpm run logs:api|worker           # 生产单服务日志

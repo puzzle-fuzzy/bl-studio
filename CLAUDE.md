@@ -18,7 +18,8 @@ AI 媒体生成平台（文生图/文生视频等），由原 bailian-studio（V
 ```bash
 pnpm install
 pnpm run dev              # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
-pnpm run typecheck        # 全仓 tsc --noEmit（这就是 lint；无 ESLint）
+pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行；这就是 lint，无 ESLint）
+pnpm run typecheck:root   # 根作用域 tsc --noEmit：infra/scripts/ + 根 tests/（per-package typecheck 不含这两处）
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
 pnpm run verify           # baseline + boundaries + manifests + typecheck + test
 pnpm run check:boundaries # 包边界
@@ -41,6 +42,8 @@ pnpm run db:push / db:push:test
 
 测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后 `db:push` + `db:push:test`。
 
+社区化特性（封禁/画廊/提示词库/反馈/成本分析）设计见 `docs/05-community-features.md`。其中**审计动作新增必须在三处同步**：`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`infra/scripts/ensure-audit-action-constraint.ts`；drizzle 检测不到已命名 CHECK 表达式变更，迁移里要**手工 DROP/ADD** 该约束。
+
 ## 架构与边界
 
 包边界是**可执行的架构**（`infra/scripts/check-package-boundaries.ts`，进 `verify`）：
@@ -62,9 +65,11 @@ pnpm run db:push / db:push:test
 | event-bus | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |
 | generation-repository | 生成记录/任务/产物/事件的持久化接缝（`FOR UPDATE SKIP LOCKED`） |
+| media-repository | 媒体作业（提取音频/首帧等）持久化与派生产物 |
 | auth | argon2id 密码 + JWT 会话（http-only cookie） |
 | storage | local/OSS 存储适配器 |
 | provider-dashscope | DashScope 协议执行（仅 worker 消费） |
+| provider-health | provider 健康探测（worker 心跳/就绪检查） |
 | task-engine | 纯任务状态机 + 退避 |
 | bailian-adapter | 外部 SDK 唯一入口（coverage 基线） |
 | credit-ledger | 积分账本（冻结/结算/释放） |
@@ -84,8 +89,9 @@ pnpm run db:push / db:push:test
 ### apps/admin（管理后台，同源 /admin）
 
 - 与 web 同技术栈（shadcn/ui + zustand + api-client），**同源 `/admin` 挂载**（web 容器 nginx 反代，无需新域名/证书/跨域）。
-- 页面：`/login`、`/`（用户列表：分页/搜索/角色/软删）、`/users/:id`（详情/积分赠送/资产）、`/stats`（调用统计）。
+- 页面：`/login`、`/users`（用户列表：分页/搜索/角色/软删 + 多选批量封禁/解封/赠送/删除）、`/users/:id`（详情/积分赠送/资产）、`/stats`（调用统计）、`/analytics`（成本毛利 + 留存漏斗）、`/feedback`（反馈管理）。
 - 路由守卫：restore 后非 `role === 'admin'` → 403 页；未登录 → `/login`。API 侧一律 `requireAdminUser()`。
+- web 端社区入口：`/gallery`（社区画廊）、`/prompts`（提示词库）均为 ProtectedRoute 内页面。
 - 复用 `apps/web` 的 shadcn 组件时注意：两 app 的 `components/ui/` 各自独立，新增组件两边都要有（或按需拷贝）。
 
 ## 测试约定

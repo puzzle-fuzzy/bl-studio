@@ -105,7 +105,7 @@
 ## E. 创作闭环
 
 ### E1. 服务端提示词资产库
-`prompt_library` 表；`GET/POST /api/prompt-library`、`PATCH/DELETE /api/prompt-library/:id`（owner 限定）；存 `{name, modelId, prompt, params}`（仅文本参数）。前端 `/prompts` 页 + GenerationDetailPage「保存为提示词」+ `prompt-library-store`。
+`prompt_library` 表；`GET/POST /api/prompt-library`、`PATCH/DELETE /api/prompt-library/:id`（owner 限定）；存 `{name, modelId, prompt, params}`（仅文本参数）。前端 `/prompts` 页 + GenerationDetailPage「保存为提示词」。提示词列表状态由 PromptsPage **页面本地 state** 承载（未建独立 zustand store——列表只在页面内使用，登出时随路由卸载自然失效）。
 
 ### E2. 同 prompt 多模型对比生成
 `generation_records.batchId` + `CreateGenerationRequest.batchId?`。**关键**：`CreateGenerationSchema`（`packages/shared/src/validation.ts`）是**非 strict** 的 `z.object`，`batchId` 必须显式加 `z.string().optional()`（trim + 长度上限），否则被静默剥离。**不要**把 `batchId` 加入 `idempotencyKeyFor` 指纹（会破坏重试幂等）。CreatePage「对比模式」：公共参数填一次，多选 ≤4 模型 → 逐个 `createGeneration`（同 batchId）→ toast「已提交 N 个对比任务」。

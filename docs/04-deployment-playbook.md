@@ -75,6 +75,15 @@ curl -sS -o /dev/null -w "%{http_code}\n" --resolve logs.yxswy.com:443:101.35.24
 #    401（basic_auth 保护，正确）
 ```
 
+**首次部署 / 新库（或 model_costs 表为空）时，追加一次性播种模型成本**（幂等，`on conflict do nothing`，不会覆盖 admin 已调成本）：
+
+```bash
+docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra \
+  -f /opt/bailian-studio/infra/docker/docker-compose.prod.yml \
+  run --rm migrate pnpm exec tsx infra/scripts/seed-model-costs.ts
+#   输出：Seeded N model cost rows.（admin「分析 → 维护模型成本」可再调）
+```
+
 ---
 
 ## 3. 分步手动流程（一键失败时用）
@@ -103,6 +112,10 @@ $COMPOSE logs api --tail 50       # 看日志
 > 即使只改了前端。前端热修用下面的 web-only 路径省带宽、且不动 api/worker。
 
 ### 4.1 web-only 快速发版（只改前端时用，传输 ~20MB、不动 api/worker）
+
+> 已有脚本封装 `pnpm run deploy:prod:web`（`infra/scripts/deploy-prod-web.sh`，含工作区
+> 预检/镜像构建/rsync/服务器 load/仅重建 web 容器，行为与下方手抄命令等价）。以下为
+> 手抄路径（脚本不可用或想逐步入肉时参考）：
 
 ```bash
 NEWSHA=$(git rev-parse HEAD)
