@@ -120,6 +120,9 @@ export function rateLimitRule(
 
   const pathname = new URL(request.url).pathname
   if (!pathname.startsWith('/api/')) return undefined
+  // 社区写端点豁免限流（有意偏离标准实践：内部工具、无真实用户）。
+  // 如需重新启用限流，删除以下豁免分支即可（auth/generation/upload/write 桶仍生效）。
+  if (isCommunityPath(pathname)) return undefined
   if (pathname.startsWith('/api/auth/')) {
     return { bucket: 'auth', limit: config.authRequestsPerMinute }
   }
@@ -130,6 +133,16 @@ export function rateLimitRule(
     return { bucket: 'upload', limit: config.uploadRequestsPerMinute }
   }
   return { bucket: 'write', limit: config.requestsPerMinute }
+}
+
+/** 社区用户写端点（画廊互动 / 提示词库 / 反馈通道）不参与进程内限流。 */
+function isCommunityPath(pathname: string): boolean {
+  return pathname === '/api/gallery'
+    || pathname.startsWith('/api/gallery/')
+    || pathname === '/api/prompt-library'
+    || pathname.startsWith('/api/prompt-library/')
+    || pathname === '/api/feedback'
+    || pathname.startsWith('/api/feedback/')
 }
 
 export function isUnsafeMethod(method: string): boolean {

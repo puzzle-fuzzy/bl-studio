@@ -1730,6 +1730,178 @@ describe('generation repository', () => {
     expect(crossUserArtifact?.status).toBe('stored')
   })
 
+  // -------------------------------------------------------------------------
+  // 社区治理 / 发现 / 收藏分页 / 社交通知（计划文档 §1、§3、§4）。
+  // -------------------------------------------------------------------------
+
+  async function createPublicGeneration(userId: string, prompt: string, at: string): Promise<string> {
+    const created = await repository.createGeneration({
+      userId,
+      modelId: 'qwen-image',
+      params: { prompt, n: 1, size: '1328*1328' },
+    })
+    await repository.completeGeneration({
+      recordId: created.record.id,
+      costFinal: 20,
+      output: { artifacts: [{ kind: 'image', sourceUrl: 'https://provider.test/cover.png' }] },
+      enqueueArtifactPersist: true,
+      now: at,
+    })
+    await repository.setGenerationVisibility({ userId, recordId: created.record.id, visibility: 'public', now: at })
+    return created.record.id
+  }
+
+  it('收藏分页跨页不丢：游标用收藏时间编码（回归：第二页恒空）', async () => {
+    const ids = [
+      await createPublicGeneration('user_1', 'favorite page 1', '2026-07-01T00:00:00.000Z'),
+      await createPublicGeneration('user_1', 'favorite page 2', '2026-07-02T00:00:00.000Z'),
+      await createPublicGeneration('user_1', 'favorite page 3', '2026-07-03T00:00:00.000Z'),
+    ]
+    for (const id of ids) {
+      await repository.setGenerationFavorite({ userId: 'user_page', recordId: id, favorited: true })
+    }
+
+    const page1 = await repository.listGenerationFavorites({ userId: 'user_page', limit: 2 })
+    expect(page1.items).toHaveLength(2)
+    expect(page1.nextCursor).toBeDefined()
+    const page2 = await repository.listGenerationFavorites({ userId: 'user_page', limit: 2, cursor: page1.nextCursor })
+    expect(page2.items).toHaveLength(1)
+
+    const seen = new Set([...page1.items, ...page2.items].map(item => item.id))
+    expect(seen.size).toBe(3)
+    for (const id of ids) expect(seen.has(id)).toBe(true)
+  })
+
+  it('收藏列表与详情可见性一致：作者隐藏后从收藏列表消失', async () => {
+    const id = await createPublicGeneration('user_1', 'hidden from favorites', '2026-07-05T00:00:00.000Z')
+    await repository.setGenerationFavorite({ userId: 'user_page', recordId: id, favorited: true })
+
+    const before = await repository.listGenerationFavorites({ userId: 'user_page' })
+    expect(before.items.some(item => item.id === id)).toBe(true)
+
+    await repository.setGalleryRecordHidden({ recordId: id, hidden: true, actorId: 'user_admin' })
+    const after = await repository.listGenerationFavorites({ userId: 'user_page' })
+    expect(after.items.some(item => item.id === id)).toBe(false)
+  })
+
+  it('admin 画廊治理：includeHidden / q / authorId 过滤 + 下架/恢复', async () => {
+    const sunsetId = await createPublicGeneration('user_a', 'a beautiful sunset', '2026-07-06T00:00:00.000Z')
+    const oceanId = await createPublicGeneration('user_b', 'deep blue ocean', '2026-07-07T00:00:00.000Z')
+
+    // 初始：两条都可见。
+    expect((await repository.listAdminGalleryGenerations({})).items).toHaveLength(2)
+    expect((await repository.listAdminGalleryGenerations({ authorId: 'user_a' })).items.map(i => i.id)).toEqual([sunsetId])
+    expect((await repository.listAdminGalleryGenerations({ q: 'ocean' })).items.map(i => i.id)).toEqual([oceanId])
+
+    // 下架 sunset：includeHidden=false 只回 ocean；=true 两条都回（带 hiddenAt）。
+    await repository.setGalleryRecordHidden({ recordId: sunsetId, hidden: true, actorId: 'user_admin' })
+    expect((await repository.listAdminGalleryGenerations({})).items.map(i => i.id)).toEqual([oceanId])
+    const hiddenView = await repository.listAdminGalleryGenerations({ includeHidden: true })
+    expect(hiddenView.items).toHaveLength(2)
+    const sunset = hiddenView.items.find(item => item.id === sunsetId)
+    expect(sunset?.hiddenAt).toBeDefined()
+
+    // 恢复后重新可见。
+    await repository.setGalleryRecordHidden({ recordId: sunsetId, hidden: false, actorId: 'user_admin' })
+    expect((await repository.listAdminGalleryGenerations({})).items).toHaveLength(2)
+  })
+
+  it('封禁联动：hideUserPublicWorks 隐藏用户全部公开作品，画廊不再可见', async () => {
+    await createPublicGeneration('user_a', 'ban me one', '2026-07-08T00:00:00.000Z')
+    await createPublicGeneration('user_a', 'ban me two', '2026-07-09T00:00:00.000Z')
+    await createPublicGeneration('user_b', 'keep me', '2026-07-10T00:00:00.000Z')
+
+    const hidden = await repository.hideUserPublicWorks({ userId: 'user_a', actorId: 'user_admin' })
+    expect(hidden).toBe(2)
+
+    const gallery = await repository.listGalleryGenerations({ viewerId: 'user_page' })
+    expect(gallery.items).toHaveLength(1)
+    expect(gallery.items[0]?.author.id).toBe('user_b')
+
+    // admin 视角仍能看到（治理需保留在列，带 hiddenAt）。
+    const adminView = await repository.listAdminGalleryGenerations({ includeHidden: true, authorId: 'user_a' })
+    expect(adminView.items).toHaveLength(2)
+    expect(adminView.items.every(item => item.hiddenAt !== undefined)).toBe(true)
+  })
+
+  it('画廊发现：q 搜索 + hot 排序（按点赞数）+ authorId 过滤', async () => {
+    const sunsetId = await createPublicGeneration('user_a', 'golden sunset over the sea', '2026-07-11T00:00:00.000Z')
+    const oceanId = await createPublicGeneration('user_a', 'calm ocean waves', '2026-07-12T00:00:00.000Z')
+
+    // q 搜索参数正文。
+    const search = await repository.listGalleryGenerations({ viewerId: 'user_page', q: 'ocean' })
+    expect(search.items.map(item => item.id)).toEqual([oceanId])
+
+    // authorId 过滤。
+    expect((await repository.listGalleryGenerations({ viewerId: 'user_page', authorId: 'user_a' })).items).toHaveLength(2)
+
+    // hot 排序：sunset 2 赞 > ocean 0 赞。
+    await repository.setGenerationLike({ userId: 'user_1', recordId: sunsetId, liked: true })
+    await repository.setGenerationLike({ userId: 'user_page', recordId: sunsetId, liked: true })
+    const hot = await repository.listGalleryGenerations({ viewerId: 'user_page', sort: 'hot' })
+    expect(hot.items[0]?.id).toBe(sunsetId)
+    expect(hot.items[0]?.likeCount).toBe(2)
+
+    // hot 分页游标带 likeCount 复合键：翻页不丢。
+    const hotPage1 = await repository.listGalleryGenerations({ viewerId: 'user_page', sort: 'hot', limit: 1 })
+    expect(hotPage1.nextCursor).toBeDefined()
+    const hotPage2 = await repository.listGalleryGenerations({
+      viewerId: 'user_page',
+      sort: 'hot',
+      limit: 1,
+      cursor: hotPage1.nextCursor,
+    })
+    expect(hotPage2.items).toHaveLength(1)
+    expect(hotPage2.items[0]?.id).toBe(oceanId)
+  })
+
+  it('画廊过滤被封禁作者的作品（作者 bannedAt 非空 → 列表/详情/点赞均不可见）', async () => {
+    const id = await createPublicGeneration('user_a', 'banned author work', '2026-07-13T00:00:00.000Z')
+    await db.update(users).set({ bannedAt: new Date() }).where(eq(users.id, 'user_a'))
+
+    expect((await repository.listGalleryGenerations({ viewerId: 'user_page' })).items).toHaveLength(0)
+    expect(await repository.getGalleryGeneration({ recordId: id, viewerId: 'user_page' })).toBeUndefined()
+    await expect(repository.setGenerationLike({ userId: 'user_page', recordId: id, liked: true }))
+      .rejects.toMatchObject({ code: 'GENERATION_NOT_FOUND' })
+  })
+
+  it('社交通知：创建/列表/未读数/标记已读/越权', async () => {
+    const recordId = await createPublicGeneration('user_1', 'notification record', '2026-07-14T00:00:00.000Z')
+    await repository.createSocialNotification({
+      recipientId: 'user_page',
+      actorId: 'user_1',
+      kind: 'like',
+      recordId,
+      title: '收到新点赞',
+      body: '「Alice」点赞了你的公开作品',
+    })
+    await repository.createSocialNotification({
+      recipientId: 'user_page',
+      actorId: 'user_1',
+      kind: 'favorite',
+      recordId,
+      title: '收到新收藏',
+      body: '「Alice」收藏了你的公开作品',
+    })
+
+    const list = await repository.listNotifications({ userId: 'user_page' })
+    expect(list.items).toHaveLength(2)
+    expect(list.items.every(item => !item.read)).toBe(true)
+    expect(list.items.map(item => item.kind).sort()).toEqual(['favorite', 'like'])
+    expect(await repository.countUnreadNotifications('user_page')).toBe(2)
+
+    const firstId = list.items[0]?.id
+    if (firstId === undefined) throw new Error('expected notification id')
+    expect(await repository.markNotificationRead({ userId: 'user_page', notificationId: firstId })).toBe(true)
+    expect(await repository.countUnreadNotifications('user_page')).toBe(1)
+
+    // 越权：他人标记我的通知 → false（不抛错，返回未命中）。
+    expect(await repository.markNotificationRead({ userId: 'user_1', notificationId: firstId })).toBe(false)
+
+    expect(await repository.markAllNotificationsRead('user_page')).toBe(1)
+    expect(await repository.countUnreadNotifications('user_page')).toBe(0)
+  })
+
   it('does not revive a soft-deleted generated asset when artifact persistence retries', async () => {
     const created = await repository.createGeneration({
       userId: 'user_store',

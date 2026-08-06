@@ -21,6 +21,7 @@ import {
   generationLikes,
   generationRecords,
   modelCosts,
+  notifications,
   promptLibrary,
   userFeedback,
   users,
@@ -31,17 +32,23 @@ import { GenerationRepositoryError } from './errors'
 import { clampLimit, decodeCursor, encodeCursor } from './cursor'
 import { toGenerationArtifact, toGenerationRecord } from './mappers'
 import type {
+  AdminGalleryItem,
   CostMarginRow,
   FeedbackKind,
   FeedbackStatus,
   GalleryDetail,
   GalleryItem,
+  GallerySort,
   GalleryVisibility,
   GenerationArtifact,
+  ListAdminGalleryResult,
   ListFeedbackResult,
   ListGalleryResult,
+  ListNotificationsResult,
   ListPromptLibraryResult,
   ModelCost,
+  NotificationItem,
+  NotificationKind,
   PromptLibraryItem,
   RetentionAnalytics,
   UserFeedback,
@@ -59,6 +66,9 @@ export interface ContentRepository {
     limit?: number
     category?: ModelCategory
     modelId?: string
+    authorId?: string
+    q?: string
+    sort?: GallerySort
     viewerId?: string
   }): Promise<ListGalleryResult>
   getGalleryGeneration(input: { recordId: string; viewerId?: string }): Promise<GalleryDetail | undefined>
@@ -76,6 +86,40 @@ export interface ContentRepository {
   /** 查询 viewer 是否已收藏某记录；记录对 viewer 不可见时返回 undefined。 */
   getGenerationFavorited(input: { userId: string; recordId: string }): Promise<boolean | undefined>
   listGenerationFavorites(input: { userId: string; cursor?: string; limit?: number }): Promise<ListGalleryResult>
+
+  // -------------------------------------------------------------------------
+  // 社区治理（admin）：含隐藏作品的画廊列表 + 下架/恢复 + 封禁联动。
+  // -------------------------------------------------------------------------
+  listAdminGalleryGenerations(input: {
+    cursor?: string
+    limit?: number
+    includeHidden?: boolean
+    q?: string
+    authorId?: string
+  }): Promise<ListAdminGalleryResult>
+  /** admin 画廊产物读取：不检查 hiddenAt（治理需预览已隐藏作品）。 */
+  getAdminGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined>
+  setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void>
+  /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt。 */
+  hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number>
+
+  // -------------------------------------------------------------------------
+  // 社交通知：作者收到点赞/收藏通知。
+  // -------------------------------------------------------------------------
+  /** 读取记录作者 id（不存在或已删除返回 undefined）。 */
+  getGenerationOwner(recordId: string): Promise<string | undefined>
+  createSocialNotification(input: {
+    recipientId: string
+    actorId?: string
+    kind: NotificationKind
+    recordId?: string
+    title: string
+    body: string
+  }): Promise<void>
+  listNotifications(input: { userId: string; cursor?: string; limit?: number }): Promise<ListNotificationsResult>
+  countUnreadNotifications(userId: string): Promise<number>
+  markNotificationRead(input: { userId: string; notificationId: string }): Promise<boolean>
+  markAllNotificationsRead(userId: string): Promise<number>
 
   // -------------------------------------------------------------------------
   // 提示词资产库（服务端命名库，owner 限定）。
@@ -148,10 +192,14 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     limit?: number
     category?: ModelCategory
     modelId?: string
+    authorId?: string
+    q?: string
+    sort?: GallerySort
     viewerId?: string
   }): Promise<ListGalleryResult> {
     const limit = clampLimit(input.limit)
     const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+    const hot = input.sort === 'hot'
 
     const conditions: SQL[] = [
       eq(generationRecords.visibility, 'public'),
@@ -161,21 +209,62 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     ]
     if (input.category !== undefined) conditions.push(eq(generationRecords.category, input.category))
     if (input.modelId !== undefined) conditions.push(eq(generationRecords.modelId, input.modelId))
-    if (cursor !== undefined) {
-      conditions.push(sql`(${generationRecords.createdAt} < ${cursor.createdAt} OR (${generationRecords.createdAt} = ${cursor.createdAt} AND ${generationRecords.id} < ${cursor.id}))`)
+    if (input.authorId !== undefined) conditions.push(eq(generationRecords.userId, input.authorId))
+    if (input.q !== undefined && input.q.length > 0) {
+      // 参数正文（含 prompt）整体按文本搜索；画廊量级小，::text ilike 可接受。
+      conditions.push(ilike(sql`${generationRecords.inputParamsJson}::text`, `%${input.q}%`))
     }
 
-    const rows = await db
-      .select({
-        record: generationRecords,
-        authorId: users.id,
-        authorDisplayName: users.displayName,
-      })
-      .from(generationRecords)
-      .innerJoin(users, eq(users.id, generationRecords.userId))
-      .where(and(...conditions))
-      .orderBy(desc(generationRecords.createdAt), desc(generationRecords.id))
-      .limit(limit + 1)
+    // hot 排序需要每行点赞数作为排序/游标键（无赞按 0 处理）。
+    const likeCountSub = hot
+      ? db.select({ recordId: generationLikes.recordId, likeCount: sql<number>`count(*)::int`.as('like_count') })
+          .from(generationLikes)
+          .groupBy(generationLikes.recordId)
+          .as('gallery_like_count')
+      : undefined
+    const likeCountExpr = likeCountSub !== undefined ? sql<number>`coalesce(${likeCountSub.likeCount}, 0)::int` : undefined
+
+    if (cursor !== undefined) {
+      if (hot) {
+        const likeCount = cursor.likeCount ?? 0
+        conditions.push(sql`(
+          ${likeCountExpr} < ${likeCount}
+          OR (${likeCountExpr} = ${likeCount} AND ${generationRecords.createdAt} < ${cursor.createdAt})
+          OR (${likeCountExpr} = ${likeCount} AND ${generationRecords.createdAt} = ${cursor.createdAt} AND ${generationRecords.id} < ${cursor.id})
+        )`)
+      } else {
+        conditions.push(sql`(${generationRecords.createdAt} < ${cursor.createdAt} OR (${generationRecords.createdAt} = ${cursor.createdAt} AND ${generationRecords.id} < ${cursor.id}))`)
+      }
+    }
+
+    let rows: GalleryListRow[]
+    if (hot) {
+      rows = await db
+        .select({
+          record: generationRecords,
+          authorId: users.id,
+          authorDisplayName: users.displayName,
+          likeCount: likeCountExpr!,
+        })
+        .from(generationRecords)
+        .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
+        .leftJoin(likeCountSub!, eq(likeCountSub!.recordId, generationRecords.id))
+        .where(and(...conditions))
+        .orderBy(desc(likeCountExpr!), desc(generationRecords.createdAt), desc(generationRecords.id))
+        .limit(limit + 1)
+    } else {
+      rows = await db
+        .select({
+          record: generationRecords,
+          authorId: users.id,
+          authorDisplayName: users.displayName,
+        })
+        .from(generationRecords)
+        .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
+        .where(and(...conditions))
+        .orderBy(desc(generationRecords.createdAt), desc(generationRecords.id))
+        .limit(limit + 1)
+    }
 
     const hasMore = rows.length > limit
     const page = hasMore ? rows.slice(0, limit) : rows
@@ -186,7 +275,11 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     return {
       items,
       ...(hasMore && last !== undefined
-        ? { nextCursor: encodeCursor({ createdAt: last.record.createdAt.toISOString(), id: last.record.id }) }
+        ? {
+            nextCursor: encodeCursor(hot
+              ? { likeCount: last.likeCount ?? 0, createdAt: last.record.createdAt.toISOString(), id: last.record.id }
+              : { createdAt: last.record.createdAt.toISOString(), id: last.record.id }),
+          }
         : {}),
     }
   }
@@ -199,7 +292,7 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
         authorDisplayName: users.displayName,
       })
       .from(generationRecords)
-      .innerJoin(users, eq(users.id, generationRecords.userId))
+      .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
       .where(and(
         eq(generationRecords.id, input.recordId),
         eq(generationRecords.visibility, 'public'),
@@ -246,6 +339,7 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
       .select({ artifact: generationArtifacts })
       .from(generationArtifacts)
       .innerJoin(generationRecords, eq(generationRecords.id, generationArtifacts.recordId))
+      .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
       .where(and(
         eq(generationArtifacts.id, input.artifactId),
         eq(generationArtifacts.recordId, input.recordId),
@@ -323,6 +417,9 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     const conditions: SQL[] = [
       eq(generationFavorites.userId, input.userId),
       isNull(generationRecords.deletedAt),
+      // 与详情可见性一致：作者隐藏（hiddenAt）或封禁/删除后从收藏列表消失，
+      // 避免列表可见但详情 404 的不一致（回归：见计划文档 §1.3）。
+      isNull(generationRecords.hiddenAt),
       sql`(${generationRecords.userId} = ${input.userId} OR (${generationRecords.visibility} = 'public' AND ${generationRecords.status} = 'succeeded'))`,
     ]
     if (cursor !== undefined) {
@@ -334,12 +431,16 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
         record: generationRecords,
         authorId: users.id,
         authorDisplayName: users.displayName,
+        favoriteCreatedAt: generationFavorites.createdAt,
+        favoriteRecordId: generationFavorites.recordId,
       })
       .from(generationFavorites)
       .innerJoin(generationRecords, eq(generationRecords.id, generationFavorites.recordId))
-      .innerJoin(users, eq(users.id, generationRecords.userId))
+      .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
       .where(and(...conditions))
-      .orderBy(desc(generationFavorites.createdAt))
+      // 游标排序键必须是「收藏时间」（favorites.createdAt），不能用作品创建时间
+      // 编码——否则第二页恒空（收藏必然晚于创建）。次级键补 recordId 保证同毫秒稳定。
+      .orderBy(desc(generationFavorites.createdAt), desc(generationFavorites.recordId))
       .limit(limit + 1)
 
     const hasMore = rows.length > limit
@@ -351,9 +452,215 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     return {
       items,
       ...(hasMore && last !== undefined
+        ? { nextCursor: encodeCursor({ createdAt: last.favoriteCreatedAt.toISOString(), id: last.favoriteRecordId }) }
+        : {}),
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // 社区治理（admin）：含隐藏作品的画廊列表 + 下架/恢复 + 封禁联动。
+  // ---------------------------------------------------------------------------
+
+  /** admin 画廊治理列表：含隐藏作品（includeHidden 控制），可按作者/提示词搜索。 */
+  async function listAdminGalleryGenerations(input: {
+    cursor?: string
+    limit?: number
+    includeHidden?: boolean
+    q?: string
+    authorId?: string
+  }): Promise<ListAdminGalleryResult> {
+    const limit = clampLimit(input.limit)
+    const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+
+    const conditions: SQL[] = [
+      eq(generationRecords.visibility, 'public'),
+      eq(generationRecords.status, 'succeeded'),
+      isNull(generationRecords.deletedAt),
+    ]
+    // admin 需要看到全部公开作品（含已隐藏的）做治理；includeHidden 缺省为 false
+    // 时只列当前在画廊可见的作品。
+    if (input.includeHidden !== true) conditions.push(isNull(generationRecords.hiddenAt))
+    if (input.authorId !== undefined) conditions.push(eq(generationRecords.userId, input.authorId))
+    if (input.q !== undefined && input.q.length > 0) {
+      conditions.push(ilike(sql`${generationRecords.inputParamsJson}::text`, `%${input.q}%`))
+    }
+    if (cursor !== undefined) {
+      conditions.push(sql`(${generationRecords.createdAt} < ${cursor.createdAt} OR (${generationRecords.createdAt} = ${cursor.createdAt} AND ${generationRecords.id} < ${cursor.id}))`)
+    }
+
+    const rows = await db
+      .select({
+        record: generationRecords,
+        authorId: users.id,
+        authorDisplayName: users.displayName,
+      })
+      .from(generationRecords)
+      // 治理视角不过滤封禁作者（被封用户的公开内容恰恰需要下架）。
+      .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.deletedAt)))
+      .where(and(...conditions))
+      .orderBy(desc(generationRecords.createdAt), desc(generationRecords.id))
+      .limit(limit + 1)
+
+    const hasMore = rows.length > limit
+    const page = hasMore ? rows.slice(0, limit) : rows
+    const last = page[page.length - 1]
+
+    const items = await hydrateAdminGalleryItems(db, page)
+
+    return {
+      items,
+      ...(hasMore && last !== undefined
         ? { nextCursor: encodeCursor({ createdAt: last.record.createdAt.toISOString(), id: last.record.id }) }
         : {}),
     }
+  }
+
+  /** admin 画廊产物读取：与 getGalleryArtifact 相同但**不检查 hiddenAt**（治理需预览已隐藏作品）。 */
+  async function getAdminGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined> {
+    const [row] = await db
+      .select({ artifact: generationArtifacts })
+      .from(generationArtifacts)
+      .innerJoin(generationRecords, eq(generationRecords.id, generationArtifacts.recordId))
+      .where(and(
+        eq(generationArtifacts.id, input.artifactId),
+        eq(generationArtifacts.recordId, input.recordId),
+        eq(generationArtifacts.status, 'stored'),
+        isNull(generationArtifacts.deletedAt),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+      ))
+      .limit(1)
+    return row === undefined ? undefined : toGenerationArtifact(row.artifact)
+  }
+
+  /** admin 下架/恢复一条公开作品：写 hiddenAt/hiddenBy，仅限 public+succeeded 未删记录。 */
+  async function setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void> {
+    const now = new Date()
+    const [row] = await db
+      .update(generationRecords)
+      .set(input.hidden
+        ? { hiddenAt: now, hiddenBy: input.actorId, updatedAt: now, updatedBy: input.actorId }
+        : { hiddenAt: null, hiddenBy: null, updatedAt: now, updatedBy: input.actorId })
+      .where(and(
+        eq(generationRecords.id, input.recordId),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+      ))
+      .returning({ id: generationRecords.id })
+    if (row === undefined) {
+      throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Generation not found: ${input.recordId}`)
+    }
+  }
+
+  /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt（解封不自动恢复）。 */
+  async function hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number> {
+    const now = new Date()
+    const rows = await db
+      .update(generationRecords)
+      .set({ hiddenAt: now, hiddenBy: input.actorId, updatedAt: now, updatedBy: input.actorId })
+      .where(and(
+        eq(generationRecords.userId, input.userId),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+        isNull(generationRecords.hiddenAt),
+      ))
+      .returning({ id: generationRecords.id })
+    return rows.length
+  }
+
+  // ---------------------------------------------------------------------------
+  // 社交通知：作者收到点赞/收藏通知。
+  // ---------------------------------------------------------------------------
+
+  /** 读取记录作者 id（不存在或已删除返回 undefined）。 */
+  async function getGenerationOwner(recordId: string): Promise<string | undefined> {
+    const [row] = await db
+      .select({ userId: generationRecords.userId })
+      .from(generationRecords)
+      .where(and(eq(generationRecords.id, recordId), isNull(generationRecords.deletedAt)))
+      .limit(1)
+    return row?.userId
+  }
+
+  /** 创建一条社交通知（best-effort：失败不影响点赞/收藏主流程，由调用方吞掉）。 */
+  async function createSocialNotification(input: {
+    recipientId: string
+    actorId?: string
+    kind: NotificationKind
+    recordId?: string
+    title: string
+    body: string
+  }): Promise<void> {
+    const now = new Date()
+    await db.insert(notifications).values({
+      id: randomUUID(),
+      userId: input.recipientId,
+      kind: input.kind,
+      title: input.title,
+      body: input.body,
+      createdAt: now,
+      updatedAt: now,
+      ...(input.actorId !== undefined ? { actorId: input.actorId } : {}),
+      ...(input.recordId !== undefined ? { recordId: input.recordId } : {}),
+    })
+  }
+
+  /** 分页列出某用户的通知（keyset：createdAt desc, id desc）。 */
+  async function listNotifications(input: { userId: string; cursor?: string; limit?: number }): Promise<ListNotificationsResult> {
+    const limit = clampLimit(input.limit)
+    const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+
+    const conditions: SQL[] = [eq(notifications.userId, input.userId)]
+    if (cursor !== undefined) {
+      conditions.push(sql`(${notifications.createdAt} < ${cursor.createdAt} OR (${notifications.createdAt} = ${cursor.createdAt} AND ${notifications.id} < ${cursor.id}))`)
+    }
+
+    const rows = await db
+      .select()
+      .from(notifications)
+      .where(and(...conditions))
+      .orderBy(desc(notifications.createdAt), desc(notifications.id))
+      .limit(limit + 1)
+
+    const hasMore = rows.length > limit
+    const page = hasMore ? rows.slice(0, limit) : rows
+    const last = page[page.length - 1]
+
+    return {
+      items: page.map(toNotificationItem),
+      ...(hasMore && last !== undefined
+        ? { nextCursor: encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
+        : {}),
+    }
+  }
+
+  async function countUnreadNotifications(userId: string): Promise<number> {
+    const [row] = await db
+      .select({ count: sql<number>`count(*)::int` })
+      .from(notifications)
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)))
+    return row?.count ?? 0
+  }
+
+  async function markNotificationRead(input: { userId: string; notificationId: string }): Promise<boolean> {
+    const [row] = await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.id, input.notificationId), eq(notifications.userId, input.userId)))
+      .returning({ id: notifications.id })
+    return row !== undefined
+  }
+
+  async function markAllNotificationsRead(userId: string): Promise<number> {
+    const rows = await db
+      .update(notifications)
+      .set({ readAt: new Date() })
+      .where(and(eq(notifications.userId, userId), isNull(notifications.readAt)))
+      .returning({ id: notifications.id })
+    return rows.length
   }
 
   async function listPromptLibrary(input: { userId: string; cursor?: string; limit?: number; q?: string }): Promise<ListPromptLibraryResult> {
@@ -537,6 +844,16 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     setGenerationFavorite,
     getGenerationFavorited,
     listGenerationFavorites,
+    listAdminGalleryGenerations,
+    getAdminGalleryArtifact,
+    setGalleryRecordHidden,
+    hideUserPublicWorks,
+    getGenerationOwner,
+    createSocialNotification,
+    listNotifications,
+    countUnreadNotifications,
+    markNotificationRead,
+    markAllNotificationsRead,
     listPromptLibrary,
     createPromptLibraryItem,
     updatePromptLibraryItem,
@@ -618,6 +935,20 @@ async function updateFeedbackStatus(db: BailianStudioDb, input: { itemId: string
   return toFeedback(row)
 }
 
+/** notifications 行 → 领域类型。 */
+function toNotificationItem(row: typeof notifications.$inferSelect): NotificationItem {
+  return {
+    id: row.id,
+    kind: row.kind as NotificationKind,
+    ...(row.actorId !== null ? { actorId: row.actorId } : {}),
+    ...(row.recordId !== null ? { recordId: row.recordId } : {}),
+    title: row.title,
+    body: row.body,
+    read: row.readAt !== null,
+    createdAt: row.createdAt.toISOString(),
+  }
+}
+
 /** user_feedback 行 → 领域类型。 */
 function toFeedback(row: typeof userFeedback.$inferSelect): UserFeedback {
   return {
@@ -687,6 +1018,9 @@ type GalleryRow = {
   authorDisplayName: string | null
 }
 
+/** 画廊列表行：hot 排序时额外携带点赞数（作为排序/游标键）。 */
+type GalleryListRow = GalleryRow & { likeCount?: number }
+
 /** 把一批画廊记录行 hydrate 成 GalleryItem（补封面产物、点赞计数、viewer 交互态）。 */
 async function hydrateGalleryItems(db: BailianStudioDb, rows: readonly GalleryRow[], viewerId?: string): Promise<GalleryItem[]> {
   if (rows.length === 0) return []
@@ -725,6 +1059,43 @@ async function hydrateGalleryItems(db: BailianStudioDb, rows: readonly GalleryRo
     likeCount: likeCounts.get(row.record.id) ?? 0,
     likedByViewer: likedIds.has(row.record.id),
     favoritedByViewer: favoritedIds.has(row.record.id),
+    createdAt: row.record.createdAt.toISOString(),
+  }))
+}
+
+/** 把一批 admin 画廊行 hydrate 成 AdminGalleryItem（封面 + 点赞数 + 隐藏态）。 */
+async function hydrateAdminGalleryItems(db: BailianStudioDb, rows: readonly GalleryRow[]): Promise<AdminGalleryItem[]> {
+  if (rows.length === 0) return []
+
+  const recordIds = rows.map(row => row.record.id)
+  const artifactRows = await db
+    .select()
+    .from(generationArtifacts)
+    .where(and(
+      inArray(generationArtifacts.recordId, recordIds),
+      eq(generationArtifacts.status, 'stored'),
+      isNull(generationArtifacts.deletedAt),
+    ))
+    .orderBy(asc(generationArtifacts.createdAt), asc(generationArtifacts.id))
+  const coverByRecord = new Map<string, GenerationArtifact>()
+  for (const row of artifactRows) {
+    if (!coverByRecord.has(row.recordId)) coverByRecord.set(row.recordId, toGenerationArtifact(row))
+  }
+
+  const likeCounts = await countLikesByRecords(db, recordIds)
+
+  return rows.map(row => ({
+    id: row.record.id,
+    modelId: row.record.modelId,
+    category: row.record.category as ModelCategory,
+    author: { id: row.authorId, displayName: row.authorDisplayName },
+    ...(coverByRecord.get(row.record.id) !== undefined ? { cover: coverByRecord.get(row.record.id) } : {}),
+    likeCount: likeCounts.get(row.record.id) ?? 0,
+    visibility: row.record.visibility as GalleryVisibility,
+    status: row.record.status,
+    ...(row.record.hiddenAt !== null
+      ? { hiddenAt: row.record.hiddenAt.toISOString(), hiddenBy: row.record.hiddenBy ?? undefined }
+      : {}),
     createdAt: row.record.createdAt.toISOString(),
   }))
 }
@@ -776,11 +1147,12 @@ async function viewerFavoritedIds(db: BailianStudioDb, viewerId: string | undefi
   return new Set(rows.map(row => row.recordId))
 }
 
-/** 记录是否对所有人公开可见（画廊候选）。 */
+/** 记录是否对所有人公开可见（画廊候选；作者被封禁/删除则视为不可见）。 */
 async function isPublicVisible(db: BailianStudioDb, recordId: string): Promise<boolean> {
   const [row] = await db
     .select({ id: generationRecords.id })
     .from(generationRecords)
+    .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
     .where(and(
       eq(generationRecords.id, recordId),
       eq(generationRecords.visibility, 'public'),
@@ -792,7 +1164,7 @@ async function isPublicVisible(db: BailianStudioDb, recordId: string): Promise<b
   return row !== undefined
 }
 
-/** 记录对某 viewer 是否可见：自己的未删记录，或公开成功未藏记录。 */
+/** 记录对某 viewer 是否可见：自己的未删记录，或公开成功未藏记录（作者被封禁/删除则不可见）。 */
 async function isVisibleToViewer(db: BailianStudioDb, recordId: string, viewerId: string): Promise<boolean> {
   const [row] = await db
     .select({
@@ -801,11 +1173,15 @@ async function isVisibleToViewer(db: BailianStudioDb, recordId: string, viewerId
       status: generationRecords.status,
       deletedAt: generationRecords.deletedAt,
       hiddenAt: generationRecords.hiddenAt,
+      authorBannedAt: users.bannedAt,
+      authorDeletedAt: users.deletedAt,
     })
     .from(generationRecords)
+    .innerJoin(users, eq(users.id, generationRecords.userId))
     .where(eq(generationRecords.id, recordId))
     .limit(1)
   if (row === undefined || row.deletedAt !== null) return false
+  if (row.authorBannedAt !== null || row.authorDeletedAt !== null) return false
   if (row.userId === viewerId) return true
   return row.visibility === 'public' && row.status === 'succeeded' && row.hiddenAt === null
 }

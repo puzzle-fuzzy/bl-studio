@@ -25,7 +25,8 @@ export class GenerationSseHub {
   private readonly listeners = new Map<string, Set<Listener>>()
 
   publish(event: BailianStudioSSEEvent): void {
-    if (!event.event.startsWith('generation.')) return
+    // 只路由生成事件与社交通知（notification 由点赞/收藏触发，同样按 userId 分桶）。
+    if (!event.event.startsWith('generation.') && event.event !== 'notification') return
     if (event.id !== undefined) {
       if (this.seenEventIds.has(event.id)) return
       this.seenEventIds.add(event.id)

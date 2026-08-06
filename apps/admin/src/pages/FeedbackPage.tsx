@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import type { UserFeedback } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
@@ -44,33 +44,53 @@ export function FeedbackPage() {
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const load = useCallback(async (reset: boolean) => {
-    if (reset) {
-      setLoading(true)
-      setItems([])
-      setNextCursor(undefined)
-    } else {
-      setLoadingMore(true)
-    }
+  /** 请求序号：首载/翻页共用，防止状态切换时旧响应覆盖新数据。 */
+  const requestSeq = useRef(0)
+
+  // 首载与翻页分离：loadFirst 仅依赖过滤器（status），由 effect 驱动；loadMore 闭包
+  // nextCursor，只挂按钮。修复 nextCursor 进入 useCallback 依赖导致的无限刷新循环。
+  const loadFirst = useCallback(async () => {
+    const seq = ++requestSeq.current
+    setLoading(true)
     setError(null)
+    setItems([])
+    setNextCursor(undefined)
     try {
       const page = await apiClient.adminListFeedback({
-        ...(reset ? {} : nextCursor !== undefined ? { cursor: nextCursor } : {}),
         ...(status !== 'all' ? { status: status as 'open' | 'reviewing' | 'resolved' | 'closed' } : {}),
       })
-      setItems(current => reset ? page.items : [...current, ...page.items])
+      if (seq !== requestSeq.current) return
+      setItems(page.items)
       setNextCursor(page.nextCursor)
     } catch (err) {
-      setError(userErrorMessage(err))
+      if (seq === requestSeq.current) setError(userErrorMessage(err))
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
-  }, [status, nextCursor])
+  }, [status])
 
   useEffect(() => {
-    void load(true)
-  }, [load])
+    void loadFirst()
+  }, [loadFirst])
+
+  const loadMore = useCallback(async () => {
+    if (nextCursor === undefined) return
+    const seq = requestSeq.current
+    setLoadingMore(true)
+    try {
+      const page = await apiClient.adminListFeedback({
+        cursor: nextCursor,
+        ...(status !== 'all' ? { status: status as 'open' | 'reviewing' | 'resolved' | 'closed' } : {}),
+      })
+      if (seq !== requestSeq.current) return
+      setItems(current => [...current, ...page.items])
+      setNextCursor(page.nextCursor)
+    } catch (err) {
+      if (seq === requestSeq.current) setError(userErrorMessage(err))
+    } finally {
+      if (seq === requestSeq.current) setLoadingMore(false)
+    }
+  }, [nextCursor, status])
 
   const updateStatus = async (item: UserFeedback, next: string) => {
     try {
@@ -153,7 +173,7 @@ export function FeedbackPage() {
 
       {nextCursor !== undefined && items.length > 0 && (
         <div className="flex justify-center">
-          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void load(false)}>
+          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
             {loadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}
           </Button>
         </div>

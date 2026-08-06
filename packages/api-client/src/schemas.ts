@@ -774,6 +774,8 @@ export const GalleryArtifactSchema = z.object({
   kind: z.string(),
   readUrl: z.string().optional(),
   thumbnailUrl: z.string().optional(),
+  /** 文本类产物的正文（kind='text' 时直接随详情返回，无需再拉文件）。 */
+  text: z.string().optional(),
 })
 
 export const GalleryRecordSchema = z.object({
@@ -800,6 +802,57 @@ export const GalleryDetailSchema = z.object({
 export const SetVisibilityInputSchema = z.object({
   visibility: z.enum(['private', 'public']),
 }).strict()
+
+// ---------------------------------------------------------------------------
+// 社交通知（/api/notifications）。
+// ---------------------------------------------------------------------------
+
+export const NotificationItemSchema = z.object({
+  id: z.string(),
+  kind: z.enum(['like', 'favorite', 'system']),
+  actorId: z.string().optional(),
+  recordId: z.string().optional(),
+  title: z.string(),
+  body: z.string(),
+  read: z.boolean(),
+  createdAt: z.string(),
+})
+
+export const ListNotificationsResponseSchema = z.object({
+  items: z.array(NotificationItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const NotificationUnreadCountSchema = z.object({ count: z.number() })
+
+export const NotificationReadSchema = z.object({ read: z.boolean() })
+
+export const NotificationReadAllSchema = z.object({ marked: z.number() })
+
+// ---------------------------------------------------------------------------
+// 管理后台 · 社区画廊治理（/api/admin/gallery）。
+// ---------------------------------------------------------------------------
+
+export const AdminGalleryItemSchema = z.object({
+  id: z.string(),
+  modelId: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  author: z.object({ id: z.string(), displayName: z.string().nullable() }),
+  cover: GalleryCoverSchema.optional(),
+  likeCount: z.number(),
+  visibility: z.enum(['private', 'public']),
+  status: z.string(),
+  hiddenAt: z.string().optional(),
+  hiddenBy: z.string().optional(),
+  createdAt: z.string(),
+})
+
+export const ListAdminGalleryResponseSchema = z.object({
+  items: z.array(AdminGalleryItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const AdminGalleryHideResultSchema = z.object({ hidden: z.boolean() })
 
 // ---------------------------------------------------------------------------
 // 管理分析（model_costs + 成本毛利 + 留存漏斗）。
@@ -928,6 +981,12 @@ export type UserFeedback = z.infer<typeof UserFeedbackSchema>
 export type ListFeedbackResult = z.infer<typeof ListFeedbackResponseSchema>
 export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackInputSchema>
 export type UpdateFeedbackStatusInput = z.infer<typeof UpdateFeedbackStatusInputSchema>
+export type NotificationItem = z.infer<typeof NotificationItemSchema>
+export type ListNotificationsResult = z.infer<typeof ListNotificationsResponseSchema>
+export type NotificationUnreadCount = z.infer<typeof NotificationUnreadCountSchema>
+export type AdminGalleryItem = z.infer<typeof AdminGalleryItemSchema>
+export type ListAdminGalleryResult = z.infer<typeof ListAdminGalleryResponseSchema>
+export type AdminGalleryHideResult = z.infer<typeof AdminGalleryHideResultSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
 export type AdminCreateUserInput = z.infer<typeof AdminCreateUserInputSchema>
 export type AdminUpdateUserInput = z.infer<typeof AdminUpdateUserInputSchema>

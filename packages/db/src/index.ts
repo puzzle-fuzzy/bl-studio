@@ -24,6 +24,7 @@ export {
   generationShares,
   mediaJobs,
   modelCosts,
+  notifications,
   promptLibrary,
   providerRequestAudits,
   sessions,

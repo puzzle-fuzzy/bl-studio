@@ -1,5 +1,5 @@
 import { Link, Outlet, useNavigate } from 'react-router'
-import { BarChart3, ChartPie, LogOut, MessageSquare, Users } from 'lucide-react'
+import { BarChart3, ChartPie, Images, LogOut, MessageSquare, Users } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 
@@ -43,6 +43,12 @@ export function AdminShell() {
                 <Link to="/feedback">
                   <MessageSquare data-icon />
                   反馈
+                </Link>
+              </Button>
+              <Button asChild variant="ghost" size="sm">
+                <Link to="/gallery">
+                  <Images data-icon />
+                  画廊治理
                 </Link>
               </Button>
             </nav>

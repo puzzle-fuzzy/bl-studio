@@ -1,19 +1,28 @@
 import { Elysia } from 'elysia'
 import { AuthError } from '@bailian-studio/auth'
-import { validateInput } from '@bailian-studio/shared'
+import type { AdminGalleryItem } from '@bailian-studio/generation-repository'
+import { createLogger, validateInput } from '@bailian-studio/shared'
 import { listModels } from '@bailian-studio/model-core'
+import { resolveLocalStoragePath } from '@bailian-studio/storage'
 import type { ApiDependencies } from '../../dependencies'
+import { contentTypeForPath } from '../../lib/artifact-content-types'
 import { auditErrorCode, recordApiAuditEvent } from '../../lib/audit'
+import { requestErrorResponseBody } from '../../lib/http-errors'
 import { getRequestTrace } from '../../lib/middleware'
+import { LocalFileTooLargeError, createLocalFileResponse } from '../../lib/local-file-response'
 import { requireAdminUser } from '../auth/session'
+import { resolveArtifactReadUrlUseCase } from '../artifacts/service'
 import { ListAssetsQuerySchema } from '../assets/service'
 import { assetWithReadUrl } from '../assets/routes'
 import {
+  AdminGalleryArtifactParamsSchema,
   AnalyticsQuerySchema,
   BatchGrantPointsSchema,
   BatchUsersSchema,
   CreateUserSchema,
+  ListAdminGalleryQuerySchema,
   ListUsersQuerySchema,
+  TargetGalleryRecordSchema,
   TargetUserSchema,
   UpdateUserSchema,
   UpsertModelCostsSchema,
@@ -27,6 +36,43 @@ import {
  * 安全红线：不能改/删自己的管理员身份（防运营事故）。
  */
 export function createAdminRoutes(deps: ApiDependencies) {
+  const adminLogger = createLogger('admin-gallery')
+
+  type AdminGalleryCoverResponse = { id: string; kind: string; readUrl?: string; thumbnailUrl?: string }
+
+  /** admin 画廊封面：本地存储指向 admin 专属产物路由（不检查 hiddenAt，可预览已隐藏作品）。 */
+  async function adminGalleryCover(item: AdminGalleryItem): Promise<AdminGalleryCoverResponse | undefined> {
+    if (item.cover === undefined) return undefined
+    const resolved = await resolveArtifactReadUrlUseCase({ storage: deps.storage }).execute({
+      artifact: item.cover,
+      localReadUrl: deps.storage.provider === 'local'
+        ? `/api/admin/gallery/generations/${encodeURIComponent(item.id)}/artifacts/${encodeURIComponent(item.cover.id)}`
+        : undefined,
+    })
+    return {
+      id: item.cover.id,
+      kind: item.cover.kind,
+      ...(resolved.readUrl !== undefined ? { readUrl: resolved.readUrl } : {}),
+      ...(resolved.thumbnailUrl !== undefined ? { thumbnailUrl: resolved.thumbnailUrl } : {}),
+    }
+  }
+
+  /**
+   * 封禁联动：隐藏该用户全部公开作品（hygiene 层）。enforcement 由画廊查询的
+   * `users.bannedAt` 过滤保证；这里让作品即使解封后也保持隐藏，需 admin 手动恢复。
+   * best-effort：失败不阻断封禁（连接信息不进日志）。
+   */
+  async function hideUserPublicWorksBestEffort(userId: string, actorId: string): Promise<void> {
+    try {
+      await deps.generationRepository.hideUserPublicWorks({ userId, actorId })
+    } catch (error) {
+      adminLogger.warn('gallery.hide_public_works_failed', {
+        userId,
+        errorName: error instanceof Error ? error.name : 'unknown',
+      })
+    }
+  }
+
   return new Elysia()
     .get('/api/admin/users', async ({ request, query }) => {
       await requireAdminUser(request, deps.authService)
@@ -129,6 +175,8 @@ export function createAdminRoutes(deps: ApiDependencies) {
       }
       try {
         await deps.authService.adminBanUser(userId)
+        // 封禁联动：隐藏其公开作品（hygiene，见 hideUserPublicWorksBestEffort 注释）。
+        await hideUserPublicWorksBestEffort(userId, actor.id)
         await recordApiAuditEvent(deps.generationRepository, request, {
           userId: actor.id,
           action: 'admin.user.ban',
@@ -182,6 +230,8 @@ export function createAdminRoutes(deps: ApiDependencies) {
         throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
       }
       await deps.authService.adminBatchBanUsers(targets)
+      // 封禁联动：批量隐藏其公开作品（hygiene）。
+      for (const userId of targets) await hideUserPublicWorksBestEffort(userId, actor.id)
       await recordApiAuditEvent(deps.generationRepository, request, {
         userId: actor.id,
         action: 'admin.user.ban',
@@ -355,6 +405,145 @@ export function createAdminRoutes(deps: ApiDependencies) {
           })),
           retention: { registered, ...retention },
         },
+      }
+    })
+    // -----------------------------------------------------------------------
+    // 社区画廊治理：含隐藏作品的列表 + 下架/恢复 + 产物预览（admin 专属，绕过 hiddenAt）。
+    // -----------------------------------------------------------------------
+    .get('/api/admin/gallery', async ({ request, query }) => {
+      await requireAdminUser(request, deps.authService)
+      const input = validateInput(ListAdminGalleryQuerySchema, query)
+      const page = await deps.generationRepository.listAdminGalleryGenerations({
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
+        ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
+        ...(input.includeHidden === 'true' ? { includeHidden: true } : {}),
+        ...(input.q !== undefined && input.q.length > 0 ? { q: input.q } : {}),
+        ...(input.authorId !== undefined ? { authorId: input.authorId } : {}),
+      })
+      const items = await Promise.all(page.items.map(async item => ({
+        id: item.id,
+        modelId: item.modelId,
+        category: item.category,
+        author: item.author,
+        ...(item.cover !== undefined ? { cover: await adminGalleryCover(item) } : {}),
+        likeCount: item.likeCount,
+        visibility: item.visibility,
+        status: item.status,
+        ...(item.hiddenAt !== undefined ? { hiddenAt: item.hiddenAt, hiddenBy: item.hiddenBy } : {}),
+        createdAt: item.createdAt,
+      })))
+      return {
+        success: true,
+        data: {
+          items,
+          ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        },
+      }
+    })
+    .post('/api/admin/gallery/:id/hide', async ({ request, params }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { id } = validateInput(TargetGalleryRecordSchema, params)
+      try {
+        await deps.generationRepository.setGalleryRecordHidden({ recordId: id, hidden: true, actorId: actor.id })
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.hide',
+          outcome: 'succeeded',
+          targetType: 'generation',
+          targetId: id,
+        })
+        return { success: true, data: { hidden: true } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.hide',
+          outcome: 'failed',
+          targetType: 'generation',
+          targetId: id,
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/gallery/:id/unhide', async ({ request, params }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { id } = validateInput(TargetGalleryRecordSchema, params)
+      try {
+        await deps.generationRepository.setGalleryRecordHidden({ recordId: id, hidden: false, actorId: actor.id })
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.unhide',
+          outcome: 'succeeded',
+          targetType: 'generation',
+          targetId: id,
+        })
+        return { success: true, data: { hidden: false } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.unhide',
+          outcome: 'failed',
+          targetType: 'generation',
+          targetId: id,
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .get('/api/admin/gallery/generations/:id/artifacts/:artifactId', async ({ request, params, set }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { id, artifactId } = validateInput(AdminGalleryArtifactParamsSchema, params)
+
+      const artifact = await deps.generationRepository.getAdminGalleryArtifact({ recordId: id, artifactId })
+      if (artifact === undefined || artifact.storageKey === undefined) {
+        set.status = 404
+        return requestErrorResponseBody(request, 'GALLERY_ARTIFACT_NOT_FOUND', 'Gallery artifact not found', set)
+      }
+
+      const storage = deps.storage
+      if (storage.provider !== 'local') {
+        const resolved = await resolveArtifactReadUrlUseCase({ storage }).execute({ artifact, expiresInSeconds: 300 })
+        if (resolved.readUrl === undefined) {
+          set.status = 404
+          return requestErrorResponseBody(request, 'GALLERY_ARTIFACT_NOT_FOUND', 'Gallery artifact not found', set)
+        }
+        return Response.redirect(resolved.readUrl, 302)
+      }
+
+      let path: string
+      try {
+        path = resolveLocalStoragePath(deps.artifactLocalRoot, decodeURIComponent(artifact.storageKey))
+      } catch (error) {
+        set.status = 400
+        return requestErrorResponseBody(
+          request,
+          'INVALID_ARTIFACT_KEY',
+          error instanceof Error ? error.message : 'Invalid artifact key',
+          set,
+        )
+      }
+
+      try {
+        return await createLocalFileResponse({
+          path,
+          maxBytes: deps.artifactConfig.maxReadBytes,
+          contentType: artifact.mimeType ?? contentTypeForPath(path),
+          cacheControl: 'private, max-age=300',
+        })
+      } catch (error) {
+        const code = typeof error === 'object' && error !== null && 'code' in error ? error.code : undefined
+        if (error instanceof LocalFileTooLargeError) set.status = 413
+        else set.status = code === 'ENOENT' ? 404 : 500
+        return requestErrorResponseBody(
+          request,
+          error instanceof LocalFileTooLargeError
+            ? 'ARTIFACT_TOO_LARGE'
+            : code === 'ENOENT' ? 'GALLERY_ARTIFACT_NOT_FOUND' : 'ARTIFACT_READ_FAILED',
+          error instanceof LocalFileTooLargeError
+            ? 'Artifact exceeds the maximum response size'
+            : code === 'ENOENT' ? 'Gallery artifact not found' : 'Failed to read gallery artifact',
+          set,
+        )
       }
     })
 }

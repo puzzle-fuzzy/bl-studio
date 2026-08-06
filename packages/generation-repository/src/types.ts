@@ -528,6 +528,30 @@ export interface GalleryDetail {
   favoritedByViewer: boolean
 }
 
+/** 画廊列表排序：'latest' 按发布时间倒序（默认），'hot' 按点赞数倒序。 */
+export type GallerySort = 'latest' | 'hot'
+
+/** admin 画廊治理条目：admin 视角，含隐藏态与作者状态，供下架/恢复决策。 */
+export interface AdminGalleryItem {
+  id: string
+  modelId: string
+  category: ModelCategory
+  author: { id: string; displayName: string | null }
+  /** 封面产物（首个已存 artifact，含 storage 坐标；API 层拼 readUrl 后脱敏）。 */
+  cover?: GenerationArtifact
+  likeCount: number
+  visibility: GalleryVisibility
+  status: string
+  hiddenAt?: string
+  hiddenBy?: string
+  createdAt: string
+}
+
+export interface ListAdminGalleryResult {
+  items: AdminGalleryItem[]
+  nextCursor?: string
+}
+
 // ---------------------------------------------------------------------------
 // 提示词资产库（服务端命名库）。
 // ---------------------------------------------------------------------------
@@ -599,5 +623,29 @@ export interface UserFeedback {
 
 export interface ListFeedbackResult {
   items: UserFeedback[]
+  nextCursor?: string
+}
+
+// ---------------------------------------------------------------------------
+// 社交通知（作品被点赞/收藏 → 通知作者）。
+// ---------------------------------------------------------------------------
+
+export type NotificationKind = 'like' | 'favorite' | 'system'
+
+export interface NotificationItem {
+  id: string
+  kind: NotificationKind
+  /** 触发动作的用户（点赞/收藏的人）；系统通知为空。 */
+  actorId?: string
+  /** 关联的公开作品记录。 */
+  recordId?: string
+  title: string
+  body: string
+  read: boolean
+  createdAt: string
+}
+
+export interface ListNotificationsResult {
+  items: NotificationItem[]
   nextCursor?: string
 }

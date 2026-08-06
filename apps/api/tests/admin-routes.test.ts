@@ -109,6 +109,10 @@ describe('admin routes', () => {
       ['GET', '/api/admin/stats/overview'],
       ['GET', '/api/admin/model-costs'],
       ['GET', '/api/admin/stats/analytics'],
+      ['GET', '/api/admin/gallery'],
+      ['POST', '/api/admin/gallery/g1/hide'],
+      ['POST', '/api/admin/gallery/g1/unhide'],
+      ['GET', '/api/admin/gallery/generations/g1/artifacts/a1'],
     ] as const
     for (const [method, path] of paths) {
       const response = await app.handle(adminRequest(path, { method }))

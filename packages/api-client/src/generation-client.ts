@@ -41,8 +41,14 @@ import {
   AdminModelCostsResponseSchema,
   AdminModelCostsUpdateInputSchema,
   AdminModelCostsUpdateResponseSchema,
+  AdminGalleryHideResultSchema,
   FeedbackItemResponseSchema,
+  ListAdminGalleryResponseSchema,
   ListFeedbackResponseSchema,
+  ListNotificationsResponseSchema,
+  NotificationReadAllSchema,
+  NotificationReadSchema,
+  NotificationUnreadCountSchema,
   SubmitFeedbackInputSchema,
   UpdateFeedbackStatusInputSchema,
   CreatePromptLibraryInputSchema,
@@ -83,8 +89,12 @@ import type {
   BatchGrantPointsResult,
   BatchUsersRequest,
   AdminAnalytics,
+  AdminGalleryHideResult,
   AdminModelCostsResult,
+  ListAdminGalleryResult,
   ListFeedbackResult,
+  ListNotificationsResult,
+  NotificationUnreadCount,
   SubmitFeedbackInput,
   UpdateFeedbackStatusInput,
   UserFeedback,
@@ -413,12 +423,15 @@ export interface BailianStudioApiClient {
 
   // 社区画廊（需登录；公开可见性由作品 owner 决定）
   // ---------------------------------------------------------------------------
-  /** `GET /api/gallery` —— 社区画廊公开作品列表（keyset + category/modelId 过滤）。 */
+  /** `GET /api/gallery` —— 社区画廊公开作品列表（keyset + category/modelId/作者/搜索/排序）。 */
   listGallery(params?: {
     limit?: number
     cursor?: string
     category?: 'image' | 'video' | 'audio' | 'text'
     modelId?: string
+    authorId?: string
+    q?: string
+    sort?: 'latest' | 'hot'
   }): Promise<ListGalleryResult>
   /** `GET /api/gallery/favorites` —— 我的收藏列表。 */
   listMyFavorites(params?: { limit?: number; cursor?: string }): Promise<ListGalleryResult>
@@ -457,6 +470,21 @@ export interface BailianStudioApiClient {
   /** `GET /api/admin/stats/analytics` —— 成本毛利 + 留存漏斗。 */
   adminGetAnalytics(params?: { from?: string; to?: string; days?: number }): Promise<AdminAnalytics>
 
+  // 管理后台 · 社区画廊治理（需 admin）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/admin/gallery` —— 画廊治理列表（含隐藏作品，可按作者/提示词搜索）。 */
+  adminListGallery(params?: {
+    limit?: number
+    cursor?: string
+    includeHidden?: boolean
+    q?: string
+    authorId?: string
+  }): Promise<ListAdminGalleryResult>
+  /** `POST /api/admin/gallery/:id/hide` —— 下架一条公开作品。 */
+  adminHideGalleryItem(recordId: string): Promise<AdminGalleryHideResult>
+  /** `POST /api/admin/gallery/:id/unhide` —— 恢复一条已下架作品。 */
+  adminUnhideGalleryItem(recordId: string): Promise<AdminGalleryHideResult>
+
   // 反馈通道
   // ---------------------------------------------------------------------------
   /** `POST /api/feedback` —— 提交意见反馈。 */
@@ -465,6 +493,17 @@ export interface BailianStudioApiClient {
   adminListFeedback(params?: { limit?: number; cursor?: string; status?: 'open' | 'reviewing' | 'resolved' | 'closed' }): Promise<ListFeedbackResult>
   /** `PATCH /api/admin/feedback/:id` —— admin 更新反馈状态。 */
   adminUpdateFeedbackStatus(itemId: string, status: UpdateFeedbackStatusInput['status']): Promise<UserFeedback>
+
+  // 社交通知（需登录；只作用于本人）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/notifications` —— 我的通知列表（keyset 分页）。 */
+  listNotifications(params?: { limit?: number; cursor?: string }): Promise<ListNotificationsResult>
+  /** `GET /api/notifications/unread-count` —— 未读数。 */
+  getNotificationUnreadCount(): Promise<NotificationUnreadCount>
+  /** `POST /api/notifications/:id/read` —— 标记单条已读。 */
+  markNotificationRead(notificationId: string): Promise<{ read: boolean }>
+  /** `POST /api/notifications/read-all` —— 全部标记已读。 */
+  markAllNotificationsRead(): Promise<{ marked: number }>
 }
 
 /**
@@ -1101,6 +1140,9 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       if (params.cursor !== undefined) search.set('cursor', params.cursor)
       if (params.category !== undefined) search.set('category', params.category)
       if (params.modelId !== undefined && params.modelId.length > 0) search.set('modelId', params.modelId)
+      if (params.authorId !== undefined && params.authorId.length > 0) search.set('authorId', params.authorId)
+      if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
+      if (params.sort !== undefined && params.sort !== 'latest') search.set('sort', params.sort)
       const query = search.toString()
       return unwrapData(
         `${base}/api/gallery${query.length > 0 ? `?${query}` : ''}`,
@@ -1292,6 +1334,80 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         FeedbackItemResponseSchema,
       )
       return data.item
+    },
+
+    async adminListGallery(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.includeHidden === true) search.set('includeHidden', 'true')
+      if (params.q !== undefined && params.q.length > 0) search.set('q', params.q)
+      if (params.authorId !== undefined && params.authorId.length > 0) search.set('authorId', params.authorId)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/gallery${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListAdminGalleryResponseSchema,
+      )
+    },
+
+    async adminHideGalleryItem(recordId) {
+      return unwrapData(
+        `${base}/api/admin/gallery/${encodeURIComponent(recordId)}/hide`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        AdminGalleryHideResultSchema,
+      )
+    },
+
+    async adminUnhideGalleryItem(recordId) {
+      return unwrapData(
+        `${base}/api/admin/gallery/${encodeURIComponent(recordId)}/unhide`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        AdminGalleryHideResultSchema,
+      )
+    },
+
+    async listNotifications(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/notifications${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListNotificationsResponseSchema,
+      )
+    },
+
+    async getNotificationUnreadCount() {
+      return unwrapData(
+        `${base}/api/notifications/unread-count`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        NotificationUnreadCountSchema,
+      )
+    },
+
+    async markNotificationRead(notificationId) {
+      return unwrapData(
+        `${base}/api/notifications/${encodeURIComponent(notificationId)}/read`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        NotificationReadSchema,
+      )
+    },
+
+    async markAllNotificationsRead() {
+      return unwrapData(
+        `${base}/api/notifications/read-all`,
+        { method: 'POST', credentials: 'include' },
+        fetchImpl,
+        NotificationReadAllSchema,
+      )
     },
   }
 }

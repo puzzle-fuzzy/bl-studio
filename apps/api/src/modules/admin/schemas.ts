@@ -47,6 +47,31 @@ export const BatchGrantPointsSchema = z.object({
 
 export type BatchGrantPointsInput = z.infer<typeof BatchGrantPointsSchema>
 
+/** admin 画廊治理列表：含隐藏作品（includeHidden=true）、按作者/提示词搜索、keyset 分页。 */
+export const ListAdminGalleryQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().trim().min(1).max(1024).optional(),
+  /** 查询参数为字符串 'true'/'false'（Elysia query），在路由层转布尔。 */
+  includeHidden: z.enum(['true', 'false']).optional(),
+  q: z.string().trim().min(1).max(200).optional(),
+  authorId: z.string().trim().min(1).max(256).optional(),
+}).strict()
+
+export type ListAdminGalleryQueryInput = z.infer<typeof ListAdminGalleryQuerySchema>
+
+/** admin 下架/恢复一条公开作品的目标。 */
+export const TargetGalleryRecordSchema = z.object({ id: z.string().trim().min(1).max(256) }).strict()
+
+export type TargetGalleryRecordInput = z.infer<typeof TargetGalleryRecordSchema>
+
+/** admin 画廊产物读取的目标（recordId + artifactId）。 */
+export const AdminGalleryArtifactParamsSchema = z.object({
+  id: z.string().trim().min(1).max(256),
+  artifactId: z.string().trim().min(1).max(256),
+}).strict()
+
+export type AdminGalleryArtifactParamsInput = z.infer<typeof AdminGalleryArtifactParamsSchema>
+
 /** 批量维护每模型成本单价。 */
 export const UpsertModelCostsSchema = z.object({
   entries: z.array(z.object({

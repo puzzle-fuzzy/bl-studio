@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router'
 import { Copy, Loader2, Plus, Search, Sparkles, Trash2 } from 'lucide-react'
 import type { PromptLibraryItem } from '@bailian-studio/api-client'
@@ -40,41 +40,56 @@ export function PromptsPage() {
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
+  /** 请求序号：首载/翻页共用，防止搜索词切换时旧响应覆盖新数据。 */
+  const requestSeq = useRef(0)
+
   useEffect(() => {
     void loadModels()
   }, [loadModels])
 
-  const load = useCallback(async (reset: boolean) => {
-    if (reset) {
-      setLoading(true)
-      setItems([])
-      setNextCursor(undefined)
-    } else {
-      setLoadingMore(true)
-    }
+  // 首载与翻页分离：loadFirst 仅依赖过滤器（q），由 effect 驱动；loadMore 闭包
+  // nextCursor，只挂按钮。修复 nextCursor 进入 useCallback 依赖导致的无限刷新循环。
+  const loadFirst = useCallback(async () => {
+    const seq = ++requestSeq.current
+    setLoading(true)
     setError(null)
+    setItems([])
+    setNextCursor(undefined)
     try {
-      const page = await apiClient.listPromptLibrary({
-        ...(reset ? {} : nextCursor !== undefined ? { cursor: nextCursor } : {}),
-        ...(q.length > 0 ? { q } : {}),
-      })
-      setItems(current => reset ? page.items : [...current, ...page.items])
+      const page = await apiClient.listPromptLibrary({ ...(q.length > 0 ? { q } : {}) })
+      if (seq !== requestSeq.current) return
+      setItems(page.items)
       setNextCursor(page.nextCursor)
     } catch (err) {
-      setError(userErrorMessage(err))
+      if (seq === requestSeq.current) setError(userErrorMessage(err))
     } finally {
-      setLoading(false)
-      setLoadingMore(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
-  }, [q, nextCursor])
+  }, [q])
 
   useEffect(() => {
-    void load(true)
-  }, [load])
+    void loadFirst()
+  }, [loadFirst])
+
+  const loadMore = useCallback(async () => {
+    if (nextCursor === undefined) return
+    const seq = requestSeq.current
+    setLoadingMore(true)
+    try {
+      const page = await apiClient.listPromptLibrary({ cursor: nextCursor, ...(q.length > 0 ? { q } : {}) })
+      if (seq !== requestSeq.current) return
+      setItems(current => [...current, ...page.items])
+      setNextCursor(page.nextCursor)
+    } catch (err) {
+      if (seq === requestSeq.current) setError(userErrorMessage(err))
+    } finally {
+      if (seq === requestSeq.current) setLoadingMore(false)
+    }
+  }, [nextCursor, q])
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
-    void load(true)
+    void loadFirst()
   }
 
   const handleCreate = async () => {
@@ -93,7 +108,7 @@ export function PromptsPage() {
       })
       setCreateOpen(false)
       setCreateForm({ name: '', modelId: '', prompt: '' })
-      void load(true)
+      void loadFirst()
       showMessage({ title: '已保存到提示词库', tone: 'success' })
     } catch (err) {
       setCreateError(userErrorMessage(err))
@@ -184,7 +199,7 @@ export function PromptsPage() {
 
       {nextCursor !== undefined && items.length > 0 && (
         <div className="flex justify-center pt-2">
-          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void load(false)}>
+          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
             {loadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}
           </Button>
         </div>

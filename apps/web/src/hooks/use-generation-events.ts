@@ -3,6 +3,7 @@ import { apiClient } from '@/lib/api'
 import { ACTIVE_GENERATION_STATUSES, THUMBNAIL_REFRESH_MS } from '@/lib/labels'
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useAssetsStore } from '@/stores/assets-store'
+import { useNotificationsStore } from '@/stores/notifications-store'
 
 /**
  * SSE 实时订阅（一次挂载，跨路由常开）。
@@ -63,6 +64,11 @@ export function useGenerationEvents(enabled: boolean): void {
       ]) {
         next.addEventListener(name, onEvent)
       }
+
+      // 社交通知事件（点赞/收藏）：只做「刷新提示」，从服务端拉最新通知与未读数。
+      next.addEventListener('notification', () => {
+        void useNotificationsStore.getState().refreshFromServer()
+      })
     }
 
     connect()

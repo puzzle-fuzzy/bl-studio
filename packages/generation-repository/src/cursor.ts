@@ -39,6 +39,8 @@ export interface ListGenerationRecordsResult {
 interface CursorPayload {
   createdAt: string
   id: string
+  /** 可选复合排序键（hot 画廊按点赞数排序时需要）；缺省时按 (createdAt, id) 单键续读。 */
+  likeCount?: number
 }
 
 const DEFAULT_LIMIT = 20
@@ -54,8 +56,12 @@ export function clampLimit(limit: number | undefined): number {
   return Math.max(1, Math.min(MAX_LIMIT, Math.floor(limit)))
 }
 
-/** 将 (createdAt, id) 编码为对外的 base64url 不透明 token。 */
-export function encodeCursor(payload: CursorPayload): string {
+/** 将 (createdAt, id[, likeCount]) 编码为对外的 base64url 不透明 token。 */
+export function encodeCursor(payload: {
+  createdAt: string
+  id: string
+  likeCount?: number
+}): string {
   return Buffer.from(JSON.stringify(payload), 'utf8').toString('base64url')
 }
 
@@ -84,16 +90,24 @@ export function decodeCursor(token: string): CursorPayload {
 
 function readCursorPayload(parsed: unknown): CursorPayload {
   if (
-    typeof parsed === 'object'
-    && parsed !== null
-    && 'createdAt' in parsed
-    && 'id' in parsed
-    && typeof parsed.createdAt === 'string'
-    && typeof parsed.id === 'string'
+    typeof parsed !== 'object'
+    || parsed === null
+    || !('createdAt' in parsed)
+    || !('id' in parsed)
+    || typeof parsed.createdAt !== 'string'
+    || typeof parsed.id !== 'string'
   ) {
-    return { createdAt: parsed.createdAt, id: parsed.id }
+    throw invalidCursor('cursor is missing createdAt/id')
   }
-  throw invalidCursor('cursor is missing createdAt/id')
+  const likeCount = 'likeCount' in parsed ? parsed.likeCount : undefined
+  if (likeCount !== undefined && typeof likeCount !== 'number') {
+    throw invalidCursor('cursor has invalid likeCount')
+  }
+  return {
+    createdAt: parsed.createdAt,
+    id: parsed.id,
+    ...(typeof likeCount === 'number' ? { likeCount } : {}),
+  }
 }
 
 function invalidCursor(reason: string): GenerationRepositoryError {

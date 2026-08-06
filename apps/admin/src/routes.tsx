@@ -11,6 +11,7 @@ import { UserDetailPage } from '@/pages/UserDetailPage'
 const StatsPage = lazy(() => import('@/pages/StatsPage').then(module => ({ default: module.StatsPage })))
 const AnalyticsPage = lazy(() => import('@/pages/AnalyticsPage').then(module => ({ default: module.AnalyticsPage })))
 const FeedbackPage = lazy(() => import('@/pages/FeedbackPage').then(module => ({ default: module.FeedbackPage })))
+const GalleryManagePage = lazy(() => import('@/pages/GalleryManagePage').then(module => ({ default: module.GalleryManagePage })))
 
 /**
  * 管理后台路由（basename /admin）。
@@ -59,6 +60,14 @@ export const router = createBrowserRouter(
               element: (
                 <Suspense fallback={null}>
                   <FeedbackPage />
+                </Suspense>
+              ),
+            },
+            {
+              path: 'gallery',
+              element: (
+                <Suspense fallback={null}>
+                  <GalleryManagePage />
                 </Suspense>
               ),
             },

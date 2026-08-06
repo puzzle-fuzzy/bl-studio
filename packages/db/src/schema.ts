@@ -148,7 +148,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'gallery.visibility-change', 'admin.gallery.hide', 'admin.gallery.unhide', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),
@@ -561,6 +561,33 @@ export const userFeedback = pgTable('user_feedback', {
   check('user_feedback_kind_check', sql`${table.kind} in ('feedback', 'bug', 'suggestion', 'complaint')`),
   check('user_feedback_status_check', sql`${table.status} in ('open', 'reviewing', 'resolved', 'closed')`),
   index('user_feedback_status_created_idx').on(table.status, table.createdAt),
+])
+
+/**
+ * 社交通知：作品被点赞/收藏时通知作者（服务端落库 + SSE 实时推送）。
+ * kind：like/favorite（社交通知）/ system（预留系统通知）；actorId 为触发者，
+ * recordId 关联公开作品；readAt 为空表示未读。删除用户/记录时级联清理。
+ */
+export const notifications = pgTable('notifications', {
+  id: text('id').primaryKey(),
+  /** 收件人。 */
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  /** like | favorite | system。 */
+  kind: text('kind').notNull(),
+  /** 触发者（点赞/收藏的人）；系统通知为空。 */
+  actorId: text('actor_id').references(() => users.id, { onDelete: 'set null' }),
+  /** 关联的公开作品记录。 */
+  recordId: text('record_id').references(() => generationRecords.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  body: text('body').notNull(),
+  readAt: timestamp('read_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('notifications_kind_check', sql`${table.kind} in ('like', 'favorite', 'system')`),
+  index('notifications_user_created_idx').on(table.userId, table.createdAt),
 ])
 
 /**

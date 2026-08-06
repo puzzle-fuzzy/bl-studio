@@ -67,6 +67,11 @@ export interface PresencePayload {
 export interface NotificationPayload {
   message: string
   level?: 'info' | 'warning' | 'error'
+  /**
+   * 归属用户 id（SSE hub 按 userId 分桶推送）。携带时事件被推送到该用户的
+   * generation 频道；不携带时仍可被订阅方收到（当前 hub 只路由带 userId 的事件）。
+   */
+  userId?: string
 }
 
 /**

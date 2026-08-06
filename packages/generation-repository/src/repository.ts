@@ -72,17 +72,22 @@ import {
   type TaskRecordRow,
 } from './mappers'
 import type {
+  AdminGalleryItem,
   CostMarginRow,
   FeedbackKind,
   FeedbackStatus,
   GalleryDetail,
+  GallerySort,
   GalleryVisibility,
   GenerationArtifact,
   GenerationEvent,
+  ListAdminGalleryResult,
   ListFeedbackResult,
   ListGalleryResult,
+  ListNotificationsResult,
   ListPromptLibraryResult,
   ModelCost,
+  NotificationKind,
   PromptLibraryItem,
   RetentionAnalytics,
   UserFeedback,
@@ -740,6 +745,9 @@ export interface GenerationRepository {
     limit?: number
     category?: ModelCategory
     modelId?: string
+    authorId?: string
+    q?: string
+    sort?: GallerySort
     viewerId?: string
   }): Promise<ListGalleryResult>
   getGalleryGeneration(input: { recordId: string; viewerId?: string }): Promise<GalleryDetail | undefined>
@@ -757,6 +765,41 @@ export interface GenerationRepository {
   /** 查询 viewer 是否已收藏某记录；记录对 viewer 不可见时返回 undefined。 */
   getGenerationFavorited(input: { userId: string; recordId: string }): Promise<boolean | undefined>
   listGenerationFavorites(input: { userId: string; cursor?: string; limit?: number }): Promise<ListGalleryResult>
+
+  // -------------------------------------------------------------------------
+  // 社区治理（admin）：含隐藏作品的画廊列表 + 下架/恢复 + 封禁联动。
+  // -------------------------------------------------------------------------
+  listAdminGalleryGenerations(input: {
+    cursor?: string
+    limit?: number
+    includeHidden?: boolean
+    q?: string
+    authorId?: string
+  }): Promise<ListAdminGalleryResult>
+  /** admin 画廊产物读取：不检查 hiddenAt（治理需预览已隐藏作品）。 */
+  getAdminGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined>
+  setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void>
+  /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt。 */
+  hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number>
+
+  // -------------------------------------------------------------------------
+  // 社交通知：作者收到点赞/收藏通知。
+  // -------------------------------------------------------------------------
+  /** 读取记录作者 id（不存在或已删除返回 undefined）。 */
+  getGenerationOwner(recordId: string): Promise<string | undefined>
+  createSocialNotification(input: {
+    recipientId: string
+    actorId?: string
+    kind: NotificationKind
+    recordId?: string
+    title: string
+    body: string
+  }): Promise<void>
+  listNotifications(input: { userId: string; cursor?: string; limit?: number }): Promise<ListNotificationsResult>
+  countUnreadNotifications(userId: string): Promise<number>
+  markNotificationRead(input: { userId: string; notificationId: string }): Promise<boolean>
+  markAllNotificationsRead(userId: string): Promise<number>
+
   listPromptLibrary(input: { userId: string; cursor?: string; limit?: number; q?: string }): Promise<ListPromptLibraryResult>
   createPromptLibraryItem(input: {
     userId: string
