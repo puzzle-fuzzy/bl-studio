@@ -54,6 +54,7 @@ export const router = createBrowserRouter([
       { path: '/library', element: lazyPage('LibraryPage', () => import('@/pages/LibraryPage')) },
       { path: '/gallery', element: lazyPage('GalleryPage', () => import('@/pages/GalleryPage')) },
       { path: '/prompts', element: lazyPage('PromptsPage', () => import('@/pages/PromptsPage')) },
+      { path: '/settings', element: lazyPage('ProfilePage', () => import('@/pages/ProfilePage')) },
     ],
   },
   {

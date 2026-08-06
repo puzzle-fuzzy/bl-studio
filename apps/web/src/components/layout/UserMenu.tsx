@@ -1,8 +1,8 @@
 import { useState } from 'react'
-import { LogIn, LogOut, KeyRound, MessageSquare, Moon, Sun } from 'lucide-react'
+import { LogIn, LogOut, MessageSquare, Moon, Sun, UserRound } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useTheme } from 'next-themes'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
@@ -13,14 +13,13 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 import { SidebarMenuButton } from '@/components/ui/sidebar'
-import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
 import { FeedbackDialog } from '@/components/feedback/FeedbackDialog'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { useAuthStore } from '@/stores/auth-store'
 import { useAuthDialogStore } from '@/stores/auth-dialog-store'
 
 /**
- * 账户菜单（侧栏底部）：头像 + 完整邮箱，下拉含积分、主题切换、修改密码、退出。
+ * 账户菜单（侧栏底部）：头像 + 完整邮箱，下拉含积分、主题切换、个人信息、退出。
  * 未登录时显示登录入口。
  */
 export function UserMenu() {
@@ -31,7 +30,6 @@ export function UserMenu() {
   const openAuth = useAuthDialogStore(state => state.open)
   const { resolvedTheme, setTheme } = useTheme()
   const navigate = useNavigate()
-  const [changeOpen, setChangeOpen] = useState(false)
   const [feedbackOpen, setFeedbackOpen] = useState(false)
 
   if (status !== 'authenticated' || user === null) {
@@ -43,7 +41,6 @@ export function UserMenu() {
     )
   }
 
-  const initials = (user.displayName ?? user.email).slice(0, 2).toUpperCase()
   const isDark = resolvedTheme === 'dark'
 
   return (
@@ -51,9 +48,7 @@ export function UserMenu() {
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton className="h-auto w-full min-w-0">
-            <Avatar className="size-7 shrink-0">
-              <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-            </Avatar>
+            <UserAvatar userId={user.id} name={user.displayName} className="size-7 shrink-0" />
             <span className="min-w-0 flex-1 text-left leading-tight">
               <span className="block truncate text-sm font-medium">{user.displayName ?? user.email}</span>
               <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
@@ -74,9 +69,9 @@ export function UserMenu() {
             {isDark ? <Sun data-icon /> : <Moon data-icon />}
             {isDark ? '浅色模式' : '深色模式'}
           </DropdownMenuItem>
-          <DropdownMenuItem className="py-2" onClick={() => setChangeOpen(true)}>
-            <KeyRound data-icon />
-            修改密码
+          <DropdownMenuItem className="py-2" onClick={() => navigate('/settings')}>
+            <UserRound data-icon />
+            个人信息
           </DropdownMenuItem>
           <DropdownMenuItem className="py-2" onClick={() => setFeedbackOpen(true)}>
             <MessageSquare data-icon />
@@ -104,7 +99,6 @@ export function UserMenu() {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-      <ChangePasswordDialog open={changeOpen} onOpenChange={setChangeOpen} />
       <FeedbackDialog open={feedbackOpen} onOpenChange={setFeedbackOpen} />
     </>
   )

@@ -1,7 +1,7 @@
 import { Elysia } from 'elysia'
 import { z } from 'zod'
-import { AuthError } from '@bailian-studio/auth'
-import { validateInput } from '@bailian-studio/shared'
+import { AuthError, type PublicUser } from '@bailian-studio/auth'
+import { validateInput, ValidationError } from '@bailian-studio/shared'
 import type { ApiDependencies } from '../../dependencies'
 import { auditErrorCode, recordApiAuditEvent } from '../../lib/audit'
 import {
@@ -45,6 +45,31 @@ const ChangePasswordSchema = z.object({
   currentPassword: z.string().min(8).max(256),
   newPassword: z.string().min(8).max(256),
 })
+
+const ProfileUpdateSchema = z.object({
+  displayName: z.string().trim().min(1).max(100),
+})
+
+/** 头像上传白名单：只允许位图。拒绝 SVG（可内联脚本，是 XSS 向量）及其它类型。 */
+const AVATAR_ALLOWED_MIME_TYPES = new Set(['image/png', 'image/jpeg', 'image/webp'])
+
+const AVATAR_MIME_TO_EXT: Record<string, string> = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+}
+
+/** 头像文件大小上限（与前端提示一致）。 */
+const AVATAR_MAX_BYTES = 2 * 1024 * 1024
+
+async function deleteStorageKeyBestEffort(storage: ApiDependencies['storage'], key: string): Promise<void> {
+  if (storage.deleteObject === undefined) return
+  try {
+    await storage.deleteObject({ key })
+  } catch {
+    // 旧文件清理失败不阻断本次操作：孤儿对象交由存储巡检任务统一回收。
+  }
+}
 
 function maxAgeFor(expiresAt: Date): number {
   return Math.max(0, Math.floor((expiresAt.getTime() - Date.now()) / 1000))
@@ -265,6 +290,108 @@ export function createAuthRoutes(deps: ApiDependencies) {
       } catch (error) {
         await recordApiAuditEvent(deps.generationRepository, request, {
           action: 'auth.logout-all',
+          outcome: 'failed',
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .patch('/profile', async ({ request, body }) => {
+      try {
+        const user = await requireAuthUser(request, deps.authService)
+        const updated = await deps.authService.updateProfile(
+          user.id,
+          validateInput(ProfileUpdateSchema, body),
+        )
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: user.id,
+          action: 'auth.profile.update',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: user.id,
+        })
+        return { success: true, data: { user: updated } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          action: 'auth.profile.update',
+          outcome: 'failed',
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/avatar', async ({ request }) => {
+      try {
+        const user = await requireAuthUser(request, deps.authService)
+        const formData = await request.formData()
+        const file = formData.get('file')
+
+        if (!(file instanceof File)) {
+          throw new ValidationError('File is required', 'file')
+        }
+        if (!AVATAR_ALLOWED_MIME_TYPES.has(file.type)) {
+          throw new ValidationError('仅支持 PNG / JPEG / WEBP 格式的头像图片', 'file')
+        }
+        if (file.size > AVATAR_MAX_BYTES) {
+          throw new ValidationError('头像文件大小不能超过 2MB', 'file')
+        }
+
+        const ext = AVATAR_MIME_TO_EXT[file.type]
+        const key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`
+        const buffer = Buffer.from(await file.arrayBuffer())
+        const stored = await deps.storage.writeObject({ key, body: buffer, contentType: file.type })
+
+        // 先记旧 key（updateAvatar 成功后旧值就丢了），再落库新头像。
+        const previousKey = await deps.authService.getUserAvatarStorageKey(user.id)
+        let updated: PublicUser
+        try {
+          updated = await deps.authService.updateAvatar(user.id, stored.key)
+        } catch (error) {
+          // 存储是外部副作用：DB 提交失败时删除新写入的对象，避免重试泄漏孤儿 blob。
+          await deleteStorageKeyBestEffort(deps.storage, stored.key)
+          throw error
+        }
+        if (previousKey !== undefined && previousKey !== null && previousKey !== stored.key) {
+          await deleteStorageKeyBestEffort(deps.storage, previousKey)
+        }
+
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: user.id,
+          action: 'auth.avatar.update',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: user.id,
+          metadata: { byteSize: file.size },
+        })
+        return { success: true, data: { user: updated } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          action: 'auth.avatar.update',
+          outcome: 'failed',
+          metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .delete('/avatar', async ({ request }) => {
+      try {
+        const user = await requireAuthUser(request, deps.authService)
+        const previousKey = await deps.authService.getUserAvatarStorageKey(user.id)
+        const updated = await deps.authService.removeAvatar(user.id)
+        if (previousKey !== undefined && previousKey !== null) {
+          await deleteStorageKeyBestEffort(deps.storage, previousKey)
+        }
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: user.id,
+          action: 'auth.avatar.remove',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: user.id,
+        })
+        return { success: true, data: { user: updated } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          action: 'auth.avatar.remove',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
         })

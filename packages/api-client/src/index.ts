@@ -29,6 +29,7 @@ export {
   type BailianStudioApiClient,
   type UploadAssetInput,
 } from './generation-client'
+export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
 export type {
   AssetItem,

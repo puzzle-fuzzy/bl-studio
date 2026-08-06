@@ -5,6 +5,7 @@ import type { AdminUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
+import { UserAvatar } from '@/components/layout/user-avatar'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -335,7 +336,12 @@ export function UserListPage() {
                           {user.email}
                         </Link>
                       </TableCell>
-                      <TableCell>{user.displayName ?? '—'}</TableCell>
+                      <TableCell>
+                        <div className="flex items-center gap-2">
+                          <UserAvatar userId={user.id} name={user.displayName} size="sm" className="shrink-0" />
+                          <span className="min-w-0 truncate">{user.displayName ?? '—'}</span>
+                        </div>
+                      </TableCell>
                       <TableCell>
                         {banned
                           ? <Badge variant="destructive">已封禁</Badge>

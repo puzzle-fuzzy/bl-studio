@@ -6,11 +6,15 @@ export interface FakeAuthService extends AuthService {
 }
 
 export function createFakeAuthService(
-  currentUser: () => Omit<PublicUser, 'emailVerifiedAt' | 'bannedAt'> & { emailVerifiedAt?: string },
+  currentUser: () => Omit<PublicUser, 'emailVerifiedAt' | 'bannedAt' | 'hasAvatar'> & {
+    emailVerifiedAt?: string
+    hasAvatar?: boolean
+  },
 ): FakeAuthService {
   let banned = false
   const user = (): PublicUser => ({
     ...currentUser(),
+    hasAvatar: currentUser().hasAvatar ?? false,
     emailVerifiedAt: currentUser().emailVerifiedAt ?? '2026-07-25T00:00:00.000Z',
     bannedAt: banned ? '2026-07-25T00:00:00.000Z' : null,
   })
@@ -66,6 +70,10 @@ export function createFakeAuthService(
       : undefined,
     revokeSessionByToken: async () => {},
     revokeAllSessionsByToken: async () => {},
+    updateProfile: async (_id, input) => ({ ...user(), displayName: input.displayName }),
+    updateAvatar: async _id => ({ ...user(), hasAvatar: true }),
+    removeAvatar: async _id => ({ ...user(), hasAvatar: false }),
+    getUserAvatarStorageKey: async () => null,
     adminCreateUser: async input => ({
       id: 'admin-created',
       email: input.email,

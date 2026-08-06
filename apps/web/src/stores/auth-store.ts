@@ -38,6 +38,9 @@ interface AuthState {
   forgotPassword(email: string): Promise<void>
   resetPassword(token: string, newPassword: string): Promise<void>
   changePassword(currentPassword: string, newPassword: string): Promise<void>
+  updateProfile(displayName: string): Promise<void>
+  uploadAvatar(file: File): Promise<void>
+  removeAvatar(): Promise<void>
   logout(): Promise<void>
   logoutAll(): Promise<void>
 }
@@ -116,6 +119,21 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async changePassword(currentPassword, newPassword) {
     const user = await apiClient.changePassword({ currentPassword, newPassword })
+    set({ user })
+  },
+
+  async updateProfile(displayName) {
+    const user = await apiClient.updateProfile({ displayName })
+    set({ user })
+  },
+
+  async uploadAvatar(file) {
+    const user = await apiClient.uploadAvatar(file)
+    set({ user })
+  },
+
+  async removeAvatar() {
+    const user = await apiClient.removeAvatar()
     set({ user })
   },
 

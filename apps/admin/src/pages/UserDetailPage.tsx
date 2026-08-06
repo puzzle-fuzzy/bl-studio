@@ -4,6 +4,7 @@ import { ArrowLeft, Gift, Loader2, Minus } from 'lucide-react'
 import type { AdminUser, AssetItem, CreditBalance } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { UserAvatar } from '@/components/layout/user-avatar'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -155,6 +156,7 @@ export function UserDetailPage() {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
+            <UserAvatar userId={user.id} name={user.displayName} size="sm" className="shrink-0" />
             {user.email}
             <Badge variant={user.role === 'admin' ? 'default' : 'secondary'}>
               {user.role === 'admin' ? '管理员' : '用户'}

@@ -57,6 +57,7 @@ const CONTRACT_USER = {
   id: CONTRACT_USER_ID,
   email: 'api-contract@example.test',
   displayName: 'API Contract',
+  hasAvatar: false,
   role: 'user' as const,
   emailVerifiedAt: '2026-07-25T00:00:00.000Z',
   bannedAt: null,
@@ -80,6 +81,10 @@ const contractAuthService: AuthService = {
   forgotPassword: async () => ({ accepted: true }),
   resetPassword: async () => {},
   changePassword: async () => ({ token: 'contract-token', user: CONTRACT_USER, expiresAt: new Date(Date.now() + 3600_000) }),
+  updateProfile: async (_id, input) => ({ ...CONTRACT_USER, displayName: input.displayName }),
+  updateAvatar: async _id => ({ ...CONTRACT_USER, hasAvatar: true }),
+  removeAvatar: async _id => ({ ...CONTRACT_USER, hasAvatar: false }),
+  getUserAvatarStorageKey: async () => null,
   verifyToken: async token => token === 'contract-token'
     ? { user: CONTRACT_USER, sessionId: 'contract-session' }
     : undefined,

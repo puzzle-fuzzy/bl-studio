@@ -29,10 +29,13 @@ import {
   revokeSession,
   setUserBanned,
   setUsersBanned,
+  clearUserAvatar as clearUserAvatarRecord,
   softDeleteUser as softDeleteUserRecord,
   softDeleteUsers as softDeleteUsersRecord,
   updateUserAdmin as updateUserAdminRecord,
+  updateUserAvatar as updateUserAvatarRecord,
   updateUserPassword,
+  updateUserSelf as updateUserSelfRecord,
   type AuthActionTokenPurpose,
   type UserRepositoryRecord,
 } from './repository'
@@ -41,6 +44,8 @@ export interface PublicUser {
   id: string
   email: string
   displayName: string | null
+  /** 已上传自定义头像；false 时前端使用由 userId 生成的 identicon 默认头像。 */
+  hasAvatar: boolean
   role: 'user' | 'admin'
   emailVerifiedAt: string
   /** 非空即封禁（正常会话下恒为 null —— 封禁用户会被 verifyToken 拒绝）。 */
@@ -114,6 +119,16 @@ export interface AuthService {
     currentPassword: string
     newPassword: string
   }): Promise<AuthResult>
+
+  /** 用户自助更新昵称（displayName）；用户不存在或已删除时抛 AUTH_UNAUTHORIZED。 */
+  updateProfile(userId: string, input: { displayName: string }): Promise<PublicUser>
+  /** 用户自助设置自定义头像（storage key 由 API 层写入存储后提供）。 */
+  updateAvatar(userId: string, avatarStorageKey: string): Promise<PublicUser>
+  /** 用户自助移除自定义头像（回到 identicon 默认头像）。 */
+  removeAvatar(userId: string): Promise<PublicUser>
+  /** 头像公开路由的只读查询：返回自定义头像存储 key；undefined=用户不存在。 */
+  getUserAvatarStorageKey(userId: string): Promise<string | null | undefined>
+
   verifyToken(token: string): Promise<VerifiedSession | undefined>
   revokeSessionByToken(token: string): Promise<void>
   revokeAllSessionsByToken(token: string): Promise<void>
@@ -238,6 +253,7 @@ function toPublicUser(user: UserRepositoryRecord): PublicUser {
     id: user.id,
     email: user.email,
     displayName: user.displayName,
+    hasAvatar: user.avatarStorageKey !== null,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt.toISOString(),
     bannedAt: user.bannedAt === null ? null : user.bannedAt.toISOString(),
@@ -618,6 +634,42 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       //（生成提交、预估、SSE 都经由 requireAuthUser → verifyToken）。
       if (user === undefined || user.emailVerifiedAt === null || user.bannedAt !== null) return undefined
       return { user: toPublicUser(user), sessionId: payload.sid }
+    },
+
+    async updateProfile(userId, input) {
+      const displayName = input.displayName.trim()
+      if (displayName.length < 1 || displayName.length > 100) {
+        throw new ValidationError('昵称长度为 1–100 个字符', 'displayName')
+      }
+      const updated = await updateUserSelfRecord(options.db, userId, { displayName }, now())
+      if (updated === undefined) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。')
+      }
+      return toPublicUser(updated)
+    },
+
+    async updateAvatar(userId, avatarStorageKey) {
+      if (avatarStorageKey.length === 0 || avatarStorageKey.length > 512) {
+        throw new ValidationError('Avatar storage key is invalid', 'avatarStorageKey')
+      }
+      const updated = await updateUserAvatarRecord(options.db, userId, avatarStorageKey, now())
+      if (updated === undefined) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。')
+      }
+      return toPublicUser(updated)
+    },
+
+    async removeAvatar(userId) {
+      const updated = await clearUserAvatarRecord(options.db, userId, now())
+      if (updated === undefined) {
+        throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。')
+      }
+      return toPublicUser(updated)
+    },
+
+    async getUserAvatarStorageKey(userId) {
+      const user = await findActiveUserById(options.db, userId)
+      return user === undefined ? undefined : user.avatarStorageKey
     },
 
     async revokeSessionByToken(token) {

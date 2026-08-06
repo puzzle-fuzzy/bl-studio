@@ -426,4 +426,67 @@ describe('auth service', () => {
         .toBe('batch-a@x.test')
     })
   })
+
+  describe('profile & avatar (user self-service)', () => {
+    async function verifiedUser(email: string) {
+      await handle.authService.register({ email, password: 'password1' })
+      const rawToken = tokenFrom(emailSender.verifications.at(-1)!.url)
+      const session = await handle.authService.verifyEmail(rawToken)
+      return { user: session.user, session }
+    }
+
+    it('updates the display name and persists it', async () => {
+      const { user } = await verifiedUser('profile@x.test')
+      const updated = await handle.authService.updateProfile(user.id, { displayName: '新昵称' })
+      expect(updated.displayName).toBe('新昵称')
+      expect(updated.hasAvatar).toBe(false)
+
+      const db = createDb({ url: handle.databaseUrl, max: 1 })
+      try {
+        const [row] = await db
+          .select({ displayName: users.displayName })
+          .from(users)
+          .where(eq(users.id, user.id))
+        expect(row?.displayName).toBe('新昵称')
+      } finally {
+        await db.close()
+      }
+    })
+
+    it('rejects an empty or over-length display name', async () => {
+      const { user } = await verifiedUser('profile-invalid@x.test')
+      await expect(handle.authService.updateProfile(user.id, { displayName: '   ' }))
+        .rejects.toMatchObject({ code: 'VALIDATION_INVALID_INPUT' })
+      await expect(handle.authService.updateProfile(user.id, { displayName: 'x'.repeat(101) }))
+        .rejects.toMatchObject({ code: 'VALIDATION_INVALID_INPUT' })
+    })
+
+    it('sets, reads, and removes the custom avatar storage key', async () => {
+      const { user } = await verifiedUser('avatar@x.test')
+      expect(await handle.authService.getUserAvatarStorageKey(user.id)).toBeNull()
+
+      const updated = await handle.authService.updateAvatar(user.id, 'avatars/avatar/x.png')
+      expect(updated.hasAvatar).toBe(true)
+      expect(await handle.authService.getUserAvatarStorageKey(user.id)).toBe('avatars/avatar/x.png')
+
+      const removed = await handle.authService.removeAvatar(user.id)
+      expect(removed.hasAvatar).toBe(false)
+      expect(await handle.authService.getUserAvatarStorageKey(user.id)).toBeNull()
+    })
+
+    it('reports undefined for unknown users from getUserAvatarStorageKey', async () => {
+      expect(await handle.authService.getUserAvatarStorageKey('no-such-user')).toBeUndefined()
+    })
+
+    it('throws AUTH_UNAUTHORIZED for self-service on a deleted user', async () => {
+      const { user } = await verifiedUser('profile-deleted@x.test')
+      await handle.authService.softDeleteUser(user.id)
+      await expect(handle.authService.updateProfile(user.id, { displayName: 'x' }))
+        .rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED' })
+      await expect(handle.authService.updateAvatar(user.id, 'avatars/u/x.png'))
+        .rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED' })
+      await expect(handle.authService.removeAvatar(user.id))
+        .rejects.toMatchObject({ code: 'AUTH_UNAUTHORIZED' })
+    })
+  })
 })

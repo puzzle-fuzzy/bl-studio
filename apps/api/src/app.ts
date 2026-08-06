@@ -28,6 +28,7 @@ import { createNotificationsRoutes } from './modules/notifications/routes'
 import { modelRoutes } from './modules/models/routes'
 import { createArtifactRoutes } from './modules/artifacts/routes'
 import { createAssetRoutes } from './modules/assets'
+import { createAvatarRoutes } from './modules/avatars'
 import { createAuthRoutes } from './modules/auth'
 import { createMediaRoutes } from './modules/media'
 import { createShareRoutes } from './modules/shares'
@@ -66,7 +67,7 @@ export function createApp(options: ApiAppOptions) {
     origin: [...dependencies.allowedOrigins],
     credentials: true,
      allowedHeaders: ['Content-Type', 'Authorization', 'X-Request-ID', 'X-Trace-ID'],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   }))
   .onRequest((context) => {
     const { set } = context
@@ -143,6 +144,7 @@ export function createApp(options: ApiAppOptions) {
   })
   .use(modelRoutes)
   .use(createAuthRoutes(dependencies))
+  .use(createAvatarRoutes(dependencies))
   .use(createGenerationRoutes(dependencies))
   .use(createGalleryRoutes(dependencies))
   .use(createPromptLibraryRoutes(dependencies))

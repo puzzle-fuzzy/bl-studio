@@ -20,6 +20,8 @@ export interface UserRepositoryRecord {
   email: string
   passwordHash: string
   displayName: string | null
+  /** 自定义头像的存储 key（storage adapter 命名空间下）；为空使用 identicon 默认头像。 */
+  avatarStorageKey: string | null
   role: 'user' | 'admin'
   emailVerifiedAt: Date | null
   githubId: string | null
@@ -36,6 +38,7 @@ function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
     email: row.email,
     passwordHash: row.passwordHash,
     displayName: row.displayName,
+    avatarStorageKey: row.avatarStorageKey,
     role: row.role as UserRepositoryRecord['role'],
     emailVerifiedAt: row.emailVerifiedAt,
     githubId: row.githubId,
@@ -432,6 +435,66 @@ export async function updateUserAdmin(
   const [row] = await db
     .update(users)
     .set(patch)
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning()
+  return row === undefined ? undefined : toUserRecord(row)
+}
+
+export interface UpdateUserSelfInput {
+  displayName: string
+}
+
+/** 用户自助更新昵称；返回更新后的用户，用户不存在或已删除时为 undefined。 */
+export async function updateUserSelf(
+  db: AuthDatabase,
+  userId: string,
+  input: UpdateUserSelfInput,
+  now: Date,
+): Promise<UserRepositoryRecord | undefined> {
+  const [row] = await db
+    .update(users)
+    .set({
+      displayName: input.displayName,
+      updatedAt: now,
+      updatedBy: 'user.profile.update',
+    })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning()
+  return row === undefined ? undefined : toUserRecord(row)
+}
+
+/** 用户自助设置自定义头像存储 key；返回更新后的用户，用户不存在或已删除时为 undefined。 */
+export async function updateUserAvatar(
+  db: AuthDatabase,
+  userId: string,
+  avatarStorageKey: string,
+  now: Date,
+): Promise<UserRepositoryRecord | undefined> {
+  const [row] = await db
+    .update(users)
+    .set({
+      avatarStorageKey,
+      updatedAt: now,
+      updatedBy: 'user.avatar.update',
+    })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning()
+  return row === undefined ? undefined : toUserRecord(row)
+}
+
+/** 用户自助移除自定义头像（回到 identicon 默认头像）；返回更新后的用户，用户不存在或已删除时为 undefined。 */
+export async function clearUserAvatar(
+  db: AuthDatabase,
+  userId: string,
+  now: Date,
+): Promise<UserRepositoryRecord | undefined> {
+  const [row] = await db
+    .update(users)
+    .set({
+      avatarStorageKey: null,
+      updatedAt: now,
+      updatedBy: 'user.avatar.remove',
+    })
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
     .returning()
   return row === undefined ? undefined : toUserRecord(row)

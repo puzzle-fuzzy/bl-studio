@@ -19,6 +19,10 @@ const buttonVariants = cva(
         destructive:
           "bg-destructive/10 text-destructive hover:bg-destructive/20 focus-visible:border-destructive/40 focus-visible:ring-destructive/20 dark:bg-destructive/20 dark:hover:bg-destructive/30 dark:focus-visible:ring-destructive/40",
         link: "text-primary underline-offset-4 hover:underline",
+        // 毛玻璃：浮在媒体效果图上，不遮挡预览。显式写死 text-*/hover:bg-*，
+        // 避免被其它 variant 残留的 foreground/hover 类污染（twMerge 只去重同修饰组）。
+        glass:
+          "border-white/25 bg-white/10 text-white backdrop-blur-md hover:bg-white/20 hover:text-white",
       },
       size: {
         default:

@@ -352,6 +352,12 @@ export interface BailianStudioApiClient {
   forgotPassword(input: { email: string }): Promise<EmailActionAccepted>
   resetPassword(input: { token: string; newPassword: string }): Promise<void>
   changePassword(input: { currentPassword: string; newPassword: string }): Promise<PublicUser>
+  /** `PATCH /api/auth/profile` —— 更新当前用户昵称（displayName）。 */
+  updateProfile(input: { displayName: string }): Promise<PublicUser>
+  /** `POST /api/auth/avatar` —— 上传自定义头像（multipart 图片），返回更新后的用户。 */
+  uploadAvatar(file: File): Promise<PublicUser>
+  /** `DELETE /api/auth/avatar` —— 移除自定义头像，回到 identicon 默认头像。 */
+  removeAvatar(): Promise<PublicUser>
   logoutAll(): Promise<void>
   /** `POST /api/auth/login` —— 登录并写入会话 cookie，返回当前用户。 */
   login(input: CredentialsInput): Promise<PublicUser>
@@ -913,6 +919,38 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       const data = await unwrapData(
         `${base}/api/auth/change-password`,
         { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        AuthResponseSchema,
+      )
+      return data.user
+    },
+
+    async updateProfile(input) {
+      const data = await unwrapData(
+        `${base}/api/auth/profile`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        AuthResponseSchema,
+      )
+      return data.user
+    },
+
+    async uploadAvatar(file) {
+      const formData = new FormData()
+      formData.append('file', file)
+      const data = await unwrapData(
+        `${base}/api/auth/avatar`,
+        { method: 'POST', body: formData, credentials: 'include' },
+        fetchImpl,
+        AuthResponseSchema,
+      )
+      return data.user
+    },
+
+    async removeAvatar() {
+      const data = await unwrapData(
+        `${base}/api/auth/avatar`,
+        { method: 'DELETE', credentials: 'include' },
         fetchImpl,
         AuthResponseSchema,
       )

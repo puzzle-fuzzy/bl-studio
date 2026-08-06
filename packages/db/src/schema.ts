@@ -50,6 +50,11 @@ export const users = pgTable('users', {
   /** GitHub OAuth 用户 ID（数字），邮箱登录用户为 NULL。 */
   githubId: text('github_id'),
   displayName: text('display_name'),
+  /**
+   * 自定义头像的存储 key（storage adapter 命名空间下）。为空表示未上传，
+   * 使用由 userId 确定性生成的 identicon 默认头像（GET /api/avatars/:userId）。
+   */
+  avatarStorageKey: text('avatar_storage_key'),
   role: text('role').notNull().default('user'),
   /**
    * 封禁时间，非空即封禁。封禁 ≠ 软删除：封禁保留邮箱占用与账号数据，
@@ -148,7 +153,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'gallery.visibility-change', 'admin.gallery.hide', 'admin.gallery.unhide', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'auth.profile.update', 'auth.avatar.update', 'auth.avatar.remove', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'gallery.visibility-change', 'admin.gallery.hide', 'admin.gallery.unhide', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),

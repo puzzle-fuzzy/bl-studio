@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { useAuthStore } from '@/stores/auth-store'
+import { UserAvatar } from '@/components/ui/user-avatar'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { modelNameZh } from '@/lib/model-modes'
@@ -470,16 +471,16 @@ function GalleryCard({
         <button type="button" onClick={onOpen} aria-label="查看详情" className="relative block aspect-square w-full overflow-hidden bg-muted">
           {renderCardMedia(item, thumbUrl, videoUrl, coverUrl, prompt)}
         </button>
-        {/* 操作按钮组：兄弟节点 + pointer-events 隔离；常显（触屏/键盘可达）。 */}
-        <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1 bg-linear-to-t from-black/50 via-transparent to-transparent p-2">
-          <Button size="sm" variant="secondary" className="pointer-events-auto" onClick={onReuse}>
+        {/* 操作按钮组：兄弟节点 + pointer-events 隔离；毛玻璃背景不遮挡效果图。 */}
+        <div className="pointer-events-none absolute inset-0 flex items-end justify-end gap-1 bg-linear-to-t from-black/30 via-transparent to-transparent p-2">
+          <Button size="sm" variant="glass" className="pointer-events-auto" onClick={onReuse}>
             <Sparkles data-icon />
             {isAuthor ? '同参数·含参考图' : '同参数'}
           </Button>
-          <Button size="icon-sm" variant="secondary" className="pointer-events-auto" onClick={onFavorite} aria-label={item.favoritedByViewer ? '取消收藏' : '收藏'}>
+          <Button size="icon-sm" variant="glass" className="pointer-events-auto" onClick={onFavorite} aria-label={item.favoritedByViewer ? '取消收藏' : '收藏'}>
             {item.favoritedByViewer ? <BookmarkCheck data-icon className="text-primary" /> : <Bookmark data-icon />}
           </Button>
-          <Button size="icon-sm" variant="secondary" className="pointer-events-auto" onClick={onLike} aria-label={item.likedByViewer ? '取消点赞' : '点赞'}>
+          <Button size="icon-sm" variant="glass" className="pointer-events-auto" onClick={onLike} aria-label={item.likedByViewer ? '取消点赞' : '点赞'}>
             <Heart data-icon className={item.likedByViewer ? 'fill-current text-destructive' : undefined} />
           </Button>
         </div>
@@ -492,12 +493,15 @@ function GalleryCard({
             {item.likeCount}
           </span>
         </div>
-        <p className="text-xs text-muted-foreground">
-          <button type="button" onClick={onAuthorClick} className="transition-colors hover:text-foreground hover:underline">
-            {item.author.displayName ?? item.author.id.slice(0, 8)}
-          </button>
-          {' · '}{formatTime(item.createdAt)}
-        </p>
+        <div className="flex min-w-0 items-center gap-2">
+          <UserAvatar userId={item.author.id} name={item.author.displayName} size="sm" className="shrink-0" />
+          <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+            <button type="button" onClick={onAuthorClick} className="transition-colors hover:text-foreground hover:underline">
+              {item.author.displayName ?? item.author.id.slice(0, 8)}
+            </button>
+            {' · '}{formatTime(item.createdAt)}
+          </p>
+        </div>
       </div>
     </div>
   )
@@ -558,6 +562,7 @@ function GalleryDetailView({
       <DialogHeader>
         <DialogTitle className="flex flex-wrap items-center gap-2 pr-8">
           <Badge variant="secondary">{detail.record.modelId}</Badge>
+          <UserAvatar userId={detail.author.id} name={detail.author.displayName} size="sm" />
           <span className="text-sm font-normal text-muted-foreground">{detail.author.displayName ?? detail.author.id.slice(0, 8)}</span>
           <div className="ml-auto flex flex-wrap items-center gap-1.5">
             <button
