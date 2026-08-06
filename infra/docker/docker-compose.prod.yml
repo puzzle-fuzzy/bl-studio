@@ -21,6 +21,14 @@ x-logging: &json-logging
     max-size: "20m"
     max-file: "3"
 
+# 静态 ffmpeg/ffprobe（宿主机自包含二进制，无共享库依赖，可跨发行版挂进 Debian 容器）。
+# 运行时镜像不再打包 ffmpeg；api（上传媒体时长探测）与 worker（音频提取/缩略图）都依赖
+# 这两个挂载。首次使用前先跑 infra/scripts/fetch-static-ffmpeg.sh（宿主机路径可经
+# FFMPEG_HOST_DIR 覆盖，默认 /opt/bailian-studio/ffmpeg）。
+x-ffmpeg-mounts: &ffmpeg-mounts
+  - ${FFMPEG_HOST_DIR:-/opt/bailian-studio/ffmpeg}/ffmpeg:/usr/local/bin/ffmpeg:ro
+  - ${FFMPEG_HOST_DIR:-/opt/bailian-studio/ffmpeg}/ffprobe:/usr/local/bin/ffprobe:ro
+
 networks:
   # 业务后端：web → api → worker/postgres/migrate/backup
   backend:
@@ -80,6 +88,9 @@ services:
     environment:
       # 生产强制 JSON-lines 日志，供 Alloy 按字段采集解析。
       LOG_FORMAT: json
+      # ffprobe 来自静态挂载（见 x-ffmpeg-mounts）；显式指向，不依赖 PATH。
+      FFPROBE_PATH: /usr/local/bin/ffprobe
+    volumes: *ffmpeg-mounts
     command: ["bun", "apps/api/src/index.ts"]
     restart: unless-stopped
     depends_on:
@@ -112,6 +123,10 @@ services:
       - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.production}
     environment:
       LOG_FORMAT: json
+      # 静态 ffmpeg/ffprobe 挂载路径（见 x-ffmpeg-mounts）；显式指向，不依赖 PATH。
+      FFMPEG_PATH: /usr/local/bin/ffmpeg
+      FFPROBE_PATH: /usr/local/bin/ffprobe
+    volumes: *ffmpeg-mounts
     command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
     restart: unless-stopped
     depends_on:

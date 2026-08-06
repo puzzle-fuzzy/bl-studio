@@ -84,6 +84,26 @@ ssh_cmd() {
 
 echo "==> 部署目标：${DEPLOY_HOST}（镜像 tag: ${SHA:0:12}）"
 
+# ── 提示：仅前端改动时 web-only 更省（非阻断）────────────────────
+# 上一次提交只动了 apps/web|apps/admin（docs 不计入），全量部署会白传 runtime 镜像。
+changed_files="$(git diff --name-only "$SHA~1" "$SHA" 2>/dev/null || true)"
+non_frontend="$(printf '%s\n' "$changed_files" | grep -vE '^(apps/(web|admin)|docs)/' | grep -v '^$' || true)"
+if [[ -n "$changed_files" && -z "$non_frontend" ]] && printf '%s\n' "$changed_files" | grep -qE '^apps/(web|admin)/'; then
+  echo "==> 提示：本次提交只改了前端（apps/web|apps/admin）。"
+  echo "==> 前端热修建议用 pnpm run deploy:prod:web（传输 ~20MB，不重传 runtime 镜像）。"
+  echo "==> 若确实需要全量部署（连带后端/DB 变更），忽略本提示继续。"
+fi
+
+# ── 预检 4：宿主机静态 ffmpeg/ffprobe 就绪（runtime 镜像不再打包它们）────────
+# 路径可经 FFMPEG_HOST_DIR 覆盖（默认 /opt/bailian-studio/ffmpeg），与
+# docker-compose.prod.yml 的 x-ffmpeg-mounts 保持一致。
+FFMPEG_HOST_DIR="$(env_value FFMPEG_HOST_DIR "$ENV_INFRA")"
+FFMPEG_HOST_DIR="${FFMPEG_HOST_DIR:-/opt/bailian-studio/ffmpeg}"
+echo "==> 预检：宿主机静态 ffmpeg/ffprobe（$FFMPEG_HOST_DIR）"
+if ! ssh_cmd "test -x $FFMPEG_HOST_DIR/ffmpeg && test -x $FFMPEG_HOST_DIR/ffprobe"; then
+  fail "服务器缺少静态 ffmpeg/ffprobe（$FFMPEG_HOST_DIR）。先运行：infra/scripts/fetch-static-ffmpeg.sh"
+fi
+
 # ── 本机构镜像（SHA tag，不可变）─────────────────────────────────
 echo "==> 构建 runtime / web 镜像（平台 ${DEPLOY_PLATFORM}）"
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target runtime \
@@ -107,7 +127,7 @@ rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docke
 rsync -az infra/loki/ infra/alloy/ infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/"
 # 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
 rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
-rsync -az infra/scripts/backup-postgres.sh infra/scripts/setup-host-edge.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
+rsync -az infra/scripts/backup-postgres.sh infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
 rsync -az "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 
 # 服务器侧收紧 env 文件权限（含真实凭据）。

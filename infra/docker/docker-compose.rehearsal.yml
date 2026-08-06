@@ -70,7 +70,8 @@ services:
       ARTIFACT_LOCAL_PUBLIC_BASE_URL: /api/artifacts/local
       GENERATION_DAILY_QUOTA_MODE: attempts
       MEDIA_MAX_DURATION_SECONDS: "1800"
-      FFPROBE_PATH: ffprobe
+      # 静态 ffmpeg/ffprobe：本地 infra/ffmpeg/（用 fetch-static-ffmpeg.sh 准备，gitignored）。
+      FFPROBE_PATH: /usr/local/bin/ffprobe
       GENERATION_DAILY_TASK_LIMIT: "0"
       GENERATION_DAILY_COST_LIMIT_CENTS: "0"
     command: ["bun", "apps/api/src/index.ts"]
@@ -78,6 +79,8 @@ services:
       - "5013:5003"
     volumes:
       - rehearsal_artifacts:/app/var/artifacts
+      - ../ffmpeg/ffmpeg:/usr/local/bin/ffmpeg:ro
+      - ../ffmpeg/ffprobe:/usr/local/bin/ffprobe:ro
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -104,11 +107,15 @@ services:
       DASHSCOPE_API_KEY: rehearsal-placeholder-not-a-secret
       BAILIAN_CONTRACT_LOCALE: zh-CN
       WORKER_ID: rehearsal-worker-1
-      FFMPEG_PATH: ffmpeg
+      # 静态 ffmpeg/ffprobe：本地 infra/ffmpeg/（用 fetch-static-ffmpeg.sh 准备，gitignored）。
+      FFMPEG_PATH: /usr/local/bin/ffmpeg
+      FFPROBE_PATH: /usr/local/bin/ffprobe
       ARTIFACT_LOCAL_ROOT: /app/var/artifacts
     command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
     volumes:
       - rehearsal_artifacts:/app/var/artifacts
+      - ../ffmpeg/ffmpeg:/usr/local/bin/ffmpeg:ro
+      - ../ffmpeg/ffprobe:/usr/local/bin/ffprobe:ro
     depends_on:
       migrate:
         condition: service_completed_successfully

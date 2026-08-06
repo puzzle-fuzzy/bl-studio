@@ -43,7 +43,23 @@ ssh yxswy-server 'docker --version && getent hosts create.yxswy.com'
 
 # 4) 工作区干净
 git status --porcelain   # 必须无输出
+
+# 5) 宿主机静态 ffmpeg/ffprobe 已就绪（runtime 镜像不再打包它们）
+#    在服务器上执行（见 infra/scripts/fetch-static-ffmpeg.sh）：
+#    ssh yxswy-server 'bash /opt/bailian-studio/scripts/fetch-static-ffmpeg.sh'
+#    → 产物 /opt/bailian-studio/ffmpeg/{ffmpeg,ffprobe}（自包含静态二进制）
+#    deploy:prod 会预检这两文件存在，缺失则拒绝部署。
 ```
+
+> **部署路径怎么选（省带宽的关键）**：
+>
+> | 改动范围 | 命令 | 传输 |
+> |---|---|---|
+> | **只改前端**（apps/web、apps/admin） | `pnpm run deploy:prod:web` | ~20MB，不动 api/worker/runtime |
+> | **改了后端 / 前后端同改 / 改了 DB schema** | `pnpm run verify && pnpm run deploy:prod` | 全量（runtime 镜像，瘦身后 ~240MB） |
+>
+> `deploy:prod` 现在会在「上一次提交只改前端」时打印 web-only 提示（非阻断）。日常前端热修
+> 一律走 web-only，只有后端变更才全量重传 runtime 镜像。
 
 ### 2.2 一键发布
 
@@ -108,8 +124,15 @@ $COMPOSE logs api --tail 50       # 看日志
 
 改代码 → `pnpm run verify` → `pnpm run deploy:prod`。每次按**新 commit SHA** 重建镜像（层缓存让构建很快），迁移幂等，边缘脚本幂等。
 
-> **成本提示**：`deploy:prod` 会把 runtime 镜像（~1.97GB，含 node_modules + ffmpeg）一起重传，
+> **成本提示**：`deploy:prod` 会把 runtime 镜像（生产依赖 `pnpm install --prod` 后
+> ~380MB；2026-08 起 ffmpeg/ffprobe 改为宿主机静态挂载，进一步瘦到 ~240MB）一起重传，
 > 即使只改了前端。前端热修用下面的 web-only 路径省带宽、且不动 api/worker。
+>
+> **ffmpeg 挂载架构（2026-08 起）**：runtime 镜像不再打包 ffmpeg/ffprobe，api（上传媒体时长
+> 探测）与 worker（音频提取/缩略图）通过 compose 的 `x-ffmpeg-mounts`（`FFMPEG_HOST_DIR`
+> 可覆盖，默认 `/opt/bailian-studio/ffmpeg`）bind-mount 宿主机**静态** ffmpeg/ffprobe。
+> 静态版自包含、无共享库依赖，才能跨发行版（宿主机 OpenCloudOS/rpm → 容器 Debian）挂载。
+> 宿主机二进制缺失时 `deploy:prod` 预检直接拒绝（不会部署出媒体功能挂掉的 worker）。
 
 ### 4.1 web-only 快速发版（只改前端时用，传输 ~20MB、不动 api/worker）
 

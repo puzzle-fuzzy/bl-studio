@@ -105,9 +105,13 @@ COPY infra/scripts ./infra/scripts
 # infra/seed 供生产一次性播种（seed-model-costs.ts 的 model-costs.json 源数据）。
 COPY infra/seed ./infra/seed
 
-# Worker 媒体提取与 API 侧上传探测都需要 ffprobe。
+# ffmpeg/ffprobe 不再打进镜像（每次部署可省 ~150MB 传输）：api/worker 通过 compose
+# bind-mount 宿主机 /opt/bailian-studio/ffmpeg 下的静态二进制（见 infra/scripts/fetch-static-ffmpeg.sh）。
+# 静态版自包含、无共享库依赖，才能跨发行版（宿主机 rpm 系 → 容器 Debian）挂载。
+# 未配 mount 的环境（纯 migrate/web）不需要 ffmpeg；媒体/探测功能在 api/worker 容器里失效前，
+# 由 deploy 脚本预检保证宿主机二进制已就绪。
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+  && apt-get install -y --no-install-recommends ca-certificates \
   && rm -rf /var/lib/apt/lists/*
 
 ENV NODE_ENV=production
