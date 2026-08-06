@@ -11,6 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { ParameterForm } from '@/components/create/ParameterForm'
 import { PromptInput } from '@/components/create/PromptInput'
 import { CreationPresetPanel } from '@/components/create/CreationPresetPanel'
+import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { EstimateSummary } from '@/components/create/EstimateSummary'
 import { GenerationsPanel } from '@/components/generations/GenerationsPanel'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
@@ -298,9 +299,10 @@ export function CreatePage() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-2">
-      {/* 左栏：模型下拉 + 表单（无卡片边框）。xl 下两栏各自独立滚动，表单很长时不连带滚走最近任务。
-          relative 让内部 Select 的原生 <select> 以本列为定位上下文，随列裁剪，避免漏出撑高文档。 */}
-      <div className="space-y-6 xl:relative xl:max-h-[calc(100svh-3rem)] xl:overflow-y-auto xl:px-1 xl:pb-8">
+      {/* 左栏：模型下拉 + 表单（无卡片边框）。xl 下两栏各自独立滚动（OverlayScrollbars
+          虚拟滚动条），表单很长时不连带滚走最近任务。 */}
+      <VirtualScrollArea className="xl:max-h-[calc(100svh-3rem)]">
+        <div className="space-y-6 xl:pl-1 xl:pr-4 xl:pb-8">
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">选择模型</h2>
           <ModelSelector models={models} selectedId={modelId} onSelect={handleModelSelect} />
@@ -462,12 +464,15 @@ export function CreatePage() {
             </div>
           </section>
         )}
-      </div>
+        </div>
+      </VirtualScrollArea>
 
       {/* 右栏：最近任务（与左栏以竖分割线隔开）。xl 下固定高度、独立滚动。 */}
-      <div className="xl:relative xl:max-h-[calc(100svh-3rem)] xl:overflow-y-auto xl:border-l xl:border-border xl:pl-8 xl:pb-8">
-        <GenerationsPanel variant="embedded" />
-      </div>
+      <VirtualScrollArea className="xl:max-h-[calc(100svh-3rem)] xl:border-l xl:border-border">
+        <div className="xl:pl-8 xl:pr-4 xl:pb-8">
+          <GenerationsPanel variant="embedded" />
+        </div>
+      </VirtualScrollArea>
     </form>
   )
 }

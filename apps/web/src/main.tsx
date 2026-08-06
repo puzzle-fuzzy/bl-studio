@@ -5,6 +5,8 @@ import { ThemeProvider } from 'next-themes'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { router } from './routes'
 import './styles.css'
+import 'overlayscrollbars/overlayscrollbars.css'
+import './os-theme.css'
 
 const rootElement = document.getElementById('root')
 if (rootElement === null) {

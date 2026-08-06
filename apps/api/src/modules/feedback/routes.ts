@@ -56,6 +56,16 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
         throw error
       }
     })
+    .get('/api/feedback', async ({ request, query }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(ListFeedbackQuerySchema, query)
+      const page = await deps.generationRepository.listMyFeedback({
+        userId: user.id,
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
+        ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
+      })
+      return { success: true, data: page }
+    })
     .get('/api/admin/feedback', async ({ request, query }) => {
       await requireAdminUser(request, deps.authService)
       const input = validateInput(ListFeedbackQuerySchema, query)

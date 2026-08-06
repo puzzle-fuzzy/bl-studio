@@ -1,0 +1,24 @@
+/* OverlayScrollbars 自定义主题（须在 overlayscrollbars.css 之后引入，才能覆盖
+   .os-scrollbar 基类默认变量）：透明轨道 + 细长半透明 handle，跟随明暗主题。 */
+.os-theme-custom {
+  box-sizing: border-box;
+  --os-size: 10px;
+  --os-padding-perpendicular: 2px;
+  --os-padding-axis: 2px;
+  --os-track-border-radius: 9999px;
+  --os-handle-interactive-area-offset: 4px;
+  --os-handle-border-radius: 9999px;
+  --os-handle-min-size: 28px;
+  --os-track-bg: transparent;
+  --os-track-bg-hover: transparent;
+  --os-track-bg-active: transparent;
+  --os-track-border: transparent;
+  --os-track-border-hover: transparent;
+  --os-track-border-active: transparent;
+  --os-handle-bg: color-mix(in oklab, var(--muted-foreground) 40%, transparent);
+  --os-handle-bg-hover: color-mix(in oklab, var(--muted-foreground) 65%, transparent);
+  --os-handle-bg-active: color-mix(in oklab, var(--muted-foreground) 85%, transparent);
+  --os-handle-border: transparent;
+  --os-handle-border-hover: transparent;
+  --os-handle-border-active: transparent;
+}

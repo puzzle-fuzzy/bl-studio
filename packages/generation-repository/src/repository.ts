@@ -822,6 +822,7 @@ export interface GenerationRepository {
   getRetentionAnalytics(input: { since: string }): Promise<RetentionAnalytics>
   submitFeedback(input: { userId: string; kind: FeedbackKind; content: string }): Promise<UserFeedback>
   listFeedback(input: { cursor?: string; limit?: number; status?: FeedbackStatus }): Promise<ListFeedbackResult>
+  listMyFeedback(input: { userId: string; cursor?: string; limit?: number }): Promise<ListFeedbackResult>
   updateFeedbackStatus(input: { itemId: string; status: FeedbackStatus; resolvedBy: string }): Promise<UserFeedback>
 }
 

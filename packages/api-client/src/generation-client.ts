@@ -495,6 +495,8 @@ export interface BailianStudioApiClient {
   // ---------------------------------------------------------------------------
   /** `POST /api/feedback` —— 提交意见反馈。 */
   submitFeedback(input: SubmitFeedbackInput): Promise<UserFeedback>
+  /** `GET /api/feedback` —— 我的反馈历史（keyset 分页）。 */
+  listMyFeedback(params?: { limit?: number; cursor?: string }): Promise<ListFeedbackResult>
   /** `GET /api/admin/feedback` —— admin 列表反馈（状态过滤）。 */
   adminListFeedback(params?: { limit?: number; cursor?: string; status?: 'open' | 'reviewing' | 'resolved' | 'closed' }): Promise<ListFeedbackResult>
   /** `PATCH /api/admin/feedback/:id` —— admin 更新反馈状态。 */
@@ -1348,6 +1350,19 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         FeedbackItemResponseSchema,
       )
       return data.item
+    },
+
+    async listMyFeedback(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/feedback${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListFeedbackResponseSchema,
+      )
     },
 
     async adminListFeedback(params = {}) {

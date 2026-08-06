@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { UserAvatar } from '@/components/ui/user-avatar'
+import { ChangePasswordDialog } from '@/components/auth/ChangePasswordDialog'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { userErrorMessage } from '@/lib/user-error'
@@ -22,7 +23,6 @@ export function ProfilePage() {
   const updateProfile = useAuthStore(state => state.updateProfile)
   const uploadAvatar = useAuthStore(state => state.uploadAvatar)
   const removeAvatar = useAuthStore(state => state.removeAvatar)
-  const changePassword = useAuthStore(state => state.changePassword)
   const showMessage = useNotificationsStore(state => state.showMessage)
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
@@ -31,11 +31,7 @@ export function ProfilePage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
-  const [currentPassword, setCurrentPassword] = useState('')
-  const [newPassword, setNewPassword] = useState('')
-  const [confirmPassword, setConfirmPassword] = useState('')
-  const [changingPassword, setChangingPassword] = useState(false)
-  const [passwordError, setPasswordError] = useState<string | null>(null)
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
 
   // 头像/昵称更新后 store 的 user 会刷新，这里同步输入框初值。
   useEffect(() => {
@@ -81,27 +77,6 @@ export function ProfilePage() {
       showMessage({ title: userErrorMessage(err), tone: 'warning' })
     } finally {
       setUploadingAvatar(false)
-    }
-  }
-
-  const handleChangePassword = async (event: React.FormEvent) => {
-    event.preventDefault()
-    if (newPassword !== confirmPassword) {
-      setPasswordError('两次输入的新密码不一致')
-      return
-    }
-    setPasswordError(null)
-    setChangingPassword(true)
-    try {
-      await changePassword(currentPassword, newPassword)
-      showMessage({ title: '密码已修改', tone: 'success', description: '其他设备将需要重新登录' })
-      setCurrentPassword('')
-      setNewPassword('')
-      setConfirmPassword('')
-    } catch (err) {
-      setPasswordError(userErrorMessage(err))
-    } finally {
-      setChangingPassword(false)
     }
   }
 
@@ -171,56 +146,18 @@ export function ProfilePage() {
       </Card>
 
       <Card>
-        <CardHeader>
-          <CardTitle>修改密码</CardTitle>
-          <CardDescription>{PASSWORD_RULES}</CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleChangePassword} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label htmlFor="profile-current">当前密码</Label>
-              <Input
-                id="profile-current"
-                type="password"
-                autoComplete="current-password"
-                value={currentPassword}
-                onChange={event => setCurrentPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="profile-new">新密码</Label>
-              <Input
-                id="profile-new"
-                type="password"
-                autoComplete="new-password"
-                minLength={8}
-                maxLength={256}
-                value={newPassword}
-                onChange={event => setNewPassword(event.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="profile-confirm">确认新密码</Label>
-              <Input
-                id="profile-confirm"
-                type="password"
-                autoComplete="new-password"
-                value={confirmPassword}
-                onChange={event => setConfirmPassword(event.target.value)}
-                required
-              />
-            </div>
-            {passwordError !== null && <p className="text-sm text-destructive">{passwordError}</p>}
-            <div className="flex justify-end">
-              <Button type="submit" disabled={changingPassword}>
-                {changingPassword ? <Loader2 className="size-4 animate-spin" /> : '保存'}
-              </Button>
-            </div>
-          </form>
+        <CardContent className="flex items-center justify-between gap-4 py-6">
+          <div className="space-y-0.5">
+            <p className="text-sm font-medium">密码</p>
+            <p className="text-sm text-muted-foreground">{PASSWORD_RULES}</p>
+          </div>
+          <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
+            修改密码
+          </Button>
         </CardContent>
       </Card>
+
+      <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen} />
     </div>
   )
 }

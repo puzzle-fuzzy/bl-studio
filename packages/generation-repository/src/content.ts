@@ -154,6 +154,7 @@ export interface ContentRepository {
   // -------------------------------------------------------------------------
   submitFeedback(input: { userId: string; kind: FeedbackKind; content: string }): Promise<UserFeedback>
   listFeedback(input: { cursor?: string; limit?: number; status?: FeedbackStatus }): Promise<ListFeedbackResult>
+  listMyFeedback(input: { userId: string; cursor?: string; limit?: number }): Promise<ListFeedbackResult>
   updateFeedbackStatus(input: { itemId: string; status: FeedbackStatus; resolvedBy: string }): Promise<UserFeedback>
 }
 
@@ -864,6 +865,7 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     getRetentionAnalytics,
     submitFeedback: input => submitFeedback(db, input),
     listFeedback: input => listFeedback(db, input),
+    listMyFeedback: input => listMyFeedback(db, input),
     updateFeedbackStatus: input => updateFeedbackStatus(db, input),
   }
 }
@@ -895,6 +897,31 @@ async function listFeedback(db: BailianStudioDb, input: { cursor?: string; limit
   const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
   const conditions: SQL[] = [isNull(userFeedback.deletedAt)]
   if (input.status !== undefined) conditions.push(eq(userFeedback.status, input.status))
+  if (cursor !== undefined) {
+    conditions.push(sql`(${userFeedback.createdAt} < ${cursor.createdAt} OR (${userFeedback.createdAt} = ${cursor.createdAt} AND ${userFeedback.id} < ${cursor.id}))`)
+  }
+  const rows = await db
+    .select()
+    .from(userFeedback)
+    .where(and(...conditions))
+    .orderBy(desc(userFeedback.createdAt), desc(userFeedback.id))
+    .limit(limit + 1)
+  const hasMore = rows.length > limit
+  const page = hasMore ? rows.slice(0, limit) : rows
+  const last = page[page.length - 1]
+  return {
+    items: page.map(toFeedback),
+    ...(hasMore && last !== undefined
+      ? { nextCursor: encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
+      : {}),
+  }
+}
+
+/** 用户自己的反馈历史：按 userId 过滤 + keyset（createdAt desc, id desc）。 */
+async function listMyFeedback(db: BailianStudioDb, input: { userId: string; cursor?: string; limit?: number }): Promise<ListFeedbackResult> {
+  const limit = clampLimit(input.limit)
+  const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+  const conditions: SQL[] = [isNull(userFeedback.deletedAt), eq(userFeedback.userId, input.userId)]
   if (cursor !== undefined) {
     conditions.push(sql`(${userFeedback.createdAt} < ${cursor.createdAt} OR (${userFeedback.createdAt} = ${cursor.createdAt} AND ${userFeedback.id} < ${cursor.id}))`)
   }
