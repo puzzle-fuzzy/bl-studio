@@ -99,9 +99,9 @@ fi
 # docker-compose.prod.yml 的 x-ffmpeg-mounts 保持一致。
 FFMPEG_HOST_DIR="$(env_value FFMPEG_HOST_DIR "$ENV_INFRA")"
 FFMPEG_HOST_DIR="${FFMPEG_HOST_DIR:-/opt/bailian-studio/ffmpeg}"
-echo "==> 预检：宿主机静态 ffmpeg/ffprobe（$FFMPEG_HOST_DIR）"
-if ! ssh_cmd "test -x $FFMPEG_HOST_DIR/ffmpeg && test -x $FFMPEG_HOST_DIR/ffprobe"; then
-  fail "服务器缺少静态 ffmpeg/ffprobe（$FFMPEG_HOST_DIR）。先运行：infra/scripts/fetch-static-ffmpeg.sh"
+echo "==> 预检：宿主机静态 ffmpeg/ffprobe（${FFMPEG_HOST_DIR}）"
+if ! ssh_cmd "test -x ${FFMPEG_HOST_DIR}/ffmpeg && test -x ${FFMPEG_HOST_DIR}/ffprobe"; then
+  fail "服务器缺少静态 ffmpeg/ffprobe（${FFMPEG_HOST_DIR}）。先运行：infra/scripts/fetch-static-ffmpeg.sh"
 fi
 
 # ── 本机构镜像（SHA tag，不可变）─────────────────────────────────
