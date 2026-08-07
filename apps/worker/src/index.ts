@@ -5,6 +5,7 @@
  * 并一直运行直到收到停止信号。
  */
 
+import { createCreditLedgerFromUrl } from '@bailian-studio/credit-ledger'
 import { getModelById } from '@bailian-studio/model-core'
 import { createGenerationRepositoryFromUrl } from '@bailian-studio/generation-repository'
 import { createMediaRepositoryFromUrl } from '@bailian-studio/media-repository'
@@ -66,6 +67,7 @@ async function main(): Promise<void> {
 
   const generationHandle = createGenerationRepositoryFromUrl(env.databaseUrl)
   const mediaHandle = createMediaRepositoryFromUrl(env.databaseUrl)
+  const creditHandle = createCreditLedgerFromUrl(env.databaseUrl)
 
   const providerRegistry = createProviderRegistry({
     dashscope: {
@@ -111,6 +113,8 @@ async function main(): Promise<void> {
       : { staleGenerationSweepIntervalMs: env.workerStaleGenerationSweepIntervalMs }),
     pollIntervalMs: env.workerPollIntervalMs ?? 100,
     idleSleepMs: env.workerIdleSleepMs ?? 1000,
+    // P1-27：接入 credit-ledger，worker 周期兜底释放「终态 generation 的僵尸 reserve」。
+    creditLedger: creditHandle.ledger,
   }
 
   const loop = new WorkerLoop(config)
@@ -128,7 +132,7 @@ async function main(): Promise<void> {
     await loop.run()
     console.log(`[${env.workerId}] stopped`)
   } finally {
-    await Promise.all([generationHandle.close(), mediaHandle.close()])
+    await Promise.all([generationHandle.close(), mediaHandle.close(), creditHandle.close()])
   }
 }
 

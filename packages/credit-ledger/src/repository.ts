@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto'
-import { and, desc, eq, lt, or } from 'drizzle-orm'
+import { and, desc, eq, inArray, lt, notExists, or, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import {
   creditAccounts,
   creditLedgerEntries,
@@ -410,23 +411,51 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
     async reconcile() {
       return options.db.transaction(async tx => {
         const accounts = await tx.select().from(creditAccounts)
-        const entries = await tx
+        // P1-06：set-based —— 每账户只取最新一条快照（ROW_NUMBER 窗口函数），负余额
+        // 由 DB 过滤（WHERE），不再把整本账本载入内存。内存占用从 O(全部条目) 降到
+        // O(账户数 + 异常条数)，全表扫描仍由 Postgres 完成。
+        // 注：drizzle 0.45 已移除 query builder 的 distinctOn，这里走原生 SQL。
+        const latestRows = await tx.execute<{
+          account_id: string
+          id: string
+          available_balance_cents: number
+          reserved_balance_cents: number
+        }>(sql`
+          SELECT account_id, id, available_balance_cents, reserved_balance_cents
+          FROM (
+            SELECT credit_ledger_entries.*,
+                   ROW_NUMBER() OVER (
+                     PARTITION BY account_id
+                     ORDER BY created_at DESC, id DESC
+                   ) AS rn
+            FROM credit_ledger_entries
+          ) ranked
+          WHERE rn = 1
+        `)
+        const negativeRows = await tx
           .select()
           .from(creditLedgerEntries)
-          .orderBy(desc(creditLedgerEntries.createdAt), desc(creditLedgerEntries.id))
+          .where(or(lt(creditLedgerEntries.availableBalanceCents, 0), lt(creditLedgerEntries.reservedBalanceCents, 0)))
         const latestByAccount = new Map<string, CreditLedgerEntryRow>()
+        for (const row of latestRows) {
+          // execute() 走原生 SQL，列名是 snake_case；这里只取对账用到的字段，
+          // 转回 CreditLedgerEntryRow 的 camelCase 形状（其余字段对账用不到）。
+          latestByAccount.set(row.account_id, {
+            id: row.id,
+            accountId: row.account_id,
+            availableBalanceCents: row.available_balance_cents,
+            reservedBalanceCents: row.reserved_balance_cents,
+          } as CreditLedgerEntryRow)
+        }
         const violations: CreditReconciliationReport['violations'] = []
 
-        for (const entry of entries) {
-          if (!latestByAccount.has(entry.accountId)) latestByAccount.set(entry.accountId, entry)
-          if (entry.availableBalanceCents < 0 || entry.reservedBalanceCents < 0) {
-            violations.push({
-              code: 'NEGATIVE_BALANCE',
-              userId: entry.userId,
-              accountId: entry.accountId,
-              message: `Ledger entry ${entry.id} contains a negative balance snapshot`,
-            })
-          }
+        for (const entry of negativeRows) {
+          violations.push({
+            code: 'NEGATIVE_BALANCE',
+            userId: entry.userId,
+            accountId: entry.accountId,
+            message: `Ledger entry ${entry.id} contains a negative balance snapshot`,
+          })
         }
 
         for (const account of accounts) {
@@ -462,7 +491,7 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
 
         return {
           checkedAccounts: accounts.length,
-          checkedEntries: entries.length,
+          checkedEntries: latestRows.length + negativeRows.length,
           violations,
           healthy: violations.length === 0,
         }
@@ -474,23 +503,30 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
         throw new CreditLedgerError('POINTS_ADJUSTMENT_INVALID', 'olderThan must be a valid date')
       }
       const now = nowOrDefault(input.now)
+      const settledAlias = alias(creditLedgerEntries, 'settled')
       return options.db.transaction(async tx => {
+        // P1-06：候选判定整体下推到 SQL —— kind=reserve + 超时 + generation 已终态 +
+        // NOT EXISTS（该 generation 尚无 settle/refund）。此前在 JS 里全表载入账本后
+        // 内存建集合，账本增长后每次清扫 O(全部条目) 内存。
         const rows = await tx
           .select({ entry: creditLedgerEntries, generationStatus: generationRecords.status })
           .from(creditLedgerEntries)
           .innerJoin(generationRecords, eq(generationRecords.id, creditLedgerEntries.generationId))
-          .where(and(eq(creditLedgerEntries.kind, 'reserve'), lt(creditLedgerEntries.createdAt, input.olderThan)))
-        const allEntries = await tx.select().from(creditLedgerEntries)
-        const releasedGenerationIds = new Set(
-          allEntries
-            .filter(entry => (entry.kind === 'settle' || entry.kind === 'refund') && entry.generationId !== null)
-            .map(entry => entry.generationId as string),
-        )
-        const terminalStatuses = new Set(['succeeded', 'failed', 'cancelled'])
-        const candidates = rows
-          .filter(row => terminalStatuses.has(row.generationStatus))
-          .map(row => row.entry)
-          .filter(entry => entry.generationId !== null && !releasedGenerationIds.has(entry.generationId))
+          .where(and(
+            eq(creditLedgerEntries.kind, 'reserve'),
+            lt(creditLedgerEntries.createdAt, input.olderThan),
+            inArray(generationRecords.status, ['succeeded', 'failed', 'cancelled']),
+            notExists(
+              tx
+                .select({ one: sql`1` })
+                .from(settledAlias)
+                .where(and(
+                  eq(settledAlias.generationId, creditLedgerEntries.generationId),
+                  inArray(settledAlias.kind, ['settle', 'refund']),
+                )),
+            ),
+          ))
+        const candidates = rows.map(row => row.entry)
 
         if (!input.confirm) {
           return { candidates: candidates.length, released: 0, skipped: true, releasedEntryIds: [] }

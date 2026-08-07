@@ -4,6 +4,7 @@
  * 负责自身的 poll/idle 计时与优雅停止标志。
  */
 
+import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
@@ -46,6 +47,8 @@ export interface WorkerLoopConfig {
   workerHeartbeatIntervalMs?: number
   /** 卡住 generation 记录（任务已终态失败但记录停在 submitting/processing）的清扫间隔。默认 60s。 */
   staleGenerationSweepIntervalMs?: number
+  /** 可选的 credit-ledger 句柄：周期兜底释放「generation 已终态但 reserve 从未结算/退款」的陈旧预留（P1-27）。 */
+  creditLedger?: Pick<CreditLedger, 'releaseStaleReservations'>
   /** 可选的结构化日志器；默认 createLogger(`worker:<workerId>`)。 */
   logger?: Logger
   /** 可选的进程内指标收集器，用于任务/provider 计数器与计时。 */
@@ -63,6 +66,7 @@ export class WorkerLoop {
   private readonly errorBackoffMs: number
   private readonly workerHeartbeatIntervalMs: number
   private readonly staleGenerationSweepIntervalMs: number
+  private readonly creditLedger?: Pick<CreditLedger, 'releaseStaleReservations'>
   private readonly metrics: MetricsCollector
 
   constructor(private readonly config: WorkerLoopConfig) {
@@ -103,6 +107,7 @@ export class WorkerLoop {
     this.errorBackoffMs = config.errorBackoffMs ?? 5_000
     this.workerHeartbeatIntervalMs = config.workerHeartbeatIntervalMs ?? 5_000
     this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
+    this.creditLedger = config.creditLedger
   }
 
   /** 一直运行直到调用 stop()。优雅停止时 resolve。 */
@@ -110,6 +115,7 @@ export class WorkerLoop {
     this.running = true
     const stopHeartbeat = this.startWorkerHeartbeat()
     const stopSweeper = this.startStaleGenerationSweeper()
+    const stopReserveSweeper = this.startStaleReserveSweeper()
     try {
       while (this.running) {
         try {
@@ -122,6 +128,7 @@ export class WorkerLoop {
     } finally {
       await stopHeartbeat()
       stopSweeper()
+      stopReserveSweeper()
     }
   }
 
@@ -230,6 +237,40 @@ export class WorkerLoop {
       } catch (error) {
         this.logger.error('stale_generations.fail_failed', { recordId: record.id, error: errorMessage(error) })
       }
+    }
+  }
+
+  /**
+   * 周期兜底释放陈旧 reserve（P1-27）。正常路径下 reserve 会随 generation 结算
+   * （settle/refund）自然释放；只有 worker 崩溃、结算中途失败等异常会让「终态
+   * generation 的 reserve」变成僵尸预留。此处以与 stale-generation 相同的节奏清扫，
+   * 阈值 1 小时给正常生成（视频动辄十几分钟）留足余量。
+   */
+  private startStaleReserveSweeper(): () => void {
+    if (this.creditLedger === undefined) {
+      return () => {}
+    }
+    const timer = setInterval(() => {
+      void this.sweepStaleReservations()
+    }, this.staleGenerationSweepIntervalMs)
+    return () => clearInterval(timer)
+  }
+
+  private async sweepStaleReservations(): Promise<void> {
+    const ledger = this.creditLedger
+    if (ledger === undefined) return
+    try {
+      const olderThan = new Date(Date.now() - 60 * 60 * 1000)
+      const result = await ledger.releaseStaleReservations({ olderThan, confirm: true })
+      if (result.released > 0) {
+        this.logger.warn('stale_reservations.released', {
+          released: result.released,
+          candidates: result.candidates,
+          skipped: result.skipped,
+        })
+      }
+    } catch (error) {
+      this.logger.error('stale_reservations.sweep_failed', { error: errorMessage(error) })
     }
   }
 

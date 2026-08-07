@@ -378,6 +378,9 @@ importers:
 
   apps/worker:
     dependencies:
+      '@bailian-studio/credit-ledger':
+        specifier: workspace:*
+        version: link:../../packages/credit-ledger
       '@bailian-studio/event-bus':
         specifier: workspace:*
         version: link:../../packages/event-bus
