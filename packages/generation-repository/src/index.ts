@@ -66,8 +66,9 @@ export {
   type IsolatedGenerationRepository,
 } from './test-utils'
 export type {
-  ArtifactKind,
   AdminGalleryItem,
+  AdminTaskItem,
+  ArtifactKind,
   ArtifactStatus,
   ArtifactStorageProvider,
   CancelGenerationInput,
@@ -79,6 +80,7 @@ export type {
   GallerySort,
   GalleryVisibility,
   ListAdminGalleryResult,
+  ListAdminTasksResult,
   ListFeedbackResult,
   ListGalleryResult,
   ListNotificationsResult,

@@ -1,6 +1,7 @@
 import { Component, type ReactNode } from 'react'
 import { AlertTriangle, RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { isChunkLoadError } from '@/lib/chunk-recovery'
 
 interface Props {
   children: ReactNode
@@ -21,6 +22,12 @@ export class ErrorBoundary extends Component<Props, State> {
   }
 
   private handleReset = () => {
+    // 懒加载 chunk 失败：软重置只会重试同一个缺失 chunk，必须真正刷新取新 shell
+    // （index.html no-cache，刷新即 revalidate 到最新构建）。
+    if (isChunkLoadError(this.state.message)) {
+      window.location.reload()
+      return
+    }
     this.setState({ hasError: false, message: '' })
   }
 

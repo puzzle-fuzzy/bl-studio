@@ -182,6 +182,7 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 | Loki 里没有日志 | `logs alloy`（docker.sock 权限、positions 卷）；`logs loki`（receiving 错误）；Grafana datasource `url: http://loki:3100` |
 | 限流/审计按 IP 错乱 | 检查 宿主机 nginx → web nginx → api 的 XFF 链：每层用 `$proxy_add_x_forwarded_for` 追加、`API_TRUST_PROXY=true`（API 取首项=真实 IP） |
 | worker 不消费队列 | `logs worker`、`/api/health/ready` 的 worker 字段、数据库连接 |
+| 用户报 `Failed to fetch dynamically imported module: …/assets/*-<hash>.js` 且刷新没用 | 部署后旧 chunk 被删、客户端仍引用旧 shell（见 04 §7.G）。**先确认线上头**：`curl -sI https://create.yxswy.com/` 的 index.html 应为 `no-cache`。客户端自愈已内置（`vite:preloadError`/动态 import 失败 → 守卫式 reload 一次）；受影响用户硬刷新（Cmd/Ctrl+Shift+R）或清缓存即可 |
 | 迁移失败 | `logs migrate`；`run --rm migrate` 手动重跑（幂等） |
 | 卷权限（loki/grafana） | 首次挂载若报权限，用一次性 `user: root` init 修正属主后重启 |
 

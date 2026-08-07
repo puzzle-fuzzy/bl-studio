@@ -1,6 +1,6 @@
 import { Elysia } from 'elysia'
 import { AuthError } from '@bailian-studio/auth'
-import type { AdminGalleryItem } from '@bailian-studio/generation-repository'
+import type { AdminGalleryItem, GenerationArtifact } from '@bailian-studio/generation-repository'
 import { createLogger, validateInput } from '@bailian-studio/shared'
 import { listModels } from '@bailian-studio/model-core'
 import { resolveLocalStoragePath } from '@bailian-studio/storage'
@@ -17,10 +17,12 @@ import { assetWithReadUrl } from '../assets/routes'
 import {
   AdminGalleryArtifactParamsSchema,
   AnalyticsQuerySchema,
+  BatchGallerySchema,
   BatchGrantPointsSchema,
   BatchUsersSchema,
   CreateUserSchema,
   ListAdminGalleryQuerySchema,
+  ListAdminTasksQuerySchema,
   ListUsersQuerySchema,
   TargetGalleryRecordSchema,
   TargetUserSchema,
@@ -52,6 +54,33 @@ export function createAdminRoutes(deps: ApiDependencies) {
     return {
       id: item.cover.id,
       kind: item.cover.kind,
+      ...(resolved.readUrl !== undefined ? { readUrl: resolved.readUrl } : {}),
+      ...(resolved.thumbnailUrl !== undefined ? { thumbnailUrl: resolved.thumbnailUrl } : {}),
+    }
+  }
+
+  type AdminGalleryArtifactResponse = { id: string; kind: string; readUrl?: string; thumbnailUrl?: string; text?: string }
+
+  /** admin 画廊产物预览项：text 内联正文，其余走 read-url 解析（本地指向 admin 专属产物路由）。 */
+  async function adminGalleryArtifactItem(
+    recordId: string,
+    artifact: GenerationArtifact,
+  ): Promise<AdminGalleryArtifactResponse> {
+    if (artifact.kind === 'text' && artifact.text !== undefined) {
+      return { id: artifact.id, kind: artifact.kind, text: artifact.text }
+    }
+    if (artifact.storageKey === undefined) {
+      return { id: artifact.id, kind: artifact.kind }
+    }
+    const resolved = await resolveArtifactReadUrlUseCase({ storage: deps.storage }).execute({
+      artifact,
+      localReadUrl: deps.storage.provider === 'local'
+        ? `/api/admin/gallery/generations/${encodeURIComponent(recordId)}/artifacts/${encodeURIComponent(artifact.id)}`
+        : undefined,
+    })
+    return {
+      id: artifact.id,
+      kind: artifact.kind,
       ...(resolved.readUrl !== undefined ? { readUrl: resolved.readUrl } : {}),
       ...(resolved.thumbnailUrl !== undefined ? { thumbnailUrl: resolved.thumbnailUrl } : {}),
     }
@@ -408,6 +437,30 @@ export function createAdminRoutes(deps: ApiDependencies) {
       }
     })
     // -----------------------------------------------------------------------
+    // 任务中心：全量 task_records（含进行中 + 已完成），keyset 分页 + 过滤。
+    // 只读排障视角，不写审计（列表类查询与画廊列表一致）。
+    // -----------------------------------------------------------------------
+    .get('/api/admin/tasks', async ({ request, query }) => {
+      await requireAdminUser(request, deps.authService)
+      const input = validateInput(ListAdminTasksQuerySchema, query)
+      const page = await deps.generationRepository.listAdminTasks({
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
+        ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
+        ...(input.status !== undefined ? { status: input.status } : {}),
+        ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.domain !== undefined ? { domain: input.domain } : {}),
+        ...(input.userId !== undefined ? { userId: input.userId } : {}),
+        ...(input.recordId !== undefined ? { recordId: input.recordId } : {}),
+      })
+      return {
+        success: true,
+        data: {
+          items: page.items,
+          ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        },
+      }
+    })
+    // -----------------------------------------------------------------------
     // 社区画廊治理：含隐藏作品的列表 + 下架/恢复 + 产物预览（admin 专属，绕过 hiddenAt）。
     // -----------------------------------------------------------------------
     .get('/api/admin/gallery', async ({ request, query }) => {
@@ -439,6 +492,13 @@ export function createAdminRoutes(deps: ApiDependencies) {
           ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
         },
       }
+    })
+    .get('/api/admin/gallery/:id/artifacts', async ({ request, params }) => {
+      await requireAdminUser(request, deps.authService)
+      const { id } = validateInput(TargetGalleryRecordSchema, params)
+      const artifacts = await deps.generationRepository.listAdminGalleryRecordArtifacts({ recordId: id })
+      const items = await Promise.all(artifacts.map(artifact => adminGalleryArtifactItem(id, artifact)))
+      return { success: true, data: { items } }
     })
     .post('/api/admin/gallery/:id/hide', async ({ request, params }) => {
       const actor = await requireAdminUser(request, deps.authService)
@@ -486,6 +546,87 @@ export function createAdminRoutes(deps: ApiDependencies) {
           targetType: 'generation',
           targetId: id,
           metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    // 批量治理：只对「实际状态翻转」的记录写成功审计（复用单条 action，不新增审计码）；
+    // 失败分支只写一条汇总 failed 审计。
+    .post('/api/admin/gallery/batch-hide', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { ids } = validateInput(BatchGallerySchema, body)
+      try {
+        const affected = await deps.generationRepository.setGalleryRecordsHidden({ recordIds: ids, hidden: true, actorId: actor.id })
+        for (const id of affected) {
+          await recordApiAuditEvent(deps.generationRepository, request, {
+            userId: actor.id,
+            action: 'admin.gallery.hide',
+            outcome: 'succeeded',
+            targetType: 'generation',
+            targetId: id,
+          })
+        }
+        return { success: true, data: { affected: affected.length } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.hide',
+          outcome: 'failed',
+          targetType: 'generation',
+          metadata: { count: ids.length, errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/gallery/batch-unhide', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { ids } = validateInput(BatchGallerySchema, body)
+      try {
+        const affected = await deps.generationRepository.setGalleryRecordsHidden({ recordIds: ids, hidden: false, actorId: actor.id })
+        for (const id of affected) {
+          await recordApiAuditEvent(deps.generationRepository, request, {
+            userId: actor.id,
+            action: 'admin.gallery.unhide',
+            outcome: 'succeeded',
+            targetType: 'generation',
+            targetId: id,
+          })
+        }
+        return { success: true, data: { affected: affected.length } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'admin.gallery.unhide',
+          outcome: 'failed',
+          targetType: 'generation',
+          metadata: { count: ids.length, errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/api/admin/gallery/batch-delete', async ({ request, body }) => {
+      const actor = await requireAdminUser(request, deps.authService)
+      const { ids } = validateInput(BatchGallerySchema, body)
+      try {
+        const affected = await deps.generationRepository.softDeleteGalleryRecords({ recordIds: ids, actorId: actor.id })
+        for (const id of affected) {
+          await recordApiAuditEvent(deps.generationRepository, request, {
+            userId: actor.id,
+            action: 'generation.delete',
+            outcome: 'succeeded',
+            targetType: 'generation',
+            targetId: id,
+            metadata: { libraryState: 'deleted', scope: 'admin.gallery.batch' },
+          })
+        }
+        return { success: true, data: { affected: affected.length } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: actor.id,
+          action: 'generation.delete',
+          outcome: 'failed',
+          targetType: 'generation',
+          metadata: { count: ids.length, errorCode: auditErrorCode(error) },
         })
         throw error
       }

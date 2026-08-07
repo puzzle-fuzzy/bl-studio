@@ -3,9 +3,11 @@ import { ImageIcon, Loader2, Search } from 'lucide-react'
 import type { AdminGalleryItem } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent } from '@/components/ui/card'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -42,6 +44,13 @@ export function GalleryManagePage() {
   const [confirmTarget, setConfirmTarget] = useState<{ item: AdminGalleryItem; action: 'hide' | 'unhide' } | null>(null)
   const [mutating, setMutating] = useState(false)
 
+  const [preview, setPreview] = useState<{ items: LightboxMedia[]; index: number } | null>(null)
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null)
+
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [batchBusy, setBatchBusy] = useState(false)
+  const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
+
   const requestSeq = useRef(0)
 
   // 首载与翻页分离（同 web 端模式）：loadFirst 依赖过滤器；loadMore 闭包游标。
@@ -51,6 +60,7 @@ export function GalleryManagePage() {
     setError(null)
     setItems([])
     setNextCursor(undefined)
+    setSelected(new Set())
     try {
       const page = await apiClient.adminListGallery({
         ...(q.trim().length > 0 ? { q: q.trim() } : {}),
@@ -98,8 +108,97 @@ export function GalleryManagePage() {
 
   const visibleItems = items.filter(item => (visibility === 'hidden' ? item.hiddenAt !== undefined : true))
 
+  // 多选批量治理（覆盖当前页可见项；loadFirst 时重置选择）。
+  const selectableRows = visibleItems
+  const allSelected = selectableRows.length > 0 && selectableRows.every(item => selected.has(item.id))
+  const someSelected = selectableRows.some(item => selected.has(item.id))
+  const selectedCount = selected.size
+
+  const toggleSelect = (id: string) => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelected(current => {
+      const next = new Set(current)
+      if (allSelected) {
+        for (const item of selectableRows) next.delete(item.id)
+      } else {
+        for (const item of selectableRows) next.add(item.id)
+      }
+      return next
+    })
+  }
+
+  const runBatch = async (op: () => Promise<unknown>, okMessage: string) => {
+    if (selectedCount === 0) return
+    setBatchBusy(true)
+    setError(null)
+    try {
+      const result = await op()
+      const affected = typeof result === 'object' && result !== null && 'affected' in result
+        ? String((result as { affected: number }).affected)
+        : String(selectedCount)
+      setError(`${okMessage}：${affected} 个作品`)
+      void loadFirst()
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setBatchBusy(false)
+    }
+  }
+
+  const handleBatchHide = () => {
+    void runBatch(
+      () => apiClient.adminBatchHideGallery({ ids: [...selected] }),
+      '已下架',
+    )
+  }
+
+  const handleBatchUnhide = () => {
+    void runBatch(
+      () => apiClient.adminBatchUnhideGallery({ ids: [...selected] }),
+      '已恢复',
+    )
+  }
+
+  const handleBatchDelete = () => {
+    setBatchDeleteOpen(false)
+    void runBatch(
+      () => apiClient.adminBatchDeleteGallery({ ids: [...selected] }),
+      '已删除',
+    )
+  }
+
   const confirmHide = (item: AdminGalleryItem) => setConfirmTarget({ item, action: 'hide' })
   const confirmUnhide = (item: AdminGalleryItem) => setConfirmTarget({ item, action: 'unhide' })
+
+  /** 拉取该记录的全部产物 → 映射 LightboxMedia → 打开全屏预览弹窗（遮罩 + 下载）。 */
+  const openPreview = async (item: AdminGalleryItem) => {
+    setPreviewLoadingId(item.id)
+    setError(null)
+    try {
+      const { items } = await apiClient.adminListGalleryArtifacts(item.id)
+      const media: LightboxMedia[] = items.map(artifact => ({
+        key: artifact.id,
+        kind: isLightboxKind(artifact.kind) ? artifact.kind : 'image',
+        url: artifact.readUrl,
+        thumbnailUrl: artifact.thumbnailUrl,
+        fileName: '作品预览',
+        text: artifact.text,
+      }))
+      setPreview({ items: media, index: 0 })
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setPreviewLoadingId(null)
+    }
+  }
 
   const executeConfirm = async () => {
     if (confirmTarget === null) return
@@ -151,6 +250,23 @@ export function GalleryManagePage() {
 
       {error !== null && <p className="text-sm text-destructive">{error}</p>}
 
+      {selectedCount > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+          <span className="text-sm text-muted-foreground">已选 {selectedCount} 个作品</span>
+          <div className="ml-auto flex items-center gap-2">
+            <Button size="sm" variant="outline" disabled={batchBusy} onClick={handleBatchUnhide}>
+              {batchBusy ? <Loader2 className="size-4 animate-spin" /> : '批量恢复'}
+            </Button>
+            <Button size="sm" variant="destructive" disabled={batchBusy} onClick={handleBatchHide}>
+              {batchBusy ? <Loader2 className="size-4 animate-spin" /> : '批量下架'}
+            </Button>
+            <Button size="sm" variant="destructive" disabled={batchBusy} onClick={() => setBatchDeleteOpen(true)}>
+              {batchBusy ? <Loader2 className="size-4 animate-spin" /> : '批量删除'}
+            </Button>
+          </div>
+        </div>
+      )}
+
       <Card>
         <CardContent className="p-0">
           {loading ? (
@@ -164,6 +280,14 @@ export function GalleryManagePage() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      aria-label="全选当前页"
+                      checked={allSelected ? true : someSelected ? 'indeterminate' : false}
+                      onCheckedChange={toggleSelectAll}
+                      disabled={selectableRows.length === 0}
+                    />
+                  </TableHead>
                   <TableHead className="w-24">封面</TableHead>
                   <TableHead>模型 / 类型</TableHead>
                   <TableHead className="w-32">作者</TableHead>
@@ -177,7 +301,24 @@ export function GalleryManagePage() {
                 {visibleItems.map(item => (
                   <TableRow key={item.id}>
                     <TableCell>
-                      <CoverThumb item={item} />
+                      <Checkbox
+                        aria-label={`选择作品 ${item.id}`}
+                        checked={selected.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <button
+                        type="button"
+                        onClick={() => void openPreview(item)}
+                        title="点击预览"
+                        aria-label={`预览作品 ${item.id}`}
+                        className="cursor-pointer rounded-md ring-offset-2 transition-shadow hover:ring-2 hover:ring-ring"
+                      >
+                        {previewLoadingId === item.id
+                          ? <div className="flex size-12 items-center justify-center rounded-md bg-muted"><Loader2 className="size-4 animate-spin text-muted-foreground" /></div>
+                          : <CoverThumb item={item} />}
+                      </button>
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-2">
@@ -239,6 +380,38 @@ export function GalleryManagePage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <AlertDialog open={batchDeleteOpen} onOpenChange={setBatchDeleteOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>确认批量删除？</AlertDialogTitle>
+            <AlertDialogDescription>
+              将软删除选中的 {selectedCount} 个作品：从社区画廊消失，数据保留可恢复（管理员可重新公开/恢复）。此操作会写入审计日志。
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={batchBusy}>取消</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDelete} disabled={batchBusy}>
+              {batchBusy ? <Loader2 className="size-4 animate-spin" /> : null}
+              确认删除
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {preview !== null && preview.items.length > 0 && (
+        <MediaLightbox
+          items={preview.items}
+          index={preview.index}
+          onIndexChange={index => setPreview(current => (current === null ? null : { ...current, index }))}
+          onClose={() => setPreview(null)}
+          downloadUrl={
+            preview.items[preview.index]?.url !== undefined
+              ? resolveApiUrl(preview.items[preview.index]?.url)
+              : undefined
+          }
+        />
+      )}
     </div>
   )
 }

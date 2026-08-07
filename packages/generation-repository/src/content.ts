@@ -14,7 +14,7 @@
  *  - 越权访问统一按 GENERATION_NOT_FOUND 处理（IDOR 模式：不存在与不可见同响应）。
  */
 import { randomUUID } from 'node:crypto'
-import { and, asc, desc, eq, gte, ilike, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
+import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import {
   generationArtifacts,
   generationFavorites,
@@ -23,6 +23,7 @@ import {
   modelCosts,
   notifications,
   promptLibrary,
+  taskRecords,
   userFeedback,
   users,
   type BailianStudioDb,
@@ -30,9 +31,10 @@ import {
 import type { ModelCategory } from '@bailian-studio/model-core'
 import { GenerationRepositoryError } from './errors'
 import { clampLimit, decodeCursor, encodeCursor } from './cursor'
-import { toGenerationArtifact, toGenerationRecord } from './mappers'
+import { toGenerationArtifact, toGenerationRecord, toTaskRecord } from './mappers'
 import type {
   AdminGalleryItem,
+  AdminTaskItem,
   CostMarginRow,
   FeedbackKind,
   FeedbackStatus,
@@ -42,6 +44,7 @@ import type {
   GalleryVisibility,
   GenerationArtifact,
   ListAdminGalleryResult,
+  ListAdminTasksResult,
   ListFeedbackResult,
   ListGalleryResult,
   ListNotificationsResult,
@@ -99,9 +102,28 @@ export interface ContentRepository {
   }): Promise<ListAdminGalleryResult>
   /** admin 画廊产物读取：不检查 hiddenAt（治理需预览已隐藏作品）。 */
   getAdminGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined>
+  /** admin 画廊一条记录的全部产物（stored 未删），不检查 hiddenAt；供预览弹窗多图切换。 */
+  listAdminGalleryRecordArtifacts(input: { recordId: string }): Promise<GenerationArtifact[]>
   setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void>
+  /** admin 批量下架/恢复：只返回实际状态翻转的记录 id（hide 只命中未藏，unhide 只命中已藏）。 */
+  setGalleryRecordsHidden(input: { recordIds: string[]; hidden: boolean; actorId: string }): Promise<string[]>
+  /** admin 批量软删（可恢复）：仅限 public+succeeded 未删记录。 */
+  softDeleteGalleryRecords(input: { recordIds: string[]; actorId: string }): Promise<string[]>
   /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt。 */
   hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number>
+
+  // -------------------------------------------------------------------------
+  // 管理后台 · 任务中心：全量 task_records（含进行中 + 已完成）。
+  // -------------------------------------------------------------------------
+  listAdminTasks(input: {
+    cursor?: string
+    limit?: number
+    status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    type?: string
+    domain?: string
+    userId?: string
+    recordId?: string
+  }): Promise<ListAdminTasksResult>
 
   // -------------------------------------------------------------------------
   // 社交通知：作者收到点赞/收藏通知。
@@ -535,6 +557,24 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     return row === undefined ? undefined : toGenerationArtifact(row.artifact)
   }
 
+  /** admin 画廊预览：列出记录的全部 stored 未删产物（多图切换），不检查 hiddenAt。 */
+  async function listAdminGalleryRecordArtifacts(input: { recordId: string }): Promise<GenerationArtifact[]> {
+    const rows = await db
+      .select({ artifact: generationArtifacts })
+      .from(generationArtifacts)
+      .innerJoin(generationRecords, eq(generationRecords.id, generationArtifacts.recordId))
+      .where(and(
+        eq(generationArtifacts.recordId, input.recordId),
+        eq(generationArtifacts.status, 'stored'),
+        isNull(generationArtifacts.deletedAt),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+      ))
+      .orderBy(asc(generationArtifacts.createdAt), asc(generationArtifacts.id))
+    return rows.map(row => toGenerationArtifact(row.artifact))
+  }
+
   /** admin 下架/恢复一条公开作品：写 hiddenAt/hiddenBy，仅限 public+succeeded 未删记录。 */
   async function setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void> {
     const now = new Date()
@@ -555,6 +595,44 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     }
   }
 
+  /** admin 批量下架/恢复：状态翻转条件随 hidden 方向变化，只返回实际变更的记录 id。 */
+  async function setGalleryRecordsHidden(input: { recordIds: string[]; hidden: boolean; actorId: string }): Promise<string[]> {
+    if (input.recordIds.length === 0) return []
+    const now = new Date()
+    const rows = await db
+      .update(generationRecords)
+      .set(input.hidden
+        ? { hiddenAt: now, hiddenBy: input.actorId, updatedAt: now, updatedBy: input.actorId }
+        : { hiddenAt: null, hiddenBy: null, updatedAt: now, updatedBy: input.actorId })
+      .where(and(
+        inArray(generationRecords.id, input.recordIds),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+        // 翻转方向：hide 只命中尚未隐藏的，unhide 只命中已隐藏的——已满足条件的 id 不计为变更。
+        input.hidden ? isNull(generationRecords.hiddenAt) : isNotNull(generationRecords.hiddenAt),
+      ))
+      .returning({ id: generationRecords.id })
+    return rows.map(row => row.id)
+  }
+
+  /** admin 批量软删（可恢复）：仅限 public+succeeded 未删记录，不检查 hiddenAt（已下架也可删）。 */
+  async function softDeleteGalleryRecords(input: { recordIds: string[]; actorId: string }): Promise<string[]> {
+    if (input.recordIds.length === 0) return []
+    const now = new Date()
+    const rows = await db
+      .update(generationRecords)
+      .set({ deletedAt: now, deletedBy: input.actorId, updatedAt: now, updatedBy: input.actorId })
+      .where(and(
+        inArray(generationRecords.id, input.recordIds),
+        eq(generationRecords.visibility, 'public'),
+        eq(generationRecords.status, 'succeeded'),
+        isNull(generationRecords.deletedAt),
+      ))
+      .returning({ id: generationRecords.id })
+    return rows.map(row => row.id)
+  }
+
   /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt（解封不自动恢复）。 */
   async function hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number> {
     const now = new Date()
@@ -570,6 +648,101 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
       ))
       .returning({ id: generationRecords.id })
     return rows.length
+  }
+
+  // ---------------------------------------------------------------------------
+  // 管理后台 · 任务中心：全量 task_records（含进行中 + 已完成）。
+  // ---------------------------------------------------------------------------
+
+  /** admin 任务中心：keyset (createdAt,id) DESC 倒序翻页，leftJoin 作者 + 关联记录上下文。 */
+  async function listAdminTasks(input: {
+    cursor?: string
+    limit?: number
+    status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    type?: string
+    domain?: string
+    userId?: string
+    recordId?: string
+  }): Promise<ListAdminTasksResult> {
+    const limit = clampLimit(input.limit)
+    const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+
+    const conditions: SQL[] = [isNull(taskRecords.deletedAt)]
+    if (input.status !== undefined) conditions.push(eq(taskRecords.status, input.status))
+    if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
+    if (input.domain !== undefined) conditions.push(eq(taskRecords.domain, input.domain))
+    if (input.userId !== undefined) conditions.push(eq(taskRecords.userId, input.userId))
+    if (input.recordId !== undefined) conditions.push(eq(taskRecords.recordId, input.recordId))
+    if (cursor !== undefined) {
+      conditions.push(sql`(${taskRecords.createdAt} < ${cursor.createdAt} OR (${taskRecords.createdAt} = ${cursor.createdAt} AND ${taskRecords.id} < ${cursor.id}))`)
+    }
+
+    const rows = await db
+      .select({
+        task: taskRecords,
+        authorId: users.id,
+        authorDisplayName: users.displayName,
+        recordModelId: generationRecords.modelId,
+        recordCategory: generationRecords.category,
+      })
+      .from(taskRecords)
+      // leftJoin：任务不因用户/记录被删而消失（排障视角要能看到孤儿任务）。
+      .leftJoin(users, eq(users.id, taskRecords.userId))
+      .leftJoin(generationRecords, eq(generationRecords.id, taskRecords.recordId))
+      .where(and(...conditions))
+      .orderBy(desc(taskRecords.createdAt), desc(taskRecords.id))
+      .limit(limit + 1)
+
+    const hasMore = rows.length > limit
+    const page = hasMore ? rows.slice(0, limit) : rows
+    const last = page[page.length - 1]
+
+    const items: AdminTaskItem[] = page.map(row => {
+      const task = toTaskRecord(row.task)
+      const error = task.errorJson === undefined
+        ? undefined
+        : {
+            category: task.errorJson.category,
+            message: task.errorJson.message,
+            retriable: task.errorJson.retriable,
+            ...(task.errorJson.code !== undefined ? { code: task.errorJson.code } : {}),
+          }
+      const durationMs = task.startedAt !== undefined && task.completedAt !== undefined
+        ? Math.max(0, Date.parse(task.completedAt) - Date.parse(task.startedAt))
+        : undefined
+      return {
+        id: task.id,
+        type: task.type,
+        domain: task.domain,
+        status: task.status,
+        priority: task.priority,
+        attempts: task.attempts,
+        maxAttempts: task.maxAttempts,
+        nextRunAt: task.nextRunAt,
+        ...(task.startedAt !== undefined ? { startedAt: task.startedAt } : {}),
+        ...(task.completedAt !== undefined ? { completedAt: task.completedAt } : {}),
+        createdAt: task.createdAt,
+        updatedAt: task.updatedAt,
+        ...(task.recordId !== undefined ? { recordId: task.recordId } : {}),
+        ...(task.userId !== undefined ? { userId: task.userId } : {}),
+        ...(task.traceId !== undefined ? { traceId: task.traceId } : {}),
+        ...(row.authorId !== null
+          ? { author: { id: row.authorId, displayName: row.authorDisplayName } }
+          : {}),
+        ...(row.recordModelId !== null && row.recordCategory !== null
+          ? { recordContext: { modelId: row.recordModelId, category: row.recordCategory as ModelCategory } }
+          : {}),
+        ...(error !== undefined ? { error } : {}),
+        ...(durationMs !== undefined ? { durationMs } : {}),
+      }
+    })
+
+    return {
+      items,
+      ...(hasMore && last !== undefined
+        ? { nextCursor: encodeCursor({ createdAt: last.task.createdAt.toISOString(), id: last.task.id }) }
+        : {}),
+    }
   }
 
   // ---------------------------------------------------------------------------
@@ -847,8 +1020,12 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     listGenerationFavorites,
     listAdminGalleryGenerations,
     getAdminGalleryArtifact,
+    listAdminGalleryRecordArtifacts,
     setGalleryRecordHidden,
+    setGalleryRecordsHidden,
+    softDeleteGalleryRecords,
     hideUserPublicWorks,
+    listAdminTasks,
     getGenerationOwner,
     createSocialNotification,
     listNotifications,

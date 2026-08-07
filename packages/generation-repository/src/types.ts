@@ -553,6 +553,41 @@ export interface ListAdminGalleryResult {
 }
 
 // ---------------------------------------------------------------------------
+// 管理后台 · 任务中心：全量 task_records 列表（含进行中 + 已完成）。
+// ---------------------------------------------------------------------------
+
+/** admin 任务列表项：作者投影 + 记录上下文 + 错误摘要（供运营排障）。 */
+export interface AdminTaskItem {
+  id: string
+  type: TaskRecord['type']
+  domain: TaskRecord['domain']
+  status: TaskRecord['status']
+  priority: number
+  attempts: number
+  maxAttempts: number
+  nextRunAt: string
+  startedAt?: string
+  completedAt?: string
+  createdAt: string
+  updatedAt: string
+  recordId?: string
+  userId?: string
+  traceId?: string
+  /** 作者投影（left join users；用户已删时缺失）。 */
+  author?: { id: string; displayName: string | null }
+  /** 关联生成记录上下文（recordId 命中 generation_records 时）。 */
+  recordContext?: { modelId: string; category: ModelCategory }
+  error?: TaskDiagnosticError
+  /** 最近一次执行耗时（completedAt − startedAt），毫秒。 */
+  durationMs?: number
+}
+
+export interface ListAdminTasksResult {
+  items: AdminTaskItem[]
+  nextCursor?: string
+}
+
+// ---------------------------------------------------------------------------
 // 提示词资产库（服务端命名库）。
 // ---------------------------------------------------------------------------
 

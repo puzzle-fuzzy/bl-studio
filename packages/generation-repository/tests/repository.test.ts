@@ -1824,6 +1824,242 @@ describe('generation repository', () => {
     expect(adminView.items.every(item => item.hiddenAt !== undefined)).toBe(true)
   })
 
+  it('admin 任务中心：全量列表 + keyset 分页 + 过滤 + author/recordContext join + error/durationMs 投影', async () => {
+    // 直接插入一条生成记录（不经 repository，避免自动创建 submit/poll/persist 任务污染断言），
+    // 用于验证 recordContext join（modelId + category）。
+    const recordId = 'task_center_record'
+    await db.insert(generationRecords).values({
+      id: recordId,
+      userId: 'user_1',
+      modelId: 'qwen-image',
+      provider: 'dashscope',
+      providerModel: 'qwen-image-v1',
+      category: 'image',
+      status: 'succeeded',
+      inputParamsJson: { prompt: 'task center record' },
+      costEstimate: 20,
+      providerCancelStatus: 'none',
+      createdAt: new Date('2026-07-13T00:00:00.000Z'),
+      updatedAt: new Date('2026-07-13T00:00:00.000Z'),
+    })
+
+    const insertTask = async (input: {
+      id: string
+      type: string
+      domain: string
+      status: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+      at: string
+      userId?: string
+      recordId?: string
+      error?: Record<string, unknown>
+      startedAt?: string
+      completedAt?: string
+    }) => {
+      await db.insert(taskRecords).values({
+        id: input.id,
+        type: input.type,
+        domain: input.domain,
+        status: input.status,
+        priority: 10,
+        inputJson: {},
+        attempts: input.error !== undefined ? 1 : 0,
+        maxAttempts: 3,
+        nextRunAt: new Date(input.at),
+        ...(input.startedAt !== undefined ? { startedAt: new Date(input.startedAt) } : {}),
+        ...(input.completedAt !== undefined ? { completedAt: new Date(input.completedAt) } : {}),
+        ...(input.error !== undefined ? { errorJson: input.error } : {}),
+        ...(input.recordId !== undefined ? { recordId: input.recordId } : {}),
+        ...(input.userId !== undefined ? { userId: input.userId } : {}),
+        traceId: `trace-${input.id}`,
+        createdAt: new Date(input.at),
+        updatedAt: new Date(input.at),
+      })
+    }
+
+    await insertTask({
+      id: 'task_old', type: 'generation.submit', domain: 'generation', status: 'succeeded', at: '2026-07-13T00:00:00.000Z',
+      userId: 'user_1', recordId, startedAt: '2026-07-13T00:00:00.000Z', completedAt: '2026-07-13T00:00:05.000Z',
+    })
+    await insertTask({
+      id: 'task_mid', type: 'generation.poll', domain: 'generation', status: 'failed', at: '2026-07-14T00:00:00.000Z',
+      userId: 'user_page', recordId,
+      error: { category: 'provider', message: 'upstream 500', retriable: true, code: 'PROVIDER_UPSTREAM' },
+    })
+    await insertTask({
+      id: 'task_new', type: 'artifact.persist', domain: 'artifact', status: 'queued', at: '2026-07-15T00:00:00.000Z',
+      userId: 'user_race', recordId,
+    })
+
+    // 默认倒序：最新在前。
+    const all = await repository.listAdminTasks({})
+    expect(all.items.map(item => item.id)).toEqual(['task_new', 'task_mid', 'task_old'])
+
+    // join 投影：author（id + displayName）+ recordContext（modelId/category）。
+    const newest = all.items.find(item => item.id === 'task_new')!
+    expect(newest.author?.id).toBe('user_race')
+    expect(newest.recordContext).toEqual({ modelId: 'qwen-image', category: 'image' })
+
+    // 成功任务的 durationMs = completedAt − startedAt；失败任务（无时间）为 undefined。
+    const succeeded = all.items.find(item => item.id === 'task_old')!
+    expect(succeeded.durationMs).toBe(5000)
+    expect(succeeded.error).toBeUndefined()
+
+    // error 摘要投影（category/message/retriable/code，不含原始 JSON）。
+    const failed = all.items.find(item => item.id === 'task_mid')!
+    expect(failed.error).toEqual({
+      category: 'provider',
+      message: 'upstream 500',
+      retriable: true,
+      code: 'PROVIDER_UPSTREAM',
+    })
+    expect(failed.durationMs).toBeUndefined()
+
+    // 各过滤条件。
+    expect((await repository.listAdminTasks({ status: 'failed' })).items.map(item => item.id)).toEqual(['task_mid'])
+    expect((await repository.listAdminTasks({ type: 'generation.submit' })).items.map(item => item.id)).toEqual(['task_old'])
+    expect((await repository.listAdminTasks({ domain: 'artifact' })).items.map(item => item.id)).toEqual(['task_new'])
+    expect((await repository.listAdminTasks({ userId: 'user_1' })).items.map(item => item.id)).toEqual(['task_old'])
+    expect((await repository.listAdminTasks({ recordId })).items).toHaveLength(3)
+
+    // keyset 翻页：limit 2 → 第二页取到第三条，跨页不丢不重。
+    const page1 = await repository.listAdminTasks({ limit: 2 })
+    expect(page1.items.map(item => item.id)).toEqual(['task_new', 'task_mid'])
+    expect(page1.nextCursor).toBeDefined()
+    const page2 = await repository.listAdminTasks({ limit: 2, cursor: page1.nextCursor })
+    expect(page2.items.map(item => item.id)).toEqual(['task_old'])
+    expect(page2.nextCursor).toBeUndefined()
+
+    // 软删任务不列出。
+    await db.update(taskRecords).set({ deletedAt: new Date(), deletedBy: 'user_admin' }).where(eq(taskRecords.id, 'task_old'))
+    const afterDelete = await repository.listAdminTasks({})
+    expect(afterDelete.items.map(item => item.id)).toEqual(['task_new', 'task_mid'])
+  })
+
+  it('admin 画廊预览：listAdminGalleryRecordArtifacts 只返 stored 未删，且不检查 hiddenAt', async () => {
+    const insertRecord = async (id: string, visibility: 'public' | 'private', status: string): Promise<void> => {
+      await db.insert(generationRecords).values({
+        id,
+        userId: 'user_1',
+        modelId: 'qwen-image',
+        provider: 'dashscope',
+        providerModel: 'qwen-image-v1',
+        category: 'image',
+        status,
+        inputParamsJson: { prompt: `preview ${id}` },
+        costEstimate: 20,
+        visibility,
+        providerCancelStatus: 'none',
+        createdAt: new Date('2026-07-13T00:00:00.000Z'),
+        updatedAt: new Date('2026-07-13T00:00:00.000Z'),
+      })
+    }
+    const insertArtifact = async (input: {
+      id: string
+      recordId: string
+      kind?: string
+      deleted?: boolean
+      createdAt: string
+    }): Promise<void> => {
+      await db.insert(generationArtifacts).values({
+        id: input.id,
+        recordId: input.recordId,
+        userId: 'user_1',
+        kind: input.kind ?? 'image',
+        status: 'stored',
+        storageProvider: 'local',
+        storageKey: `${input.id}.png`,
+        ...(input.deleted === true ? { deletedAt: new Date(), deletedBy: 'user_admin' } : {}),
+        createdAt: new Date(input.createdAt),
+        updatedAt: new Date(input.createdAt),
+      })
+    }
+
+    await insertRecord('preview_record', 'public', 'succeeded')
+    await insertArtifact({ id: 'art_1', recordId: 'preview_record', createdAt: '2026-07-13T00:00:00.000Z' })
+    await insertArtifact({ id: 'art_2', recordId: 'preview_record', createdAt: '2026-07-13T00:00:01.000Z' })
+    await insertArtifact({ id: 'art_deleted', recordId: 'preview_record', deleted: true, createdAt: '2026-07-13T00:00:02.000Z' })
+
+    // 只返 stored 未删，按 (createdAt,id) 升序；软删产物被排除。
+    const artifacts = await repository.listAdminGalleryRecordArtifacts({ recordId: 'preview_record' })
+    expect(artifacts.map(artifact => artifact.id)).toEqual(['art_1', 'art_2'])
+    expect(artifacts[0]?.storageKey).toBe('art_1.png')
+
+    // 关键：记录被下架（hiddenAt 置位）后，预览仍能取到产物（治理需预览已隐藏作品）。
+    await repository.setGalleryRecordHidden({ recordId: 'preview_record', hidden: true, actorId: 'user_admin' })
+    const afterHide = await repository.listAdminGalleryRecordArtifacts({ recordId: 'preview_record' })
+    expect(afterHide.map(artifact => artifact.id)).toEqual(['art_1', 'art_2'])
+
+    // 记录可见性/状态不匹配（非 public / 非 succeeded）→ 空列表。
+    await insertRecord('preview_private', 'private', 'succeeded')
+    await insertArtifact({ id: 'art_p', recordId: 'preview_private', createdAt: '2026-07-13T00:00:00.000Z' })
+    expect((await repository.listAdminGalleryRecordArtifacts({ recordId: 'preview_private' }))).toHaveLength(0)
+    await insertRecord('preview_failed', 'public', 'failed')
+    await insertArtifact({ id: 'art_f', recordId: 'preview_failed', createdAt: '2026-07-13T00:00:00.000Z' })
+    expect((await repository.listAdminGalleryRecordArtifacts({ recordId: 'preview_failed' }))).toHaveLength(0)
+  })
+
+  it('admin 批量治理：setGalleryRecordsHidden 只计实际翻转，softDeleteGalleryRecords 只删 public', async () => {
+    const insertRecord = async (id: string, visibility: 'public' | 'private', status: string, hidden?: boolean): Promise<void> => {
+      await db.insert(generationRecords).values({
+        id,
+        userId: 'user_1',
+        modelId: 'qwen-image',
+        provider: 'dashscope',
+        providerModel: 'qwen-image-v1',
+        category: 'image',
+        status,
+        inputParamsJson: { prompt: `batch ${id}` },
+        costEstimate: 20,
+        visibility,
+        providerCancelStatus: 'none',
+        ...(hidden === true ? { hiddenAt: new Date('2026-07-01T00:00:00.000Z'), hiddenBy: 'user_admin' } : {}),
+        createdAt: new Date('2026-07-13T00:00:00.000Z'),
+        updatedAt: new Date('2026-07-13T00:00:00.000Z'),
+      })
+    }
+
+    await insertRecord('batch_a', 'public', 'succeeded')
+    await insertRecord('batch_b', 'public', 'succeeded')
+    await insertRecord('batch_already_hidden', 'public', 'succeeded', true)
+    await insertRecord('batch_private', 'private', 'succeeded')
+    await insertRecord('batch_failed', 'public', 'failed')
+
+    // 批量下架：只命中未藏的 public 成功记录；已藏/非 public/非 succeeded 不计入。
+    const hidden = await repository.setGalleryRecordsHidden({
+      recordIds: ['batch_a', 'batch_b', 'batch_already_hidden', 'batch_private', 'batch_failed'],
+      hidden: true,
+      actorId: 'user_admin',
+    })
+    expect(hidden.sort()).toEqual(['batch_a', 'batch_b'])
+
+    // 重复下架同一批：全部已藏 → 0 个实际变更。
+    expect((await repository.setGalleryRecordsHidden({
+      recordIds: ['batch_a', 'batch_b', 'batch_already_hidden'],
+      hidden: true,
+      actorId: 'user_admin',
+    }))).toHaveLength(0)
+
+    // 批量恢复：只命中已藏记录。
+    const unhidden = await repository.setGalleryRecordsHidden({
+      recordIds: ['batch_a', 'batch_b', 'batch_already_hidden', 'batch_private'],
+      hidden: false,
+      actorId: 'user_admin',
+    })
+    expect(new Set(unhidden)).toEqual(new Set(['batch_a', 'batch_b', 'batch_already_hidden']))
+
+    // 批量软删：只删 public+succeeded；private 记录不受影响。
+    const deleted = await repository.softDeleteGalleryRecords({
+      recordIds: ['batch_a', 'batch_private', 'batch_failed'],
+      actorId: 'user_admin',
+    })
+    expect(deleted).toEqual(['batch_a'])
+
+    // 软删后 admin 画廊不再包含该记录；重复调用返回空。
+    const gallery = await repository.listAdminGalleryGenerations({ includeHidden: true })
+    expect(gallery.items.some(item => item.id === 'batch_a')).toBe(false)
+    expect((await repository.softDeleteGalleryRecords({ recordIds: ['batch_a'], actorId: 'user_admin' }))).toHaveLength(0)
+  })
+
   it('画廊发现：q 搜索 + hot 排序（按点赞数）+ authorId 过滤', async () => {
     const sunsetId = await createPublicGeneration('user_a', 'golden sunset over the sea', '2026-07-11T00:00:00.000Z')
     const oceanId = await createPublicGeneration('user_a', 'calm ocean waves', '2026-07-12T00:00:00.000Z')

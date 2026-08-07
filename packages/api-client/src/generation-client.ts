@@ -43,7 +43,9 @@ import {
   AdminModelCostsUpdateResponseSchema,
   AdminGalleryHideResultSchema,
   FeedbackItemResponseSchema,
+  AdminGalleryArtifactsResponseSchema,
   ListAdminGalleryResponseSchema,
+  ListAdminTasksResponseSchema,
   ListFeedbackResponseSchema,
   ListNotificationsResponseSchema,
   NotificationReadAllSchema,
@@ -87,11 +89,14 @@ import type {
   BatchAffectedResult,
   BatchGrantPointsRequest,
   BatchGrantPointsResult,
+  BatchGalleryRequest,
   BatchUsersRequest,
   AdminAnalytics,
   AdminGalleryHideResult,
+  AdminGalleryArtifactsResult,
   AdminModelCostsResult,
   ListAdminGalleryResult,
+  ListAdminTasksResult,
   ListFeedbackResult,
   ListNotificationsResult,
   NotificationUnreadCount,
@@ -476,6 +481,19 @@ export interface BailianStudioApiClient {
   /** `GET /api/admin/stats/analytics` —— 成本毛利 + 留存漏斗。 */
   adminGetAnalytics(params?: { from?: string; to?: string; days?: number }): Promise<AdminAnalytics>
 
+  // 管理后台 · 任务中心（需 admin）
+  // ---------------------------------------------------------------------------
+  /** `GET /api/admin/tasks` —— 全量任务列表（含进行中 + 已完成），keyset 分页 + 过滤。 */
+  adminListTasks(params?: {
+    limit?: number
+    cursor?: string
+    status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    type?: string
+    domain?: string
+    userId?: string
+    recordId?: string
+  }): Promise<ListAdminTasksResult>
+
   // 管理后台 · 社区画廊治理（需 admin）
   // ---------------------------------------------------------------------------
   /** `GET /api/admin/gallery` —— 画廊治理列表（含隐藏作品，可按作者/提示词搜索）。 */
@@ -486,10 +504,18 @@ export interface BailianStudioApiClient {
     q?: string
     authorId?: string
   }): Promise<ListAdminGalleryResult>
+  /** `GET /api/admin/gallery/:id/artifacts` —— 画廊治理预览：记录的全部产物（多图切换）。 */
+  adminListGalleryArtifacts(recordId: string): Promise<AdminGalleryArtifactsResult>
   /** `POST /api/admin/gallery/:id/hide` —— 下架一条公开作品。 */
   adminHideGalleryItem(recordId: string): Promise<AdminGalleryHideResult>
   /** `POST /api/admin/gallery/:id/unhide` —— 恢复一条已下架作品。 */
   adminUnhideGalleryItem(recordId: string): Promise<AdminGalleryHideResult>
+  /** `POST /api/admin/gallery/batch-hide` —— 批量下架（只影响实际翻转的记录）。 */
+  adminBatchHideGallery(input: BatchGalleryRequest): Promise<BatchAffectedResult>
+  /** `POST /api/admin/gallery/batch-unhide` —— 批量恢复。 */
+  adminBatchUnhideGallery(input: BatchGalleryRequest): Promise<BatchAffectedResult>
+  /** `POST /api/admin/gallery/batch-delete` —— 批量软删（可恢复）。 */
+  adminBatchDeleteGallery(input: BatchGalleryRequest): Promise<BatchAffectedResult>
 
   // 反馈通道
   // ---------------------------------------------------------------------------
@@ -1389,6 +1415,24 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       return data.item
     },
 
+    async adminListTasks(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.status !== undefined) search.set('status', params.status)
+      if (params.type !== undefined && params.type.length > 0) search.set('type', params.type)
+      if (params.domain !== undefined && params.domain.length > 0) search.set('domain', params.domain)
+      if (params.userId !== undefined && params.userId.length > 0) search.set('userId', params.userId)
+      if (params.recordId !== undefined && params.recordId.length > 0) search.set('recordId', params.recordId)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/tasks${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListAdminTasksResponseSchema,
+      )
+    },
+
     async adminListGallery(params = {}) {
       const search = new URLSearchParams()
       if (params.limit !== undefined) search.set('limit', String(params.limit))
@@ -1402,6 +1446,15 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         { method: 'GET', credentials: 'include' },
         fetchImpl,
         ListAdminGalleryResponseSchema,
+      )
+    },
+
+    async adminListGalleryArtifacts(recordId) {
+      return unwrapData(
+        `${base}/api/admin/gallery/${encodeURIComponent(recordId)}/artifacts`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminGalleryArtifactsResponseSchema,
       )
     },
 
@@ -1420,6 +1473,33 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         { method: 'POST', credentials: 'include' },
         fetchImpl,
         AdminGalleryHideResultSchema,
+      )
+    },
+
+    async adminBatchHideGallery(input) {
+      return unwrapData(
+        `${base}/api/admin/gallery/batch-hide`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
+      )
+    },
+
+    async adminBatchUnhideGallery(input) {
+      return unwrapData(
+        `${base}/api/admin/gallery/batch-unhide`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
+      )
+    },
+
+    async adminBatchDeleteGallery(input) {
+      return unwrapData(
+        `${base}/api/admin/gallery/batch-delete`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        BatchAffectedResponseSchema,
       )
     },
 

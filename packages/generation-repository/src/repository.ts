@@ -82,6 +82,7 @@ import type {
   GenerationArtifact,
   GenerationEvent,
   ListAdminGalleryResult,
+  ListAdminTasksResult,
   ListFeedbackResult,
   ListGalleryResult,
   ListNotificationsResult,
@@ -778,9 +779,28 @@ export interface GenerationRepository {
   }): Promise<ListAdminGalleryResult>
   /** admin 画廊产物读取：不检查 hiddenAt（治理需预览已隐藏作品）。 */
   getAdminGalleryArtifact(input: { recordId: string; artifactId: string }): Promise<GenerationArtifact | undefined>
+  /** admin 画廊一条记录的全部产物（stored 未删），不检查 hiddenAt；供预览弹窗多图切换。 */
+  listAdminGalleryRecordArtifacts(input: { recordId: string }): Promise<GenerationArtifact[]>
   setGalleryRecordHidden(input: { recordId: string; hidden: boolean; actorId: string }): Promise<void>
+  /** admin 批量下架/恢复：只返回实际状态翻转的记录 id（hide 只命中未藏，unhide 只命中已藏）。 */
+  setGalleryRecordsHidden(input: { recordIds: string[]; hidden: boolean; actorId: string }): Promise<string[]>
+  /** admin 批量软删（可恢复）：仅限 public+succeeded 未删记录。 */
+  softDeleteGalleryRecords(input: { recordIds: string[]; actorId: string }): Promise<string[]>
   /** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt。 */
   hideUserPublicWorks(input: { userId: string; actorId: string }): Promise<number>
+
+  // -------------------------------------------------------------------------
+  // 管理后台 · 任务中心：全量 task_records 列表（含进行中 + 已完成）。
+  // -------------------------------------------------------------------------
+  listAdminTasks(input: {
+    cursor?: string
+    limit?: number
+    status?: 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+    type?: string
+    domain?: string
+    userId?: string
+    recordId?: string
+  }): Promise<ListAdminTasksResult>
 
   // -------------------------------------------------------------------------
   // 社交通知：作者收到点赞/收藏通知。

@@ -4,9 +4,14 @@ import { RouterProvider } from 'react-router'
 import { ThemeProvider } from 'next-themes'
 import { TooltipProvider } from '@/components/ui/tooltip'
 import { router } from './routes'
+import { installChunkRecovery } from '@/lib/chunk-recovery'
 import './styles.css'
 import 'overlayscrollbars/overlayscrollbars.css'
 import './os-theme.css'
+
+// 部署后旧 chunk 被删、客户端仍引用时，动态 import 会 404。index.html 已是
+// no-cache，刷新即自愈，这里在渲染前挂全局恢复监听（见 lib/chunk-recovery.ts）。
+installChunkRecovery()
 
 const rootElement = document.getElementById('root')
 if (rootElement === null) {

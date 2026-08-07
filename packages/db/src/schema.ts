@@ -703,6 +703,8 @@ export const taskRecords = pgTable('task_records', {
   index('task_records_lock_idx').on(table.lockedBy, table.lockedUntil),
   // 业务记录反查：列出某条生成记录的全部关联任务。
   index('task_records_record_idx').on(table.recordId),
+  // 管理后台任务中心：keyset (created_at, id) 倒序翻页。
+  index('task_records_created_idx').on(table.createdAt, table.id),
 ])
 
 /**

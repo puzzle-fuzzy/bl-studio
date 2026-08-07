@@ -3,6 +3,8 @@ import { createBrowserRouter, Navigate } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { ProtectedRoute } from '@/components/auth/ProtectedRoute'
 import { RedirectIfAuthed } from '@/components/auth/RedirectIfAuthed'
+import { RouteErrorElement } from '@/components/shared/RouteErrorElement'
+import { notifyChunkLoadFailure } from '@/lib/chunk-recovery'
 import { CreatePage } from '@/pages/CreatePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { GenerationsPage } from '@/pages/GenerationsPage'
@@ -20,7 +22,14 @@ import { LoginPage } from '@/pages/auth/LoginPage'
 
 function lazyPage(name: string, loader: () => Promise<Record<string, unknown>>) {
   const Component = lazy(async () => {
-    const module = await loader()
+    let module: Record<string, unknown>
+    try {
+      module = await loader()
+    } catch (error) {
+      // 动态 import 失败（部署后旧 chunk 被删）：触发守卫式 reload 自愈。
+      notifyChunkLoadFailure(error)
+      throw error
+    }
     const Candidate = module[name]
     if (typeof Candidate !== 'function') {
       throw new Error(`懒加载页面缺少命名导出：${name}`)
@@ -42,33 +51,41 @@ function lazyPage(name: string, loader: () => Promise<Record<string, unknown>>) 
 }
 
 export const router = createBrowserRouter([
-  { path: '/', element: <Navigate to="/create" replace /> },
   {
-    element: <ProtectedRoute />,
+    // 根布局 errorElement：懒加载 chunk 失败等渲染错误不再白屏，显示刷新恢复 UI。
+    // 受保护路由内的渲染错误优先被 AppShell 的 ErrorBoundary 捕获，这里兜底
+    // 登录/认证/分享等没有内层边界的路由。
+    errorElement: <RouteErrorElement />,
     children: [
-      { path: '/create', element: <CreatePage /> },
-      { path: '/catalog', element: <CatalogPage /> },
-      { path: '/generations', element: <GenerationsPage /> },
-      { path: '/generations/:id', element: lazyPage('GenerationDetailPage', () => import('@/pages/GenerationDetailPage')) },
-      { path: '/functions', element: lazyPage('FunctionsPage', () => import('@/pages/FunctionsPage')) },
-      { path: '/library', element: lazyPage('LibraryPage', () => import('@/pages/LibraryPage')) },
-      { path: '/gallery', element: lazyPage('GalleryPage', () => import('@/pages/GalleryPage')) },
-      { path: '/prompts', element: lazyPage('PromptsPage', () => import('@/pages/PromptsPage')) },
-      { path: '/settings', element: lazyPage('ProfilePage', () => import('@/pages/ProfilePage')) },
+      { path: '/', element: <Navigate to="/create" replace /> },
+      {
+        element: <ProtectedRoute />,
+        children: [
+          { path: '/create', element: <CreatePage /> },
+          { path: '/catalog', element: <CatalogPage /> },
+          { path: '/generations', element: <GenerationsPage /> },
+          { path: '/generations/:id', element: lazyPage('GenerationDetailPage', () => import('@/pages/GenerationDetailPage')) },
+          { path: '/functions', element: lazyPage('FunctionsPage', () => import('@/pages/FunctionsPage')) },
+          { path: '/library', element: lazyPage('LibraryPage', () => import('@/pages/LibraryPage')) },
+          { path: '/gallery', element: lazyPage('GalleryPage', () => import('@/pages/GalleryPage')) },
+          { path: '/prompts', element: lazyPage('PromptsPage', () => import('@/pages/PromptsPage')) },
+          { path: '/settings', element: lazyPage('ProfilePage', () => import('@/pages/ProfilePage')) },
+        ],
+      },
+      {
+        path: '/login',
+        element: (
+          <RedirectIfAuthed>
+            <LoginPage />
+          </RedirectIfAuthed>
+        ),
+      },
+      { path: '/auth/verify-email', element: lazyPage('VerifyEmailPage', () => import('@/pages/auth/VerifyEmailPage')) },
+      { path: '/auth/check-email', element: lazyPage('CheckEmailPage', () => import('@/pages/auth/CheckEmailPage')) },
+      { path: '/auth/forgot-password', element: lazyPage('ForgotPasswordPage', () => import('@/pages/auth/ForgotPasswordPage')) },
+      { path: '/auth/reset-password', element: lazyPage('ResetPasswordPage', () => import('@/pages/auth/ResetPasswordPage')) },
+      { path: '/share/generations/:shareId', element: lazyPage('SharedGenerationPage', () => import('@/pages/SharedGenerationPage')) },
+      { path: '*', element: <Navigate to="/create" replace /> },
     ],
   },
-  {
-    path: '/login',
-    element: (
-      <RedirectIfAuthed>
-        <LoginPage />
-      </RedirectIfAuthed>
-    ),
-  },
-  { path: '/auth/verify-email', element: lazyPage('VerifyEmailPage', () => import('@/pages/auth/VerifyEmailPage')) },
-  { path: '/auth/check-email', element: lazyPage('CheckEmailPage', () => import('@/pages/auth/CheckEmailPage')) },
-  { path: '/auth/forgot-password', element: lazyPage('ForgotPasswordPage', () => import('@/pages/auth/ForgotPasswordPage')) },
-  { path: '/auth/reset-password', element: lazyPage('ResetPasswordPage', () => import('@/pages/auth/ResetPasswordPage')) },
-  { path: '/share/generations/:shareId', element: lazyPage('SharedGenerationPage', () => import('@/pages/SharedGenerationPage')) },
-  { path: '*', element: <Navigate to="/create" replace /> },
 ])

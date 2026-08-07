@@ -235,6 +235,13 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
 17. **`rsync -az infra/nginx/ server:/opt/.../infra/` 后服务器上文件位置不对**
     → 源目录尾斜杠 = 拷"内容"而非"目录本身"。规避：目标路径写全子目录，如 `server:/opt/.../infra/nginx/`。
 
+### G. 前端缓存 / chunk 加载（2026-08-07 事故实录）
+18. **用户报 `Failed to fetch dynamically imported module: https://create.yxswy.com/assets/GenerationDetailPage-C1HjH_VR.js`，刷新没用**
+    → 懒加载路由 chunk 按内容哈希命名；部署重建后旧 chunk 被**物理删除**（dist 烤进镜像、容器替换即删旧文件，无版本目录/保留方案）。仍持有旧 shell 的客户端（缓存旧 index.html、tab 跨部署未关、bfcache/内存旧模块图）对动态 import 命中 404。应用内「重试」若只 setState 不 reload，会反复重试同一缺失 chunk，观感即「刷新没用」。
+    → **根因在客户端恢复缺失，不在缓存头**：线上 index.html 已 `no-cache`（每次加载 revalidate 取新哈希），真正 F5 本应自愈。
+    → 规避/已落地：① 客户端守卫式自愈（`vite:preloadError` + 动态 import 失败 → sessionStorage 守卫下 reload 一次，`apps/web/src/lib/chunk-recovery.ts`，admin 同款）；② 错误边界「重试」对 chunk 错误改真 reload；③ 懒路由根布局 `errorElement` 恢复 UI；④ 资产头加 `immutable`、admin HTML 补 `no-cache`（`infra/nginx/bailian-studio.conf`，注意 location 内 add_header 不继承 server 级头、需重复声明）。
+    → 排查第一手：`curl -sI https://create.yxswy.com/` 看 index.html 的 Cache-Control；部署后对比 `apps/web/dist/assets/*.js` 与线上哈希。
+
 ---
 
 ## 8. 未来会话入口速查

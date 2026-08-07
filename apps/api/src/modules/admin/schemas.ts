@@ -64,6 +64,26 @@ export const TargetGalleryRecordSchema = z.object({ id: z.string().trim().min(1)
 
 export type TargetGalleryRecordInput = z.infer<typeof TargetGalleryRecordSchema>
 
+/** admin 批量下架/恢复/软删：1~100 个作品 id。 */
+export const BatchGallerySchema = z.object({
+  ids: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+}).strict()
+
+export type BatchGalleryInput = z.infer<typeof BatchGallerySchema>
+
+/** admin 任务中心列表：keyset 分页 + 可选 status/type/domain/userId/recordId 过滤。 */
+export const ListAdminTasksQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  cursor: z.string().trim().min(1).max(1024).optional(),
+  status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']).optional(),
+  type: z.string().trim().min(1).max(120).optional(),
+  domain: z.string().trim().min(1).max(120).optional(),
+  userId: z.string().trim().min(1).max(256).optional(),
+  recordId: z.string().trim().min(1).max(256).optional(),
+}).strict()
+
+export type ListAdminTasksQueryInput = z.infer<typeof ListAdminTasksQuerySchema>
+
 /** admin 画廊产物读取的目标（recordId + artifactId）。 */
 export const AdminGalleryArtifactParamsSchema = z.object({
   id: z.string().trim().min(1).max(256),

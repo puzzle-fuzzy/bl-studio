@@ -673,6 +673,11 @@ export const BatchUsersRequestSchema = z.object({
   userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
 }).strict()
 
+/** admin 画廊批量治理请求（下架/恢复/软删）：1~100 个作品 id。 */
+export const BatchGalleryRequestSchema = z.object({
+  ids: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
+}).strict()
+
 /** 批量赠送积分请求：idempotencyKey 为整批共享幂等键（前端 crypto.randomUUID()）。 */
 export const BatchGrantPointsRequestSchema = z.object({
   userIds: z.array(z.string().trim().min(1).max(256)).min(1).max(100),
@@ -736,6 +741,7 @@ export type AdminUser = z.infer<typeof AdminUserSchema>
 export type AdminListUsersResult = z.infer<typeof AdminListUsersResponseSchema>
 export type AdminStatsOverview = z.infer<typeof AdminStatsOverviewSchema>
 export type BatchUsersRequest = z.infer<typeof BatchUsersRequestSchema>
+export type BatchGalleryRequest = z.infer<typeof BatchGalleryRequestSchema>
 export type BatchGrantPointsRequest = z.infer<typeof BatchGrantPointsRequestSchema>
 export type BatchAffectedResult = z.infer<typeof BatchAffectedResponseSchema>
 export type BatchGrantPointsResult = z.infer<typeof BatchGrantPointsResponseSchema>
@@ -855,6 +861,62 @@ export const ListAdminGalleryResponseSchema = z.object({
 })
 
 export const AdminGalleryHideResultSchema = z.object({ hidden: z.boolean() })
+
+// ---------------------------------------------------------------------------
+// 管理后台 · 任务中心。
+// ---------------------------------------------------------------------------
+
+/** task error 摘要（category 与 task-engine TaskErrorCategory 对齐）。 */
+const TaskErrorCategoryEnum = z.enum([
+  'validation', 'auth', 'quota', 'rate_limit', 'provider', 'network', 'timeout', 'storage', 'cancelled', 'system',
+])
+
+export const AdminTaskErrorSchema = z.object({
+  category: TaskErrorCategoryEnum,
+  message: z.string(),
+  retriable: z.boolean(),
+  code: z.string().optional(),
+})
+
+export const AdminTaskItemSchema = z.object({
+  id: z.string(),
+  type: z.string(),
+  domain: z.enum(['generation', 'artifact', 'media', 'system']),
+  status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
+  priority: z.number(),
+  attempts: z.number(),
+  maxAttempts: z.number(),
+  nextRunAt: z.string(),
+  startedAt: z.string().optional(),
+  completedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+  recordId: z.string().optional(),
+  userId: z.string().optional(),
+  traceId: z.string().optional(),
+  author: z.object({ id: z.string(), displayName: z.string().nullable() }).optional(),
+  recordContext: z.object({ modelId: z.string(), category: z.enum(['image', 'video', 'audio', 'text']) }).optional(),
+  error: AdminTaskErrorSchema.optional(),
+  durationMs: z.number().optional(),
+})
+
+export const ListAdminTasksResponseSchema = z.object({
+  items: z.array(AdminTaskItemSchema),
+  nextCursor: z.string().optional(),
+})
+
+/** admin 画廊预览产物项（text 内联正文；媒体项带 readUrl/thumbnailUrl）。 */
+export const AdminGalleryArtifactSchema = z.object({
+  id: z.string(),
+  kind: z.string(),
+  readUrl: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  text: z.string().optional(),
+})
+
+export const AdminGalleryArtifactsResponseSchema = z.object({
+  items: z.array(AdminGalleryArtifactSchema),
+})
 
 // ---------------------------------------------------------------------------
 // 管理分析（model_costs + 成本毛利 + 留存漏斗）。
@@ -989,6 +1051,11 @@ export type NotificationUnreadCount = z.infer<typeof NotificationUnreadCountSche
 export type AdminGalleryItem = z.infer<typeof AdminGalleryItemSchema>
 export type ListAdminGalleryResult = z.infer<typeof ListAdminGalleryResponseSchema>
 export type AdminGalleryHideResult = z.infer<typeof AdminGalleryHideResultSchema>
+export type AdminTaskItem = z.infer<typeof AdminTaskItemSchema>
+export type AdminTaskError = z.infer<typeof AdminTaskErrorSchema>
+export type ListAdminTasksResult = z.infer<typeof ListAdminTasksResponseSchema>
+export type AdminGalleryArtifact = z.infer<typeof AdminGalleryArtifactSchema>
+export type AdminGalleryArtifactsResult = z.infer<typeof AdminGalleryArtifactsResponseSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>
 export type AdminCreateUserInput = z.infer<typeof AdminCreateUserInputSchema>
 export type AdminUpdateUserInput = z.infer<typeof AdminUpdateUserInputSchema>
