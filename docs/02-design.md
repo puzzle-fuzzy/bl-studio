@@ -135,7 +135,7 @@ bl-studio/
 | `bun run` / `bun x`（scripts） | `pnpm` / `pnpm exec` |
 
 ### 4.2 结构性改进（有意义的架构调整）
-1. **统一错误继承**：`RepositoryError`/`ProviderErrorInfo`/`AuthError` 全部继承 `BailianStudioError`，保留各自字段与 `code`/`retryable`/`metadata` 契约。→ 收敛 `shared/errors.ts` 自述债务。
+1. **错误体系（按现状如实描述，收敛推后）**：共享主干只有 `BailianStudioError`（`code`/`retryable`/`metadata`，实际仅 `ValidationError` 继承）。各业务层各自定义错误类并 `extends Error`：`GenerationRepositoryError`/`AuthError`/`CreditLedgerError`/`MediaRepositoryError`/`ModelCoreError`/`ApiClientError`/`DashScopeHttpError`；`ProviderErrorInfo` 是 **interface**。层间一致性靠**集中映射**而非统一继承：`apps/api/src/lib/http-errors.ts` 用 `instanceof` 逐一映射到 HTTP 状态与响应体，各层 `code` 是带完整 union 的稳定字符串（`Record<Code, number>` 覆盖完整联合，新增 code 未映射即编译报错），未分类错误走兜底 `INTERNAL_ERROR`——**绝不透传 `message`/`cause` 原文给客户端**（R2-P0-03，原文只进服务端日志经值级脱敏）。跨层统一继承留待后续（届时把各层子类迁到继承 `BailianStudioError` 并补回 `shared/errors.ts` 子类）。
 2. **清理废弃字段**：移除 `/api/usage` 与 `/api/generations/estimate` 响应的 `finalCents` 别名，同步更新 api-client schema 与测试。
 3. **类型收敛**：`api-client` 的本地类型声明改为从单一契约模块导出（不破坏包边界：契约类型留在 api-client，model-core 通过 `catalog.ts` 投影在结构上满足）。
 4. **SSE 类型精化**：为 `generation.status` 载荷的 status 保留字符串联合，但前端解析分支固定（`recordMatchesGenerationViews` 迁移为纯函数）。

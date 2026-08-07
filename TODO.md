@@ -504,10 +504,11 @@
 - **修法**：正则补 `accessKeyId|accessKey|jwt|session|cookie|credential|signature`；对值里的凭据模式（如 `[A-Z0-9_]{16,}`、已知 secret 前缀）做模糊化；或规定日志接口不允许原样落 Error.message。
 - **已核实安全侧**：worker 未把 DashScope 请求/响应体打日志（`DashScopeHttpError.raw` 只存不记），脱敏框架本身（输出前替换/含嵌套/双格式/绝不抛错）是对的。
 
-**R2-P1-14 · 错误体系与 docs/02-design §4.2 宣称完全不符（6+ 套平行错误类）**
+**R2-P1-14 · 错误体系与 docs/02-design §4.2 宣称完全不符（6+ 套平行错误类）** — ✅ 已处理（2026-08-08，取 (b) 路径）
 - **位置**：[02-design.md:138](docs/02-design.md) 宣称「RepositoryError/ProviderErrorInfo/AuthError 全部继承 BailianStudioError」；实际 [errors.ts:9-17](packages/shared/src/errors.ts#L9) 自述「各业务层各自定义，并未统一继承」，`BailianStudioError` 只有 `ValidationError` 继承；`GenerationRepositoryError`/`AuthError`/`CreditLedgerError`/`MediaRepositoryError`/`ModelCoreError`/`ApiClientError`/`DashScopeHttpError` 全 `extends Error`；`ProviderErrorInfo` 是 **interface 不是 class**，本身不可能「继承」
 - **影响**：契约不一致（code 各自 string union、`details`≠`metadata`、无 retryable）；[http-errors.ts:75-95](apps/api/src/lib/http-errors.ts#L75) 靠 `instanceof` 逐一映射，新错误类型落到兜底 500（即 R2-P0-03 泄漏路径）
 - **修法**：二选一 —— (a) 真收敛：各层错误继承 `BailianStudioError`，统一 `code`/`retryable`/`metadata`；(b) 至少把 02-design:138 改写为现状，并给 http-errors 兜底分支加「不得透传 message」约束。
+- **处理**：取 (b)——02-design:138 改写为现状（集中映射契约 + 兜底 INTERNAL_ERROR 不泄漏）；「不得透传 message」约束已在 R2-P0-03 落地（[http-errors.ts:190-194](apps/api/src/lib/http-errors.ts#L190-L194)），文档如实记录。跨层统一继承留待后续。
 
 **R2-P1-15 · 指标「只写不读」—— 无任何观测出口**
 - **位置**：[metrics.ts:4-7](apps/api/src/lib/metrics.ts#L4)（注释「供未来的 /metrics 端点」）；[app.ts:125-126](apps/api/src/app.ts#L125)（api.request）；[generation-task-handler.ts:604-613](apps/worker/src/generation-task-handler.ts#L604)（worker.provider_request）；[worker-loop.ts:126-128](apps/worker/src/worker-loop.ts#L126)（`metricsSnapshot()` 无调用方）；全仓无 `/metrics` 端点
