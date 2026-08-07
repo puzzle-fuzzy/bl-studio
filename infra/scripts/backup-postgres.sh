@@ -21,6 +21,14 @@ if ! pg_dump "$DATABASE_URL" | gzip -9 > "$TMP"; then
   exit 1
 fi
 
+# P2-35：gzip 完整性校验。管道成功不代表产物可解压（磁盘满/内存不足/中断都可能
+# 截断文件）；校验通过才原子 mv 为正式备份，损坏产物直接删除并标红。
+if ! gzip -t "$TMP"; then
+  echo "[backup] gzip 完整性校验失败，删除损坏临时文件: $TMP" >&2
+  rm -f "$TMP"
+  exit 1
+fi
+
 mv "$TMP" "$OUT"
 echo "[backup] 完成: $OUT"
 

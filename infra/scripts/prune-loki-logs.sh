@@ -22,7 +22,22 @@ curl -fsS -X POST \
   --data-urlencode "end=${END_MS}" \
   "${LOKI_URL}/loki/api/v1/delete"
 
-# 校验删除请求已入队（返回列表里应含一条）。
-curl -fsS "${LOKI_URL}/loki/api/v1/delete" | grep -q '{' \
-  && echo "==> 删除请求已入队，compactor 将于下次压缩时应用（约 10 分钟内）" \
-  || { echo "==> 未看到待处理删除请求（可能已应用）"; exit 0; }
+# 校验删除请求已入队（Loki 返回 JSON 数组，[] 表示已无可应用请求）。
+# P2-37：原来 `grep -q '{'` 会把空数组 []（已应用）和任何含 { 的响应都判成「已入队」；
+# 改为真正解析 JSON。优先 python3（服务器 certbot 依赖 python3，必然存在），
+# 缺失时退回「去空白后是否非空数组」的保守判断。
+response="$(curl -fsS "${LOKI_URL}/loki/api/v1/delete")"
+if command -v python3 >/dev/null 2>&1; then
+  if printf '%s' "$response" | python3 -c 'import json,sys; sys.exit(0 if len(json.load(sys.stdin)) > 0 else 1)' 2>/dev/null; then
+    echo "==> 删除请求已入队，compactor 将于下次压缩时应用（约 10 分钟内）"
+  else
+    echo "==> 未看到待处理删除请求（可能已应用）"
+  fi
+else
+  compact="$(printf '%s' "$response" | tr -d '[:space:]')"
+  if [[ -n "$compact" && "$compact" != "[]" && "$compact" != "null" ]]; then
+    echo "==> 删除请求已入队，compactor 将于下次压缩时应用（约 10 分钟内）"
+  else
+    echo "==> 未看到待处理删除请求（可能已应用）"
+  fi
+fi

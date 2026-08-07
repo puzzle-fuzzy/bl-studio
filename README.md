@@ -16,7 +16,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本），由 **ba
 | API 运行时 | **Bun**（唯一例外：Elysia 用 `bun apps/api/src/index.ts` 启动） |
 | Worker 运行时 | Node + **tsx** |
 | API 框架 | Elysia 1.4 |
-| ORM | Drizzle（Postgres 23 张表） |
+| ORM | Drizzle（Postgres 24 张表） |
 | 前端 | React 19 + Vite 8 + **zustand** + react-router 8 + **shadcn/ui** + Tailwind CSS 4 + **react-window** + sonner |
 | 登录 | 邮箱密码 + **GitHub OAuth**（会话 http-only cookie） |
 | 密码哈希 | @node-rs/argon2（argon2id） |

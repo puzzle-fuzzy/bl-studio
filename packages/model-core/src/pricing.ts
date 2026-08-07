@@ -50,13 +50,28 @@ function mediaPresent(value: unknown): boolean {
 }
 
 /** 判断 params 是否命中某 rate 的 conditions。空 conditions 恒不命中（默认价由回退处理）。 */
-function matchesConditions(rate: Readonly<PricingRateData>, params: Record<string, unknown>): boolean {
+function matchesConditions(
+  rate: Readonly<PricingRateData>,
+  params: Record<string, unknown>,
+  manifest: FrozenModelManifest,
+): boolean {
   const conditionEntries = Object.entries(rate.conditions)
   if (conditionEntries.length === 0) return false
   return conditionEntries.every(([key, value]) => {
     if (isPresenceCondition(value)) return mediaPresent(params[key]) === value.present
-    return params[key] === value
+    // 条件引用的参数可能未随 payload 显式携带（可选项缺省，例如 worker 的 poll 续跑
+    // 路径刻意不重跑默认值填充）。用 manifest 声明的 defaultValue 解析出有效值再比较，
+    // 避免把「缺省即默认」误判为不匹配——否则 keling/wanx 的 audio=false、wanx 的
+    // promptExtend=true 等条件永远命中不了，P2-20 保守回退会取到最高档费率
+    // （回归：dashscope-runner 期望 420 实际 840）。
+    const effective = params[key] ?? defaultParameterValue(manifest, key)
+    return effective === value
   })
+}
+
+/** 条件参数在 manifest 中声明的默认值；参数未声明默认值时返回 undefined。 */
+function defaultParameterValue(manifest: FrozenModelManifest, name: string): unknown {
+  return manifest.parameters.find(parameter => parameter.name === name)?.defaultValue
 }
 
 /** 默认价判定：conditions 为空对象。registry-check 强制每个 chargeItem 至多一个默认价。 */
@@ -91,7 +106,7 @@ function selectRate(
   const pool = candidates.some(rate => rate.region === DEFAULT_REGION)
     ? candidates.filter(rate => rate.region === DEFAULT_REGION)
     : candidates
-  return pool.find(candidate => matchesConditions(candidate, params))
+  return pool.find(candidate => matchesConditions(candidate, params, manifest))
     ?? pool.find(isDefaultRate)
     ?? conservativeFallback(pool)
 }

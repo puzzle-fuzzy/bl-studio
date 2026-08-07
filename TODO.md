@@ -363,6 +363,7 @@
 - **P2-18 · 可选字符串空串原样透传 provider** —— ✅ 已处理（2026-08-08）：`validation.ts` 的 `applyDefaults` 新增归一化——text 参数值为 `''` 时视为未提供并删除（与 isEmpty 语义一致），deepseek `stop` 清空后不再以空串进请求体。
 - **P2-19 · catalog/api-client 投影手工维护易漂移** —— ✅ 已处理（2026-08-08）：新增根契约测试 `tests/catalog-projection-completeness.test.ts`——类型层 `Exclude<keyof ModelParameter, ...>` 强制覆盖（model-core 加字段未同步即 tsc 红）+ 运行层对每个已注册模型经 `ModelCatalogItemSchema.parse` 断言投影字段不丢（`parsed.parameters` deep-equal 任一字段剥掉即红）。为此把 `ModelValidationRuleSchema` 从模块私有改为导出。
 - **P2-20 · selectRate 的 `pool[0]` 静默回退可能低估费用** —— ✅ 已处理（2026-08-08）：`pricing.ts` 新增 `conservativeFallback`——conditions 未命中且无默认价时取池中每单位分值最高 rate（保守上界），不再静默取第一条；`selectRate` 与 `tokenRateCents` 均接线。两个剧本 manifest 把「视觉文本输入 / 多模态文本输出」设为默认价，使常见路径不被保守回退高估（音频档仍按 mode 区分）。新增两条定价测试锁定行为。
+  - **回归修复（2026-08-08）**：conservativeFallback 暴露了条件匹配对「缺省参数」的误判——worker 的 poll 续跑路径刻意不重跑默认值填充（raw params 无 `audio`），`matchesConditions` 的 `params[key] === value` 把 `undefined === false` 判为不匹配，keling std 档永远命中不了 → 保守回退取到 pro-audio 1.2（dashscope-runner 期望 420 实得 840）。修复：`matchesConditions` 用 manifest 声明的 `defaultValue` 解析缺省参数的有效值再比较（`audio` 默认 false、`promptExtend` 默认 true 都正确命中）。新增两条 pricing 回归测试锁定（false 默认 / true 默认两种模式）。
 
 ### API
 - **P2-21 · SSE 事件名不一致** —— ✅ 已处理（2026-08-08）：创建/重试的路由手工发布统一改为 `generation.status`，`BailianStudioSSEEventMap` 删除 `generation.created`，前端监听列表同步去掉。调查确认 hub 已按事件 id 去重（sse-hub.ts），生产无重复投递——真正的 bug 只是「同一事件名取决于时序」（live 由路由发 `created`、重放/listener 发 `status`）。现在创建即首个 status 事件，live/重放/listener 三路同名。
@@ -377,16 +378,16 @@
 - **P2-28 · 通知点击不定位到具体作品** —— ✅ 已处理（2026-08-08）：社交通知点击改为 `navigate('/generations/:recordId')` 定位到具体作品详情（recordId 即作品 id）。
 
 ### 工程化 / 运维 / 文档
-- **P2-29 · 迁移在单次部署中跑两遍** —— [deploy-prod.sh:146+149](infra/scripts/deploy-prod.sh#L146)：`run --rm migrate` + `up -d` 再启 migrate 服务。`up -d` 换 `--scale migrate=0`。
-- **P2-30 · ensure-audit-action-constraint 每次 push 都 DROP/ADD** —— [ensure-audit-action-constraint.ts:15-16](infra/scripts/ensure-audit-action-constraint.ts#L15)：先查 `pg_constraint` 现值，一致则跳过。
-- **P2-31 · nginx 模板依赖宿主机全局 `$connection_upgrade` map** —— [create.yxswy.com.conf:41-42](infra/nginx/create.yxswy.com.conf#L41)：map 定义不在本仓库，全新主机 `nginx -t` 会挂。模板加注前置或自写 map 片段。
-- **P2-32 · 运维脚本普遍依赖手动导出 DATABASE_URL** —— [package.json:31-33,50,71](package.json#L31)：credits:reconcile/release-stale/admin:promote/db:seed:model-costs 无 dotenv 前缀。统一加 `dotenv -e infra/env/.env`。
-- **P2-33 · db:push/studio 硬编码端口 URL（第三份拷贝）** —— [package.json:39-49](package.json#L39) 内联 `127.0.0.1:55431/55432`，与 defaults.ts/.env.example 形成三份来源。加断言测试防漂移。
-- **P2-34 · setup-host-edge.sh 域名硬编码** —— [setup-host-edge.sh:16](infra/scripts/setup-host-edge.sh#L16)（DOMAINS 数组），换域名必须改脚本。
-- **P2-35 · 备份文件无完整性校验** —— [backup-postgres.sh:18-25](infra/scripts/backup-postgres.sh#L18)：`pg_dump|gzip` 成功但产物损坏不会被发现。`gzip -t` 校验后再 mv。
-- **P2-36 · README 表数过时** —— [README.md:19](README.md#L19)「23 张表」，schema.ts 现为 24 张（含 worker_heartbeats 等）。
-- **P2-37 · prune-loki-logs.sh 用 `grep -q '{'` 判空** —— [prune-loki-logs.sh:26-28](infra/scripts/prune-loki-logs.sh#L26)：空列表 `[]` 被误判「可能已应用」exit 0，删除被拒/过期也误判成功。改解析 JSON。
-- **P2-38 · env 模板漂移（worker 心跳变量）** —— [config.ts:52-53](apps/worker/src/config.ts#L52) 读 `WORKER_LOCK_HEARTBEAT_MS` + `WORKER_HEARTBEAT_INTERVAL_MS` 两个变量；`.env.example` 只文档化后者、`.env.test.example` 只文档化前者、`.env.production.example` 两个都没有。三份模板补齐。
+- **P2-29 · 迁移在单次部署中跑两遍** —— ✅ 已处理（2026-08-08）：`up -d` 加 `--scale migrate=0`（migrate 是 restart:no 一次性服务，已由 `run --rm migrate` 跑过）；docker compose 实验验证 scale=0 时 `depends_on: service_completed_successfully` 的 api/worker 立即启动，不会启第二个 migrate 容器。
+- **P2-30 · ensure-audit-action-constraint 每次 push 都 DROP/ADD** —— ✅ 已处理（2026-08-08）：先查 `pg_constraint`（`pg_get_constraintdef` 抽取 action 集合），与期望一致则 no-op 跳过；仅不一致/缺失才 DROP/ADD。已用 test DB 验证 no-op 与重建两条路径。
+- **P2-31 · nginx 模板依赖宿主机全局 `$connection_upgrade` map** —— ✅ 已处理（2026-08-08）：模板加注前置说明；setup-host-edge.sh 自检 `$http_upgrade → $connection_upgrade` map 是否已定义，缺失时自写 `/etc/nginx/conf.d/websocket-upgrade.conf` 兜底（幂等，避免与全局定义重复导致 duplicate map）。
+- **P2-32 · 运维脚本普遍依赖手动导出 DATABASE_URL** —— ✅ 已处理（2026-08-08）：credits:reconcile/release-stale/admin:promote/db:backfill:credits/db:seed:model-costs/queue:health/queue:retention 统一加 `dotenv -e infra/env/.env` 前缀。
+- **P2-33 · db:push/studio 硬编码端口 URL（第三份拷贝）** —— ✅ 已处理（2026-08-08）：新增根契约测试 `tests/db-url-consistency.test.ts` 断言 defaults.ts ↔ package.json `db:*` 内联 URL ↔ .env.example/.env.test.example 三处来源一致，任何一处改串漏改其余即红。
+- **P2-34 · setup-host-edge.sh 域名硬编码** —— ✅ 已处理（2026-08-08）：DOMAINS 改为读 .env.prod-infra 的 SITE_DOMAIN / LOGS_DOMAIN（缺省回退原值），换域名无需改脚本（模板按 `<域名>.conf` 命名随 infra/nginx/ rsync）。
+- **P2-35 · 备份文件无完整性校验** —— ✅ 已处理（2026-08-08）：`pg_dump|gzip` 后先 `gzip -t "$TMP"` 校验，通过才原子 mv；损坏产物删除并标红退出。
+- **P2-36 · README 表数过时** —— ✅ 已处理（2026-08-08）：README「23 张表」→「24 张表」（schema.ts 实为 24 个 pgTable，含 worker_heartbeats）。
+- **P2-37 · prune-loki-logs.sh 用 `grep -q '{'` 判空** —— ✅ 已处理（2026-08-08）：改真正解析 JSON（优先 python3 `json.load` 判数组非空，无 python3 回退「去空白后非空数组」），空列表 `[]` 正确识别为「已应用」。
+- **P2-38 · env 模板漂移（worker 心跳变量）** —— ✅ 已处理（2026-08-08）：三份模板补齐 `WORKER_LOCK_HEARTBEAT_MS` + `WORKER_HEARTBEAT_INTERVAL_MS`（.env.production.example 与 .env.example 两个都有，.env.test.example 有 `WORKER_LOCK_DURATION_MS`）。
 
 ---
 

@@ -13,7 +13,14 @@ ENV_INFRA="$INFRA_DIR/env/.env.prod-infra"
 NGINX_CONFD="/etc/nginx/conf.d"
 ACME_ROOT="/var/www/bailian-acme"
 HTPASSWD_FILE="/etc/nginx/htpasswd.bailian-logs"
-DOMAINS=("create.yxswy.com" "logs.yxswy.com")
+# 域名清单优先读 .env.prod-infra 的 SITE_DOMAIN / LOGS_DOMAIN（部署脚本同一来源），
+# 缺失才回退默认值（P2-34：换域名不再需要改脚本）。
+# 注意：模板文件需按 `<域名>.conf` 命名，部署时随 infra/nginx/ rsync 到服务器。
+SITE_DOMAIN="$(awk -F= '$1=="SITE_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_INFRA" | tail -n 1)"
+LOGS_DOMAIN="$(awk -F= '$1=="LOGS_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_INFRA" | tail -n 1)"
+SITE_DOMAIN="${SITE_DOMAIN:-create.yxswy.com}"
+LOGS_DOMAIN="${LOGS_DOMAIN:-logs.yxswy.com}"
+DOMAINS=("$SITE_DOMAIN" "$LOGS_DOMAIN")
 
 [[ -f "$ENV_INFRA" ]] || { echo "缺少 $ENV_INFRA" >&2; exit 1; }
 
@@ -68,6 +75,24 @@ if [[ ! -f "/etc/letsencrypt/live/${DOMAINS[0]}/fullchain.pem" ]]; then
     --keep-until-expiring
 else
   echo "==> 证书已存在，跳过签发"
+fi
+
+# 3.5) WebSocket 升级 map 兜底（P2-31）：create.yxswy.com.conf 引用 $connection_upgrade，
+#      全新主机全局 nginx 未定义该 map 时 `nginx -t` 会挂。自检已存在则跳过，
+#      否则自写一个 conf.d 片段（避免与全局定义重复导致 duplicate map 错误）。
+MAP_FILE="/etc/nginx/conf.d/websocket-upgrade.conf"
+if grep -rqE 'map[[:space:]]+\$http_upgrade[[:space:]]+\$connection_upgrade' \
+    /etc/nginx/nginx.conf "$NGINX_CONFD" 2>/dev/null; then
+  echo "==> WebSocket upgrade map 已存在，跳过"
+else
+  cat > "$MAP_FILE" <<'EOF'
+# 标准 WebSocket 升级 map（由 setup-host-edge.sh 在宿主未定义时兜底写入）。
+map $http_upgrade $connection_upgrade {
+    default upgrade;
+    ''      close;
+}
+EOF
+  echo "==> 已写入 WebSocket upgrade map: $MAP_FILE"
 fi
 
 # 4) 写入完整 conf.d（HTTP+HTTPS，模板来自仓库 infra/nginx/）。

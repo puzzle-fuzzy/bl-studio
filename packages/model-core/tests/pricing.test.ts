@@ -158,6 +158,70 @@ describe('estimatePriceCents', () => {
     expect(estimatePriceCents(noDefaultManifest, { duration: 10 })).toBe(1200)
   })
 
+  it('resolves missing condition params against the manifest default — false default (P2-20 回归)', () => {
+    const audioDefaultFalse: ModelManifest = {
+      ...baseManifest,
+      id: 'priced-audio-default-false',
+      category: 'video',
+      parameters: [
+        { name: 'duration', label: '时长', type: 'number', defaultValue: 5, min: 3, max: 15, step: 1 },
+        {
+          name: 'mode',
+          label: '模式',
+          type: 'select',
+          defaultValue: 'pro',
+          options: [{ label: 'std', value: 'std' }, { label: 'pro', value: 'pro' }],
+        },
+        { name: 'audio', label: '音频', type: 'boolean', defaultValue: false },
+      ],
+      request: { kind: 'dashscope-video-task', endpoint: '/video', mediaMode: 'none', bindings: {} },
+      output: { kind: 'video-url', path: 'output.video_url' },
+      pricing: {
+        unit: 'per_second',
+        quantityKey: 'duration',
+        currency: 'CNY',
+        rates: [
+          { id: 'std-silent', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '0.6', conditions: { mode: 'std', audio: false } },
+          { id: 'pro-silent', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '0.8', conditions: { mode: 'pro', audio: false } },
+          { id: 'std-audio', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '0.9', conditions: { mode: 'std', audio: true } },
+          { id: 'pro-audio', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '1.2', conditions: { mode: 'pro', audio: true } },
+        ],
+      },
+    }
+    // audio 缺省（默认 false）应命中 std-silent 0.6 × 7s = 420 分，
+    // 而不是保守回退取最高档 pro-audio 1.2 → 840（worker poll 续跑路径不重跑默认值填充）。
+    expect(estimatePriceCents(audioDefaultFalse, { duration: 7, mode: 'std' })).toBe(420)
+    // 显式 audio: true 命中 std-audio 0.9 × 7s = 630 分。
+    expect(estimatePriceCents(audioDefaultFalse, { duration: 7, mode: 'std', audio: true })).toBe(630)
+  })
+
+  it('resolves missing condition params against the manifest default — true default (promptExtend 模式)', () => {
+    const extendedDefaultTrue: ModelManifest = {
+      ...baseManifest,
+      id: 'priced-extended-default-true',
+      category: 'video',
+      parameters: [
+        { name: 'duration', label: '时长', type: 'number', defaultValue: 5, min: 1, max: 60, step: 1 },
+        { name: 'promptExtend', label: '智能改写', type: 'boolean', defaultValue: true },
+      ],
+      request: { kind: 'dashscope-video-task', endpoint: '/video', mediaMode: 'none', bindings: {} },
+      output: { kind: 'video-url', path: 'output.video_url' },
+      pricing: {
+        unit: 'per_second',
+        quantityKey: 'duration',
+        currency: 'CNY',
+        rates: [
+          { id: 'extended', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '1.2', conditions: { promptExtend: true } },
+          { id: 'plain', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '0.6', conditions: { promptExtend: false } },
+        ],
+      },
+    }
+    // promptExtend 缺省（默认 true）应命中 extended 1.2 × 5s = 600 分，而非 0.6 的 300。
+    expect(estimatePriceCents(extendedDefaultTrue, { duration: 5 })).toBe(600)
+    // 显式 promptExtend: false 命中 plain 0.6 × 5s = 300 分。
+    expect(estimatePriceCents(extendedDefaultTrue, { duration: 5, promptExtend: false })).toBe(300)
+  })
+
   it('scales per_token rates (decimal yuan per 1M tokens) down to an integer-cent estimate', () => {
     const textManifest: ModelManifest = {
       ...baseManifest,

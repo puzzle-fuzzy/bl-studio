@@ -164,7 +164,10 @@ echo "==> 执行数据库迁移"
 ssh_cmd "$COMPOSE run --rm migrate"
 
 echo "==> 滚动启动核心栈"
-ssh_cmd "$COMPOSE up -d --no-build --pull never"
+# migrate 是 restart:no 的一次性服务，已在上一步 run --rm 跑过；scale 到 0
+# 避免 up -d 再启一个 migrate 容器把迁移跑第二遍（P2-29）。依赖它的
+# api/worker 不会等待该服务（scale=0 即视为跳过），迁移已完成，直接起。
+ssh_cmd "$COMPOSE up -d --no-build --pull never --scale migrate=0"
 
 echo "==> 接入宿主机 nginx 边缘（证书 + conf.d，幂等）"
 ssh_cmd "bash $REMOTE_INFRA/scripts/setup-host-edge.sh $REMOTE_INFRA"
