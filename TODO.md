@@ -304,25 +304,28 @@
 
 ### 2.5 模型知识（model-core）
 
-### P1-34 · fun-music prompt 必填与 required-one-of 规则自相矛盾
+### P1-34 · fun-music prompt 必填与 required-one-of 规则自相矛盾 — ✅ 已处理（commit `b4f46ac`，2026-08-08）
 - **位置**：[fun-music.ts:24](packages/model-core/src/manifests/audio/fun-music.ts#L24)（`prompt required:true`）vs [:80-86](packages/model-core/src/manifests/audio/fun-music.ts#L80-L86)（`required-one-of [lyrics, prompt]`）
 - **影响**：官方允许「仅歌词」提交，此处必被 `REQUIRED_PARAMETER(prompt)` 拒绝；规则与文案形成错误引导。
 - **修法**：去掉 prompt 的 `required:true`（二选一语义以规则为准），补「仅 lyrics」回归测试。
+- **处理**：① prompt 置 `required:false`（二选一语义以 required-one-of 规则为准）；② [validation.test.ts](packages/model-core/tests/validation.test.ts) 补「仅 lyrics」在真实 fun-music manifest 上通过的回归；③ [acceptance.ts](packages/provider-dashscope/src/acceptance.ts) 的 `buildOfflineFixtureParams` 增加 `required-one-of` 规则满足逻辑（全空时优先补 prompt 类文本字段）——否则 acceptance matrix 因「一个都不给」报 `INVALID_FIXTURE`。P1-36 的价格矛盾未动，留待人工核实。
 
-### P1-35 · subModeOf 把视频理解模型归类为「视频编辑」，主创建页可触达
+### P1-35 · subModeOf 把视频理解模型归类为「视频编辑」，主创建页可触达 — ✅ 已处理（commit `b4f46ac`，2026-08-08）
 - **位置**：[model-modes.ts:44-59](apps/web/src/lib/model-modes.ts#L44-L59)（`video_input` → `vedit`）；SubMode 无 `understand`
 - **影响**：qwen-omni-screenplay/-flash（启用状态）出现在视频编辑子模式，与真正编辑模型混列；用户按编辑模型选择会拿到文本剧本而非视频。
 - **修法**：SubMode 增加 `understand`（或独立分组），剧本类 capabilities 先行归类；至少从 vedit 排除。
+- **处理**：[model-modes.ts](apps/web/src/lib/model-modes.ts) 增加 `'understand'` 子模式（SUB_MODE_LABELS「视频理解」、SUB_MODE_ORDER.video 追加），subModeOf 的 video 分支将 `screenplay` capability 先行归为 `understand`；不变表补 `['video', ['screenplay'], 'understand']` 与 `['video', ['screenplay','video_input','streaming'], 'understand']` 行。
 
 ### P1-36 · qwen-image-2 头注释价格与 manifest rates 矛盾（需核实）
 - **位置**：[qwen-image-2.ts:6-9](packages/model-core/src/manifests/image/qwen-image-2.ts#L6-L9)（注释 0.20/0.25/0.15 元）vs [:112/:230/:348](packages/model-core/src/manifests/image/qwen-image-2.ts#L112)（rates 实为 0.5/0.5/0.2 元）
 - **影响**：若 rates 是错的一方 → 真实资金影响；若注释是错的一方 → 误导维护。
 - **修法**：对照百炼官方价格页核对，把官方价格写进注释并标注核验日期。
 
-### P1-37 · 「新增模型 = 只改 manifest」声明不完全成立，多个硬编码消费者
+### P1-37 · 「新增模型 = 只改 manifest」声明不完全成立，多个硬编码消费者 — ✅ 已处理（commit `b4f46ac`，2026-08-08）
 - **位置**：[FunctionsPage.tsx:16-17](apps/web/src/pages/FunctionsPage.tsx#L16-L17)、[chat-builder.ts](packages/provider-dashscope/src/chat-builder.ts)（buildScreenplayPrompt 硬编码）、[pricing.ts:170-172](packages/model-core/src/pricing.ts#L170-L172)（token 桶→conditions.mode 映射硬编码）、[model-modes.ts:14](apps/web/src/lib/model-modes.ts#L14)（无 understand）
 - **影响**：新增剧本类/ASR 类模型仍需改 4 处非 manifest 代码，漏改一处即静默错配（FunctionsPage 的 `find(Boolean)` 只取第一个）。
 - **修法**：把「剧本流/ASR 流」能力判定下沉到 manifest capabilities（如新增 `screenplay` capability），按 capability 分发。
+- **处理**：① `screenplay` 进 [types.ts](packages/model-core/src/types.ts) 的 ModelCapability 联合，两个 omni-screenplay manifest 加该 capability；② [tool-submission.ts](apps/web/src/lib/tool-submission.ts) 重写为 capability 分发（`toolModelKind` / `selectToolModel` / `toolMediaParamName` / `buildToolGenerationPayload`），删硬编码 ID 表；③ [FunctionsPage.tsx](apps/web/src/pages/FunctionsPage.tsx) 改用 `selectToolModel`；④ [chat-builder.ts](packages/provider-dashscope/src/chat-builder.ts) 加「非 screenplay capability 直接抛错」守卫（改错即红）。pricing.ts:170-172 评估为 DashScope token 桶契约（mode 字符串已在 manifest 的 mode 参数文档化，rates 由 manifest 驱动），不改。
 
 ### 2.6 工程化 / CI / 运维
 
