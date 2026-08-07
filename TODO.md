@@ -370,11 +370,11 @@
 - **P2-23 · `markGenerationProcessing`/`scheduleGenerationPoll` 迁移失败误抛 `GENERATION_NOT_CANCELLABLE`** —— ✅ 已处理（2026-08-08）：新增专用错误码 `GENERATION_NOT_PROCESSABLE`（repository errors.ts 联合 + api http-errors 409 映射），两处 throw 换用；repository.test 同步断言。cancel 路径的 `GENERATION_NOT_CANCELLABLE` 保留不动。
 
 ### 前端
-- **P2-24 · assets-store `getFreshAsset` 的 set() 形状错误（死代码）** —— [assets-store.ts:131-148](apps/web/src/stores/assets-store.ts#L131) 返回顶层 Record 而非 `{ queries: {...} }`，调用会污染根状态；grep 无调用方。修正或删除。
-- **P2-25 · 任务筛选 `matchesProgress.running` 漏状态** —— [GenerationsPanel.tsx:139-144](apps/web/src/components/generations/GenerationsPanel.tsx#L139) 只匹配 queued/processing，漏 submitting/provider_processing 等。复用 `ACTIVE_GENERATION_STATUSES`（labels.ts）。
-- **P2-26 · 详情页重复手写状态列表** —— [GenerationDetailPage.tsx:98](apps/web/src/pages/GenerationDetailPage.tsx#L98) `isActive` 手写 5 状态，与 labels.ts 重复。
-- **P2-27 · `setGenerationLibraryState` 复用 CancelGenerationResponseSchema** —— [generation-client.ts:745-758](packages/api-client/src/generation-client.ts#L745)：结构一致但命名误导。
-- **P2-28 · 通知点击不定位到具体作品** —— [NotificationMenu.tsx:34-36](apps/web/src/components/layout/NotificationMenu.tsx#L34) 只 `navigate('/gallery')`，recordId 未用。
+- **P2-24 · assets-store `getFreshAsset` 的 set() 形状错误（死代码）** —— ✅ 已处理（2026-08-08）：接口声明 + 实现一并删除（grep 无调用方；set 返回裸 Record 会污染根状态，`remove` 已提供正确的 `{ queries }` 更新范式）。
+- **P2-25 · 任务筛选 `matchesProgress.running` 漏状态** —— ✅ 已处理（2026-08-08）：running 分支复用 `ACTIVE_GENERATION_STATUSES`（原手写 queued/processing 与真实状态机对不上，`queued` 甚至不是合法状态）。
+- **P2-26 · 详情页重复手写状态列表** —— ✅ 已处理（2026-08-08）：`isActive` 改用 `ACTIVE_GENERATION_STATUSES.has(status)`。
+- **P2-27 · `setGenerationLibraryState` 复用 CancelGenerationResponseSchema** —— ✅ 已处理（2026-08-08）：新增语义正确的 `GenerationRecordUpdateResponseSchema`（`{ record }`），client 改用它；取消端点继续用 Cancel 版本。
+- **P2-28 · 通知点击不定位到具体作品** —— ✅ 已处理（2026-08-08）：社交通知点击改为 `navigate('/generations/:recordId')` 定位到具体作品详情（recordId 即作品 id）。
 
 ### 工程化 / 运维 / 文档
 - **P2-29 · 迁移在单次部署中跑两遍** —— [deploy-prod.sh:146+149](infra/scripts/deploy-prod.sh#L146)：`run --rm migrate` + `up -d` 再启 migrate 服务。`up -d` 换 `--scale migrate=0`。

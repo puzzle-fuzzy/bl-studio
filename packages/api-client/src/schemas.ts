@@ -408,6 +408,11 @@ export const CancelGenerationResponseSchema = z.object({
   record: GenerationRecordSchema,
 })
 
+/** 非状态迁移的 record 更新端点返回的 record（如设置作品库状态）。 */
+export const GenerationRecordUpdateResponseSchema = z.object({
+  record: GenerationRecordSchema,
+})
+
 /** 重跑生成返回新 record + task（与创建生成同构）。 */
 export const RetryGenerationResponseSchema = CreateGenerationResponseSchema
 

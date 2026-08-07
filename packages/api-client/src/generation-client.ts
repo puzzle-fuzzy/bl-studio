@@ -31,6 +31,7 @@ import {
   CreditBalanceResponseSchema,
   CreateGenerationResponseSchema,
   EmailActionAcceptedSchema,
+  GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
   GenerationDiagnosticsSchema,
   CreateMediaJobResponseSchema,
@@ -753,7 +754,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
           credentials: 'include',
         },
         fetchImpl,
-        CancelGenerationResponseSchema,
+        GenerationRecordUpdateResponseSchema,
       )
       return data.record
     },

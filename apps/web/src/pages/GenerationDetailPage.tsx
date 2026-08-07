@@ -24,7 +24,7 @@ import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
 import { parsePromptReferences } from '@/lib/reference-format'
 import { encodeDeepLinkParams } from '@/lib/deeplink-params'
-import { generationStatusLabel, kindLabel } from '@/lib/labels'
+import { ACTIVE_GENERATION_STATUSES, generationStatusLabel, kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
 
 /** 生成详情页：成品 + 输入参数 + 操作（取消/重跑/分享/移除）+ 诊断。 */
@@ -95,7 +95,8 @@ function DetailContent({
     return () => { cancelled = true }
   }, [id])
 
-  const isActive = ['draft', 'submitting', 'processing', 'provider_processing', 'saving_output'].includes(record.status)
+  // 复用共享活跃态集合，避免与 labels.ts 重复手写（P2-26）。
+  const isActive = ACTIVE_GENERATION_STATUSES.has(record.status)
 
   const handleVisibilityToggle = async () => {
     const next: 'private' | 'public' = visibility === 'private' ? 'public' : 'private'

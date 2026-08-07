@@ -9,6 +9,7 @@ import { GenerationListItem } from '@/components/generations/GenerationListItem'
 import { GenerationStatusFilter } from '@/components/generations/GenerationStatusFilter'
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
+import { ACTIVE_GENERATION_STATUSES } from '@/lib/labels'
 
 /** 产物类型筛选（嵌入态）。 */
 type KindFilter = 'all' | 'image' | 'video' | 'audio'
@@ -150,10 +151,12 @@ function recordKind(
   return undefined
 }
 
-/** 任务进度匹配：已完成 / 进行中（排队+处理中）/ 失败（失败+取消）。 */
+/** 任务进度匹配：已完成 / 进行中（活跃态）/ 失败（失败+取消）。 */
 function matchesProgress(status: string, filter: ProgressFilter): boolean {
   if (filter === 'done') return status === 'succeeded'
-  if (filter === 'running') return status === 'queued' || status === 'processing'
+  // 复用共享的活跃态集合：submitting/provider_processing/saving_output 等
+  // 非终态都属于「进行中」，避免这里手写列表与 labels.ts 漂移（P2-25）。
+  if (filter === 'running') return ACTIVE_GENERATION_STATUSES.has(status)
   if (filter === 'failed') return status === 'failed' || status === 'cancelled'
   return true
 }

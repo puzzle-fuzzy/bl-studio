@@ -30,9 +30,9 @@ export function NotificationMenu() {
 
   const handleOpen = (notification: AppNotification) => {
     void openNotification(notification.id)
-    // 社交通知关联作品：跳画廊查看该作品。
+    // 社交通知关联作品：直接定位到该作品详情页（recordId 即作品 id，P2-28）。
     if (notification.server === true && notification.recordId !== undefined) {
-      navigate('/gallery')
+      navigate(`/generations/${encodeURIComponent(notification.recordId)}`)
     }
   }
 

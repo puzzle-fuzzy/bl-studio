@@ -28,7 +28,6 @@ interface AssetsState {
   queries: Record<string, AssetQueryState>
   load(query: AssetQuery, force?: boolean): Promise<void>
   loadMore(query: AssetQuery): Promise<void>
-  getFreshAsset(id: string): Promise<AssetItem | null>
   remove(id: string): Promise<void>
   invalidate(): void
   clear(): void
@@ -134,25 +133,6 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
       set(current => ({
         queries: { ...current.queries, [key]: { ...(current.queries[key] ?? state), isLoadingMore: false } },
       }))
-    }
-  },
-
-  async getFreshAsset(id) {
-    try {
-      const asset = await apiClient.getAsset(id)
-      // 回写所有包含该资产的缓存
-      set(state => {
-        const queries: Record<string, AssetQueryState> = {}
-        for (const [key, entry] of Object.entries(state.queries)) {
-          if (entry.items.some(item => item.id === id)) {
-            queries[key] = { ...entry, items: entry.items.map(item => (item.id === id ? asset : item)) }
-          }
-        }
-        return queries
-      })
-      return asset
-    } catch {
-      return null
     }
   },
 
