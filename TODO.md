@@ -245,7 +245,7 @@
 - **关联**：`releaseStaleReservations` 目前**无任何调用方**（见 P2-07）—— 崩溃后既未 settle 也未 refund 的 reserve 永远不会被释放。
 
 ### P1-28 · login 计时侧信道 + 未验证邮箱可枚举
-- **位置**：[auth/src/service.ts:491-496](packages/auth/src/service.ts#L491-L496)
+> ✅ 已处理（未提交，工作树中）——login 对不存在邮箱也跑 DUMMY_PASSWORD_HASH（argon2id 固定哈希，参数与真实一致）抹平计时；未验证/不存在/密码错误统一返回 AUTH_INVALID_CREDENTIALS（HTTP 401），不再发 AUTH_EMAIL_UNVERIFIED。- **位置**：[auth/src/service.ts:491-496](packages/auth/src/service.ts#L491-L496)
 - **问题**：用户不存在时短路不跑 argon2（快速失败）；login 对未验证返回 `AUTH_EMAIL_UNVERIFIED`、对不存在返回 `AUTH_INVALID_CREDENTIALS`。resend 接口（:472）统一 `accepted:true` 防枚举是对的，login 反而不对。
 - **修法**：不存在时对固定 dummy hash 也跑 verifyPassword 抹平时间；login 对未验证与不存在返回同一错误。
 

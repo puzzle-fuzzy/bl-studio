@@ -33,3 +33,14 @@ export function hashPassword(plain: string): Promise<string> {
 export function verifyPassword(plain: string, hash: string): Promise<boolean> {
   return argon2Verify(hash, plain)
 }
+
+/**
+ * 用户不存在时的"假校验"目标哈希（P1-28）：让 login 对未知邮箱也跑一次完整的
+ * argon2 校验，抹平「存在/不存在」的响应时间差（计时侧信道 / 账号枚举）。
+ *
+ * 固定字符串是某个随机口令的 argon2id 哈希（明文已丢弃，无人知晓），只作时序
+ * 等价物，不代表任何真实账号。参数与 hashPassword 默认一致（m=19456,t=2,p=1），
+ * 校验耗时与真实账号同量级。
+ */
+export const DUMMY_PASSWORD_HASH =
+  '$argon2id$v=19$m=19456,t=2,p=1$Hn4wJWUbvME1JTGA86LTtw$gLiHDVY0FGSrPIlsanpfiIxkwuwqmgIXC9qs2ahR50w'

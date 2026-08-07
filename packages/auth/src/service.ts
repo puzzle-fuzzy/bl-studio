@@ -4,7 +4,7 @@ import { createLogger, ValidationError } from '@bailian-studio/shared'
 import type { TransactionalEmailSender } from './email'
 import { AuthError } from './errors'
 import { signJwt, verifyJwt } from './jwt'
-import { hashPassword, verifyPassword } from './password'
+import { DUMMY_PASSWORD_HASH, hashPassword, verifyPassword } from './password'
 import {
   clearUserBanned,
   clearUsersBanned,
@@ -495,11 +495,13 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       const email = normalizeEmail(input.email)
       validatePassword(input.password)
       const user = await findActiveUserByEmail(options.db, email)
-      if (user === undefined || !(await verifyPassword(input.password, user.passwordHash))) {
+      // P1-28：用户不存在时也对 DUMMY_PASSWORD_HASH 跑一次完整 argon2 校验，抹平
+      // 「存在/不存在」响应时间差（计时侧信道）；未验证邮箱与不存在/密码错误统一
+      // 返回 AUTH_INVALID_CREDENTIALS，杜绝通过错误码枚举邮箱。已封禁用户被
+      // findActiveUserByEmail 排除，走同一假校验路径。
+      const matched = await verifyPassword(input.password, user?.passwordHash ?? DUMMY_PASSWORD_HASH)
+      if (user === undefined || !matched || user.emailVerifiedAt === null) {
         throw new AuthError('AUTH_INVALID_CREDENTIALS', '邮箱或密码不正确，请重新输入。')
-      }
-      if (user.emailVerifiedAt === null) {
-        throw new AuthError('AUTH_EMAIL_UNVERIFIED', '该邮箱尚未完成验证，请检查验证邮件或重新发送。')
       }
       ensureNotBanned(user)
       return issueSession(user)

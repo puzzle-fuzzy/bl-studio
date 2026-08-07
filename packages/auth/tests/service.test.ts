@@ -81,10 +81,11 @@ describe('auth service', () => {
     } finally {
       await db.close()
     }
+    // P1-28：未验证邮箱与「不存在/密码错误」统一返回 AUTH_INVALID_CREDENTIALS，防枚举。
     await expect(handle.authService.login({
       email: 'pending@x.test',
       password: 'password1',
-    })).rejects.toMatchObject({ code: 'AUTH_EMAIL_UNVERIFIED' })
+    })).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' })
   })
 
   it('consumes a verification token once and issues a verifiable session', async () => {
@@ -227,10 +228,11 @@ describe('auth service', () => {
       emailSender.failVerification = false
     }
 
+    // P1-28：未验证邮箱与「不存在/密码错误」统一返回 AUTH_INVALID_CREDENTIALS，防枚举。
     await expect(handle.authService.login({
       email: 'mail-failure@x.test',
       password: 'password1',
-    })).rejects.toMatchObject({ code: 'AUTH_EMAIL_UNVERIFIED' })
+    })).rejects.toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' })
     await expect(handle.authService.register({
       email: 'mail-failure@x.test',
       password: 'password1',
@@ -272,6 +274,26 @@ describe('auth service', () => {
       caught = error
     }
     expect(caught).toBeInstanceOf(AuthError)
+  })
+
+  it('returns the same credential error for unverified vs nonexistent accounts (P1-28 anti-enumeration)', async () => {
+    // 已注册未验证的用户与不存在的邮箱必须拿到同一错误码与文案，杜绝通过响应差异枚举邮箱。
+    await handle.authService.register({ email: 'enum-probe@x.test', password: 'password1' })
+    const unverifiedErr = await handle.authService.login({
+      email: 'enum-probe@x.test',
+      password: 'password1',
+    }).then(() => null, error => error as unknown)
+    const nonexistentErr = await handle.authService.login({
+      email: 'enum-probe-missing@x.test',
+      password: 'password1',
+    }).then(() => null, error => error as unknown)
+    expect(unverifiedErr).toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' })
+    expect(nonexistentErr).toMatchObject({ code: 'AUTH_INVALID_CREDENTIALS' })
+    expect((unverifiedErr as { message?: string }).message).toBe(
+      (nonexistentErr as { message?: string }).message,
+    )
+    // 正确密码 + 未验证也绝不能签发会话。
+    expect(unverifiedErr).not.toMatchObject({ sessionId: expect.any(String) })
   })
 
   describe('loginWithGithub', () => {
