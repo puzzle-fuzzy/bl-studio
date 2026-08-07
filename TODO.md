@@ -230,26 +230,31 @@
 ### 2.3 Worker / 执行层
 
 ### P1-22 · submit 后锁丢失 → 重复 submit → poll 任务指数增长
+> ✅ 已处理（commit `5eb4466`）——submit 重跑时若 `record.providerTaskId` 已存在则转 poll 续跑；`scheduleGenerationPoll` 插入前先查重「该 record 的非终态 poll 任务」，已有则复用不重复插，杜绝 poll 任务指数增长与幂等窗口过期后的二次 provider 成本。
 - **位置**：[generation-task-handler.ts:124,282-297](apps/worker/src/generation-task-handler.ts#L124)；[repository.ts:2195-2242](packages/generation-repository/src/repository.ts#L2195-L2242)
 - **问题**：submit 已提交、但 poll 任务未存 succeeded 时崩溃/锁过期 → task 重认领 → `providerTaskId` 取 undefined → 重新 submit → 再插一条 poll。多 worker 下 poll 各自再调度，任务数成倍增长。幂等窗口过期后还会真实产生第二个 provider 任务 → 双份成本。
 - **修法**：submit 重跑时若 `record.providerTaskId` 已存在则转 poll 续跑；`scheduleGenerationPoll` 插入前查重（唯一性约束）。
 
 ### P1-23 · 仓库层异常被误分类为 retriable → 重跑 provider 执行
+> ✅ 已处理（commit `5eb4466`）——`runner.execute`（provider 传输层，可重试）与 post-execution 本地结算/持久化在代码结构上分离：前者失败走原 retriable 路径，后者失败归 `system` + `retriable:false`（`WORKER_INFRASTRUCTURE_ERROR`，经 `applyInfrastructureError` 记录失败+退款）。同步/流模型无幂等 key，本地失败绝不重跑 provider。
 - **位置**：[provider-error-mapping.ts:22-28](apps/worker/src/provider-error-mapping.ts#L22-L28)；[errors.ts:101](packages/provider-dashscope/src/errors.ts#L101)（未知错误一律 `retriable:true`）
 - **影响**：「provider 已执行成功、只是本地结算/持久化失败」被误判成值得重试 → 对同步模型再次执行 provider 生成，依赖幂等 key 才不重复计费。
 - **修法**：显式区分错误来源 —— 仓库/账本/存储层错误归 `system` 并「记录失败+退款」而非「重跑 provider」；可重试只针对 provider 传输层。
 
 ### P1-24 · 超时从 createdAt 起算，包含排队时间 → 负载下假超时
+> ✅ 已处理（commit `5eb4466`）——generation/artifact 任务超时均改从 `task.startedAt`（最近一次认领开始时间）起算，`createdAt` 兜底；排队时间不再计入超时。
 - **位置**：[generation-task-handler.ts:78](apps/worker/src/generation-task-handler.ts#L78)、[artifact-task-handler.ts:25](apps/worker/src/artifact-task-handler.ts#L25)
 - **影响**：队列积压时任务还没轮到就被判超时失败，放大故障。
 - **修法**：改从 `startedAt`（认领时间）起算。
 
 ### P1-25 · ffmpeg stderr 全量缓冲进内存 + kill 不带进程组
+> ✅ 已处理（commit `5eb4466`）——ffmpeg 以 detached 独立进程组启动，kill 对进程组 `SIGTERM → SIGKILL`（`packages/shared/src/process.ts` spawn 新增 `detached` 选项）；stderr 增量滚动只保留尾部 16KB（`collectStderrTail`，单块超限也从头裁剪），异常媒体不再无界占内存。
 - **位置**：[media-processor.ts:131](apps/worker/src/media-processor.ts#L131)（`new Response(proc.stderr).text()`）、[:134](apps/worker/src/media-processor.ts#L134)（`proc.kill()`）
 - **影响**：异常媒体文件输出大量 stderr → 内存无界增长；超时只杀主进程，遗留子进程/线程。
 - **修法**：stderr 滚动保留尾部 N KB；kill 升级 `SIGTERM → SIGKILL` 或 detached 独立进程组。
 
 ### P1-26 · 单 worker 进程单任务串行，无并发能力
+> ✅ 已处理（commit `5eb4466`）——worker 加有界并发（默认 `concurrency: 3`，可配置）：`run()` 以 in-flight 门控同时认领 N 条并行跑，锁/心跳逐任务隔离已具备并发安全前提；stop 时优雅排空在飞任务。集成测试以 `concurrency: 1` 验证「共享队列不重复完成」契约。
 - **位置**：[worker-loop.ts:189-206](apps/worker/src/worker-loop.ts#L189-L206)（每次认领 1 条跑完再认领下一条）
 - **影响**：视频模型单条 10-30min，期间该进程只服务一条任务，吞吐受限；部署侧无多 worker 配置证据。
 - **修法**：加有界并发（认领 N 条并行，锁/心跳已具备并发安全前提），或文档化「按进程扩容」并给出配置。
