@@ -71,7 +71,7 @@ async function main(): Promise<void> {
     dashscope: {
       apiKey: env.dashscopeApiKey,
       ...(env.bailianWorkspaceId === undefined ? {} : { workspaceId: env.bailianWorkspaceId }),
-      contractLocale: env.bailianContractLocale,
+      errorLocale: env.errorLocale,
       ...(env.dashscopeRequestTimeoutMs === undefined ? {} : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
     },
   })

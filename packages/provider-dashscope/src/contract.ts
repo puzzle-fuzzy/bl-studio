@@ -5,9 +5,9 @@
  * 它们的"失败"翻译成调用方（worker）依赖的 DashScopeHttpError，并钉住三类错误码：
  *  - DASHSCOPE_*：传输解析失败（工作空间缺失/非法、端点不受信等），由 ModelCoreError
  *    映射而来（见 resolveTransportTarget）；
- *  - BAILIAN_CONTRACT_SCHEMA_VALIDATION_FAILED：请求参数不满足 manifest 约束，在
+ *  - PARAMETER_VALIDATION_FAILED：请求参数不满足 manifest 约束，在
  *    fetch 之前抛出（漂移的 manifest 被提前拦截）；
- *  - BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH：成功响应缺关键字段（非 2xx 响应则
+ *  - RESPONSE_SCHEMA_MISMATCH：成功响应缺关键字段（非 2xx 响应则
  *    以 HTTP 状态和 provider 错误码决定重试策略，契约问题附加为诊断信息）。
  */
 import {
@@ -21,7 +21,7 @@ import {
 import { classifyDashScopeError } from './errors'
 import { DashScopeHttpError, withHttpStatus } from './http'
 
-export type BailianContractLocale = 'zh-CN' | 'en-US'
+export type ProviderErrorLocale = 'zh-CN' | 'en-US'
 
 /** 传输解析（transport.ts）抛出的 ModelCoreError 统一映射为 provider 校验错误。 */
 export function resolveTransportTarget<T>(resolve: () => T): T {
@@ -49,7 +49,7 @@ export function resolveTransportTarget<T>(resolve: () => T): T {
 export function validateRequestParams(
   manifest: FrozenModelManifest,
   params: Record<string, unknown>,
-  locale: BailianContractLocale,
+  locale: ProviderErrorLocale,
 ): void {
   const result = validateModelParams(manifest, params)
   if (result.valid) return
@@ -57,7 +57,7 @@ export function validateRequestParams(
   throw new DashScopeHttpError({
     category: 'validation',
     retriable: false,
-    code: 'BAILIAN_CONTRACT_SCHEMA_VALIDATION_FAILED',
+    code: 'PARAMETER_VALIDATION_FAILED',
     message: diagnostics.messages[locale],
     details: diagnostics,
   }, undefined, { contractValidation: diagnostics, raw: params })
@@ -72,7 +72,7 @@ export function assertProviderResponseContract(
   phase: Parameters<typeof assertResponseShape>[1],
   raw: unknown,
   response: Response,
-  locale: BailianContractLocale,
+  locale: ProviderErrorLocale,
 ): void {
   const issues = assertResponseShape(manifest, phase, raw)
   if (issues.length === 0) return
@@ -93,7 +93,7 @@ export function assertProviderResponseContract(
 export function assertStreamEvent(
   manifest: FrozenModelManifest,
   event: unknown,
-  locale: BailianContractLocale,
+  locale: ProviderErrorLocale,
 ): void {
   const issues = assertResponseShape(manifest, 'stream-event', event)
   if (issues.length === 0) return
@@ -101,7 +101,7 @@ export function assertStreamEvent(
   throw new DashScopeHttpError({
     category: 'validation',
     retriable: false,
-    code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+    code: 'RESPONSE_SCHEMA_MISMATCH',
     message: diagnostics.messages[locale],
     details: diagnostics,
   }, undefined, { contractValidation: diagnostics, raw: event })
@@ -109,14 +109,14 @@ export function assertStreamEvent(
 
 function throwShapeValidation(
   issues: readonly ResponseShapeIssue[],
-  locale: BailianContractLocale,
+  locale: ProviderErrorLocale,
   raw: unknown,
 ): never {
   const diagnostics = shapeDiagnostics(issues)
   throw new DashScopeHttpError({
     category: 'validation',
     retriable: false,
-    code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+    code: 'RESPONSE_SCHEMA_MISMATCH',
     message: diagnostics.messages[locale],
     details: diagnostics,
   }, undefined, { contractValidation: diagnostics, raw })
@@ -127,8 +127,8 @@ function paramDiagnostics(
   manifest: FrozenModelManifest,
   issues: readonly ParameterValidationIssue[],
 ): {
-  readonly messages: Record<BailianContractLocale, string>
-  readonly expected: Record<BailianContractLocale, string>
+  readonly messages: Record<ProviderErrorLocale, string>
+  readonly expected: Record<ProviderErrorLocale, string>
   readonly issues: readonly ParameterValidationIssue[]
 } {
   const first = issues[0]
@@ -158,7 +158,7 @@ function paramDiagnostics(
 
 /** 响应形状失败 → 本地化诊断（issue 消息本身不带语言，双语同一措辞）。 */
 function shapeDiagnostics(issues: readonly ResponseShapeIssue[]): {
-  readonly messages: Record<BailianContractLocale, string>
+  readonly messages: Record<ProviderErrorLocale, string>
   readonly issues: readonly ResponseShapeIssue[]
 } {
   const first = issues[0]

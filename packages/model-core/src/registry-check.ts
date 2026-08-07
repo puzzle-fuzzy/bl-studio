@@ -62,6 +62,11 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
       assertConditionalConstraint(manifest.id, parameter)
     }
   }
+  for (const parameter of manifest.parameters) {
+    if (parameter.conditional?.when.field !== undefined && !parameterNames.has(parameter.conditional.when.field)) {
+      throw new Error(`${manifest.id} parameter "${parameter.name}" conditional when.field "${parameter.conditional.when.field}" does not match a parameter`)
+    }
+  }
   assertRules(manifest, parameterNames)
   if (!parameterNames.has(manifest.pricing.quantityKey)) {
     throw new Error(`${manifest.id} pricing quantityKey "${manifest.pricing.quantityKey}" does not match a parameter`)

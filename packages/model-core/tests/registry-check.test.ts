@@ -666,6 +666,41 @@ describe('registry checks', () => {
     }))).toThrow(/array-item-field-max-path field "missing" does not match a parameter/)
   })
 
+  it('rejects a conditional when.field that does not match a parameter', () => {
+    const base = manifest()
+    expect(() => assertModelManifestConsistent({
+      ...base,
+      parameters: [
+        ...base.parameters,
+        {
+          name: 'duration',
+          label: 'Duration',
+          type: 'number',
+          min: 2,
+          max: 15,
+          conditional: { max: 10, when: { field: 'referenceVideos', present: true } },
+        },
+      ],
+    })).toThrow(/conditional when.field "referenceVideos" does not match a parameter/)
+
+    // 指向已声明参数的条件约束应通过
+    expect(() => assertModelManifestConsistent({
+      ...base,
+      parameters: [
+        ...base.parameters,
+        { name: 'referenceVideos', label: 'Reference Videos', type: 'media', mediaKind: 'video' },
+        {
+          name: 'duration',
+          label: 'Duration',
+          type: 'number',
+          min: 2,
+          max: 15,
+          conditional: { max: 10, when: { field: 'referenceVideos', present: true } },
+        },
+      ],
+    })).not.toThrow()
+  })
+
   it('accepts structured select defaults and option values', () => {
     expect(() => assertModelManifestConsistent(manifest({
       parameters: [

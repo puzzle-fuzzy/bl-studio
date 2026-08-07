@@ -24,7 +24,11 @@ function isEmpty(value: unknown): boolean {
   return value === undefined || value === null || value === ''
 }
 
-function validateParameter(parameter: DeepReadonly<ModelParameter>, value: unknown): ParameterValidationIssue[] {
+function validateParameter(
+  parameter: DeepReadonly<ModelParameter>,
+  params: Record<string, unknown>,
+): ParameterValidationIssue[] {
+  const value = params[parameter.name]
   const errors: ParameterValidationIssue[] = []
 
   if (parameter.required && isEmpty(value)) {
@@ -118,7 +122,7 @@ function validateParameter(parameter: DeepReadonly<ModelParameter>, value: unkno
         integerOnly ? '整数' : `符合 ${parameter.step} 步长的数字`,
       ))
     }
-    validateConditionalNumber(parameter, value, errors)
+    validateConditionalNumber(parameter, params, errors)
   }
 
   if (typeof value === 'string' && parameter.maxLength !== undefined && value.length > parameter.maxLength) {
@@ -130,7 +134,7 @@ function validateParameter(parameter: DeepReadonly<ModelParameter>, value: unkno
     errors.push(issue('INVALID_VALUE', parameter.name, `${parameter.name} must be one of the configured options`, `${parameter.label}必须使用已配置选项`, `One of: ${values}`, `可选值：${values}`))
   }
 
-  if (parameter.conditional !== undefined && matchesWhen(parameter.conditional.when, value) && !isEmpty(value)) {
+  if (parameter.conditional !== undefined && matchesWhen(parameter.conditional.when, params) && !isEmpty(value)) {
     if (parameter.conditional.equals !== undefined && !modelValuesEqual(parameter.conditional.equals, value)) {
       const expected = parameter.conditional.equals === false ? 'false' : String(parameter.conditional.equals)
       errors.push(issue(
@@ -150,11 +154,13 @@ function validateParameter(parameter: DeepReadonly<ModelParameter>, value: unkno
 /** 条件约束的数值段：when 命中时以 min/max 覆盖静态约束。 */
 function validateConditionalNumber(
   parameter: DeepReadonly<ModelParameter>,
-  value: number,
+  params: Record<string, unknown>,
   errors: ParameterValidationIssue[],
 ): void {
   const conditional = parameter.conditional
-  if (conditional === undefined || !matchesWhen(conditional.when, value)) return
+  const value = params[parameter.name]
+  if (conditional === undefined || !matchesWhen(conditional.when, params)) return
+  if (typeof value !== 'number') return
   if (conditional.min !== undefined && value < conditional.min) {
     errors.push(issue(
       'OUT_OF_RANGE',
@@ -177,15 +183,21 @@ function validateConditionalNumber(
   }
 }
 
-/** 判断参数的条件约束 `when` 是否命中。value 是参数自身的当前值（媒体数组时取长度）。 */
+/**
+ * 判断参数的条件约束 `when` 是否命中：对 when.field 所指的参数求值（present 对
+ * 媒体数组按条数判定，equals 做值相等）。field 一律指 manifest 参数名——跨字段
+ * 语义由 field 承载，参数自身的值不参与判定（否则 wan2.7-r2v 的 duration 条件
+ * 会因数字恒「在场」而过度收紧）。
+ */
 function matchesWhen(
   when: { field: string; present?: boolean; equals?: unknown },
-  value: unknown,
+  params: Record<string, unknown>,
 ): boolean {
+  const target = params[when.field]
   if (when.present !== undefined) {
-    return (mediaItemCount(value) > 0) === when.present
+    return (mediaItemCount(target) > 0) === when.present
   }
-  return modelValuesEqual(value, when.equals)
+  return modelValuesEqual(target, when.equals)
 }
 
 function mediaItemCount(value: unknown): number {
@@ -306,17 +318,6 @@ function validateRules(
   })
 }
 
-/** 统计字符串中 CJK 字符与非 CJK 字符的数量。 */
-function countCharacters(value: string): { cjkCount: number; otherCount: number } {
-  let cjkCount = 0
-  let otherCount = 0
-  for (const char of value) {
-    if (/[㐀-鿿豈-﫿぀-ヿ가-힯]/.test(char)) cjkCount += 1
-    else otherCount += 1
-  }
-  return { cjkCount, otherCount }
-}
-
 /** 用规则自带的官方文案生成 issue；无 message 时由调用方兜底生成。 */
 function fromRuleIssue(
   code: ParameterValidationIssue['code'],
@@ -377,7 +378,7 @@ export function validateModelParams(
     ...unknownErrors,
     ...manifest.parameters
       .filter(parameter => isModelParameterVisible(parameter, params))
-      .flatMap(parameter => validateParameter(parameter, params[parameter.name])),
+      .flatMap(parameter => validateParameter(parameter, params)),
     ...validateRules(manifest, params),
   ]
   return {

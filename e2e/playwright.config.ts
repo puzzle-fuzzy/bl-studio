@@ -10,7 +10,7 @@ const inheritedTestEnv: Record<string, string> = {
   AUTH_JWT_SECRET: 'e2e-only-secret-do-not-use-in-production',
   NODE_ENV: 'test',
   CORS_ALLOWED_ORIGINS: 'http://127.0.0.1:5002',
-  BAILIAN_CONTRACT_LOCALE: 'zh-CN',
+  ERROR_LOCALE: 'zh-CN',
   GENERATION_DAILY_TASK_LIMIT: '0',
   GENERATION_DAILY_COST_LIMIT_CENTS: '0',
   API_RATE_LIMIT_ENABLED: 'true',

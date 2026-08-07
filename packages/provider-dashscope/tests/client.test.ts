@@ -131,7 +131,7 @@ describe('createDashScopeClient', () => {
     })).rejects.toMatchObject({
       info: {
         category: 'validation',
-        code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+        code: 'RESPONSE_SCHEMA_MISMATCH',
       },
     })
   })
@@ -265,7 +265,7 @@ describe('createDashScopeClient', () => {
     expect((error as DashScopeHttpError).info).toMatchObject({
       category: 'validation',
       retriable: false,
-      code: 'BAILIAN_CONTRACT_SCHEMA_VALIDATION_FAILED',
+      code: 'PARAMETER_VALIDATION_FAILED',
     })
     expect((error as DashScopeHttpError).info.details).toMatchObject({
       messages: {
@@ -307,7 +307,7 @@ describe('createDashScopeClient', () => {
       apiKey: 'test-key',
       fetch,
       workspaceId: 'ws-test',
-      contractLocale: 'en-US',
+      errorLocale: 'en-US',
     })
 
     let error: unknown
@@ -324,7 +324,7 @@ describe('createDashScopeClient', () => {
     expect((error as DashScopeHttpError).info).toMatchObject({
       category: 'validation',
       retriable: false,
-      code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+      code: 'RESPONSE_SCHEMA_MISMATCH',
     })
   })
 
@@ -454,7 +454,7 @@ describe('createDashScopeClient', () => {
       apiKey: 'test-key',
       fetch,
       workspaceId: 'ws-test',
-      contractLocale: 'en-US',
+      errorLocale: 'en-US',
     })
 
     await expect(client.submit({
@@ -680,13 +680,13 @@ describe('createDashScopeClient', () => {
     await expect(client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-unknown' })).rejects.toMatchObject({
       info: {
         category: 'validation',
-        code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+        code: 'RESPONSE_SCHEMA_MISMATCH',
       },
     })
     await expect(client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-missing' })).rejects.toMatchObject({
       info: {
         category: 'validation',
-        code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+        code: 'RESPONSE_SCHEMA_MISMATCH',
       },
     })
   })
@@ -831,7 +831,7 @@ describe('DashScopeClient request_id extraction', () => {
     await expect(client.submit({ manifest: wanxTextToVideo, params: { prompt: 'test' } })).rejects.toMatchObject({
       info: {
         category: 'validation',
-        code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+        code: 'RESPONSE_SCHEMA_MISMATCH',
       },
     })
   })

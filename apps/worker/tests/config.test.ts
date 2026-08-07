@@ -7,13 +7,13 @@ describe('worker environment boundary', () => {
       DATABASE_URL: ' postgres://db/bailian-studio ',
       DASHSCOPE_API_KEY: ' key-secret ',
       BAILIAN_WORKSPACE_ID: ' ws_demo-1 ',
-      BAILIAN_CONTRACT_LOCALE: ' en-US ',
+      ERROR_LOCALE: ' en-US ',
       WORKER_ID: ' worker-a ',
     }, 99)).toEqual({
       databaseUrl: 'postgres://db/bailian-studio',
       dashscopeApiKey: 'key-secret',
       bailianWorkspaceId: 'ws_demo-1',
-      bailianContractLocale: 'en-US',
+      errorLocale: 'en-US',
       workerId: 'worker-a',
     })
   })
@@ -25,7 +25,7 @@ describe('worker environment boundary', () => {
       BAILIAN_WORKSPACE_ID: '   ',
       WORKER_ID: '',
     }, 42)).toMatchObject({
-      bailianContractLocale: 'zh-CN',
+      errorLocale: 'zh-CN',
       workerId: 'worker-42',
     })
   })
@@ -41,7 +41,7 @@ describe('worker environment boundary', () => {
 
   it('rejects invalid locale and workspace identifiers before startup', () => {
     const base = { DATABASE_URL: 'db', DASHSCOPE_API_KEY: 'key' }
-    expect(() => readWorkerEnv({ ...base, BAILIAN_CONTRACT_LOCALE: 'fr-FR' })).toThrow(
+    expect(() => readWorkerEnv({ ...base, ERROR_LOCALE: 'fr-FR' })).toThrow(
       '必须是 zh-CN 或 en-US',
     )
     expect(() => readWorkerEnv({ ...base, BAILIAN_WORKSPACE_ID: 'bad.example.com' })).toThrow(

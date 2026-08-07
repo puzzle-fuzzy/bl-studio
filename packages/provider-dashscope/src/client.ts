@@ -19,7 +19,7 @@ import {
   assertStreamEvent,
   resolveTransportTarget,
   validateRequestParams,
-  type BailianContractLocale,
+  type ProviderErrorLocale,
 } from './contract'
 import {
   resolveDashScopeCancelTarget,
@@ -50,7 +50,7 @@ export interface CreateDashScopeClientOptions {
   /** Keling、HappyHorse、Fun Music 等工作空间专属端点所需。 */
   workspaceId?: string
   /** 契约校验错误的输出语言。 */
-  contractLocale?: BailianContractLocale
+  errorLocale?: ProviderErrorLocale
   /** 单次 provider HTTP 请求超过该时长后中止。 */
   requestTimeoutMs?: number
 }
@@ -124,14 +124,14 @@ export interface DashScopeClient {
  */
 export function createDashScopeClient(options: CreateDashScopeClientOptions): DashScopeClient {
   const fetchImpl = options.fetch ?? fetch
-  const contractLocale = options.contractLocale ?? 'zh-CN'
+  const errorLocale = options.errorLocale ?? 'zh-CN'
   const requestTimeoutMs = options.requestTimeoutMs ?? 60_000
   const transportOptions = { workspaceId: options.workspaceId }
 
   return {
     async submit(input) {
       const request = buildDashScopeRequest(input.manifest, input.params)
-      validateRequestParams(input.manifest, input.params, contractLocale)
+      validateRequestParams(input.manifest, input.params, errorLocale)
       const target = resolveTransportTarget(() => resolveDashScopeSubmitTarget(input.manifest, transportOptions))
       const headers = createManifestHeaders(options.apiKey, target.headers)
       if (request.async) headers.set('X-DashScope-Async', 'enable')
@@ -148,7 +148,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
         response.ok ? (request.async ? 'submit' : 'final') : 'error',
         responseBody,
         response,
-        contractLocale,
+        errorLocale,
       ), requestTimeoutMs)
 
       const requestId = getStringPath(raw, 'request_id')
@@ -198,7 +198,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
         headers,
       }, (responseBody, response) => {
         if (!response.ok) {
-          assertProviderResponseContract(input.manifest, 'error', responseBody, response, contractLocale)
+          assertProviderResponseContract(input.manifest, 'error', responseBody, response, errorLocale)
           return
         }
         const providerStatus = getStringPath(responseBody, 'output.task_status')
@@ -212,7 +212,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
           : lifecycle === 'succeeded'
             ? 'final'
             : 'poll'
-        assertProviderResponseContract(input.manifest, phase, responseBody, response, contractLocale)
+        assertProviderResponseContract(input.manifest, phase, responseBody, response, errorLocale)
       }, requestTimeoutMs)
 
       const requestId = getStringPath(raw, 'request_id')
@@ -298,7 +298,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
 
     async chat(input) {
       const body = buildChatRequest(input.manifest, input.params)
-      validateRequestParams(input.manifest, input.params, contractLocale)
+      validateRequestParams(input.manifest, input.params, errorLocale)
       const target = resolveTransportTarget(() => resolveDashScopeSubmitTarget(input.manifest, transportOptions))
       const streamHeaders = input.manifest.transport.mode === 'provider_async'
         ? []
@@ -337,7 +337,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
       if (!response.ok) {
         const raw = await readResponseBody(response)
         clearTimeout(timeout)
-        assertProviderResponseContract(input.manifest, 'error', raw, response, contractLocale)
+        assertProviderResponseContract(input.manifest, 'error', raw, response, errorLocale)
         throw new DashScopeHttpError(
           classifyDashScopeError(withHttpStatus(raw, response.status)),
           response.status,
@@ -350,7 +350,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
         stream = await readSseStream(
           response,
           controller.signal,
-          (event) => assertStreamEvent(input.manifest, event, contractLocale),
+          (event) => assertStreamEvent(input.manifest, event, errorLocale),
         )
         if (controller.signal.aborted) {
           throw new DOMException('The operation was aborted.', 'AbortError')
@@ -369,7 +369,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
           throw new DashScopeHttpError({
             category: 'validation',
             retriable: false,
-            code: 'BAILIAN_CONTRACT_RESPONSE_SCHEMA_MISMATCH',
+            code: 'RESPONSE_SCHEMA_MISMATCH',
             message: error.message,
             details: { line: error.line },
           }, undefined, error.line)

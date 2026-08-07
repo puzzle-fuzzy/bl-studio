@@ -4,7 +4,7 @@ export interface WorkerEnv {
   readonly databaseUrl: string
   readonly dashscopeApiKey: string
   readonly bailianWorkspaceId?: string
-  readonly bailianContractLocale: 'zh-CN' | 'en-US'
+  readonly errorLocale: 'zh-CN' | 'en-US'
   readonly workerId: string
   readonly ffmpegPath?: string
   readonly workerPollIntervalMs?: number
@@ -35,7 +35,7 @@ export function readWorkerEnv(
     validateProductionStorage(source)
   }
   const bailianWorkspaceId = optionalValue(source['BAILIAN_WORKSPACE_ID'])
-  const localeValue = optionalValue(source['BAILIAN_CONTRACT_LOCALE']) ?? 'zh-CN'
+  const localeValue = optionalValue(source['ERROR_LOCALE']) ?? 'zh-CN'
   const workerId = optionalValue(source['WORKER_ID']) ?? `worker-${pid}`
   const ffmpegPath = optionalValue(source['FFMPEG_PATH'])
   const workerPollIntervalMs = optionalPositiveInteger(source['WORKER_POLL_INTERVAL_MS'], 'WORKER_POLL_INTERVAL_MS')
@@ -54,8 +54,8 @@ export function readWorkerEnv(
 
   if (localeValue !== 'zh-CN' && localeValue !== 'en-US') {
     throw configError(
-      'BAILIAN_CONTRACT_LOCALE 必须是 zh-CN 或 en-US',
-      'BAILIAN_CONTRACT_LOCALE must be zh-CN or en-US',
+      'ERROR_LOCALE 必须是 zh-CN 或 en-US',
+      'ERROR_LOCALE must be zh-CN or en-US',
     )
   }
   if (bailianWorkspaceId !== undefined && !isValidDashScopeWorkspaceId(bailianWorkspaceId)) {
@@ -69,7 +69,7 @@ export function readWorkerEnv(
     databaseUrl,
     dashscopeApiKey,
     ...(bailianWorkspaceId === undefined ? {} : { bailianWorkspaceId }),
-    bailianContractLocale: localeValue,
+    errorLocale: localeValue,
     workerId,
     ...(ffmpegPath === undefined ? {} : { ffmpegPath }),
     ...(workerPollIntervalMs === undefined ? {} : { workerPollIntervalMs }),

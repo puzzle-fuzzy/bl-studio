@@ -53,7 +53,8 @@ export const wanx27ImagePro: ModelManifest = {
       min: 1,
       max: 12,
       step: 1,
-      description: '生成图片数量，1-12张',
+      description: '生成图片数量，1-12张（组图模式关闭时上限 4 张）',
+      conditional: { max: 4, when: { field: 'enableSequential', equals: false } },
     },
     {
       name: 'enableSequential',
@@ -170,7 +171,8 @@ export const wanx27Image: ModelManifest = {
       min: 1,
       max: 12,
       step: 1,
-      description: '生成图片数量，1-12张',
+      description: '生成图片数量，1-12张（组图模式关闭时上限 4 张）',
+      conditional: { max: 4, when: { field: 'enableSequential', equals: false } },
     },
     {
       name: 'enableSequential',

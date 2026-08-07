@@ -351,7 +351,7 @@ describe('validateModelParams', () => {
     }).valid).toBe(true)
   })
 
-  it('applies the wan2.7 reference-video duration cap of 10 when the conditional is met', () => {
+  it('caps wan2.7 reference-video duration at 10 only when reference videos are present', () => {
     const model = getModelById('wanx-2.7-reference-video')
     expect(model).toBeDefined()
     const duration = model?.parameters.find(parameter => parameter.name === 'duration')
@@ -361,16 +361,85 @@ describe('validateModelParams', () => {
       conditional: { max: 10, when: { field: 'referenceVideos', present: true } },
     })
 
-    // 带参考素材时，条件 max:10 生效（>10 报错）
+    // 仅参考图片（无参考视频）：静态 max 15 生效，duration 12 合法
     expect(validateModelParams(model!, {
       prompt: '火车穿过城市',
       references: 'https://example.com/ref.png',
+      duration: 12,
+    }).valid).toBe(true)
+
+    // 含参考视频：条件 max:10 生效（>10 报错，10 合法）
+    expect(validateModelParams(model!, {
+      prompt: '火车穿过城市',
+      references: 'https://example.com/ref.png',
+      referenceVideos: 'https://example.com/ref.mp4',
       duration: 12,
     }).errors).toContainEqual(expect.objectContaining({ code: 'OUT_OF_RANGE', field: 'duration' }))
     expect(validateModelParams(model!, {
       prompt: '火车穿过城市',
       references: 'https://example.com/ref.png',
+      referenceVideos: 'https://example.com/ref.mp4',
       duration: 10,
+    }).valid).toBe(true)
+  })
+
+  it('caps wan2.7-image count at 4 unless sequential mode is enabled', () => {
+    const model = getModelById('wanx-2.7-image')
+    expect(model).toBeDefined()
+    const n = model?.parameters.find(parameter => parameter.name === 'n')
+    expect(n).toMatchObject({
+      min: 1,
+      max: 12,
+      conditional: { max: 4, when: { field: 'enableSequential', equals: false } },
+    })
+
+    // 组图模式关闭（默认 false）：n 上限 4
+    expect(validateModelParams(model!, {
+      images: 'https://example.com/a.png',
+      prompt: '海边日落',
+      n: 6,
+    }).errors).toContainEqual(expect.objectContaining({ code: 'OUT_OF_RANGE', field: 'n' }))
+    expect(validateModelParams(model!, {
+      images: 'https://example.com/a.png',
+      prompt: '海边日落',
+      n: 4,
+    }).valid).toBe(true)
+
+    // 组图模式开启：n 可到 12
+    expect(validateModelParams(model!, {
+      images: 'https://example.com/a.png',
+      prompt: '海边日落',
+      n: 6,
+      enableSequential: true,
+    }).valid).toBe(true)
+  })
+
+  it('forces keling reference-video audio off when a feature video is present', () => {
+    const model = getModelById('keling-reference-video')
+    expect(model).toBeDefined()
+    const audio = model?.parameters.find(parameter => parameter.name === 'audio')
+    expect(audio).toMatchObject({
+      defaultValue: false,
+      conditional: { equals: false, when: { field: 'featureVideo', present: true } },
+    })
+
+    // 含特征视频时 audio 只能为 false
+    expect(validateModelParams(model!, {
+      prompt: '让角色转身',
+      featureVideo: 'https://example.com/feature.mp4',
+      audio: true,
+    }).errors).toContainEqual(expect.objectContaining({ code: 'INVALID_VALUE', field: 'audio' }))
+    expect(validateModelParams(model!, {
+      prompt: '让角色转身',
+      featureVideo: 'https://example.com/feature.mp4',
+      audio: false,
+    }).valid).toBe(true)
+
+    // 无特征视频时 audio 可开启
+    expect(validateModelParams(model!, {
+      prompt: '让角色转身',
+      references: 'https://example.com/ref.png',
+      audio: true,
     }).valid).toBe(true)
   })
 

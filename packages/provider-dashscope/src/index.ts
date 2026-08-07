@@ -20,7 +20,7 @@ export type {
   ProviderSubmitInput,
   ProviderSubmitResult,
 } from './client'
-export type { BailianContractLocale } from './contract'
+export type { ProviderErrorLocale } from './contract'
 export {
   isValidDashScopeWorkspaceId,
   resolveDashScopeCancelTarget,

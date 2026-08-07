@@ -105,7 +105,7 @@ services:
       LOG_FORMAT: json
       DATABASE_URL: postgres://bailian-studio:bailian-studio@postgres:5432/bailian-studio_rehearsal
       DASHSCOPE_API_KEY: rehearsal-placeholder-not-a-secret
-      BAILIAN_CONTRACT_LOCALE: zh-CN
+      ERROR_LOCALE: zh-CN
       WORKER_ID: rehearsal-worker-1
       # 静态 ffmpeg/ffprobe：本地 infra/ffmpeg/（用 fetch-static-ffmpeg.sh 准备，gitignored）。
       FFMPEG_PATH: /usr/local/bin/ffmpeg

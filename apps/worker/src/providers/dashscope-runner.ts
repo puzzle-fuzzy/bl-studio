@@ -29,7 +29,7 @@ import type {
 export interface CreateDashScopeRunnerOptions {
   apiKey: string
   workspaceId?: string
-  contractLocale?: 'zh-CN' | 'en-US'
+  errorLocale?: 'zh-CN' | 'en-US'
   fetch?: CreateDashScopeClientOptions['fetch']
   requestTimeoutMs?: number
 }
@@ -42,7 +42,7 @@ export class DashScopeProviderRunner implements ProviderRunner {
     this.client = createDashScopeClient({
       apiKey: options.apiKey,
       ...(options.workspaceId !== undefined ? { workspaceId: options.workspaceId } : {}),
-      ...(options.contractLocale !== undefined ? { contractLocale: options.contractLocale } : {}),
+      ...(options.errorLocale !== undefined ? { errorLocale: options.errorLocale } : {}),
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
       ...(options.requestTimeoutMs !== undefined ? { requestTimeoutMs: options.requestTimeoutMs } : {}),
     })

@@ -98,7 +98,7 @@
 | `keling-first-last-frame-video` | shot_type / multi_shot / multi_prompt 系列规则（manifest 未建模） |
 | `keling-reference-video` | element_list 主体（kling 契约 subject，manifest 未建模；references maxItems:7 覆盖无特征视频时的 ≤7） |
 | `keling-reference-video` | feature min1 when first_frame / refer max0 when first_frame / aspect_ratio required when first_frame absent（first_frame 未建模） |
-| `keling-reference-video` | audio=false when feature（因 matchesWhen 缺陷无法仅当特征视频在场时生效，按「not-enforced」记录） |
+| `keling-reference-video` | audio=false when feature（已建模为 audio 的 conditional；修复 matchesWhen 后生效，见设计缺陷） |
 | `keling-video-edit` | element_list 主体（manifest 未建模；references maxItems:4 覆盖 ≤4） |
 | `keling-video-edit` | text-length prompt ≤2500（已由 prompt maxLength:2500 天然满足） |
 | `aishi-text-to-video` | resolution 阶梯条件（t2v manifest 用 size 而非 resolution，收敛为默认档 720P：0.30/0.39） |
@@ -113,7 +113,7 @@
 ## 参数收紧清单
 
 - **seed**：qwen-image / qwen-image-2.x / qwen-image-edit 系列、wanx-2.7-image 系列、z-image、wanx-2.7-*、vidu 系列——从「仅描述取值范围」补上 `min: 0, max: 2147483647, step: 1`（契约 payloadSchema 一致）。
-- **wanx-2.7-reference-video duration**：新增 `conditional: { max: 10, when: { field: 'referenceVideos', present: true } }`（契约 field-value-when；注意 matchesWhen 缺陷使其恒生效，见设计缺陷）。
+- **wanx-2.7-reference-video duration**：新增 `conditional: { max: 10, when: { field: 'referenceVideos', present: true } }`（契约 field-value-when；matchesWhen 缺陷已修复，条件仅在含参考视频时生效，见设计缺陷）。
 - **keling-reference-video 媒体组上限**：含特征视频时 `references+featureVideo` 合计上限 5→4（契约 collection-sum-max `refer+subjects ≤4`）。
 - **其他参数**（分辨率/时长/音频等）契约与现有 manifest 已一致，无需调整。
 
@@ -125,12 +125,12 @@
 - **预估价收敛为 ~0**：`estimatePriceCents` 对 `estimatedDuration` 使用 output token rate（40 元/百万 × 60s ≈ 0.0024 元 ≈ 0.24 分 → 0 分），这是可接受的收敛——实际结算走 `calculateUsagePriceCents` 的 usage token 桶（7/53/40/213 元/百万分桶），preflight 只做展示。
 - 新增隐藏 `mode` 参数（select，`visibleWhen` 恒 false，不对外展示、不进入请求），让 `registry-check` 认可 `conditions.mode` 引用了已声明参数；`calculateUsagePriceCents` 直接读 rates 的 `conditions.mode` 分桶，不需要该参数的值。
 
-## 设计缺陷（本迁移不修复，仅记录）
+## 设计缺陷（迁移后已修复）
 
-1. **`matchesWhen` 忽略 `when.field`**（`validation.ts`）：`conditional.when` 只拿「当前参数自身的值」评估 `present`/`equals`，不看 `field` 所指的其它参数。后果：
-   - `{ max: 10, when: { field: 'referenceVideos', present: true } }`（wan2.7-r2v duration）恒生效——不带参考视频时 duration 也被压到 ≤10（本应 15）。已按任务要求落为 conditional，属「过度收紧」。
-   - `{ max: 4, when: { field: 'enableSequential', equals: false } }`（wan2.7-image n）不生效——数字永远不会 `equals false`。故未落为 conditional（避免伪约束），仅记录。
-   - `{ equals: false, when: { field: 'featureVideo', present: true } }`（keling audio）恒生效会把 audio 永远锁 false，破坏音频能力，故 keling-reference-video 的 `audio=false when feature` 记作 NOT-ENFORCED 而不是落为 conditional。
+1. **`matchesWhen` 忽略 `when.field`**（`validation.ts`）：`conditional.when` 只拿「当前参数自身的值」评估 `present`/`equals`，不看 `field` 所指的其它参数。迁移时因此产生的三个后果已于后续提交修复（`matchesWhen` 改为按 `when.field` 跨字段求值）：
+   - wan2.7-r2v `duration` 条件改为仅在含参考视频时生效（此前恒生效、无参考视频也被压到 ≤10 的「过度收紧」已消除）；
+   - wan2.7-image `n` 已落为 `conditional: { max: 4, when: { field: 'enableSequential', equals: false } }`（此前不生效，故未落为 conditional）；
+   - keling-reference-video `audio` 已落为 `conditional: { equals: false, when: { field: 'featureVideo', present: true } }`（此前会恒生效、破坏音频能力，故记作 NOT-ENFORCED）。
 2. **`conditions.mode` 与 `assertPricing` 的冲突**（`registry-check.ts`）：rate 的 conditions 字段必须是已声明参数名；omni 没有用户可见的 mode 参数。解决方案是声明一个恒隐藏的内部 `mode` 参数（见 omni 定价决策）。
 
 ## 迁移后待办

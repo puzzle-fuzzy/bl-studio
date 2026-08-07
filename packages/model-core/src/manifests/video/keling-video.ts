@@ -541,6 +541,7 @@ export const kelingReferenceVideo: ModelManifest = {
       type: 'boolean',
       defaultValue: false,
       description: '是否生成有声视频（含参考视频时只能为false）',
+      conditional: { equals: false, when: { field: 'featureVideo', present: true } },
     },
     {
       name: 'watermark',
