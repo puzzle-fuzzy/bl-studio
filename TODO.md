@@ -303,10 +303,10 @@
 - **问题**：`pnpm run e2e` 必然失败；该 spec 是 Vue 时代遗留未随 React 重写迁移。e2e 不启 worker、无 SSE/产物断言 —— 队列消费→SSE→资产落库这条最关键链路无自动化兜底。
 - **修法**：改 5003 或归档遗留 spec；补一条「seeded 用户 + succeeded generation + 真实 API」的资产闭环断言；把 e2e 挂进 CI 独立 job。
 
-### P1-39 · `verify`/`test` 不自动加载 test env，开箱跑不了
+### P1-39 · `verify`/`test` 不自动加载 test env，开箱跑不了 — ✅ 已处理（2026-08-08）
 - **位置**：[package.json:20-23](package.json#L20-L23)（无 dotenv 前缀）；[test-utils.ts:31-33](packages/db/src/test-utils.ts#L31-L33)（`requireDatabaseUrl` 缺失即抛）
 - **影响**：新环境 `pnpm install && db:test:up && pnpm run verify` 直接报 `DATABASE_URL is required`，与 CLAUDE.md 观感不符（memory 已确认此坑）。
-- **修法**：`test`/`test:root`/`verify` 前加 `dotenv -e infra/env/.env.test --`（与 `dev` 同款）；CI 已有 env 不受影响。
+- **修法**：`test`/`test:root`/`test:coverage`/`verify` 改为 `dotenv -e infra/env/.env.test -- sh -c '…'` 包裹整条链（与 `dev` 同款）；CI 已有 env 不受影响。**坑**：`dotenv -- A && B` 只给 A 加载 env，`&&` 后的 B 跑的是父 shell 的 env（无 DATABASE_URL）——必须用 `sh -c` 包住全链。附带修复：P1-28 在 [auth-routes.test.ts:171](apps/api/tests/auth-routes.test.ts#L171) 的回归断言（未验证邮箱登录改 401 + AUTH_INVALID_CREDENTIALS）。
 
 ### P1-40 · 包边界检查覆盖面缺口：web/admin/api-client/storage 等无规则
 - **位置**：[check-package-boundaries.ts:112-224](infra/scripts/check-package-boundaries.ts#L112-L224)（规则只覆盖 12 个 scope）

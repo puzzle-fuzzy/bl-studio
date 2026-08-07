@@ -161,15 +161,17 @@ describe('auth routes', () => {
     expect(body.error.details?.action).toBe('resend_verification')
   })
 
-  it('rejects login before verification, then verification sets the session cookie', async () => {
+  it('rejects login before verification (anti-enumeration, P1-28), then verification sets the session cookie', async () => {
     await register('verify-route@x.test')
     const login = await app.handle(json(
       'http://localhost/api/auth/login',
       { email: 'verify-route@x.test', password: 'password1' },
       { method: 'POST' },
     ))
-    expect(login.status).toBe(403)
-    expect((await login.json() as { error: { code: string } }).error.code).toBe('AUTH_EMAIL_UNVERIFIED')
+    // P1-28：未验证邮箱登录与「账号不存在/密码错误」统一为 401 + AUTH_INVALID_CREDENTIALS，
+    // 防止通过错误码区分账号状态。
+    expect(login.status).toBe(401)
+    expect((await login.json() as { error: { code: string } }).error.code).toBe('AUTH_INVALID_CREDENTIALS')
 
     const verified = await verifyLatestEmail()
     const body = await verified.json() as { success: true; data: { user: { email: string; emailVerifiedAt: string } } }
