@@ -60,6 +60,7 @@ export const funAsrV1: ModelManifest = {
       type: 'number',
       min: 2,
       max: 100,
+      step: 1,
       visibleWhen: { field: 'diarizationEnabled', equals: true },
       description: '仅在开启说话人分离时生效，帮助模型估计说话人数（2-100）',
     },

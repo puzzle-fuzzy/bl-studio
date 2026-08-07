@@ -86,6 +86,78 @@ describe('estimatePriceCents', () => {
     expect(estimatePriceCents(baseManifest, { n: 2, size: '1792*1024' })).toBe(20)
   })
 
+  it('prefers the explicit default over the conservative fallback when both exist (P2-20)', () => {
+    const mixedManifest: ModelManifest = {
+      ...baseManifest,
+      id: 'priced-mixed',
+      pricing: {
+        unit: 'per_second',
+        quantityKey: 'duration',
+        currency: 'CNY',
+        rates: [
+          {
+            id: 'default',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'second',
+            unitSize: 1,
+            unitPrice: '0.5',
+            conditions: {},
+          },
+          {
+            id: 'max',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'second',
+            unitSize: 1,
+            unitPrice: '1.5',
+            conditions: { tier: 'pro' },
+          },
+        ],
+      },
+    }
+    // tier 未提供 → 无条件命中 → 走默认价 0.5，而非保守上界 1.5
+    expect(estimatePriceCents(mixedManifest, { duration: 10 })).toBe(500)
+  })
+
+  it('falls back to the most expensive rate (conservative) when conditions miss and no default exists (P2-20)', () => {
+    const noDefaultManifest: ModelManifest = {
+      ...baseManifest,
+      id: 'priced-no-default',
+      pricing: {
+        unit: 'per_second',
+        quantityKey: 'duration',
+        currency: 'CNY',
+        rates: [
+          {
+            id: 'cheap',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'second',
+            unitSize: 1,
+            unitPrice: '0.6',
+            conditions: { tier: '720p' },
+          },
+          {
+            id: 'expensive',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'second',
+            unitSize: 1,
+            unitPrice: '1.2',
+            conditions: { tier: '1080p' },
+          },
+        ],
+      },
+    }
+    // tier 缺失 → 无默认价 → 保守上界 1.2 元/秒 × 10s = 1200 分（而非静默取 0.6 的 600）
+    expect(estimatePriceCents(noDefaultManifest, { duration: 10 })).toBe(1200)
+  })
+
   it('scales per_token rates (decimal yuan per 1M tokens) down to an integer-cent estimate', () => {
     const textManifest: ModelManifest = {
       ...baseManifest,

@@ -354,15 +354,15 @@
 - **P2-11 · task_records 注释与 CHECK 不一致（含 'retry'）** —— [schema.ts:657](packages/db/src/schema.ts#L657) 注释声明含 'retry'，[:696](packages/db/src/schema.ts#L696) CHECK 只有 queued/running/succeeded/failed/cancelled。已验证状态机从不持久化 'retry'（落到 queued）—— 约束对、注释过时，统一即可。
 
 ### 模型知识
-- **P2-12 · rule.code 是死配置** —— [validation.ts:322-330](packages/model-core/src/validation.ts#L322-L330) 从不读 `rule.code`，manifest 里自定义码（如 keling-video.ts:559 `REQUIRED_MEDIA`）一律被发成 `REQUIRED_PARAMETER`/`OUT_OF_RANGE`。接线（先做白名单断言）或从类型去掉。
-- **P2-13 · 剧本模型内部 `mode` 是死配置** —— [qwen-omni-screenplay.ts:53-64](packages/model-core/src/manifests/video/qwen-omni-screenplay.ts#L53)：visibleWhen 恒假、运行时被 applyDefaults 删除，唯一作用是满足「conditions 字段必须引用已声明参数」断言；实际匹配靠 [pricing.ts:170-172](packages/model-core/src/pricing.ts#L170) 硬编码。
-- **P2-14 · qwen-image-max 的 `n` 参数泄漏进 UI** —— [qwen-image-2.ts:173-181](packages/model-core/src/manifests/image/qwen-image-2.ts#L173) 无 visibleWhen，与 [:8](packages/model-core/src/manifests/image/qwen-image-2.ts#L8) 注释「不暴露给 UI」不符。
-- **P2-15 · 剧本模型 output 映射与真实响应不符（潜藏）** —— [qwen-omni-screenplay.ts:78](packages/model-core/src/manifests/video/qwen-omni-screenplay.ts#L78)（`output.text`）vs [client.ts:387-397](packages/provider-dashscope/src/client.ts#L387)（流式路径根本不用它）；若未来走异步 poll，`assertResponseShape` 会取不到内容。
-- **P2-16 · deepseek providerModel 等于 manifest id（全仓唯一，需核实）** —— [deepseek-v4.ts:24](packages/model-core/src/manifests/text/deepseek-v4.ts#L24)；其余模型都是独立百炼模型名。若百炼真实名不是这个，文本生成全线 404。对照控制台确认。
-- **P2-17 · fun-asr speakerCount 缺 step** —— [fun-asr.ts:58-65](packages/model-core/src/manifests/audio/fun-asr.ts#L58)（对比 paraformer 有 `step:1`）；无 step 时 `2.5` 能通过校验原样发给 provider。
-- **P2-18 · 可选字符串空串原样透传 provider** —— [validation.ts:23-25](packages/model-core/src/validation.ts#L23)（`''` 当缺省不报错）→ [deepseek-v4.ts:106-110](packages/model-core/src/manifests/text/deepseek-v4.ts#L106) `stop` 清空后以空串进请求体。归一为省略。
-- **P2-19 · catalog/api-client 投影手工维护易漂移** —— [catalog.ts:13,34-37](packages/model-core/src/catalog.ts#L13) + [schemas.ts:164-185](packages/api-client/src/schemas.ts#L164)：manifest 新增参数元数据时缺一字段即前端静默丢字段。加「投影字段集合与 manifest 一致」断言。
-- **P2-20 · selectRate 的 `pool[0]` 静默回退可能低估费用** —— [pricing.ts:81-83](packages/model-core/src/pricing.ts#L81)：条件组不完整时悄悄取第一条 rate 不报错。收敛为显式失败或保守值。
+- **P2-12 · rule.code 是死配置** —— ✅ 已处理（2026-08-08）：新增 `ParameterIssueCode` 白名单联合（含 `REQUIRED_MEDIA`/`TOO_MANY_MEDIA`），`validation.ts` 的 `fromRuleIssue` 改为取 `rule.code ?? 兜底码` 接线；`registry-check.ts` 加运行时白名单断言（tsx 不经 typecheck 也能挡漂移）。两个剧本 manifest 的 `conditions.mode` 交叉引用保持有效。
+- **P2-13 · 剧本模型内部 `mode` 是死配置** —— ✅ 已处理（2026-08-08）：判定为「计费模式标记」而非 bug——rate `conditions.mode` 必须引用已声明参数（registry-check 断言），`mode` 承担该交叉引用并文档化四个计费桶；恒假 visibleWhen 使其不进 UI、applyDefaults 剥离。两个剧本 manifest 补充 P2-13 注释说明标记语义与 pricing.ts 字面字符串硬编码的对应关系。
+- **P2-14 · qwen-image-max 的 `n` 参数泄漏进 UI** —— ✅ 已处理（2026-08-08）：`qwen-image-2.ts` 的 `n`（min:1 max:1）加恒假 `visibleWhen: { field: 'prompt', equals: 'internal:never-user-visible' }`，提交时被 `removeHiddenParameterValues` 剥离；定价 `quantityFrom` 缺省回退 1 = 固定值，估价/结算不受影响。
+- **P2-15 · 剧本模型 output 映射与真实响应不符（潜藏）** —— ✅ 已处理（2026-08-08）：两个剧本 manifest 的 `output.path` 由 `output.text` 改为 `output.choices.0.message.content`（chat completions 兼容路径）；流式路径不读 manifest.output，此处供未来 async-poll 时 `assertResponseShape` 推导关键路径，消除漂移。
+- **P2-16 · deepseek providerModel 等于 manifest id（全仓唯一，需核实）** —— ❓ 待核实（2026-08-08）：`providerModel: 'deepseek-v4'` 即百炼模型名；本地无 console 对照，保留，改动需人工在百炼控制台确认真实模型名。
+- **P2-17 · fun-asr speakerCount 缺 step** —— ✅ 已处理（2026-08-08）：`fun-asr.ts` speakerCount 补 `step: 1`，`2.5` 等小数不再通过校验（与 paraformer 一致）。
+- **P2-18 · 可选字符串空串原样透传 provider** —— ✅ 已处理（2026-08-08）：`validation.ts` 的 `applyDefaults` 新增归一化——text 参数值为 `''` 时视为未提供并删除（与 isEmpty 语义一致），deepseek `stop` 清空后不再以空串进请求体。
+- **P2-19 · catalog/api-client 投影手工维护易漂移** —— ✅ 已处理（2026-08-08）：新增根契约测试 `tests/catalog-projection-completeness.test.ts`——类型层 `Exclude<keyof ModelParameter, ...>` 强制覆盖（model-core 加字段未同步即 tsc 红）+ 运行层对每个已注册模型经 `ModelCatalogItemSchema.parse` 断言投影字段不丢（`parsed.parameters` deep-equal 任一字段剥掉即红）。为此把 `ModelValidationRuleSchema` 从模块私有改为导出。
+- **P2-20 · selectRate 的 `pool[0]` 静默回退可能低估费用** —— ✅ 已处理（2026-08-08）：`pricing.ts` 新增 `conservativeFallback`——conditions 未命中且无默认价时取池中每单位分值最高 rate（保守上界），不再静默取第一条；`selectRate` 与 `tokenRateCents` 均接线。两个剧本 manifest 把「视觉文本输入 / 多模态文本输出」设为默认价，使常见路径不被保守回退高估（音频档仍按 mode 区分）。新增两条定价测试锁定行为。
 
 ### API
 - **P2-21 · SSE 事件名不一致** —— [generations/routes.ts:86-98](apps/api/src/modules/generations/routes.ts#L86) 手工发 `generation.created`，[events.ts:138-145](packages/event-bus/src/events.ts#L138) 重放/listener 发 `generation.status`；同一事件发出的名字取决于时序。统一固定事件名语义。

@@ -168,7 +168,8 @@ export const qwenImageMax: ModelManifest = {
         { label: '9:16 (928×1664)', value: '928*1664' },
       ],
     },
-    // qwen-image-max 的 n 固定为 1：不暴露给 UI，仅保留用于定价计算（按张计费）
+    // qwen-image-max 的 n 固定为 1：不暴露给 UI（恒假 visibleWhen，提交时被
+    // removeHiddenParameterValues 剥离），仅保留用于定价计算——按张计费，缺省即 1。
     {
       name: 'n',
       label: '图片数量',
@@ -178,6 +179,7 @@ export const qwenImageMax: ModelManifest = {
       max: 1,
       step: 1,
       description: '固定为1张',
+      visibleWhen: { field: 'prompt', equals: 'internal:never-user-visible' },
     },
     {
       name: 'promptExtend',

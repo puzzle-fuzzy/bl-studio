@@ -726,7 +726,8 @@ describe('validateModelParams with ParametersValidationInput projection', () => 
         kind: 'required-one-of' as const,
         fields: ['prompt', 'n'],
         minimum: 1,
-        code: 'ONE_OF',
+        // P2-12：rule.code 白名单为 ParameterIssueCode，非白名单码不再类型合法
+        code: 'REQUIRED_PARAMETER' as const,
         message: { 'zh-CN': '至少提供 prompt 或 n', 'en-US': 'Provide at least one of prompt or n' },
       }],
     }

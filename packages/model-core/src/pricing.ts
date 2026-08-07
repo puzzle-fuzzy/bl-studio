@@ -65,8 +65,21 @@ function isDefaultRate(rate: Readonly<PricingRateData>): boolean {
 }
 
 /**
+ * 保守回退（P2-20）：conditions 未命中且无默认价时，不再静默取第一条。常见档位
+ * 总是声明在前，条件缺失时按最低档估价会低估费用、误导预检与日限额累加；改取池中
+ * 每单位分值最高的 rate 作保守上界。正常路径（条件命中或有默认价）不受影响。
+ */
+function conservativeFallback(pool: readonly PricingRateData[]): PricingRateData | undefined {
+  return pool.reduce<PricingRateData | undefined>(
+    (best, rate) => best === undefined || rateCentsPerUnit(rate) > rateCentsPerUnit(best) ? rate : best,
+    undefined,
+  )
+}
+
+/**
  * 从 rates 中选取一条：先过滤 chargeItem，cn-beijing 区优先；先命中 conditions，
- * 否则回退默认价（conditions 为空）。estimatePriceCents 的回退依赖"默认价存在"。
+ * 否则回退默认价（conditions 为空），仍无匹配时取保守上界（P2-20）。
+ * estimatePriceCents 的回退依赖"默认价存在"。
  */
 function selectRate(
   manifest: FrozenModelManifest,
@@ -80,7 +93,7 @@ function selectRate(
     : candidates
   return pool.find(candidate => matchesConditions(candidate, params))
     ?? pool.find(isDefaultRate)
-    ?? pool[0]
+    ?? conservativeFallback(pool)
 }
 
 /**
@@ -136,7 +149,7 @@ function tokenRateCents(
     ? rates.filter(rate => rate.region === DEFAULT_REGION)
     : rates
   const withMode = mode !== undefined ? pool.find(rate => rate.conditions['mode'] === mode) : undefined
-  const rate = withMode ?? pool.find(isDefaultRate) ?? pool[0]
+  const rate = withMode ?? pool.find(isDefaultRate) ?? conservativeFallback(pool)
   if (rate === undefined) return undefined
   return rateCentsPerUnit(rate)
 }

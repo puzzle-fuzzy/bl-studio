@@ -85,7 +85,7 @@ const ModelRuleConditionSchema = z.discriminatedUnion('kind', [
  * catalog 把 rules 原样透传，web 表单因此能直接用 model-core validateModelParams
  * 做与服务端等价的提交前校验（media 数量上限 / 文本长度 / 条件必填等）。
  */
-const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
+export const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('required-one-of'),
     fields: z.array(z.string()),

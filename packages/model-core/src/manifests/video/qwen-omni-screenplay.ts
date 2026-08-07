@@ -49,6 +49,12 @@ export const qwenOmniScreenplay: ModelManifest = {
       min: 1,
       description: '仅用于费用预估，不影响结果',
     },
+    // P2-13（已知限制，标注）：mode 是「计费模式标记」而非真实输入——恒假 visibleWhen
+    // 使其不进 UI，applyDefaults 在校验前剥离，运行时值从不被读取。它存在的意义：
+    // (1) rates 的 conditions.mode 必须引用已声明参数（registry-check 断言），mode 承担
+    //     这个交叉引用；(2) 文档化 qwen3.5-omni 家族的四个计费桶。实际匹配由
+    //     pricing.ts 的 tokenRateCents / calculateUsagePriceCents 按字面字符串硬编码，
+    //     与 manifest 的 options 保持同步（见 estimatePriceCents 注释）。
     {
       name: 'mode',
       label: '计费模式（内部）',
@@ -60,7 +66,7 @@ export const qwenOmniScreenplay: ModelManifest = {
         { label: '音频输出', value: 'audio-output' },
       ],
       visibleWhen: { field: 'videoUrl', equals: 'internal:never-user-visible' },
-      description: '内部计费模式标记，由 usage token 桶映射到 rates 的 conditions.mode，不对用户展示',
+      description: '内部计费模式标记，仅用于满足 conditions.mode 交叉引用与文档化计费桶，不对用户展示',
     },
   ],
   request: {
@@ -75,7 +81,10 @@ export const qwenOmniScreenplay: ModelManifest = {
       estimatedDuration: { target: 'ui.only' },
     },
   },
-  output: { kind: 'text', path: 'output.text' },
+  // P2-15：chat completions 兼容路径，内容在 choices[0].message.content，而非 output.text。
+  // 流式路径（worker 的 streamText）从不读 manifest.output；此处仅供 assertResponseShape 的
+  // async-poll final 阶段推导关键路径（当前 taskMode=stream 不会触发），修对以消除未来漂移。
+  output: { kind: 'text', path: 'output.choices.0.message.content' },
   // token 计费（chat completions）：预检数量用 estimatedDuration（秒）作为费用代理，
   // 实际结算按 usage token 桶（calculateUsagePriceCents）。estimatePriceCents 对 token
   // 费率给保守下限 1 分，避免预检恒 0（P1-02）。
@@ -84,6 +93,9 @@ export const qwenOmniScreenplay: ModelManifest = {
     quantityKey: 'estimatedDuration',
     currency: 'CNY',
     rates: [
+      // P2-20：视觉文本输入是本模型的常见默认档——设为默认价（conditions 为空），
+      // 让 estimatePriceCents 在没有 mode（applyDefaults 恒剥离）时落到 7 元/M 的
+      // 正确常用价，而不是被保守回退（最高费率）高估。音频档仍按 mode 区分。
       {
         id: 'cn-beijing-visual-text-input-token',
         region: 'cn-beijing',
@@ -92,7 +104,7 @@ export const qwenOmniScreenplay: ModelManifest = {
         unit: 'token',
         unitSize: 1000000,
         unitPrice: '7',
-        conditions: { mode: 'text-image-video-input' },
+        conditions: {},
       },
       {
         id: 'cn-beijing-audio-input-token',
@@ -112,7 +124,7 @@ export const qwenOmniScreenplay: ModelManifest = {
         unit: 'token',
         unitSize: 1000000,
         unitPrice: '40',
-        conditions: { mode: 'multimodal-input-text-output' },
+        conditions: {},
       },
       {
         id: 'cn-beijing-audio-output-token',

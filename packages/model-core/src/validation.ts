@@ -12,6 +12,7 @@ import type {
   ModelParameter,
   ModelRuleCondition,
   ModelValidationRule,
+  ParameterIssueCode,
   ParameterValidationIssue,
   ParametersValidationInput,
   ValidationResult,
@@ -239,7 +240,7 @@ function validateRules(
         if (provided >= minimum) return []
         const field = rule.fields[0]
         if (field === undefined) return []
-        return [fromRuleIssue('REQUIRED_PARAMETER', field, rule)]
+        return [fromRuleIssue(rule, field, 'REQUIRED_PARAMETER')]
       }
       case 'text-length': {
         const value = params[rule.field]
@@ -253,19 +254,19 @@ function validateRules(
           (limit.min !== undefined && length < limit.min)
           || (limit.max !== undefined && length > limit.max)
         ) {
-          return [fromRuleIssue('OUT_OF_RANGE', rule.field, rule)]
+          return [fromRuleIssue(rule, rule.field, 'OUT_OF_RANGE')]
         }
         return []
       }
       case 'field-required-when': {
         if (evaluateCondition(rule.condition, params) && isEmpty(params[rule.field])) {
-          return [fromRuleIssue('REQUIRED_PARAMETER', rule.field, rule)]
+          return [fromRuleIssue(rule, rule.field, 'REQUIRED_PARAMETER')]
         }
         return []
       }
       case 'field-allowed-when': {
         if (evaluateCondition(rule.condition, params) && !isEmpty(params[rule.field])) {
-          return [fromRuleIssue('INVALID_VALUE', rule.field, rule)]
+          return [fromRuleIssue(rule, rule.field, 'INVALID_VALUE')]
         }
         return []
       }
@@ -276,7 +277,7 @@ function validateRules(
         if (field === undefined) return []
         const label = rule.fields.join(', ')
         if (rule.minItems !== undefined && count < rule.minItems) {
-          if (rule.message !== undefined) return [fromRuleIssue('OUT_OF_RANGE', field, rule)]
+          if (rule.message !== undefined) return [fromRuleIssue(rule, field, 'OUT_OF_RANGE')]
           return [issue(
             'OUT_OF_RANGE',
             field,
@@ -287,7 +288,7 @@ function validateRules(
           )]
         }
         if (rule.maxItems !== undefined && count > rule.maxItems) {
-          if (rule.message !== undefined) return [fromRuleIssue('OUT_OF_RANGE', field, rule)]
+          if (rule.message !== undefined) return [fromRuleIssue(rule, field, 'OUT_OF_RANGE')]
           return [issue(
             'OUT_OF_RANGE',
             field,
@@ -309,7 +310,7 @@ function validateRules(
           if (typeof item !== 'object' || item === null) continue
           const itemValue = (item as Record<string, unknown>)[rule.itemProperty]
           if (typeof itemValue === 'number' && itemValue > maximum) {
-            return [fromRuleIssue('OUT_OF_RANGE', rule.field, rule)]
+            return [fromRuleIssue(rule, rule.field, 'OUT_OF_RANGE')]
           }
         }
         return []
@@ -318,13 +319,17 @@ function validateRules(
   })
 }
 
-/** 用规则自带的官方文案生成 issue；无 message 时由调用方兜底生成。 */
+/**
+ * 用规则自带的官方文案生成 issue；code 取 rule.code（白名单 = ParameterIssueCode，
+ * registry-check 断言；typecheck 层面非法值即编译失败）。media-group 的 message/code
+ * 可选，message 缺失时由调用方兜底生成，code 缺失时回退调用方提供的默认码。
+ */
 function fromRuleIssue(
-  code: ParameterValidationIssue['code'],
-  field: string,
   rule: DeepReadonly<ModelValidationRule>,
+  field: string,
+  fallbackCode: ParameterIssueCode,
 ): ParameterValidationIssue {
-  // media-group 的 message 可选，但所有调用点都已确认存在（含显式 `!== undefined` 守卫）。
+  const code = rule.code ?? fallbackCode
   const message = rule.message as LocalizedModelMessage
   return issue(code, field, message['en-US'], message['zh-CN'])
 }
@@ -338,6 +343,14 @@ export function applyDefaults(manifest: ParametersValidationInput, input: Record
   for (const parameter of manifest.parameters) {
     if (next[parameter.name] === undefined && parameter.defaultValue !== undefined) {
       next[parameter.name] = parameter.defaultValue
+    }
+  }
+  for (const parameter of manifest.parameters) {
+    // P2-18：可选字符串空串在语义上等同「未提供」（isEmpty 视 '' 为缺省），归一为
+    // 省略——否则空串原样透传 provider（如 deepseek 的 stop 清空后以 '' 进请求体，
+    // 部分端点会拒绝空串）。'' 不可能是 select 的合法选项，布尔/数字不产生 ''。
+    if (next[parameter.name] === '' && parameter.type === 'text') {
+      delete next[parameter.name]
     }
   }
   for (const parameter of manifest.parameters) {

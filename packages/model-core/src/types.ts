@@ -152,6 +152,19 @@ export type ModelRuleCondition =
  * 参数级静态校验（required/type/range），再评估这些跨字段规则。code/message
  * 来自官方契约（源码措辞保留），media-group 缺省时由校验器生成默认文案。
  */
+/**
+ * 参数校验问题的稳定错误码。rule.code 必须落在该白名单内（registry-check 运行时
+ * 断言 + 类型层联合），避免规则自定义码漂移成无人消费的幻数。
+ */
+export type ParameterIssueCode =
+  | 'REQUIRED_PARAMETER'
+  | 'INVALID_TYPE'
+  | 'OUT_OF_RANGE'
+  | 'INVALID_VALUE'
+  | 'UNKNOWN_PARAMETER'
+  | 'REQUIRED_MEDIA'
+  | 'TOO_MANY_MEDIA'
+
 export type ModelValidationRule =
   | {
       /** 至少提供 fields 中之一（契约 required-one-of，如 fun-music 的 lyrics/prompt）。 */
@@ -159,7 +172,7 @@ export type ModelValidationRule =
       fields: string[]
       /** 至少命中数量，缺省 1。 */
       minimum?: number
-      code: string
+      code: ParameterIssueCode
       message: LocalizedModelMessage
     }
   | {
@@ -172,7 +185,7 @@ export type ModelValidationRule =
       other: { min?: number; max: number }
       /** 仅在该传输模式下生效（契约 modes，如 fun-music 的流式/非流式区分）。缺省 = 全部模式。 */
       modes?: ModelTaskMode[]
-      code: string
+      code: ParameterIssueCode
       message: LocalizedModelMessage
     }
   | {
@@ -180,7 +193,7 @@ export type ModelValidationRule =
       kind: 'field-required-when'
       field: string
       condition: ModelRuleCondition
-      code: string
+      code: ParameterIssueCode
       message: LocalizedModelMessage
     }
   | {
@@ -188,7 +201,7 @@ export type ModelValidationRule =
       kind: 'field-allowed-when'
       field: string
       condition: ModelRuleCondition
-      code: string
+      code: ParameterIssueCode
       message: LocalizedModelMessage
     }
   | {
@@ -199,7 +212,7 @@ export type ModelValidationRule =
       maxItems?: number
       /** 条件命中时该组约束才生效。 */
       condition?: ModelRuleCondition
-      code?: string
+      code?: ParameterIssueCode
       message?: LocalizedModelMessage
     }
   | {
@@ -212,7 +225,7 @@ export type ModelValidationRule =
       maximumField: string
       /** maximumField 未提供时的默认上限。 */
       defaultMaximum: number
-      code: string
+      code: ParameterIssueCode
       message: LocalizedModelMessage
     }
 
@@ -436,7 +449,7 @@ export interface LocalizedModelMessage {
  * messages/expected 面向中英文 UI 与第三方调用方。
  */
 export interface ParameterValidationIssue {
-  code: 'REQUIRED_PARAMETER' | 'INVALID_TYPE' | 'OUT_OF_RANGE' | 'INVALID_VALUE' | 'UNKNOWN_PARAMETER'
+  code: ParameterIssueCode
   field: string
   message: string
   messages: LocalizedModelMessage

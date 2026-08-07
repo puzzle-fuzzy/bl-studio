@@ -14,7 +14,23 @@ import type {
   FrozenModelManifest,
   ModelRuleCondition,
   ModelValidationRule,
+  ParameterIssueCode,
 } from './types'
+
+/**
+ * rule.code 白名单（P2-12）：与 ParameterIssueCode 联合一致。类型层已保证
+ * 合法值，这里再加运行时断言，让 check:manifests（tsx 不经 typecheck）也能
+ * 把漂移挡在构建期。
+ */
+const RULE_CODE_WHITELIST: ReadonlySet<ParameterIssueCode> = new Set<ParameterIssueCode>([
+  'REQUIRED_PARAMETER',
+  'INVALID_TYPE',
+  'OUT_OF_RANGE',
+  'INVALID_VALUE',
+  'UNKNOWN_PARAMETER',
+  'REQUIRED_MEDIA',
+  'TOO_MANY_MEDIA',
+])
 import { isNumberStepAligned } from './number-step'
 import { modelValuesEqual } from './value-equality'
 
@@ -210,6 +226,12 @@ function assertRules(
   }
 
   for (const rule of manifest.rules ?? []) {
+    if (rule.code !== undefined && !RULE_CODE_WHITELIST.has(rule.code)) {
+      throw new Error(
+        `${manifest.id} rule ${rule.kind} code "${rule.code}" is not in the ParameterIssueCode whitelist`
+          + ` (${[...RULE_CODE_WHITELIST].join(', ')})`,
+      )
+    }
     switch (rule.kind) {
       case 'required-one-of': {
         if (rule.fields.length === 0) {
