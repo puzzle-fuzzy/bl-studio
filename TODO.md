@@ -239,13 +239,15 @@
 ### 2.4 数据层 / 账务 / 认证
 
 ### P1-27 · credit-ledger reconcile / releaseStaleReservations 全表载入 + 长事务逐行加锁
-> ✅ 已处理（未提交，工作树中）——接线完成：worker 组合根 createCreditLedgerFromUrl 创建账本句柄传入 WorkerLoop（creditLedger config），startStaleReserveSweeper 以 stale-generation 相同节奏周期调用 releaseStaleReservations({ olderThan: 1h, confirm: true }) 兜底释放僵尸 reserve；creditHandle.close() 随 shutdown finally 关闭。- **位置**：[credit-ledger/src/repository.ts:412-416](packages/credit-ledger/src/repository.ts#L412-L416)（reconcile 全表载入）、[:478-483](packages/credit-ledger/src/repository.ts#L478-L483)（releaseStaleReservations 全表拉一遍建已结算集合）、[:504](packages/credit-ledger/src/repository.ts#L504)（逐行 FOR UPDATE）
+> ✅ 已处理（未提交，工作树中）——账本 set-based 化 + worker 接线：reconcile 每账户最新快照改 ROW_NUMBER 窗口函数原生 SQL（drizzle 0.45 已移除 distinctOn）、负余额 SQL WHERE 过滤，内存 O(全部条目)→O(账户+异常)；releaseStaleReservations 候选判定下推 SQL（kind=reserve + 超时 + 终态 + NOT EXISTS settle/refund）。worker 组合根 createCreditLedgerFromUrl 创建账本句柄传入 WorkerLoop，startStaleReserveSweeper 以 stale-generation 同节奏周期调用 releaseStaleReservations({ olderThan: 1h, confirm: true }) 兜底释放僵尸 reserve（即「关联」里"无任何调用方"已解决）；creditHandle.close() 随 shutdown finally 关闭。
+- **位置**：[credit-ledger/src/repository.ts:412-416](packages/credit-ledger/src/repository.ts#L412-L416)（reconcile 全表载入）、[:478-483](packages/credit-ledger/src/repository.ts#L478-L483)（releaseStaleReservations 全表拉一遍建已结算集合）、[:504](packages/credit-ledger/src/repository.ts#L504)（逐行 FOR UPDATE）
 - **影响**：账本无界增长后每次清扫 O(全部条目) 内存，单事务锁大量 account 行，与并发结算互相阻塞/死锁，可能 OOM。
 - **修法**：set-based —— 一条 `SELECT DISTINCT generation_id WHERE kind IN ('settle','refund')` 取代全表加载，`NOT EXISTS` 下推或按 account 分批。
 - **关联**：`releaseStaleReservations` 目前**无任何调用方**（见 P2-07）—— 崩溃后既未 settle 也未 refund 的 reserve 永远不会被释放。
 
 ### P1-28 · login 计时侧信道 + 未验证邮箱可枚举
-> ✅ 已处理（未提交，工作树中）——login 对不存在邮箱也跑 DUMMY_PASSWORD_HASH（argon2id 固定哈希，参数与真实一致）抹平计时；未验证/不存在/密码错误统一返回 AUTH_INVALID_CREDENTIALS（HTTP 401），不再发 AUTH_EMAIL_UNVERIFIED。- **位置**：[auth/src/service.ts:491-496](packages/auth/src/service.ts#L491-L496)
+> ✅ 已处理（未提交，工作树中）——login 对不存在邮箱也跑 DUMMY_PASSWORD_HASH（argon2id 固定哈希，参数与真实一致）抹平计时；未验证/不存在/密码错误统一返回 AUTH_INVALID_CREDENTIALS（HTTP 401），不再发 AUTH_EMAIL_UNVERIFIED。
+- **位置**：[auth/src/service.ts:491-496](packages/auth/src/service.ts#L491-L496)
 - **问题**：用户不存在时短路不跑 argon2（快速失败）；login 对未验证返回 `AUTH_EMAIL_UNVERIFIED`、对不存在返回 `AUTH_INVALID_CREDENTIALS`。resend 接口（:472）统一 `accepted:true` 防枚举是对的，login 反而不对。
 - **修法**：不存在时对固定 dummy hash 也跑 verifyPassword 抹平时间；login 对未验证与不存在返回同一错误。
 
@@ -438,7 +440,6 @@
 - **修法**：任务列表 hidden/deleted 视图 + 详情页加「恢复」按钮，调 `setGenerationLibraryState(id,'visible')`。
 
 **R2-P1-06 · 上传「取消」只做一半 —— 客户端支持 AbortController，UI 未接线**
-> ✅ 已处理（未提交，工作树中）——账本 set-based 化：reconcile 用 ROW_NUMBER 窗口函数取每账户最新快照、负余额 SQL WHERE 过滤；releaseStaleReservations 候选判定下推 SQL（NOT EXISTS settle/refund）。drizzle 0.45 已移除 distinctOn，走原生 SQL execute。
 - **位置**：[generation-client.ts:145-167](packages/api-client/src/generation-client.ts#L145)（`uploadAssetWithProgress` 支持 `signal`→abort）；[AssetPickerDialog.tsx:68-85](apps/web/src/components/assets/AssetPickerDialog.tsx#L68)（从不传 signal、无取消按钮）；关弹窗后 XHR 继续在后台跑
 - **修法**：AssetPickerDialog 持有 AbortController，上传中显示「取消上传」，onOpenChange/卸载时 `abort()`。
 
@@ -460,11 +461,13 @@
 ### 6.3 测试质量与覆盖（测试是否真的测到了行为）
 
 **R2-P1-09 · 三个 P0 缺陷无回归测试（batchId / artifact 重试 / ASR 参数）**
-> ✅ 已处理（未提交，工作树中）——batchId 进 body 精确断言（generation-client.test.ts:286，随 P0-03 落地已核实）+ artifact 重试 retry 用例（artifact-task-handler.test.ts 三用例随 P0-02 落地已核实）+ ASR 映射下沉 apps/web/src/lib/tool-submission.ts 纯函数并单测（fileUrls 非 audioUrl，P0-01 回归）。- **位置**：[generation-client.test.ts:243,267](packages/api-client/tests/generation-client.test.ts#L243)（对 body 做 `toEqual(JSON.stringify(...))` 精确断言，但所有用例不传 batchId —— 丢字段也全绿）；[artifact-task-handler.test.ts](apps/worker/tests/artifact-task-handler.test.ts)（仅 1 个用例，无 retry 路径断言）；ASR 参数错在 UI 层，按「不测 UI」约定纯函数层够不到
+> ✅ 已处理（未提交，工作树中）——batchId 进 body 精确断言（generation-client.test.ts:286，随 P0-03 落地已核实）+ artifact 重试 retry 用例（artifact-task-handler.test.ts 三用例随 P0-02 落地已核实）+ ASR 映射下沉 apps/web/src/lib/tool-submission.ts 纯函数并单测（fileUrls 非 audioUrl，P0-01 回归）。
+- **位置**：[generation-client.test.ts:243,267](packages/api-client/tests/generation-client.test.ts#L243)（对 body 做 `toEqual(JSON.stringify(...))` 精确断言，但所有用例不传 batchId —— 丢字段也全绿）；[artifact-task-handler.test.ts](apps/worker/tests/artifact-task-handler.test.ts)（仅 1 个用例，无 retry 路径断言）；ASR 参数错在 UI 层，按「不测 UI」约定纯函数层够不到
 - **修法**：补「batchId 进 body」精确断言（修复落地即生效）；补「retriable 存储错误 → `{status:'retry'}`」用例（现有源码下必红）；把剧本/ASR 分发下沉为纯函数（`apps/web/src/lib/`）并单测参数映射，或在 generation-submit.test.ts 补 fun-asr 用例。
 
 **R2-P1-10 · apps/admin 全 app 零测试，`passWithNoTests` 掩盖空跑**
-> ✅ 已处理（未提交，工作树中）——admin 补 user-error.test.ts（镜像 web）+ chunk-recovery.test.ts（识别/忽略/reload 一次守卫），vitest.config passWithNoTests 改 false，空跑即红。- **位置**：[admin/vitest.config.ts:13](apps/admin/vitest.config.ts#L13)（`passWithNoTests:true`）；41 个 src 文件 0 测试；`src/lib/user-error.ts`(84)/`chunk-recovery.ts`(55) 全是可测逻辑
+> ✅ 已处理（未提交，工作树中）——admin 补 user-error.test.ts（镜像 web）+ chunk-recovery.test.ts（识别/忽略/reload 一次守卫），vitest.config passWithNoTests 改 false，空跑即红。
+- **位置**：[admin/vitest.config.ts:13](apps/admin/vitest.config.ts#L13)（`passWithNoTests:true`）；41 个 src 文件 0 测试；`src/lib/user-error.ts`(84)/`chunk-recovery.ts`(55) 全是可测逻辑
 - **修法**：至少补 user-error + chunk-recovery（与 web 同名模块对齐）；`passWithNoTests` 改 false 让空跑变红。
 
 **R2-P1-11 · `test:coverage` 是死链，60% 阈值无人 enforce**
@@ -473,7 +476,8 @@
 - **修法**：删死阈值 或 给 web 加 `test:coverage` script 并接进 verify。
 
 **R2-P1-12 · 登出数据清理注册表（`registerPrivateDataReset`）无测试**
-> ✅ 已处理（未提交，工作树中）——auth-store.test.ts：导入 6 个注册 store 播种标志数据→resetAllPrivateData 后全部清空（注册表漏掉任一 store 即红）+ allSettled 容错（单个回调 reject 不拖垮整体）。- **位置**：[auth-store.ts:16-24](apps/web/src/stores/auth-store.ts#L16)；6 个 store 模块级注册回调（generations/assets/notifications/credits/reference-assets/generation-artifacts）
+> ✅ 已处理（未提交，工作树中）——auth-store.test.ts：导入 6 个注册 store 播种标志数据→resetAllPrivateData 后全部清空（注册表漏掉任一 store 即红）+ allSettled 容错（单个回调 reject 不拖垮整体）。
+- **位置**：[auth-store.ts:16-24](apps/web/src/stores/auth-store.ts#L16)；6 个 store 模块级注册回调（generations/assets/notifications/credits/reference-assets/generation-artifacts）
 - **影响**：若某 store 忘注册，登出即跨用户残留数据；「每个 store 都注册了」这个不变量无测试保护。
 - **修法**：auth-store.test.ts 断言「注册→resetAllPrivateData→登出后各 store 清空」+「注册表包含预期 store 集合」。
 
