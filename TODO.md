@@ -348,9 +348,9 @@
 
 ### 数据层 / 账务
 - **P2-07 · `releaseStaleReservations` 是死代码（无任何调用方）** — ✅ 已处理（随 P1-27 commit `e68b239`）——worker 组合根 `createCreditLedgerFromUrl` 创建账本句柄传入 WorkerLoop，`startStaleReserveSweeper` 周期调用 `releaseStaleReservations({ olderThan: 1h, confirm: true })`（[worker-loop.ts:264](apps/worker/src/worker-loop.ts#L264)）；creditHandle.close() 随 shutdown finally 关闭。原描述「无任何调用方」已解决。
-- **P2-08 · 无 title/size 排序索引** —— [repository.ts:3513,3531-3549](packages/generation-repository/src/repository.ts#L3513) 的 `lower(coalesce(...))` 与 byteSize 排序无支撑索引，大资产集每页全排。
-- **P2-09 · keyset 决胜列缺 id** —— [schema.ts:253](packages/db/src/schema.ts#L253) `generation_records_user_created_idx` 缺 id，同毫秒多行时平局比较在内存做。
-- **P2-10 · 上传大小仅在读侧校验** —— [oss.ts:115](packages/storage/src/oss.ts#L115)/[local.ts:67](packages/storage/src/local.ts#L67) 的 maxBytes 只在 readObject；writeObject 不校验（**需核实** API 上传中间件是否兜底）。
+- **P2-08 · 无 title/size 排序索引** —— ✅ 已处理（2026-08-08）：`user_assets` 新增 `user_assets_user_title_idx`（`(user_id, lower(coalesce(file_name, model_id, id)))`）与 `user_assets_user_size_idx`（`(user_id, byte_size DESC NULLS LAST)`），迁移 0039。用 2000 行种子数据 EXPLAIN 验证：标题/大小排序均走索引预排序，不再全表全排。
+- **P2-09 · keyset 决胜列缺 id** —— ✅ 已处理（2026-08-08）：`generation_records_user_created_idx` 由 `(user_id, created_at)` 改为 `(user_id, created_at, id)`（迁移 0039 DROP+CREATE），keyset 平局比较走索引。`generation_records_user_library_idx` 为同一模式的辅助索引，同样受益于 id 决胜列，本次未动（主路径已覆盖）。
+- **P2-10 · 上传大小仅在读侧校验** —— ✅ 已核实并加固（2026-08-08）：writeObject 是哑适配器（策略在调用方）。逐调用方核实——asset 上传在 service 层按 `config.maxAssetSizeBytes` 校验（assets/service.ts:99）、avatar 按 `AVATAR_MAX_BYTES`、worker 产物持久化按 `fetchProviderArtifact` 的 `maxBytes` 上限下载后再写、media/thumbnail 从有界源派生。写路径均先定界，无未校验入口。两个适配器补 P2-10 契约注释，防止未来新写路径忘记定界。
 - **P2-11 · task_records 注释与 CHECK 不一致（含 'retry'）** —— [schema.ts:657](packages/db/src/schema.ts#L657) 注释声明含 'retry'，[:696](packages/db/src/schema.ts#L696) CHECK 只有 queued/running/succeeded/failed/cancelled。已验证状态机从不持久化 'retry'（落到 queued）—— 约束对、注释过时，统一即可。
 
 ### 模型知识

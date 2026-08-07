@@ -249,8 +249,9 @@ export const generationRecords = pgTable('generation_records', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  // 用户列表的主查询路径：按用户 + 创建时间倒序分页。
-  index('generation_records_user_created_idx').on(table.userId, table.createdAt),
+  // 用户列表的主查询路径：按用户 + 创建时间倒序分页（P2-09：keyset 决胜列 id 一并入索引，
+  // 同毫秒多行时平局比较走索引而非内存）。
+  index('generation_records_user_created_idx').on(table.userId, table.createdAt, table.id),
   // 幂等保障：同一用户 + 同一 idempotencyKey 只能有一条记录（NULL 不计入）。
   uniqueIndex('generation_records_user_idempotency_key_idx')
     .on(table.userId, table.idempotencyKey)
@@ -449,6 +450,16 @@ export const userAssets = pgTable('user_assets', {
   uniqueIndex('user_assets_generation_artifact_idx')
     .on(table.generationArtifactId)
     .where(sql`${table.generationArtifactId} is not null and ${table.deletedAt} is null`),
+  // 资产列表标题排序：lower(coalesce(file_name, model_id, id)) 升序（P2-08）。
+  index('user_assets_user_title_idx').on(
+    table.userId,
+    sql`lower(coalesce(${table.fileName}, ${table.modelId}, ${table.id}))`,
+  ),
+  // 资产列表大小排序：byte_size 降序、空值置后（P2-08）。
+  index('user_assets_user_size_idx').on(
+    table.userId,
+    table.byteSize.desc().nullsLast(),
+  ),
 ])
 
 /**

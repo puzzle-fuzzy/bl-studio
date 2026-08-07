@@ -31,6 +31,9 @@ export class LocalStorageAdapter implements StorageAdapter {
   }
 
   async writeObject(input: StorageWriteInput): Promise<StorageWriteResult> {
+    // P2-10：writeObject 是哑适配器，自身不做大小校验——大小护栏由调用方保证
+    // （assets/avatar 上传在 service 层按 maxAssetSizeBytes/AVATAR_MAX_BYTES 校验，
+    // worker 产物持久化按 fetch maxBytes 上限下载后再写）。新增写路径时同样要先定界。
     const fullKey = this.resolveWriteKey(input.key)
     const safeKey = sanitizeKey(fullKey)
     const target = resolveLocalStoragePath(this.options.rootDir, safeKey)
