@@ -275,24 +275,29 @@
 - **修法**：不存在时对固定 dummy hash 也跑 verifyPassword 抹平时间；login 对未验证与不存在返回同一错误。
 
 ### P1-29 · outbox SSE 无兜底轮询，NOTIFY 丢失即实时事件延迟
+> ✅ 已处理（commit `5f3ca24`）——API 侧 `startGenerationEventListener` 加周期兜底轮询（默认 5s，可配 `pollIntervalMs`）：自上次已见游标 keyset 追平 outbox，把 NOTIFY 丢失窗口收敛为 ≤ pollIntervalMs；drain 幂等（无新事件仅一次空查），close 时清理定时器。
 - **位置**：[event-listener.ts:44-60](packages/generation-repository/src/event-listener.ts#L44-L60)（只 LISTEN）；[notify.ts:37-53](packages/generation-repository/src/notify.ts#L37-L53)（pg_notify 即发即弃）
 - **问题**：Postgres NOTIFY 在无人 LISTEN 时直接丢弃；API 的 LISTEN 短暂断开的窗口内状态变更不补发。Last-Event-ID 追平只覆盖客户端→API，覆盖不了 API→hub 这一段（**需核实** API hub 是否有周期 catch-up）。
 - **修法**：加周期轮询兜底（如每 5-10s 自上次已见 id 追平），或 LISTEN 重连时强制追平。
 
 ### P1-30 · failMediaJob 无终态守卫，可把 succeeded 覆盖为 failed
+> ✅ 已处理（commit `5f3ca24`）——UPDATE 加 `status NOT IN ('succeeded','cancelled')`（与 completeMediaJob 对称），未命中时区分 `MEDIA_JOB_NOT_FOUND` 与 `MEDIA_JOB_ALREADY_COMPLETED`；补两条测试（succeeded/cancelled 终态不可被失败覆盖）。
 - **位置**：[media-repository/src/repository.ts:313-330](packages/media-repository/src/repository.ts#L313-L330)（无条件 UPDATE）；同文件 completeMediaJob（:263-269）有完整守卫，两侧不对称
 - **修法**：UPDATE 加 `status NOT IN ('succeeded','cancelled')` 条件 + returning。
 
 ### P1-31 · claimNextQueuedTask 的 ORDER BY 无索引支撑（热路径排序）
+> ✅ 已处理（commit `5f3ca24`）——schema 新增 partial index `task_records_queue_priority_idx ON (priority DESC, created_at) WHERE status='queued'`（迁移 0040），列方向与 claim 排序子句精确匹配，免每次 claim 堆排序。
 - **位置**：[repository.ts:3005-3016](packages/generation-repository/src/repository.ts#L3005-L3016)；[schema.ts:701](packages/db/src/schema.ts#L701)（`task_records_queue_idx` 与排序方向不符）
 - **修法**：加 `(priority DESC, created_at) WHERE status='queued'` partial index。
 
 ### P1-32 · outbox 触发器 DDL 游离于迁移之外
+> ✅ 已处理（commit `5f3ca24`）——触发器 DDL（`append_generation_status_event` / `notify_generation_events` / 两个触发器）收敛进迁移 `0041_generation_event_triggers`，纯 migrate 环境即可获得完整 outbox；`ensureGenerationEventsTrigger` 保留为幂等 ensure 兜底（注释标注 DDL 与迁移文件须同步改）。
 - **位置**：[notify.ts:13-77](packages/generation-repository/src/notify.ts#L13-L77)；39 个迁移均无 trigger DDL（已 grep 确认）
 - **问题**：`append_generation_status_event`/`notify_generation_events` 只在 API 启动钩子 `ensureGenerationEventsTrigger` 安装；纯 migrate 环境无触发器，API 角色若降权则启动失败。
 - **修法**：触发器 DDL 收敛进迁移，启动钩子保留为幂等 ensure 兜底。
 
 ### P1-33 · OSS 适配器不清理 key 且 expires 不夹紧
+> ✅ 已处理（commit `5f3ca24`）——`sanitizeKey` 从 local.ts 导出，OSS 写/读/删路径统一复用（拒绝 `:`/`..`/前导 `/`，含 keyPrefix 拼接前校验）；`createReadUrl` 的 expires 夹紧到 `[1, 7×86400]`。补测试：不安全 key 拒绝 + expires 夹紧。
 - **位置**：[storage/src/oss.ts:61-67](packages/storage/src/oss.ts#L61-L67)（resolveWriteKey 只加前缀）、[:93-99](packages/storage/src/oss.ts#L93-L99)（原样 expires）；对比 [local.ts:98-129](packages/storage/src/local.ts#L98-L129)（sanitizeKey 拒绝 `:`/`..`/前导 `/`）
 - **影响**：若上游把外部输入塞进 storage key，对象 key 注入/绕过前缀；过大的 expires 生成长期有效签名 URL。当前 key 均由内部 id 生成，触发面小。
 - **修法**：统一复用 sanitizeKey 语义；expires 夹紧到 [1, 7×86400]。
