@@ -202,6 +202,38 @@ describe('OssStorageAdapter', () => {
     })
   })
 
+  it('rejects unsafe write keys instead of silently prefixing them (P1-33)', async () => {
+    const client = new FakeOssClient()
+    const adapter = new OssStorageAdapter({ client })
+
+    await expect(adapter.writeObject({
+      key: '../escape/secret.png',
+      body: new Uint8Array([1]),
+    })).rejects.toThrow('unsafe storage key')
+    await expect(adapter.writeObject({
+      key: 'http://evil.example/path',
+      body: new Uint8Array([1]),
+    })).rejects.toThrow('unsafe storage key')
+    expect(client.putCalls).toHaveLength(0)
+  })
+
+  it('clamps signed URL expiry into [1, 7 days] (P1-33)', async () => {
+    const client = new FakeOssClient()
+    const adapter = new OssStorageAdapter({ client })
+
+    await adapter.createReadUrl({ key: 'uploads/a.png', expiresInSeconds: 0 })
+    await adapter.createReadUrl({ key: 'uploads/b.png', expiresInSeconds: -5 })
+    await adapter.createReadUrl({ key: 'uploads/c.png', expiresInSeconds: 30 * 24 * 3600 })
+    await adapter.createReadUrl({ key: 'uploads/d.png', expiresInSeconds: 120.7 })
+
+    expect(client.signatureCalls.map(call => call.expires)).toEqual([
+      1,
+      1,
+      7 * 24 * 3600,
+      120,
+    ])
+  })
+
   it('serializes the attachment response through the real ali-oss signer without network access', async () => {
     const adapter = new OssStorageAdapter({
       client: createOssClient({

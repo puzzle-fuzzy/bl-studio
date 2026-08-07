@@ -1,0 +1,1 @@
+CREATE INDEX "task_records_queue_priority_idx" ON "task_records" USING btree ("priority" DESC NULLS LAST,"created_at") WHERE "task_records"."status" = 'queued';

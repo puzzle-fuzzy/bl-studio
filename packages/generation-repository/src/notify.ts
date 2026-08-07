@@ -8,7 +8,11 @@ import postgres from 'postgres'
 
 /**
  * 幂等地安装「生成状态捕获」与「outbox 通知」触发器。
- * 在 API 启动时调用，因为 schema push 流程不会安装可执行的触发器 DDL。
+ *
+ * P1-32：触发器 DDL 已收敛进迁移链（0041_generation_event_triggers），纯 migrate
+ * 环境即可获得完整触发器；这里保留为幂等 ensure 兜底——对老库/手工漂移补装，
+ * 对已装环境是 CREATE OR REPLACE + DROP TRIGGER IF EXISTS 的无害重放。
+ * 改 DDL 时须与迁移文件同步修改（drizzle 不追踪 trigger 表达式）。
  */
 export async function ensureGenerationEventsTrigger(connectionString: string): Promise<void> {
   const sql = postgres(connectionString, { max: 1 })

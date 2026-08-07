@@ -281,6 +281,20 @@
       "when": 1786134608580,
       "tag": "0039_cold_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 40,
+      "version": "7",
+      "when": 1786138223099,
+      "tag": "0040_greedy_lyja",
+      "breakpoints": true
+    },
+    {
+      "idx": 41,
+      "version": "7",
+      "when": 1786138600000,
+      "tag": "0041_generation_event_triggers",
+      "breakpoints": true
     }
   ]
 }

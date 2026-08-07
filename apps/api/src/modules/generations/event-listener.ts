@@ -17,6 +17,8 @@ export interface StartGenerationEventListenerOptions {
   repository: GenerationRepository
   hub: GenerationSsePublisher
   logger?: Logger
+  /** 兜底轮询间隔（P1-29）：LISTEN 断线/无人 LISTEN 时 NOTIFY 即发即弃，靠周期追平把延迟收敛到该值以内。默认 5000ms。 */
+  pollIntervalMs?: number
 }
 
 /**
@@ -96,5 +98,16 @@ export async function startGenerationEventListener(
   // 消除「读取启动游标」与「注册 LISTEN」之间的竞态：该窗口内提交的所有内容
   // 都在 outbox 中，监听器就绪后会立即被 drain。
   await drain()
-  return listener
+  // P1-29：Postgres NOTIFY 在无人 LISTEN 时即发即弃，API 的 LISTEN 短暂断开窗口内
+  // 状态变更不会补发。周期轮询自上次已见游标追平 outbox，把「通知丢失 → 事件迟到」
+  // 的窗口收敛为 ≤ pollIntervalMs 的延迟。drain 是幂等的：游标无新事件时仅一次
+  // keyset 空查，成本可忽略。
+  const pollIntervalMs = options.pollIntervalMs ?? 5_000
+  const pollTimer: ReturnType<typeof setInterval> = setInterval(() => { void drain() }, pollIntervalMs)
+  return {
+    async close() {
+      clearInterval(pollTimer)
+      await listener.close()
+    },
+  }
 }

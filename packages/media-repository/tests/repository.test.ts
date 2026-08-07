@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { userAssets } from '@bailian-studio/db'
+import { mediaJobs, userAssets } from '@bailian-studio/db'
 import { eq } from 'drizzle-orm'
 import {
   MediaRepositoryError,
@@ -282,6 +282,61 @@ describe('media repository', () => {
       retriable: false,
       code: 'FFMPEG_NOT_CONFIGURED',
     })
+  })
+
+  it('refuses to overwrite a succeeded job with failed (P1-30 terminal guard)', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id, 'asset_source')
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_source', kind: 'video' },
+    })
+
+    await iso.repository.completeMediaJob({
+      jobId: created.job.id,
+      outputAsset: {
+        id: 'asset_output',
+        kind: 'audio',
+        fileName: 'video.mp3',
+        mimeType: 'audio/mpeg',
+        byteSize: 123,
+        storageProvider: 'local',
+        storageKey: 'media-jobs/job/video.mp3',
+      },
+      output: { durationSeconds: 5 },
+    })
+
+    await expectRejects(() => iso.repository.failMediaJob({
+      jobId: created.job.id,
+      error: { category: 'system', message: 'late failure', retriable: false, code: 'MEDIA_PROCESSING_FAILED' },
+    }), 'MEDIA_JOB_ALREADY_COMPLETED')
+
+    // succeeded 状态与 outputAssetId 保持不变。
+    const after = await iso.repository.getMediaJobById(created.job.id)
+    expect(after?.status).toBe('succeeded')
+    expect(after?.outputAssetId).toBe('asset_output')
+  })
+
+  it('refuses to overwrite a cancelled job with failed (P1-30 terminal guard)', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'owner' })
+    await seedVideoAsset(user.id, 'asset_source')
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.extract_audio',
+      source: { assetId: 'asset_source', kind: 'video' },
+    })
+
+    // 直接置 cancelled（任务取消流之外无公开 repo 方法做此变更，测试里直改行即可）。
+    await iso.db.update(mediaJobs).set({ status: 'cancelled' }).where(eq(mediaJobs.id, created.job.id))
+
+    await expectRejects(() => iso.repository.failMediaJob({
+      jobId: created.job.id,
+      error: { category: 'system', message: 'late failure', retriable: false, code: 'MEDIA_PROCESSING_FAILED' },
+    }), 'MEDIA_JOB_ALREADY_COMPLETED')
+
+    const after = await iso.repository.getMediaJobById(created.job.id)
+    expect(after?.status).toBe('cancelled')
   })
 
   it('rejects unsupported source kinds', async () => {

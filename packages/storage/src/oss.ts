@@ -3,6 +3,7 @@ import { Readable } from 'node:stream'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
 import { attachmentContentDisposition } from './content-disposition'
+import { sanitizeKey as sanitizeStorageKey } from './local'
 
 /**
  * 阿里云 OSS 存储适配器，及它依赖的客户端最小接口。
@@ -63,8 +64,13 @@ export class OssStorageAdapter implements StorageAdapter {
 
   /** 将逻辑 key 解析为新写入使用的物理 key。 */
   private resolveWriteKey(key: string): string {
-    if (this.keyPrefix.length === 0 || key === this.keyPrefix || key.startsWith(`${this.keyPrefix}/`)) return key
-    return `${this.keyPrefix}/${key}`
+    // P1-33：写路径先经 sanitizeStorageKey（与 local 适配器同一套语义，拒绝
+    // `:` / `..` / 前导 `/`），再拼命名空间前缀，杜绝外部输入做对象 key 注入。
+    const sanitized = sanitizeStorageKey(key)
+    if (this.keyPrefix.length === 0 || sanitized === this.keyPrefix || sanitized.startsWith(`${this.keyPrefix}/`)) {
+      return sanitized
+    }
+    return `${this.keyPrefix}/${sanitized}`
   }
 
   async writeObject(input: StorageWriteInput): Promise<StorageWriteResult> {
@@ -124,10 +130,11 @@ export class OssStorageAdapter implements StorageAdapter {
 
   async createReadUrl(input: StorageReadUrlInput): Promise<string> {
     // `input.key` 是持久化的物理 storage key。历史 key 可能使用与当前
-    // OSS_KEY_PREFIX 不同的命名空间，必须按原样存储签名。
-    const fullKey = input.key
+    // OSS_KEY_PREFIX 不同的命名空间，必须按原样存储签名（仅过一遍安全校验）。
+    const fullKey = sanitizeStorageKey(input.key)
     return this.options.client.signatureUrl(fullKey, {
-      expires: input.expiresInSeconds,
+      // P1-33：expires 夹紧到 [1, 7×86400]，过大/负值不再生成长期有效签名 URL。
+      expires: clampExpires(input.expiresInSeconds),
       ...(input.process !== undefined ? { process: input.process } : {}),
       ...(input.downloadFileName !== undefined
         ? {
@@ -143,7 +150,8 @@ export class OssStorageAdapter implements StorageAdapter {
     if (!Number.isSafeInteger(input.maxBytes) || input.maxBytes <= 0) throw new Error('storage read maxBytes must be a positive integer')
     const get = this.options.client.get
     if (get === undefined) throw new Error('OSS storage read is not configured')
-    const result = await get.call(this.options.client, input.key)
+    const safeKey = sanitizeStorageKey(input.key)
+    const result = await get.call(this.options.client, safeKey)
     if (result.content.byteLength > input.maxBytes) throw new Error(`storage object exceeds limit: ${result.content.byteLength} > ${input.maxBytes}`)
     const contentType = result.res?.headers?.['content-type'] ?? result.res?.headers?.['Content-Type']
     return { body: new Uint8Array(result.content), ...(contentType !== undefined ? { contentType } : {}) }
@@ -152,9 +160,19 @@ export class OssStorageAdapter implements StorageAdapter {
   async deleteObject(input: StorageDeleteInput): Promise<void> {
     const remove = this.options.client.delete
     if (remove === undefined) return
-    // 删除是对已持久化对象的补偿操作；不要改写其命名空间。
-    await remove.call(this.options.client, input.key)
+    // 删除是对已持久化对象的补偿操作；不要改写其命名空间，仅过安全校验。
+    await remove.call(this.options.client, sanitizeStorageKey(input.key))
   }
+}
+
+/** 签名 URL 有效期夹紧区间（秒）：下限 1s，上限 7 天（P1-33）。 */
+export const OSS_MIN_EXPIRES_SECONDS = 1
+export const OSS_MAX_EXPIRES_SECONDS = 7 * 24 * 60 * 60
+
+function clampExpires(seconds: number): number {
+  if (!Number.isFinite(seconds)) return OSS_MIN_EXPIRES_SECONDS
+  const clamped = Math.floor(seconds)
+  return Math.min(OSS_MAX_EXPIRES_SECONDS, Math.max(OSS_MIN_EXPIRES_SECONDS, clamped))
 }
 
 /**

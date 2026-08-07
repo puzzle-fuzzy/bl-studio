@@ -123,8 +123,11 @@ function validateReadLimit(maxBytes: number): void {
  * 注意：`:` 检查保留是有意为之，不能用 path.isAbsolute 替换——后者在 posix 下
  * 会放行 `C:x` / `C:/x`，而这些在 Windows 上会被 path.resolve 当成盘符绝对路径，
  * 从而逃逸 rootDir。
+ *
+ * 导出供 OSS 适配器复用同一套 key 安全语义（P1-33）：本地/对象存储的 key 规范
+ * 必须一致，否则同一逻辑 key 在两种适配器下会产生不同的注入面。
  */
-function sanitizeKey(key: string): string {
+export function sanitizeKey(key: string): string {
   const normalized = posix.normalize(key.replaceAll('\\', '/'))
   if (
     key.includes(':') ||

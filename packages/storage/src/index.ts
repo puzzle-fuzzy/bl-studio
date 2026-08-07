@@ -13,6 +13,8 @@ export {
   OssStorageAdapter,
   OSS_IMAGE_THUMBNAIL_PROCESS,
   OSS_VIDEO_SNAPSHOT_PROCESS,
+  OSS_MIN_EXPIRES_SECONDS,
+  OSS_MAX_EXPIRES_SECONDS,
   type CreateOssClientOptions,
   type OssClientLike,
   type OssStorageAdapterOptions,

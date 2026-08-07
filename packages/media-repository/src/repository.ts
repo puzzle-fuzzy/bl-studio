@@ -1,4 +1,4 @@
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, eq, isNull, notInArray } from 'drizzle-orm'
 import { mediaJobs, taskRecords, userAssets, type BailianStudioDb } from '@bailian-studio/db'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import { createMediaJobId, createMediaTaskId } from './id'
@@ -312,6 +312,9 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
 
     async failMediaJob(input) {
       const now = input.now ?? nowIso()
+      // P1-30：与 completeMediaJob 对称的终态守卫——succeeded/cancelled 不可被失败
+      // 覆盖（防止迟到失败回调把已完成任务的 outputAssetId 语义破坏）。已 failed 的
+      // 任务重复 fail（或 retrying 回 queued）仍是幂等无害的，故不在 NOT IN 之列。
       const [row] = await db
         .update(mediaJobs)
         .set({
@@ -321,11 +324,23 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
           errorJson: taskErrorJson(input.error),
           updatedAt: toDate(now),
         })
-        .where(and(eq(mediaJobs.id, input.jobId), isNull(mediaJobs.deletedAt)))
+        .where(and(
+          eq(mediaJobs.id, input.jobId),
+          isNull(mediaJobs.deletedAt),
+          notInArray(mediaJobs.status, ['succeeded', 'cancelled']),
+        ))
         .returning()
 
       if (row === undefined) {
-        throw new MediaRepositoryError('MEDIA_JOB_NOT_FOUND', `Media job not found: ${input.jobId}`)
+        const [existing] = await db
+          .select({ status: mediaJobs.status })
+          .from(mediaJobs)
+          .where(and(eq(mediaJobs.id, input.jobId), isNull(mediaJobs.deletedAt)))
+          .limit(1)
+        if (existing === undefined) {
+          throw new MediaRepositoryError('MEDIA_JOB_NOT_FOUND', `Media job not found: ${input.jobId}`)
+        }
+        throw new MediaRepositoryError('MEDIA_JOB_ALREADY_COMPLETED', `Media job is terminal: ${input.jobId}`)
       }
 
       return toMediaJob(row)

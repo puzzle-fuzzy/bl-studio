@@ -712,6 +712,12 @@ export const taskRecords = pgTable('task_records', {
    // 任务队列的核心索引：claim 按 status → nextRunAt → priority → createdAt
   // 顺序筛选并抢占。FOR UPDATE SKIP LOCKED 在此索引上高效工作。
   index('task_records_queue_idx').on(table.status, table.nextRunAt, table.priority, table.createdAt),
+  // P1-31：claim 排序子句是 `order by priority desc, created_at asc`（见
+  // claimNextQueuedTask）。组合索引在 secondary 列方向上不匹配 → 每次 claim 都堆排序。
+  // 补一个列方向匹配的 partial index，让 queued 入队排序直接用索引。
+  index('task_records_queue_priority_idx')
+    .on(table.priority.desc(), table.createdAt)
+    .where(sql`${table.status} = 'queued'`),
   // 僵尸任务清理：按锁持有者 + 锁过期时间扫描需要回收的任务。
   index('task_records_lock_idx').on(table.lockedBy, table.lockedUntil),
   // 业务记录反查：列出某条生成记录的全部关联任务。
