@@ -102,7 +102,13 @@ export const useGenerationsStore = create<GenerationsState>((set, get) => ({
         views: viewFilters,
       })
       if (version !== requestVersion) return
-      set({ records: result.items, nextCursor: result.nextCursor, isRefreshing: false })
+      set(state => ({
+        // P1-01：刷新合并新首页而非整表替换——已「加载更多」的任务列表不会被降级轮询 /
+        // 提交后刷新打回第一页。已翻页（nextCursor 非空）时保留原游标，未翻页才采用新游标。
+        records: mergeRecords(state.records, result.items),
+        nextCursor: state.nextCursor ?? result.nextCursor,
+        isRefreshing: false,
+      }))
     } catch {
       if (version === requestVersion) set({ isRefreshing: false })
     }

@@ -109,8 +109,10 @@ describe('estimatePriceCents', () => {
         }],
       },
     }
-    // 每百万 token 2 元 = 每 token 0.0002 分，1024 token → 0.2048 分 → 取整为 0（整数分）
-    expect(estimatePriceCents(textManifest, { maxTokens: 1024 })).toBe(0)
+    // 每百万 token 2 元 = 每 token 0.0002 分，1024 token → 0.2048 分 → 取整为 0；
+    // 但 token 费率提交前无法预知实际用量，取整成 0 会误导预检并架空每日成本上限，
+    // 因此对 token 计费给保守下限 1 分（P1-02，与结算 Math.max(1, …) 口径一致）。
+    expect(estimatePriceCents(textManifest, { maxTokens: 1024 })).toBe(1)
     expect(Number.isInteger(estimatePriceCents(textManifest, { maxTokens: 1024 }))).toBe(true)
   })
 
@@ -140,6 +142,39 @@ describe('estimatePriceCents', () => {
       },
     }
     expect(estimatePriceCents(screenplayManifest, { estimatedDuration: 63 })).toBe(32)
+  })
+
+  it('never estimates 0 for token-billed manifests whose quantity is a cost proxy (P1-02 regression)', () => {
+    // 复现 qwen-omni-screenplay 的 P1-02：pricing 声明 token 费率，但 quantityKey 是
+    // UI 费用预估参数 estimatedDuration（秒）。此前 60 秒 × per-token 费率（0.004 分/token）
+    // ≈ 0.24 分被 Math.round 成 0，日限额按 0 累加。mode 是内部计费标记、applyDefaults
+    // 恒删除，conditions 永不命中——这与真实提交形态一致。
+    const screenplayManifest: ModelManifest = {
+      ...baseManifest,
+      id: 'priced-screenplay-token',
+      category: 'video',
+      request: { kind: 'dashscope-chat', endpoint: '/chat/completions', promptParam: 'prompt', stream: true, bindings: {} },
+      output: { kind: 'text', path: 'output.text' },
+      pricing: {
+        unit: 'per_token',
+        quantityKey: 'estimatedDuration',
+        currency: 'CNY',
+        rates: [
+          {
+            id: 'output-multimodal-token',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'token',
+            unitSize: 1000000,
+            unitPrice: '40',
+            conditions: { mode: 'multimodal-input-text-output' },
+          },
+        ],
+      },
+    }
+    expect(estimatePriceCents(screenplayManifest, { estimatedDuration: 60 })).toBe(1)
+    expect(estimateModelCost(screenplayManifest, { estimatedDuration: 60 }).cents).toBeGreaterThanOrEqual(1)
   })
 
   it('falls back to input rates when the manifest declares no output rate', () => {

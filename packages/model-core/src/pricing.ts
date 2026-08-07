@@ -112,7 +112,13 @@ export function estimatePriceCents(manifest: FrozenModelManifest, params: Record
   // input-and-output 类 chargeItem（视频编辑等）输入与输出两端各自计费，数量翻倍。
   const billableQuantity = rate.chargeItem === 'input-and-output' ? quantity * 2 : quantity
   const rawCents = rateCentsPerUnit(rate) * billableQuantity
-  return Math.round(rawCents)
+  const rounded = Math.round(rawCents)
+  // token 计费模型提交前无法预知实际用量：quantity 是请求参数上限（maxTokens）或用户
+  // 费用预估代理（estimatedDuration 秒数），与 per-token 费率相乘常被取整成 0（P1-02：
+  // 剧本模型 60 秒 × 0.004 分/token ≈ 0.24 分 → Math.round 成 0），既误导「约 ¥0.00」
+  // 预检，也让 enforceDailyGenerationLimits 按 0 累加、架空每日成本上限。与结算口径
+  // （calculateUsagePriceCents 的 Math.max(1, …)）保持一致，给 token 费率保守下限 1 分。
+  return rate.unit === 'token' ? Math.max(1, rounded) : rounded
 }
 
 /**

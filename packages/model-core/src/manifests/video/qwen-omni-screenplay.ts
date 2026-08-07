@@ -76,8 +76,11 @@ export const qwenOmniScreenplay: ModelManifest = {
     },
   },
   output: { kind: 'text', path: 'output.text' },
+  // token 计费（chat completions）：预检数量用 estimatedDuration（秒）作为费用代理，
+  // 实际结算按 usage token 桶（calculateUsagePriceCents）。estimatePriceCents 对 token
+  // 费率给保守下限 1 分，避免预检恒 0（P1-02）。
   pricing: {
-    unit: 'per_second',
+    unit: 'per_token',
     quantityKey: 'estimatedDuration',
     currency: 'CNY',
     rates: [

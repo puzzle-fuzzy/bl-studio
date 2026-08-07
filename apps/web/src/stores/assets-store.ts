@@ -60,19 +60,28 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
     const task = apiClient
       .listAssets({ limit: ASSETS_PAGE_SIZE, kind: query.kind, source: query.source, sort: query.sort, q: query.q })
       .then(result => {
-        set(state => ({
-          queries: {
-            ...state.queries,
-            [key]: {
-              items: result.items,
-              nextCursor: result.nextCursor,
-              isLoading: false,
-              isLoadingMore: false,
-              hasLoaded: true,
-              error: null,
+        set(state => {
+          const current = state.queries[key]
+          // P1-01：刷新（force / invalidate 后重载）合并新首页而非整表替换——已
+          // 「加载更多」的资产列表不会被缩略图就绪轮询打回第一页。保持新首页的 API
+          // 排序在前，追加已加载的更深页项（按 id 去重，缩略图就绪项原位更新）；
+          // nextCursor 保留已翻页深度，未翻页才采用新游标。
+          const page1Ids = new Set(result.items.map(item => item.id))
+          const extra = (current?.items ?? []).filter(item => !page1Ids.has(item.id))
+          return {
+            queries: {
+              ...state.queries,
+              [key]: {
+                items: [...result.items, ...extra],
+                nextCursor: current?.nextCursor ?? result.nextCursor,
+                isLoading: false,
+                isLoadingMore: false,
+                hasLoaded: true,
+                error: null,
+              },
             },
-          },
-        }))
+          }
+        })
       })
       .catch(error => {
         set(state => ({
