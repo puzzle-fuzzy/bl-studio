@@ -464,7 +464,7 @@
 - **修法**：补「batchId 进 body」精确断言（修复落地即生效）；补「retriable 存储错误 → `{status:'retry'}`」用例（现有源码下必红）；把剧本/ASR 分发下沉为纯函数（`apps/web/src/lib/`）并单测参数映射，或在 generation-submit.test.ts 补 fun-asr 用例。
 
 **R2-P1-10 · apps/admin 全 app 零测试，`passWithNoTests` 掩盖空跑**
-- **位置**：[admin/vitest.config.ts:13](apps/admin/vitest.config.ts#L13)（`passWithNoTests:true`）；41 个 src 文件 0 测试；`src/lib/user-error.ts`(84)/`chunk-recovery.ts`(55) 全是可测逻辑
+> ✅ 已处理（未提交，工作树中）——admin 补 user-error.test.ts（镜像 web）+ chunk-recovery.test.ts（识别/忽略/reload 一次守卫），vitest.config passWithNoTests 改 false，空跑即红。- **位置**：[admin/vitest.config.ts:13](apps/admin/vitest.config.ts#L13)（`passWithNoTests:true`）；41 个 src 文件 0 测试；`src/lib/user-error.ts`(84)/`chunk-recovery.ts`(55) 全是可测逻辑
 - **修法**：至少补 user-error + chunk-recovery（与 web 同名模块对齐）；`passWithNoTests` 改 false 让空跑变红。
 
 **R2-P1-11 · `test:coverage` 是死链，60% 阈值无人 enforce**

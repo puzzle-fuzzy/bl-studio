@@ -13,6 +13,7 @@ export default defineConfig({
   test: {
     environment: 'happy-dom',
     include: ['src/**/*.test.{ts,tsx}'],
-    passWithNoTests: true,
+    // R2-P1-10：关掉 passWithNoTests，让「全绿但实际没跑」的 admin 空跑变红。
+    passWithNoTests: false,
   },
 })
