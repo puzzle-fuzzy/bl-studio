@@ -1,6 +1,7 @@
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import type { Logger, MetricsCollector } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
+import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { persistArtifactsForRecord } from './artifact-persist'
 import type { TaskProcessOutcome } from './task-contracts'
@@ -75,14 +76,9 @@ export async function processArtifactPersistTask(
     deps.metrics?.increment('worker.artifact_persist', { status: retrying ? 'retrying' : 'failed', code: taskError.code ?? 'unknown' })
     deps.metrics?.increment('worker.artifact_failure', { code: taskError.code ?? 'unknown', retriable: retrying ? 'true' : 'false' })
     return retrying
-      ? { status: 'retry', error: taskError, nextRunAt: backoffRunAt(task.attempts) }
+      ? { status: 'retry', error: taskError, nextRunAt: nextRunAt(new Date().toISOString(), task.attempts) }
       : { status: 'failed', error: taskError }
   }
-}
-
-function backoffRunAt(attempt: number): string {
-  const delayMs = Math.min(1000 * 2 ** attempt, 60_000)
-  return new Date(Date.now() + delayMs).toISOString()
 }
 
 function isExpired(createdAt: string, maxDurationMs: number): boolean {

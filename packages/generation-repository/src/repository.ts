@@ -3068,12 +3068,39 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           throw new GenerationRepositoryError('TASK_NOT_FOUND', `Task not found: ${selected.id}`)
         }
 
-        const claimedTask = transitionTask(toTaskRecord(selectedTaskRow), {
-          type: 'claim',
-          workerId: input.workerId,
-          now: input.now,
-          lockedUntil: input.lockedUntil,
-        })
+        let claimedTask: ReturnType<typeof transitionTask>
+        try {
+          claimedTask = transitionTask(toTaskRecord(selectedTaskRow), {
+            type: 'claim',
+            workerId: input.workerId,
+            now: input.now,
+            lockedUntil: input.lockedUntil,
+          })
+        } catch (claimError) {
+          // P2-05：损坏的 task 行（type/domain 配对错、非法状态、next_run_at 未来等）
+          // 使 claim 状态机确定性抛错。若不处理，事务回滚后该行仍停在 queued 且
+          // next_run_at 已到——下一次 claim 又被选中 → worker loop 无限退避，
+          // 队列里排在它后面的所有任务都得不到消费。这里把该行强制置为 failed
+          //（绕过状态机——正是状态机无法处理它），携带原始错误作终态落库，之后
+          // 永不再被选中。toTaskRecord 与 transitionTask 都是纯函数，抛错是确定性的
+          // 行级损坏；DB 写入错误仍在事务里向外抛，交给外层 backoff 重试。
+          await tx
+            .update(taskRecords)
+            .set({
+              status: 'failed',
+              errorJson: {
+                category: 'system',
+                retriable: false,
+                code: 'TASK_CLAIM_INVALID',
+                message: `Cannot claim task ${selected.id}: ${claimError instanceof Error ? claimError.message : String(claimError)}`,
+              },
+              completedAt: new Date(input.now),
+              updatedBy: input.workerId,
+              updatedAt: new Date(input.now),
+            })
+            .where(eq(taskRecords.id, selected.id))
+          return undefined
+        }
 
         const [savedTask] = await tx
           .update(taskRecords)

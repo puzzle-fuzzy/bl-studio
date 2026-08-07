@@ -340,14 +340,14 @@
 
 ### Worker / 执行层
 - **P2-01 · provider-health 包完全未接线（死代码）** —— [provider-health/src/index.ts](packages/provider-health/src/index.ts) 的 `applyProviderOutcome`/`isDegraded` 从未被消费。若「暂未开通」机制已替代该策略应删除或标注。
-- **P2-02 · 未知错误兜底一律判 retriable** —— [errors.ts:101](packages/provider-dashscope/src/errors.ts#L101)：关键词全落空时把代码 bug/内存异常也标成可重试，配合 maxAttempts:3 让真 bug 重试 3 次。收敛为「未知错误按不可重试」。
-- **P2-03 · 退避算法两处实现不一致** —— [generation-task-handler.ts:692-695](apps/worker/src/generation-task-handler.ts#L692)（`1000*2**attempt` 上限 60s）vs [task-engine/retry.ts:28-34](packages/task-engine/src/retry.ts#L28-L34)（`base*2**(attempt-1)` 上限 30s）。统一走 task-engine。
+- **P2-02 · 未知错误兜底一律判 retriable** — ✅ 已处理（2026-08-08）——[errors.ts:104](packages/provider-dashscope/src/errors.ts#L104) 兜底改为 `system` 不可重试；同时在兜底前显式识别未包装的网络故障字面（fetch failed / ECONNRESET / ENOTFOUND / getaddrinfo…）为 network 可重试——避免把瞬时网络抖动判成永久失败（task-executor「retries a submit-stage exception even without a providerTaskId」测试守住该契约）。网络/超时/429/5xx/408 都在状态码或关键词层先被标成可重试，兜底只剩代码 bug/未识别 4xx/畸形响应。
+- **P2-03 · 退避算法两处实现不一致** — ✅ 已处理（2026-08-08）——generation-task-handler 与 artifact-task-handler 各自的 `backoffRunAt`（`1000*2**attempt` 上限 60s）删除，统一走 task-engine `nextRunAt(now, attempt)`（base 1s、上限 30s）；thumbnail 本就走 task-engine，全仓唯一实现。`shiftMs` 随删。
 - **P2-04 · artifact-fetch DNS rebinding TOCTOU** —— [artifact-fetch.ts:126-149,358](apps/worker/src/artifact-fetch.ts#L126)：校验与 fetch 两次解析域名，恶意主机可先返回合法 IP 再解析到内网。白名单缓解但未做解析后 IP 固定（已知限制，标注即可）。
-- **P2-05 · 损坏的 task 行毒化整个 worker loop** —— [worker-loop.ts:109-115](apps/worker/src/worker-loop.ts#L109-L115)：claim 内 `transitionTask` 抛错回滚后，该行每次都被选中 → 无限退避，其后所有任务无法处理。claim 抛错时应跳过/强制 fail 该行。
-- **P2-06 · thumbnail/media 对瞬时失败无有效重试** —— [thumbnail-task-handler.ts:245](apps/worker/src/thumbnail-task-handler.ts#L245)（正则猜 retriable，覆盖不全）、[media-task-handler.ts:243-249](apps/worker/src/media-task-handler.ts#L243)（恒不重试）。瞬时 OSS/网络故障永久失败。
+- **P2-05 · 损坏的 task 行毒化整个 worker loop** — ✅ 已处理（2026-08-08）——[repository.ts:3071](packages/generation-repository/src/repository.ts#L3071) `claimNextQueuedTask` 内 `toTaskRecord`+`transitionTask('claim')` 包 try/catch：确定性抛错（type/domain 配对错、非法状态）时在同一事务里把该行强制置为 `failed`（errorJson `TASK_CLAIM_INVALID` 携带原错误），返回 undefined；毒行终态化、永不再被选中，排在后面的健康任务照常消费。DB 写入错误仍在事务外抛、交给外层退避。测试：repository.test.ts「force-fails a corrupt task row on claim instead of poisoning the loop」。
+- **P2-06 · thumbnail/media 对瞬时失败无有效重试** — ✅ 已处理（2026-08-08）——新增 [transient-error.ts](apps/worker/src/transient-error.ts) 共享分类器（网络/超时/OSS 节流/5xx），thumbnail 的 `thumbnailErrorFromThrown` 正则与 media 的恒 `retriable:false` 都改用它；media 增加重试路径：瞬时失败且 attempts<maxAttempts 时 `failMediaJob({ retrying:true })`（job 回 queued）并返回 `status:'retry'` + task-engine 退避。测试：media/thumbnail handler 各加 transient→retry、permanent→failed 两例。
 
 ### 数据层 / 账务
-- **P2-07 · `releaseStaleReservations` 是死代码（无任何调用方）** —— [credit-ledger/src/repository.ts:472-520](packages/credit-ledger/src/repository.ts#L472-L520)：本应是「陈旧 reserve 兜底释放」，但从未接线；崩溃残留的 reserve 会永久冻结用户积分。接线（worker 周期任务）或移除。
+- **P2-07 · `releaseStaleReservations` 是死代码（无任何调用方）** — ✅ 已处理（随 P1-27 commit `e68b239`）——worker 组合根 `createCreditLedgerFromUrl` 创建账本句柄传入 WorkerLoop，`startStaleReserveSweeper` 周期调用 `releaseStaleReservations({ olderThan: 1h, confirm: true })`（[worker-loop.ts:264](apps/worker/src/worker-loop.ts#L264)）；creditHandle.close() 随 shutdown finally 关闭。原描述「无任何调用方」已解决。
 - **P2-08 · 无 title/size 排序索引** —— [repository.ts:3513,3531-3549](packages/generation-repository/src/repository.ts#L3513) 的 `lower(coalesce(...))` 与 byteSize 排序无支撑索引，大资产集每页全排。
 - **P2-09 · keyset 决胜列缺 id** —— [schema.ts:253](packages/db/src/schema.ts#L253) `generation_records_user_created_idx` 缺 id，同毫秒多行时平局比较在内存做。
 - **P2-10 · 上传大小仅在读侧校验** —— [oss.ts:115](packages/storage/src/oss.ts#L115)/[local.ts:67](packages/storage/src/local.ts#L67) 的 maxBytes 只在 readObject；writeObject 不校验（**需核实** API 上传中间件是否兜底）。

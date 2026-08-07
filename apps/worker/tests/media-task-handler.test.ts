@@ -116,4 +116,55 @@ describe('media task handler boundary', () => {
     expect(outcome).toMatchObject({ status: 'failed', error: { code: 'MEDIA_PROCESSING_FAILED' } })
     expect(storage.deletes).toEqual(['media-jobs/media_job_1/asset_media_job_1_audio.mp3'])
   })
+
+  it('retries transient storage failures instead of permanently failing', async () => {
+    const repository = new FakeMediaRepository()
+    const storage = new FakeStorageAdapter()
+    storage.throwError = new Error('RequestTimeout: OSS upstream slow')
+
+    const outcome = await processMediaTask(makeMediaTask(), {
+      mediaRepository: repository,
+      mediaProcessor: {
+        extractAudio: async () => ({ body: new Uint8Array([1]), fileName: 'video.mp3', mimeType: 'audio/mpeg' }),
+        generateThumbnail: async () => ({
+          body: new Uint8Array([1]),
+          mimeType: 'image/webp',
+          metadata: { format: 'webp', maxDimension: 640 },
+        }),
+      },
+      storage,
+      logger: createRecordingLogger(),
+    })
+
+    expect(outcome).toMatchObject({
+      status: 'retry',
+      error: { code: 'MEDIA_PROCESSING_FAILED', retriable: true },
+    })
+    // 瞬时失败时 job 回到 queued（retrying），供重试 task 重新推进。
+    expect(repository.failed[0]).toMatchObject({ retrying: true })
+    expect(outcome.status === 'retry' && outcome.nextRunAt).toBeTruthy()
+  })
+
+  it('keeps permanent media failures non-retriable', async () => {
+    const repository = new FakeMediaRepository()
+    const storage = new FakeStorageAdapter()
+    storage.throwError = new Error('Invalid audio payload')
+
+    const outcome = await processMediaTask(makeMediaTask(), {
+      mediaRepository: repository,
+      mediaProcessor: {
+        extractAudio: async () => ({ body: new Uint8Array([1]), fileName: 'video.mp3', mimeType: 'audio/mpeg' }),
+        generateThumbnail: async () => ({
+          body: new Uint8Array([1]),
+          mimeType: 'image/webp',
+          metadata: { format: 'webp', maxDimension: 640 },
+        }),
+      },
+      storage,
+      logger: createRecordingLogger(),
+    })
+
+    expect(outcome).toMatchObject({ status: 'failed', error: { retriable: false } })
+    expect(repository.failed[0]).toMatchObject({ retrying: false })
+  })
 })

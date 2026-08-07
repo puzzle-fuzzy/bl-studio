@@ -63,11 +63,32 @@ describe('classifyDashScopeError', () => {
     })
   })
 
-  it('uses HTTP status as the message when the provider response body is empty', () => {
+  it('classifies unrecognized HTTP statuses as non-retriable system errors', () => {
     expect(classifyDashScopeError({ status: 404, message: '' })).toEqual({
-      category: 'provider',
-      retriable: true,
+      category: 'system',
+      retriable: false,
       message: 'DashScope HTTP 404',
+    })
+  })
+
+  it('classifies code-bug shaped errors (no keyword, no status) as non-retriable system errors', () => {
+    expect(classifyDashScopeError(new Error('Cannot read properties of undefined'))).toEqual({
+      category: 'system',
+      retriable: false,
+      message: 'Cannot read properties of undefined',
+    })
+  })
+
+  it('classifies un-wrapped network errors (fetch failed / TCP codes) as retriable network errors', () => {
+    expect(classifyDashScopeError(new Error('fetch failed: ECONNRESET'))).toEqual({
+      category: 'network',
+      retriable: true,
+      message: 'fetch failed: ECONNRESET',
+    })
+    expect(classifyDashScopeError(new Error('getaddrinfo ENOTFOUND api.dashscope.aliyuncs.com'))).toEqual({
+      category: 'network',
+      retriable: true,
+      message: 'getaddrinfo ENOTFOUND api.dashscope.aliyuncs.com',
     })
   })
 

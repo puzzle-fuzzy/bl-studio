@@ -10,7 +10,9 @@
 
 /**
  * provider 错误的内部分类。auth/quota/validation 这类不可重试（重试也必然失败），
- * rate_limit/timeout/provider/network/system 这类往往是临时问题、值得重试。
+ * rate_limit/timeout/provider/network 这类往往是临时问题、值得重试；system 是
+ * 「未知/异常」兜底桶——临时故障都已在分类器前面显式标成可重试，命中它的只可能是
+ * 代码 bug、未识别 4xx、畸形响应这类重试必然失败的情况，一律不可重试。
  */
 export type ProviderErrorCategory =
   | 'auth'
@@ -45,8 +47,12 @@ export interface ProviderErrorInfo {
  *
  * 关键词兜底覆盖异步任务错误（没有 HTTP 状态码）：从 message/code 里识别
  * invalid_api_key/unauthorized（auth）、quota/insufficient（quota）、
- * throttl/rate（rate_limit）、invalid/required（validation）、timeout。
- * 兜底仍命中不了时归为 provider 可重试——宁可多重试一次，也不要误判可恢复错误为永久失败。
+ * throttl/rate（rate_limit）、invalid/required（validation）、timeout、
+ * 以及未包装的网络故障字面（fetch failed / ECONNRESET / ENOTFOUND…，network）。
+ *
+ * 兜底仍命中不了时按「未知错误不可重试」收敛：所有可恢复的瞬时故障（网络/超时/
+ * 429/5xx/408）都已在前面带状态码或关键词显式标成可重试，能走到这里只剩代码 bug、
+ * 未识别 4xx、畸形响应——重试也必然失败，标成可重试只会让真 bug 被 maxAttempts 重复 3 次。
  */
 export function classifyDashScopeError(error: unknown): ProviderErrorInfo {
   const code = extractCode(error)
@@ -98,7 +104,27 @@ export function classifyDashScopeError(error: unknown): ProviderErrorInfo {
     return buildInfo('timeout', true, message, code)
   }
 
-  return buildInfo('provider', true, message, code)
+  // 网络错误：undici fetch failed、TCP 错误码、DNS/连接故障。这些是瞬时可恢复
+  // 故障（重试即可），即使它们没有 DashScopeHttpError 的 .info 包装（如从业务层
+  // 直接冒泡的原始 Error，没有网络分类可查）也必须标成可重试，否则一条未包装的
+  // 网络抖动就会让任务永久失败。其余未知错误（代码 bug、未识别 4xx）交给下面的
+  // system 不可重试兜底。
+  if (
+    compactHaystack.includes('fetchfailed')
+    || compactHaystack.includes('econnreset')
+    || compactHaystack.includes('econnrefused')
+    || compactHaystack.includes('enotfound')
+    || compactHaystack.includes('eaddrinuse')
+    || compactHaystack.includes('etimedout')
+    || compactHaystack.includes('getaddrinfo')
+    || compactHaystack.includes('networkerror')
+    || haystack.includes('socket hang up')
+    || haystack.includes('network is unreachable')
+  ) {
+    return buildInfo('network', true, message, code)
+  }
+
+  return buildInfo('system', false, message, code)
 }
 
 /**

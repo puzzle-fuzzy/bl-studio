@@ -5,7 +5,7 @@ import {
 } from '@bailian-studio/media-repository'
 import type { Logger } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
-import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
+import { nextRunAt, type TaskError, type TaskRecord } from '@bailian-studio/task-engine'
 import {
   createFfmpegMediaProcessor,
   type AudioFormat,
@@ -13,6 +13,7 @@ import {
 } from './media-processor'
 import type { TaskProcessOutcome } from './task-contracts'
 import { readCarriedTaskError, taskErrorCarrier } from './task-error-guard'
+import { isTransientFailure } from './transient-error'
 
 export interface MediaTaskHandlerDeps {
   readonly mediaRepository?: MediaRepository
@@ -89,15 +90,21 @@ export async function processMediaTask(
     }
   } catch (error) {
     const taskError = mediaTaskErrorFromThrown(error)
+    // P2-06：瞬时 OSS/网络故障不再直接永久失败——只要 attempts 未用尽就回到
+    // 队列退避重试（failMediaJob retrying 会把 job 置回 queued）。
+    const retrying = taskError.retriable && task.attempts < task.maxAttempts
     deps.logger.error('media.task.failed', {
       taskId: task.id,
       traceId: task.traceId,
       jobId,
       errorCode: taskError.code,
       message: taskError.message,
+      retriable: retrying,
     })
-    await mediaRepository.failMediaJob({ jobId, error: taskError, now: currentIso() })
-    return { status: 'failed', error: taskError }
+    await mediaRepository.failMediaJob({ jobId, error: taskError, now: currentIso(), retrying })
+    return retrying
+      ? { status: 'retry', error: taskError, nextRunAt: nextRunAt(currentIso(), task.attempts) }
+      : { status: 'failed', error: taskError }
   }
 }
 
@@ -244,7 +251,7 @@ function mediaTaskErrorFromThrown(error: unknown): TaskError {
   return readCarriedTaskError(error) ?? {
     category: 'system',
     message: error instanceof Error ? error.message : String(error),
-    retriable: false,
+    retriable: isTransientFailure(error),
     code: 'MEDIA_PROCESSING_FAILED',
   }
 }

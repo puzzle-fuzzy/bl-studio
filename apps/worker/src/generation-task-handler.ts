@@ -11,6 +11,7 @@ import type {
 import type { NormalizedArtifact, NormalizedOutput } from '@bailian-studio/provider-dashscope'
 import type { Logger, MetricsCollector } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
+import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { resolveGenerationInputParams } from './generation-input-assets'
 import {
@@ -139,7 +140,7 @@ export async function processGenerationTask(
     if (audit === undefined) {
       return {
         status: 'retry',
-        nextRunAt: backoffRunAt(task.attempts),
+        nextRunAt: nextRunAt(currentIso(), task.attempts),
         error: {
           category: 'system',
           message: 'Provider request audit could not be started; provider execution was skipped',
@@ -305,18 +306,18 @@ async function applyProviderResult(
   // 应先在 provider 侧返回「是否已消费任何 token」的信号。
   const retriable = error.retriable && manifest.taskMode !== 'stream'
   if (retriable && task.attempts < task.maxAttempts) {
-    const nextRunAt = backoffRunAt(task.attempts)
+    const retryAt = nextRunAt(currentIso(), task.attempts)
     deps.logger.warn('task.retry', {
       taskId: task.id,
       recordId: record.id,
       traceId: record.traceId,
-      nextRunAt,
+      nextRunAt: retryAt,
       attempt: task.attempts,
       message: error.message,
       category: error.category,
       ...(error.code !== undefined ? { code: error.code } : {}),
     })
-    return { status: 'retry', nextRunAt, error }
+    return { status: 'retry', nextRunAt: retryAt, error }
   }
 
   const failedRecord = await deps.repository.failGeneration({
@@ -367,12 +368,12 @@ async function applyUnexpectedError(
   const info = classifyThrownProviderError(error)
 
   if (info.retriable && task.attempts < task.maxAttempts) {
-    const nextRunAt = backoffRunAt(task.attempts)
+    const retryAt = nextRunAt(currentIso(), task.attempts)
     deps.logger.warn('task.retry', {
       taskId: task.id,
       recordId,
       traceId: task.traceId,
-      nextRunAt,
+      nextRunAt: retryAt,
       attempt: task.attempts,
       message: info.message,
       category: info.category,
@@ -380,7 +381,7 @@ async function applyUnexpectedError(
     })
     return {
       status: 'retry',
-      nextRunAt,
+      nextRunAt: retryAt,
       error: {
         category: info.category,
         message: info.message,
@@ -695,17 +696,8 @@ function nextPollAt(): string {
   return shiftSeconds(currentIso(), 5)
 }
 
-function backoffRunAt(attempt: number): string {
-  const delayMs = Math.min(1000 * 2 ** attempt, 60_000)
-  return shiftMs(currentIso(), delayMs)
-}
-
 function shiftSeconds(iso: string, seconds: number): string {
   return new Date(Date.parse(iso) + seconds * 1000).toISOString()
-}
-
-function shiftMs(iso: string, ms: number): string {
-  return new Date(Date.parse(iso) + ms).toISOString()
 }
 
 function isExpired(createdAt: string, maxDurationMs: number): boolean {

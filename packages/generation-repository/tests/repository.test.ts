@@ -1044,6 +1044,57 @@ describe('generation repository', () => {
     expect(second).toBeUndefined()
   })
 
+  it('force-fails a corrupt task row on claim instead of poisoning the loop', async () => {
+    const healthy = await repository.createGeneration({
+      userId: 'user_1',
+      modelId: 'qwen-image',
+      params: { prompt: 'lantern', n: 1, size: '1328*1328' },
+    })
+
+    // 绕过状态机直接落一条 type/domain 配对错误的脏行（P2-05 的毒化源）：
+    // type='generation.submit' 必须搭配 domain='generation'，这里写成 artifact，
+    // claim 时 transitionTask 的 assertTaskTypeMatchesDomain 会确定性抛错。
+    const now = new Date()
+    const corruptId = 'task_corrupt_poison'
+    await db.insert(taskRecords).values({
+      id: corruptId,
+      type: 'generation.submit',
+      domain: 'artifact',
+      status: 'queued',
+      priority: 99, // 高于健康任务，保证它先被 claim 选中
+      inputJson: {},
+      attempts: 0,
+      maxAttempts: 3,
+      nextRunAt: new Date(now.getTime() - 60_000),
+      createdAt: now,
+      updatedAt: now,
+    })
+
+    const claimNow = healthy.task.nextRunAt
+    const lockedUntil = new Date(new Date(claimNow).getTime() + 30_000).toISOString()
+
+    // 第一次 claim 命中毒行：被跳过（返回 undefined）且强制置为 failed 终态。
+    const first = await repository.claimNextQueuedTask({
+      workerId: 'worker-a',
+      now: claimNow,
+      lockedUntil,
+    })
+    expect(first).toBeUndefined()
+    await expect(repository.getTask(corruptId)).resolves.toMatchObject({
+      status: 'failed',
+      errorJson: { code: 'TASK_CLAIM_INVALID' },
+    })
+
+    // 毒行已排除，队列里排在后面的健康任务能被正常认领——loop 不再被毒化。
+    const second = await repository.claimNextQueuedTask({
+      workerId: 'worker-a',
+      now: claimNow,
+      lockedUntil,
+    })
+    expect(second?.id).toBe(healthy.task.id)
+    expect(second?.status).toBe('running')
+  })
+
   it('renews a task lease only while the same worker still owns it', async () => {
     const created = await repository.createGeneration({
       userId: 'user_1',

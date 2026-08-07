@@ -15,6 +15,7 @@ import {
 import type { MediaProcessor } from './media-processor'
 import type { TaskProcessOutcome } from './task-contracts'
 import { readCarriedTaskError, taskErrorCarrier } from './task-error-guard'
+import { isTransientFailure } from './transient-error'
 
 export interface ThumbnailTaskHandlerDeps {
   readonly repository: GenerationRepository
@@ -242,7 +243,7 @@ function thumbnailErrorFromThrown(error: unknown): TaskError {
   return {
     category: 'storage',
     message,
-    retriable: /network|timeout|tempor|econn|fetch|http 5/i.test(message),
+    retriable: isTransientFailure(error),
     code: 'THUMBNAIL_PROCESSING_FAILED',
   }
 }

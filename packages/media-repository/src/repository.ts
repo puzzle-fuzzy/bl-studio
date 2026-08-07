@@ -315,7 +315,9 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
       const [row] = await db
         .update(mediaJobs)
         .set({
-          status: 'failed',
+          // P2-06：瞬时失败重试时回到 queued（而不是 failed），这样重试 task
+          // 重跑时 markMediaJobProcessing 仍能把它推进到 processing。
+          status: input.retrying === true ? 'queued' : 'failed',
           errorJson: taskErrorJson(input.error),
           updatedAt: toDate(now),
         })

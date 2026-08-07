@@ -73,4 +73,6 @@ export interface FailMediaJobInput {
   jobId: string
   error: TaskError
   now?: string
+  /** 瞬时失败要重试时置 true：job 回到 queued（而非 failed），允许下次任务重新跑。 */
+  retrying?: boolean
 }

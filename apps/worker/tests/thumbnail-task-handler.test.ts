@@ -171,4 +171,88 @@ describe('thumbnail task handler', () => {
       'asset-thumbnails/asset_deleted/asset_derivative_deleted.webp',
     ])
   })
+
+  it('retries transient media processing failures (network jitter) instead of permanently failing', async () => {
+    const repository = new FakeRepository()
+    repository.thumbnailSources.set('asset_derivative_transient', {
+      derivativeId: 'asset_derivative_transient',
+      assetId: 'asset_video_transient',
+      userId: 'user_1',
+      kind: 'video',
+      source: 'upload',
+      storageProvider: 'local',
+      storageKey: 'user_uploads/user_1/video.mp4',
+      fileName: 'video.mp4',
+      mimeType: 'video/mp4',
+      byteSize: 3,
+      status: 'queued',
+    })
+    const processor = new FakeMediaProcessor()
+    processor.throwError = new Error('fetch failed: ECONNRESET')
+
+    const outcome = await processThumbnailTask(makeTask({
+      type: 'media.thumbnail',
+      domain: 'media',
+      input: { assetId: 'asset_video_transient', derivativeId: 'asset_derivative_transient' },
+      recordId: 'asset_derivative_transient',
+      attempts: 1,
+      maxAttempts: 3,
+    }), {
+      repository,
+      storage: new FakeStorageAdapter(),
+      mediaProcessor: processor,
+      logger: createRecordingLogger(),
+    })
+
+    expect(outcome).toMatchObject({
+      status: 'retry',
+      error: { code: 'THUMBNAIL_PROCESSING_FAILED', retriable: true },
+    })
+    expect(repository.mutations.at(-1)).toMatchObject({
+      kind: 'failAssetThumbnail',
+      input: { retrying: true },
+    })
+  })
+
+  it('keeps permanent thumbnail failures non-retriable', async () => {
+    const repository = new FakeRepository()
+    repository.thumbnailSources.set('asset_derivative_perm', {
+      derivativeId: 'asset_derivative_perm',
+      assetId: 'asset_video_perm',
+      userId: 'user_1',
+      kind: 'video',
+      source: 'upload',
+      storageProvider: 'local',
+      storageKey: 'user_uploads/user_1/video.mp4',
+      fileName: 'video.mp4',
+      mimeType: 'video/mp4',
+      byteSize: 3,
+      status: 'queued',
+    })
+    const processor = new FakeMediaProcessor()
+    processor.throwError = new Error('Invalid video stream data')
+
+    const outcome = await processThumbnailTask(makeTask({
+      type: 'media.thumbnail',
+      domain: 'media',
+      input: { assetId: 'asset_video_perm', derivativeId: 'asset_derivative_perm' },
+      recordId: 'asset_derivative_perm',
+      attempts: 1,
+      maxAttempts: 3,
+    }), {
+      repository,
+      storage: new FakeStorageAdapter(),
+      mediaProcessor: processor,
+      logger: createRecordingLogger(),
+    })
+
+    expect(outcome).toMatchObject({
+      status: 'failed',
+      error: { code: 'THUMBNAIL_PROCESSING_FAILED', retriable: false },
+    })
+    expect(repository.mutations.at(-1)).toMatchObject({
+      kind: 'failAssetThumbnail',
+      input: { retrying: false },
+    })
+  })
 })
