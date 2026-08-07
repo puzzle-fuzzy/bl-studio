@@ -418,6 +418,11 @@ export interface ModelManifest {
   availability: {
     enabled: boolean
     stage: 'stable' | 'beta' | 'hidden'
+    /**
+     * 未开通原因（如「暂未开通」）。设置后模型仍在 catalog 可见（前端置灰展示），
+     * 但 enabled 必须为 false：不进入 listModels/getModelById，后端拒绝提交。
+     */
+    notActivated?: string
   }
 }
 

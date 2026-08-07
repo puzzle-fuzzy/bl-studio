@@ -72,6 +72,39 @@ export function modelsInMode(
   return models.filter(model => model.category === category && subModeOf(model) === mode)
 }
 
+/** 模型是否可用：availability 缺省（旧数据）视为启用；显式 enabled:false 为暂未开通。 */
+export function isModelEnabled(model: Pick<ModelCatalogItem, 'availability'>): boolean {
+  return model.availability?.enabled !== false
+}
+
+/** 分类 + 子模式下的第一个已启用模型；该子模式无已启用模型时返回 undefined。 */
+export function firstEnabledModel(
+  models: readonly ModelCatalogItem[],
+  category: ModelCategory,
+  mode: SubMode,
+): ModelCatalogItem | undefined {
+  return modelsInMode(models, category, mode).find(isModelEnabled)
+}
+
+/**
+ * 分类下第一个已启用模型：从 preferMode 起按 SUB_MODE_ORDER 顺序扫各子模式，
+ * preferMode 之后无已启用模型则回绕从头再扫（preferMode 缺省 = 分类首子模式）。
+ * 全部暂未开通的分类返回 undefined（前端三连下拉无选中项，置灰展示）。
+ */
+export function firstEnabledInCategory(
+  models: readonly ModelCatalogItem[],
+  category: ModelCategory,
+  preferMode?: SubMode,
+): ModelCatalogItem | undefined {
+  const modes = availableSubModes(models, category)
+  const start = preferMode === undefined ? 0 : Math.max(0, modes.indexOf(preferMode))
+  for (const mode of [...modes.slice(start), ...modes.slice(0, start)]) {
+    const first = firstEnabledModel(models, category, mode)
+    if (first !== undefined) return first
+  }
+  return undefined
+}
+
 /** 分类 → 模型列表。 */
 export function modelsInCategory(models: readonly ModelCatalogItem[], category: ModelCategory): ModelCatalogItem[] {
   return models.filter(model => model.category === category)

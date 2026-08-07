@@ -35,9 +35,22 @@ export function buildSubmitPayload(
   const visible = removeHiddenParameterValues(model.parameters, values)
   const params: Record<string, unknown> = {}
   const assetRefs: Record<string, string[]> = {}
+  const mediaParamNames = new Set(
+    model.parameters.filter(parameter => parameter.type === 'media').map(parameter => parameter.name),
+  )
 
   for (const [key, value] of Object.entries(visible)) {
     if (key.startsWith('_')) continue
+    if (mediaParamNames.has(key)) {
+      // 声明的媒体参数：非空参考池 → assetRefs；空值/空数组 → 省略。
+      // 空数组不能落进 params：服务端 prepareGenerationParams 要求 media 参数
+      // 必须经 assetRefs 提供且拒绝空引用，而可选媒体参数（如 q2-pro 的参考视频）
+      // 未选素材时正是空数组——此时整体省略才是合法提交。
+      if (Array.isArray(value) && value.length > 0 && isMediaValue(value)) {
+        assetRefs[key] = value.map(asset => asset.id)
+      }
+      continue
+    }
     if (isMediaValue(value)) {
       assetRefs[key] = value.map(asset => asset.id)
     } else {

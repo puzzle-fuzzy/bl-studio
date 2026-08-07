@@ -26,6 +26,7 @@ import { zImage } from './manifests/image/z-image'
 import { qwenImageEditMax, qwenImageEditPlus, qwenImageEdit } from './manifests/image/qwen-image-edit'
 import { wanxTextToVideo } from './manifests/video/wanx-video'
 import { viduT2VPro, viduT2VTurbo, viduT2V, viduI2V, viduFirstLastFrame, viduR2V } from './manifests/video/vidu-video'
+import { viduR2VQ3, viduR2VQ3Turbo, viduR2VQ3Ad, viduR2VQ3Drama, viduR2VQ2, viduR2VQ2Pro } from './manifests/video/vidu-reference-video'
 import { wanx27T2V, wanx27I2V, wanx27R2V, wanx27VideoEdit } from './manifests/video/wanx-27-video'
 import { kelingT2V, kelingI2V, kelingFirstLastFrame, kelingReferenceVideo, kelingVideoEdit } from './manifests/video/keling-video'
 import { aishiT2V, aishiI2V, aishiFirstLastFrame } from './manifests/video/aishi-video'
@@ -80,6 +81,12 @@ const registry = [
   viduI2V,
   viduFirstLastFrame,
   viduR2V,
+  viduR2VQ3,
+  viduR2VQ3Turbo,
+  viduR2VQ3Ad,
+  viduR2VQ3Drama,
+  viduR2VQ2,
+  viduR2VQ2Pro,
   wanx27T2V,
   wanx27I2V,
   wanx27R2V,

@@ -154,7 +154,7 @@ export const viduT2VPro: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }
 
 export const viduT2VTurbo: ModelManifest = {
@@ -284,7 +284,7 @@ export const viduT2VTurbo: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }
 
 export const viduT2V: ModelManifest = {
@@ -406,7 +406,7 @@ export const viduT2V: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }
 
 export const viduI2V: ModelManifest = {
@@ -553,7 +553,7 @@ export const viduI2V: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }
 
 export const viduFirstLastFrame: ModelManifest = {
@@ -709,7 +709,7 @@ export const viduFirstLastFrame: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }
 
 export const viduR2V: ModelManifest = {
@@ -848,5 +848,5 @@ export const viduR2V: ModelManifest = {
       failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
     },
   },
-  availability: { enabled: true, stage: 'beta' },
+  availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' },
 }

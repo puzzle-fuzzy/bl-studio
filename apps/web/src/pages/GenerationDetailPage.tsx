@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
+import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-st
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { describeGenerationFailure } from '@/lib/generation-failure'
 import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
 import { parsePromptReferences } from '@/lib/reference-format'
@@ -275,10 +276,8 @@ function DetailContent({
         </Card>
       )}
 
-      {record.status === 'failed' && record.errorJson !== undefined && (
-        <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
-          {typeof record.errorJson === 'string' ? record.errorJson : '生成失败，可点击重试'}
-        </p>
+      {record.status === 'failed' && (
+        <FailureDetailPanel record={record} />
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
@@ -291,6 +290,74 @@ function DetailContent({
 
       <DiagnosticsSection recordId={id} />
     </div>
+  )
+}
+
+/** 失败详情面板：展示 provider 错误原文 + 错误码/分类/是否可重试等排障信息。 */
+function FailureDetailPanel({ record }: { record: GenerationRecord }) {
+  const failure = describeGenerationFailure(record)
+  const hasError = failure.message !== undefined
+    || failure.statusReason !== undefined
+    || failure.code !== undefined
+    || failure.category !== undefined
+    || failure.retriable !== undefined
+    || failure.details !== undefined
+  if (!hasError) {
+    return (
+      <p className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        生成失败，未返回详细原因，可点击重试。
+      </p>
+    )
+  }
+
+  const hasMetadata = failure.code !== undefined
+    || failure.category !== undefined
+    || failure.retriable !== undefined
+
+  return (
+    <Card className="border-destructive/30 bg-destructive/5">
+      <CardHeader className="py-3">
+        <CardTitle className="flex items-center gap-2 text-sm">
+          <CircleAlert data-icon className="h-4 w-4 text-destructive" />
+          失败原因
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm">
+        {failure.message !== undefined && (
+          <p className="text-destructive">{failure.message}</p>
+        )}
+        {failure.statusReason !== undefined && (
+          <p className="text-muted-foreground">{failure.statusReason}</p>
+        )}
+        {failure.details !== undefined && Object.keys(failure.details).length > 0 && (
+          <pre className="max-h-48 overflow-auto rounded-md border bg-background/80 p-2 font-mono text-xs text-muted-foreground">
+            {JSON.stringify(failure.details, null, 2)}
+          </pre>
+        )}
+        {hasMetadata && (
+          <dl className="grid grid-cols-[max-content_1fr] gap-x-4 gap-y-1 font-mono text-xs text-muted-foreground">
+            {failure.code !== undefined && (
+              <>
+                <dt>code</dt>
+                <dd>{failure.code}</dd>
+              </>
+            )}
+            {failure.category !== undefined && (
+              <>
+                <dt>category</dt>
+                <dd>{failure.category}</dd>
+              </>
+            )}
+            {failure.retriable !== undefined && (
+              <>
+                <dt>retriable</dt>
+                <dd>{failure.retriable ? '是' : '否'}</dd>
+              </>
+            )}
+          </dl>
+        )}
+      </CardContent>
+    </Card>
   )
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById, validateModelParams, type ModelManifest } from '../src'
+import { getModelById, MODEL_REGISTRY, validateModelParams, type ModelManifest } from '../src'
 
 const manifest: ModelManifest = {
   id: 'test-image',
@@ -326,7 +326,8 @@ describe('validateModelParams', () => {
   })
 
   it('enforces the Vidu seed range declared in the manifest', () => {
-    const model = getModelById('vidu-reference-video')
+    // vidu 系列现为暂未开通（enabled:false），getModelById 不返回；从注册表直取校验契约。
+    const model = MODEL_REGISTRY.find(item => item.id === 'vidu-reference-video')
     expect(model).toBeDefined()
     expect(model?.parameters.find(parameter => parameter.name === 'seed')).toMatchObject({
       min: 0,

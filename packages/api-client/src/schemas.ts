@@ -175,7 +175,11 @@ const ModelCatalogItemContractSchema = z.object({
   // 跨字段校验规则：透传 manifest rules，web 表单据此做提交前实时校验。
   rules: z.array(ModelValidationRuleSchema).optional(),
   availability: z
-    .object({ enabled: z.boolean(), stage: z.enum(['stable', 'beta', 'hidden']) })
+    .object({
+      enabled: z.boolean(),
+      stage: z.enum(['stable', 'beta', 'hidden']),
+      notActivated: z.string().optional(),
+    })
     .optional(),
   referenceFormat: ModelReferenceFormatSchema.optional(),
 })

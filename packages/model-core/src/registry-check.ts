@@ -40,6 +40,7 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
     throw new Error(`${manifest.id} must not define duplicate capabilities`)
   }
 
+  assertAvailability(manifest)
   assertTransport(manifest)
   assertPricing(manifest)
 
@@ -91,6 +92,18 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
   for (const bindingName of bindingNames) {
     if (!parameterNames.has(bindingName)) {
       throw new Error(`${manifest.id} binding "${bindingName}" does not match a parameter`)
+    }
+  }
+}
+
+function assertAvailability(manifest: FrozenModelManifest): void {
+  const availability = manifest.availability
+  if (availability.notActivated !== undefined) {
+    if (availability.enabled) {
+      throw new Error(`${manifest.id} notActivated models must be disabled (availability.enabled=false)`)
+    }
+    if (!availability.notActivated.trim()) {
+      throw new Error(`${manifest.id} availability.notActivated must not be empty`)
     }
   }
 }

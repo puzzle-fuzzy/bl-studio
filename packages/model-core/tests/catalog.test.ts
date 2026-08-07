@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   getModelAuditMetadata,
   getModelById,
+  getModelCatalogItemById,
   estimatePriceCents,
   listModels,
   MODEL_REGISTRY,
@@ -9,9 +10,9 @@ import {
 } from '../src'
 
 describe('model catalog composition', () => {
-  it('exposes every registered model as enabled', () => {
-    expect(listModels()).toHaveLength(MODEL_REGISTRY.length)
+  it('exposes only enabled models in lookup while the registry carries all (incl. 暂未开通)', () => {
     expect(MODEL_REGISTRY.length).toBeGreaterThanOrEqual(40)
+    expect(listModels().length).toBe(MODEL_REGISTRY.filter(model => model.availability.enabled).length)
   })
 
   it('covers all four categories', () => {
@@ -151,10 +152,11 @@ describe('model catalog composition', () => {
     })
   })
 
-  it('hides disabled models from lookup', () => {
+  it('hides disabled (暂未开通) models from lookup but keeps them in the catalog', () => {
     const disabled = MODEL_REGISTRY.find(model => !model.availability.enabled)
-    if (disabled === undefined) return // all enabled today; guard is the contract
+    if (disabled === undefined) return // guard is the contract; today vidu family is disabled
     expect(getModelById(disabled.id)).toBeUndefined()
+    expect(getModelCatalogItemById(disabled.id)).toBeDefined()
   })
 
   it('declares mediaKind on every media parameter', () => {

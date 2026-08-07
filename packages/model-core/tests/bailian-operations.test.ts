@@ -4,18 +4,17 @@ import {
   assertBailianOperationMapComplete,
   listBailianCoverageRequirements,
   listModelCatalogItems,
-  listModels,
+  MODEL_REGISTRY,
 } from '../src'
 
 describe('Bailian SDK product operation map', () => {
-  test('covers every enabled Bailian Studio manifest exactly once', () => {
+  test('covers every registered manifest exactly once (incl. 暂未开通的禁用模型)', () => {
     assertBailianOperationMapComplete()
     const requirements = listBailianCoverageRequirements()
-    const models = listModels()
-    expect(requirements).toHaveLength(models.length)
-    expect(new Set(requirements.map(({ consumerId }) => consumerId)).size).toBe(models.length)
+    expect(requirements).toHaveLength(MODEL_REGISTRY.length)
+    expect(new Set(requirements.map(({ consumerId }) => consumerId)).size).toBe(MODEL_REGISTRY.length)
     for (const requirement of requirements) {
-      const manifest = models.find(({ id }) => id === requirement.consumerId)
+      const manifest = MODEL_REGISTRY.find(({ id }) => id === requirement.consumerId)
       if (manifest === undefined) throw new Error(`Missing manifest ${requirement.consumerId}`)
       expect(requirement.providerModelId).toBe(manifest.providerModel)
       expect(requirement.mode).toBe(manifest.taskMode === 'provider_async' ? 'async' : manifest.taskMode)

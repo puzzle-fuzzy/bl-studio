@@ -50,6 +50,12 @@ const CAPABILITY_BY_MANIFEST_ID = {
   'vidu-image-to-video': 'video.image-to-video',
   'vidu-first-last-frame-video': 'video.image-to-video',
   'vidu-reference-video': 'video.reference-to-video',
+  'vidu-reference-video-q3': 'video.reference-to-video',
+  'vidu-reference-video-turbo': 'video.reference-to-video',
+  'vidu-reference-video-ad': 'video.reference-to-video',
+  'vidu-reference-video-drama': 'video.reference-to-video',
+  'vidu-reference-video-q2': 'video.reference-to-video',
+  'vidu-reference-video-q2-pro': 'video.reference-to-video',
   'wanx-2.7-text-to-video': 'video.text-to-video',
   'wanx-2.7-image-to-video': 'video.image-to-video',
   'wanx-2.7-reference-video': 'video.reference-to-video',
@@ -108,7 +114,9 @@ export function assertBailianOperationMapComplete(
 assertBailianOperationMapComplete()
 
 export function listBailianCoverageRequirements(): readonly BailianCoverageRequirementReference[] {
-  return listModels().map((manifest) => {
+  // 覆盖整个注册表（含暂未开通的禁用模型）：禁用模型同样进入前端 catalog 并携带
+  // operation 能力（置灰展示），其能力映射缺失会在 catalog 投影时报错。
+  return MODEL_REGISTRY.map((manifest) => {
     const capability = getBailianOperationCapability(manifest.id)
     if (capability === undefined) {
       throw new Error(`Missing Bailian operation capability for ${manifest.id}`)

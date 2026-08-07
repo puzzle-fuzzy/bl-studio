@@ -3,6 +3,9 @@ import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import {
   SUB_MODE_ORDER,
   availableSubModes,
+  firstEnabledInCategory,
+  firstEnabledModel,
+  isModelEnabled,
   modelNameZh,
   modelsInCategory,
   modelsInMode,
@@ -111,6 +114,42 @@ describe('subModeOf 派生对级联下拉的回归不变量', () => {
     for (const category of Object.keys(SUB_MODE_ORDER) as ModelCategory[]) {
       expect(SUB_MODE_ORDER[category].length).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('isModelEnabled / firstEnabledModel / firstEnabledInCategory', () => {
+  const disabledVideo = model({
+    id: 'vidu',
+    capabilities: ['multi_reference', 'image_input'],
+    // 暂未开通
+  })
+  disabledVideo.availability = { enabled: false, stage: 'beta', notActivated: '暂未开通' }
+  const t2v = model({ id: 't2v', capabilities: ['text_prompt'] })
+  const i2v = model({ id: 'i2v', capabilities: ['image_input'] })
+
+  it('isModelEnabled：availability 缺省视为启用，enabled:false 为暂未开通', () => {
+    expect(isModelEnabled(model({ id: 'legacy' }))).toBe(true)
+    expect(isModelEnabled(disabledVideo)).toBe(false)
+    expect(isModelEnabled(t2v)).toBe(true)
+  })
+
+  it('firstEnabledModel：跳过全部暂未开通的模型', () => {
+    const list = [disabledVideo, t2v]
+    expect(firstEnabledModel(list, 'video', 'r2v')).toBe(undefined)
+    expect(firstEnabledModel(list, 'video', 't2v')?.id).toBe('t2v')
+  })
+
+  it('firstEnabledInCategory：preferMode 无已启用模型时回绕到其它子模式', () => {
+    const list = [disabledVideo, t2v, i2v]
+    // r2v 全置灰 → 按 SUB_MODE_ORDER.video（r2v, i2v, t2v, vedit）回绕，先命中 i2v
+    expect(firstEnabledInCategory(list, 'video', 'r2v')?.id).toBe('i2v')
+    expect(firstEnabledInCategory(list, 'video', 'i2v')?.id).toBe('i2v')
+  })
+
+  it('firstEnabledInCategory：整分类全置灰返回 undefined（级联无选中项，仅置灰展示）', () => {
+    const vidu = model({ id: 'vidu2', capabilities: ['multi_reference'] })
+    vidu.availability = { enabled: false, stage: 'beta', notActivated: '暂未开通' }
+    expect(firstEnabledInCategory([vidu], 'video')).toBe(undefined)
   })
 })
 
