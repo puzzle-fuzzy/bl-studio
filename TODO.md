@@ -434,10 +434,10 @@
 
 ### 6.2 前端完整性 vs 设计文档（文档承诺 vs 实际接线）
 
-**R2-P1-05 · 「恢复」功能缺失 —— 文档承诺但无任何 UI**
+**R2-P1-05 · 「恢复」功能缺失 —— 文档承诺但无任何 UI** — ✅ 已处理（2026-08-08）
 - **位置**：[GenerationDetailPage.tsx:258,261](apps/web/src/pages/GenerationDetailPage.tsx#L258)（只实现 hidden/deleted）；[generation-client.ts:272](packages/api-client/src/generation-client.ts#L272)（`GenerationLibraryState` 支持 `visible`）；API 在（generation-client.ts:745）
 - **影响**：隐藏/移除任务不可逆，用户无法找回。docs/02-design 功能矩阵声称「隐藏/删除/恢复」合并到位，恢复缺失。
-- **修法**：任务列表 hidden/deleted 视图 + 详情页加「恢复」按钮，调 `setGenerationLibraryState(id,'visible')`。
+- **修法**：任务列表 hidden/deleted 视图（PageVariant 行内「恢复」按钮，恢复后按当前视图重拉使行消失）+ 详情页 trash 态把「隐藏/移除」换成「恢复」，调 `setLibraryState(id,'visible')`。
 
 **R2-P1-06 · 上传「取消」只做一半 —— 客户端支持 AbortController，UI 未接线** — ✅ 已处理（2026-08-08）
 - **位置**：[generation-client.ts:145-167](packages/api-client/src/generation-client.ts#L145)（`uploadAssetWithProgress` 支持 `signal`→abort）；[AssetPickerDialog.tsx:68-85](apps/web/src/components/assets/AssetPickerDialog.tsx#L68)（从不传 signal、无取消按钮）；关弹窗后 XHR 继续在后台跑

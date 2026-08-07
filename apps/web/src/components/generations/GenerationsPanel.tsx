@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react'
 import { useNavigate } from 'react-router'
 import { List } from 'react-window'
+import { RotateCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import type { GenerationRecord } from '@bailian-studio/api-client'
@@ -168,8 +169,15 @@ function PageVariant() {
   const load = useGenerationsStore(state => state.load)
   const loadMore = useGenerationsStore(state => state.loadMore)
   const setViewFilters = useGenerationsStore(state => state.setViewFilters)
+  const setLibraryState = useGenerationsStore(state => state.setLibraryState)
 
   const open = (id: string) => navigate(`/generations/${id}`)
+
+  // R2-P1-05：从 hidden/deleted 视图恢复任务后按当前视图重新拉取，使其从列表消失。
+  const restoreTask = async (id: string) => {
+    await setLibraryState(id, 'visible')
+    await load(true)
+  }
 
   return (
     <div className="space-y-3">
@@ -191,7 +199,7 @@ function PageVariant() {
             rowCount={records.length}
             rowHeight={112}
             rowComponent={TaskRow}
-            rowProps={{ records, onOpen: open }}
+            rowProps={{ records, onOpen: open, onRestore: id => void restoreTask(id) }}
             overscanCount={6}
             className="h-full"
           />
@@ -223,14 +231,25 @@ function TaskLoadError({ message, onRetry }: { message: string; onRetry: () => v
 interface TaskRowProps {
   records: readonly GenerationRecord[]
   onOpen: (id: string) => void
+  onRestore: (id: string) => void
 }
 
-function TaskRow({ index, style, records, onOpen }: { index: number; style: CSSProperties } & TaskRowProps) {
+function TaskRow({ index, style, records, onOpen, onRestore }: { index: number; style: CSSProperties } & TaskRowProps) {
   const record = records[index]
   if (record === undefined) return null
+  // R2-P1-05：hidden/deleted 视图行内提供「恢复」；点击行仍进详情页。
+  const isInTrash = record.hiddenAt !== null || record.deletedAt !== null
   return (
-    <div style={style} className="border-b border-border px-1.5 pb-1.5">
-      <GenerationListItem record={record} onOpen={onOpen} className="h-full" />
+    <div style={style} className="flex items-center border-b border-border px-1.5 pb-1.5">
+      <div className="min-w-0 flex-1">
+        <GenerationListItem record={record} onOpen={onOpen} className="h-full" />
+      </div>
+      {isInTrash && (
+        <Button variant="ghost" size="sm" className="shrink-0" onClick={() => onRestore(record.id)}>
+          <RotateCcw data-icon />
+          恢复
+        </Button>
+      )}
     </div>
   )
 }

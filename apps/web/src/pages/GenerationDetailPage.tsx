@@ -193,15 +193,18 @@ function DetailContent({
     }
   }
 
-  const handleLibraryState = async (state: 'hidden' | 'deleted') => {
+  const handleLibraryState = async (state: 'hidden' | 'deleted' | 'visible') => {
     try {
       const next = await apiClient.setGenerationLibraryState(id, state)
       onRefreshed(next)
-      showMessage({ title: state === 'hidden' ? '已隐藏' : '已移除', tone: 'info' })
+      showMessage({ title: state === 'hidden' ? '已隐藏' : state === 'deleted' ? '已移除' : '已恢复', tone: 'info' })
     } catch (err) {
       showMessage({ title: userErrorMessage(err), tone: 'warning' })
     }
   }
+
+  // R2-P1-05：隐藏/移除后的任务在详情页提供「恢复」，找回动作可逆。
+  const isInTrash = record.hiddenAt !== null || record.deletedAt !== null
 
   return (
     <div className="mx-auto max-w-5xl space-y-6">
@@ -255,12 +258,21 @@ function DetailContent({
           >
             {visibility === 'public' ? '取消公开' : '公开到社区'}
           </Button>
-          <Button variant="ghost" size="sm" onClick={() => void handleLibraryState('hidden')}>
-            隐藏
-          </Button>
-          <Button variant="ghost" size="sm" className="text-destructive" onClick={() => void handleLibraryState('deleted')}>
-            移除
-          </Button>
+          {isInTrash ? (
+            <Button variant="ghost" size="sm" onClick={() => void handleLibraryState('visible')}>
+              <RotateCcw data-icon />
+              恢复
+            </Button>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={() => void handleLibraryState('hidden')}>
+                隐藏
+              </Button>
+              <Button variant="ghost" size="sm" className="text-destructive" onClick={() => void handleLibraryState('deleted')}>
+                移除
+              </Button>
+            </>
+          )}
         </div>
       </div>
 
