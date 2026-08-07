@@ -439,9 +439,9 @@
 - **影响**：隐藏/移除任务不可逆，用户无法找回。docs/02-design 功能矩阵声称「隐藏/删除/恢复」合并到位，恢复缺失。
 - **修法**：任务列表 hidden/deleted 视图 + 详情页加「恢复」按钮，调 `setGenerationLibraryState(id,'visible')`。
 
-**R2-P1-06 · 上传「取消」只做一半 —— 客户端支持 AbortController，UI 未接线**
+**R2-P1-06 · 上传「取消」只做一半 —— 客户端支持 AbortController，UI 未接线** — ✅ 已处理（2026-08-08）
 - **位置**：[generation-client.ts:145-167](packages/api-client/src/generation-client.ts#L145)（`uploadAssetWithProgress` 支持 `signal`→abort）；[AssetPickerDialog.tsx:68-85](apps/web/src/components/assets/AssetPickerDialog.tsx#L68)（从不传 signal、无取消按钮）；关弹窗后 XHR 继续在后台跑
-- **修法**：AssetPickerDialog 持有 AbortController，上传中显示「取消上传」，onOpenChange/卸载时 `abort()`。
+- **修法**：AssetPickerDialog 持有 AbortController，上传中显示「取消上传」，onOpenChange/卸载时 `abort()`（含「确定」关弹窗路径）；取消上传不展示错误文案（`REQUEST_ABORTED`/`AbortError` 静默）。
 
 **R2-P1-07 · 任务列表加载错误被静默吞掉，显示误导性空态** — ✅ 已处理（2026-08-08）
 - **位置**：[generations-store.ts:90](apps/web/src/stores/generations-store.ts#L90)（load 失败写 `error`），但全仓无组件读取（已 grep 确认）

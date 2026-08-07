@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Check, Image as ImageIcon, Link2, Loader2, Upload } from 'lucide-react'
-import type { AssetItem } from '@bailian-studio/api-client'
+import { ApiClientError, type AssetItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import {
   Dialog,
@@ -47,6 +47,8 @@ export function AssetPickerDialog({
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [linkUrl, setLinkUrl] = useState('')
   const [linkError, setLinkError] = useState<string | null>(null)
+  // R2-P1-06：持有本次上传的 AbortController，支持「取消上传」与关弹窗时中止 XHR。
+  const uploadController = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (open) {
@@ -54,6 +56,25 @@ export function AssetPickerDialog({
       void load(query)
     }
   }, [open, load, query.kind])
+
+  // 组件卸载时若有未完成上传一并中止（正常情况下弹窗关闭走 handleOpenChange）。
+  useEffect(() => () => uploadController.current?.abort(), [])
+
+  const abortUpload = () => {
+    uploadController.current?.abort()
+    uploadController.current = null
+  }
+
+  const handleOpenChange = (next: boolean) => {
+    if (!next) abortUpload()
+    onOpenChange(next)
+  }
+
+  /** 判断上传是否被用户主动取消（取消不算失败，不展示错误）。 */
+  const isAbortError = (error: unknown): boolean => {
+    if (error instanceof ApiClientError) return error.code === 'REQUEST_ABORTED'
+    return error instanceof Error && error.name === 'AbortError'
+  }
 
   const toggleAsset = (asset: AssetItem) => {
     setSelected(current => {
@@ -66,6 +87,10 @@ export function AssetPickerDialog({
   }
 
   const handleUpload = async (file: File) => {
+    // 连续选文件：先中止上一次可能仍在飞的上传。
+    uploadController.current?.abort()
+    const controller = new AbortController()
+    uploadController.current = controller
     setUploading(true)
     setUploadProgress(0)
     setUploadError(null)
@@ -73,13 +98,16 @@ export function AssetPickerDialog({
       const asset = await apiClient.uploadAsset({
         file,
         kind: mediaKind,
+        signal: controller.signal,
         onProgress: (loaded, total) => setUploadProgress(total > 0 ? loaded / total : 0),
       })
       setSelected(current => (multiple ? [...current, asset] : [asset]))
       void load(query, true)
     } catch (error) {
-      setUploadError(userErrorMessage(error))
+      // R2-P1-06：用户主动取消不展示错误文案。
+      if (!isAbortError(error)) setUploadError(userErrorMessage(error))
     } finally {
+      if (uploadController.current === controller) uploadController.current = null
       setUploading(false)
     }
   }
@@ -101,7 +129,7 @@ export function AssetPickerDialog({
   const items = assetsState?.items ?? []
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>选择素材</DialogTitle>
@@ -179,6 +207,12 @@ export function AssetPickerDialog({
                 event.target.value = ''
               }}
             />
+            {/* R2-P1-06：上传中提供「取消上传」，中止进行中的 XHR。 */}
+            {uploading && (
+              <Button variant="outline" size="sm" className="w-full" onClick={abortUpload}>
+                取消上传
+              </Button>
+            )}
             {uploadError !== null && <p className="text-sm text-destructive">{uploadError}</p>}
           </TabsContent>
 
@@ -203,13 +237,13 @@ export function AssetPickerDialog({
         </Tabs>
 
         <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
+          <Button variant="outline" onClick={() => handleOpenChange(false)}>
             取消
           </Button>
           <Button
             onClick={() => {
               onSelect(selected)
-              onOpenChange(false)
+              handleOpenChange(false)
             }}
             disabled={selected.length === 0}
           >
