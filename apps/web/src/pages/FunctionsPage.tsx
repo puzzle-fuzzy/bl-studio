@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Clapperboard, FileAudio, Mic } from 'lucide-react'
-import type { AssetItem, GenerationRecord } from '@bailian-studio/api-client'
+import type { AssetItem, CreateGenerationRequest, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
@@ -12,9 +12,11 @@ import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { resolveApiUrl } from '@/lib/api'
-
-const SCREENPLAY_MODEL_IDS = ['qwen-omni-screenplay', 'qwen-omni-screenplay-flash']
-const ASR_MODEL_IDS = ['fun-asr-v1']
+import {
+  TOOL_ASR_MODEL_IDS,
+  TOOL_SCREENPLAY_MODEL_IDS,
+  buildToolGenerationPayload,
+} from '@/lib/tool-submission'
 
 /** 辅助工具：视频理解→剧本 / 提取音频 / 语音识别。 */
 export function FunctionsPage() {
@@ -35,7 +37,7 @@ export function FunctionsPage() {
 
 function ScreenplayTool() {
   const models = useModelCatalogStore(state => state.models)
-  const model = SCREENPLAY_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
+  const model = TOOL_SCREENPLAY_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
   return (
     <ToolCard
       icon={<Clapperboard className="size-5" />}
@@ -50,7 +52,7 @@ function ScreenplayTool() {
           assetKindLabel="视频"
           model={model?.id}
           modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(modelId, { videoUrl: [asset.id] })}
+          run={(asset, modelId) => runGeneration(buildToolGenerationPayload(modelId, asset.id))}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -60,7 +62,7 @@ function ScreenplayTool() {
 
 function AsrTool() {
   const models = useModelCatalogStore(state => state.models)
-  const model = ASR_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
+  const model = TOOL_ASR_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
   return (
     <ToolCard
       icon={<Mic className="size-5" />}
@@ -75,7 +77,7 @@ function AsrTool() {
           assetKindLabel="音频"
           model={model?.id}
           modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(modelId, { fileUrls: [asset.id] })}
+          run={(asset, modelId) => runGeneration(buildToolGenerationPayload(modelId, asset.id))}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -254,8 +256,7 @@ function TextTool({
   )
 }
 
-async function runGeneration(modelId: string, assetRefs: Record<string, string[]>): Promise<GenerationRecord> {
-  const payload = { modelId, params: {}, assetRefs }
+async function runGeneration(payload: CreateGenerationRequest): Promise<GenerationRecord> {
   const idempotencyKey = idempotencyKeyFor(payload)
   const response = await apiClient.createGeneration({ ...payload, idempotencyKey })
   clearIdempotencyKey(payload)

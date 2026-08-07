@@ -460,7 +460,7 @@
 ### 6.3 测试质量与覆盖（测试是否真的测到了行为）
 
 **R2-P1-09 · 三个 P0 缺陷无回归测试（batchId / artifact 重试 / ASR 参数）**
-- **位置**：[generation-client.test.ts:243,267](packages/api-client/tests/generation-client.test.ts#L243)（对 body 做 `toEqual(JSON.stringify(...))` 精确断言，但所有用例不传 batchId —— 丢字段也全绿）；[artifact-task-handler.test.ts](apps/worker/tests/artifact-task-handler.test.ts)（仅 1 个用例，无 retry 路径断言）；ASR 参数错在 UI 层，按「不测 UI」约定纯函数层够不到
+> ✅ 已处理（未提交，工作树中）——batchId 进 body 精确断言（generation-client.test.ts:286，随 P0-03 落地已核实）+ artifact 重试 retry 用例（artifact-task-handler.test.ts 三用例随 P0-02 落地已核实）+ ASR 映射下沉 apps/web/src/lib/tool-submission.ts 纯函数并单测（fileUrls 非 audioUrl，P0-01 回归）。- **位置**：[generation-client.test.ts:243,267](packages/api-client/tests/generation-client.test.ts#L243)（对 body 做 `toEqual(JSON.stringify(...))` 精确断言，但所有用例不传 batchId —— 丢字段也全绿）；[artifact-task-handler.test.ts](apps/worker/tests/artifact-task-handler.test.ts)（仅 1 个用例，无 retry 路径断言）；ASR 参数错在 UI 层，按「不测 UI」约定纯函数层够不到
 - **修法**：补「batchId 进 body」精确断言（修复落地即生效）；补「retriable 存储错误 → `{status:'retry'}`」用例（现有源码下必红）；把剧本/ASR 分发下沉为纯函数（`apps/web/src/lib/`）并单测参数映射，或在 generation-submit.test.ts 补 fun-asr 用例。
 
 **R2-P1-10 · apps/admin 全 app 零测试，`passWithNoTests` 掩盖空跑**
