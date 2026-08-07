@@ -37,6 +37,7 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
   const records = useGenerationsStore(state => state.records)
   const hasLoaded = useGenerationsStore(state => state.hasLoaded)
   const isLoading = useGenerationsStore(state => state.isLoading)
+  const error = useGenerationsStore(state => state.error)
   const load = useGenerationsStore(state => state.load)
   const loadModels = useModelCatalogStore(state => state.load)
 
@@ -49,7 +50,7 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
   const open = (id: string) => navigate(`/generations/${id}`)
 
   if (variant === 'embedded') {
-    return <EmbeddedVariant records={records} isLoading={isLoading} onOpen={open} />
+    return <EmbeddedVariant records={records} isLoading={isLoading} error={error} onOpen={open} onRetry={() => void load(true)} />
   }
 
   return <PageVariant />
@@ -59,11 +60,15 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
 function EmbeddedVariant({
   records,
   isLoading,
+  error,
   onOpen,
+  onRetry,
 }: {
   records: readonly GenerationRecord[]
   isLoading: boolean
+  error: string | null
   onOpen: (id: string) => void
+  onRetry: () => void
 }) {
   const models = useModelCatalogStore(state => state.models)
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
@@ -108,12 +113,21 @@ function EmbeddedVariant({
         </div>
       </div>
       {filtered.length === 0 ? (
-        <p className="py-4 text-center text-sm text-muted-foreground">
-          {isLoading ? '加载中…' : records.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
-        </p>
+        // R2-P1-07：加载失败时优先渲染错误态（带重试），而不是误导性的「还没有生成任务」空态。
+        error !== null && records.length === 0 ? (
+          <TaskLoadError message={error} onRetry={onRetry} />
+        ) : (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            {isLoading ? '加载中…' : records.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
+          </p>
+        )
       ) : (
         // 无卡片包裹：列表项之间用分割线划分。
         <div className="divide-y divide-border">
+          {error !== null && (
+            // 有旧数据但刷新失败：诚实提示列表可能是上次结果。
+            <p className="px-1 pb-2 text-xs text-destructive">任务列表刷新失败（{error}），当前显示上次结果</p>
+          )}
           {filtered.map(record => (
             <GenerationListItem key={record.id} record={record} onOpen={onOpen} />
           ))}
@@ -146,8 +160,12 @@ function matchesProgress(status: string, filter: ProgressFilter): boolean {
 function PageVariant() {
   const navigate = useNavigate()
   const records = useGenerationsStore(state => state.records)
+  const hasLoaded = useGenerationsStore(state => state.hasLoaded)
+  const isLoading = useGenerationsStore(state => state.isLoading)
+  const error = useGenerationsStore(state => state.error)
   const nextCursor = useGenerationsStore(state => state.nextCursor)
   const isLoadingMore = useGenerationsStore(state => state.isLoadingMore)
+  const load = useGenerationsStore(state => state.load)
   const loadMore = useGenerationsStore(state => state.loadMore)
   const setViewFilters = useGenerationsStore(state => state.setViewFilters)
 
@@ -157,14 +175,27 @@ function PageVariant() {
     <div className="space-y-3">
       <GenerationStatusFilter onFiltersChange={setViewFilters} />
       <div className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden rounded-lg border">
-        <List<TaskRowProps>
-          rowCount={records.length}
-          rowHeight={112}
-          rowComponent={TaskRow}
-          rowProps={{ records, onOpen: open }}
-          overscanCount={6}
-          className="h-full"
-        />
+        {records.length === 0 ? (
+          // R2-P1-07：空列表区分「加载中 / 加载失败 / 真没有任务」三种情况。
+          error !== null ? (
+            <div className="flex h-full items-center justify-center">
+              <TaskLoadError message={error} onRetry={() => void load(true)} />
+            </div>
+          ) : (
+            <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
+              {isLoading || !hasLoaded ? '加载中…' : '还没有生成任务，开始你的第一个创作吧'}
+            </p>
+          )
+        ) : (
+          <List<TaskRowProps>
+            rowCount={records.length}
+            rowHeight={112}
+            rowComponent={TaskRow}
+            rowProps={{ records, onOpen: open }}
+            overscanCount={6}
+            className="h-full"
+          />
+        )}
       </div>
       {nextCursor !== undefined && (
         <div className="flex justify-center">
@@ -173,6 +204,18 @@ function PageVariant() {
           </Button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** 任务列表加载失败态：错误信息 + 重试按钮（与「空态」明确区分）。 */
+function TaskLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+  return (
+    <div className="flex flex-col items-center gap-2 py-6 text-center">
+      <p className="text-sm text-destructive">任务列表加载失败：{message}</p>
+      <Button variant="outline" size="sm" onClick={onRetry}>
+        重试
+      </Button>
     </div>
   )
 }

@@ -443,10 +443,10 @@
 - **位置**：[generation-client.ts:145-167](packages/api-client/src/generation-client.ts#L145)（`uploadAssetWithProgress` 支持 `signal`→abort）；[AssetPickerDialog.tsx:68-85](apps/web/src/components/assets/AssetPickerDialog.tsx#L68)（从不传 signal、无取消按钮）；关弹窗后 XHR 继续在后台跑
 - **修法**：AssetPickerDialog 持有 AbortController，上传中显示「取消上传」，onOpenChange/卸载时 `abort()`。
 
-**R2-P1-07 · 任务列表加载错误被静默吞掉，显示误导性空态**
+**R2-P1-07 · 任务列表加载错误被静默吞掉，显示误导性空态** — ✅ 已处理（2026-08-08）
 - **位置**：[generations-store.ts:90](apps/web/src/stores/generations-store.ts#L90)（load 失败写 `error`），但全仓无组件读取（已 grep 确认）
 - **影响**：SSE 降级/500 时用户看到「还没有生成任务 / 去创作吧」，误以为真没有任务。
-- **修法**：GenerationsPanel 两形态渲染 `state.error`，与空态区分。
+- **修法**：GenerationsPanel 两形态渲染 `state.error`，与空态区分（embedded 空态 + page 空列表都渲染错误态 + 重试按钮；有旧数据时给一行「列表刷新失败，当前显示上次结果」提示）。
 
 **R2-P1-08 · ThemeToggle 是死代码（功能本身可用，组件未接线）**
 - **位置**：[ThemeToggle.tsx](apps/web/src/components/layout/ThemeToggle.tsx) 从未被 import；主题切换实际在 [UserMenu.tsx:68-71](apps/web/src/components/layout/UserMenu.tsx#L68) 内联
