@@ -340,30 +340,35 @@
 - **影响**：新环境 `pnpm install && db:test:up && pnpm run verify` 直接报 `DATABASE_URL is required`，与 CLAUDE.md 观感不符（memory 已确认此坑）。
 - **修法**：`test`/`test:root`/`test:coverage`/`verify` 改为 `dotenv -e infra/env/.env.test -- sh -c '…'` 包裹整条链（与 `dev` 同款）；CI 已有 env 不受影响。**坑**：`dotenv -- A && B` 只给 A 加载 env，`&&` 后的 B 跑的是父 shell 的 env（无 DATABASE_URL）——必须用 `sh -c` 包住全链。附带修复：P1-28 在 [auth-routes.test.ts:171](apps/api/tests/auth-routes.test.ts#L171) 的回归断言（未验证邮箱登录改 401 + AUTH_INVALID_CREDENTIALS）。
 
-### P1-40 · 包边界检查覆盖面缺口：web/admin/api-client/storage 等无规则
+### P1-40 · 包边界检查覆盖面缺口：web/admin/api-client/storage 等无规则 — ✅ 已处理（commit `5694b5d`，2026-08-08）
 - **位置**：[check-package-boundaries.ts:112-224](infra/scripts/check-package-boundaries.ts#L112-L224)（规则只覆盖 12 个 scope）
 - **影响**：CLAUDE.md 声称「运行时应用禁止直接 import `@bailian-studio/db`」，但 `apps/web`/`apps/admin` 无任何规则；api-client/storage/design-tokens/provider-health 完全不在规则表里。未来误 import 不会被拦，架构约束名存实亡。
 - **修法**：为 web/admin 补 `@bailian-studio/db` 等禁入规则，并补对应测试断言。
+- **处理**：web/admin 新增禁入规则（db / provider-dashscope / generation-repository / media-repository / auth / storage / credit-ledger / task-engine + apps/services/worker 相对 import），CLAUDE.md 契约从此可执行；api-client / storage / design-tokens 补叶子规则——用 `importSpecifier` 只匹配真实 import 语句，豁免 storage 的 shared 与 design-tokens 自身 doc 注释里的 CSS 引入示例（`import '@bailian-studio/design-tokens/tokens.css'`）。provider-health 已随 P2-01 删除，无需补规则。check-package-boundaries.test.ts 补两组断言。
 
-### P1-41 · deploy 公网冒烟在本机 curl，受 Clash fake-ip DNS 污染
+### P1-41 · deploy 公网冒烟在本机 curl，受 Clash fake-ip DNS 污染 — ✅ 已处理（commit `5694b5d`，2026-08-08）
 - **位置**：[deploy-prod.sh:168](infra/scripts/deploy-prod.sh#L168)（`curl https://$SITE_DOMAIN/api/health/ready`）
 - **问题**：手册自己强调「本地 dig 不可信、查 DNS 在服务器上」，最后一道冒烟却在本机走本机解析。
 - **修法**：用 `curl --resolve "$SITE_DOMAIN:443:<服务器IP>"`，或把冒烟放到服务器上 `ssh_cmd` 执行。
+- **处理**：从 DEPLOY_HOST 提取服务器 IP（`##*@` 去 user@、`%%:*` 去端口），公网冒烟改 `curl --resolve "$SITE_DOMAIN:443:$SERVER_HOST"`——直连服务器 IP、保留 SNI 与证书校验，绕开本机 fake-ip DNS。
 
-### P1-42 · `db:push` 永久挂 6 个 backfill + 其中个别是破坏性 UPDATE
+### P1-42 · `db:push` 永久挂 6 个 backfill + 其中个别是破坏性 UPDATE — ✅ 已处理（commit `5694b5d`，2026-08-08）
 - **位置**：[package.json:39](package.json#L39)（6 个 backfill 链）；[backfill-generated-assets.ts:13-22](infra/scripts/backfill-generated-assets.ts#L13-L22)（每次 push 把 `source='generation'` 的 original_url/storage_url 置 NULL）
 - **影响**：反复 push 重复清空生成资产上可能由应用写入的 URL；CI 每次全表扫描。迁移与「push 后自动化」边界混乱。
 - **修法**：一次性数据修正收敛进真正迁移，`db:push` 只留 schema push + ensure-audit-constraint。
+- **处理**：新增迁移 [0042_backfill_consolidation.sql](packages/db/drizzle/0042_backfill_consolidation.sql) 收敛全部一次性数据修正（generated-assets 的 URL 清空 + 投影、media-derived、credit-accounts、asset-thumbnails 排任务；幂等，已对 test DB 事务内验证执行）。usage_records 的 backfill 本就在 0014，不重复。`db:push` / `db:push:test` 收成 schema push + ensure-audit-constraint；standalone backfill 脚本（db:backfill:credits 等）保留为运维手动工具。CI/test DB 走 `db:migrate:test` 自动获得 0042。
 
-### P1-43 · `.dockerignore` 漏掉 `.env.prod-infra`
+### P1-43 · `.dockerignore` 漏掉 `.env.prod-infra` — ✅ 已处理（commit `5694b5d`，2026-08-08）
 - **位置**：[.dockerignore:15-19](.dockerignore#L15-L19)
 - **影响**：`infra/env/.env.prod-infra`（含 POSTGRES_PASSWORD、GRAFANA_ADMIN_PASSWORD、DEPLOY_SSH_KEY 路径）会进入 Docker build context（当前 Dockerfile 未 COPY 故不进镜像层，但属潜在泄漏路径）。
 - **修法**：`.dockerignore` 增加 `.env.prod-infra`（或 `.env*` 通配兜底）。
+- **处理**：`.dockerignore` 增加 `.env.prod-infra`（Dockerfile 不 COPY infra/env，纯堵潜在泄漏路径）。
 
-### P1-44 · 审计动作约束四处手写、无自动一致性检查
+### P1-44 · 审计动作约束四处手写、无自动一致性检查 — ✅ 已处理（commit `5694b5d`，2026-08-08）
 - **位置**：[audit-types.ts:7](packages/generation-repository/src/audit-types.ts#L7)、[schema.ts:156](packages/db/src/schema.ts#L156)、[ensure-audit-action-constraint.ts:15-62](infra/scripts/ensure-audit-action-constraint.ts#L15-L62)、10 个迁移内嵌 CHECK 列表
 - **问题**：当前 41 个动作三方一致（已核实），但**没有任何测试**比对它们；新增 audit action 漏改一处即漂移。
 - **修法**：写测试从 `audit-types.ts` 类型联合推导字符串集，与 schema.ts CHECK 及脚本内嵌列表逐项比对，纳入 verify。ADD 改 `NOT VALID` + `VALIDATE CONSTRAINT` 避免整表 ACCESS EXCLUSIVE。
+- **处理**：① [audit-types.ts](packages/generation-repository/src/audit-types.ts) 导出 `AUDIT_ACTIONS`（唯一运行时事实源），`AuditAction` 类型由它派生，index.ts 重新导出；② [ensure-audit-action-constraint.ts](infra/scripts/ensure-audit-action-constraint.ts) 改为直接 import `AUDIT_ACTIONS`（漂移在编译期即不可能），重建走 `ADD CONSTRAINT ... NOT VALID` + `VALIDATE CONSTRAINT`；③ 新增 [audit-action-consistency.test.ts](infra/scripts/audit-action-consistency.test.ts)（进 verify）：比对 schema.ts CHECK、迁移链内嵌 CHECK 单调增长（最新一份 == AUDIT_ACTIONS）、ensure 脚本不再内联手抄；④ root devDependencies 加 `@bailian-studio/generation-repository`（`db:push`/`test:root` 解析用）。
 
 ---
 
