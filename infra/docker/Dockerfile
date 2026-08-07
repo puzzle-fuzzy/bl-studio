@@ -56,7 +56,6 @@ COPY packages/generation-repository/package.json ./packages/generation-repositor
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/
-COPY packages/provider-health/package.json ./packages/provider-health/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/task-engine/package.json ./packages/task-engine/
@@ -87,7 +86,6 @@ COPY packages/generation-repository/package.json ./packages/generation-repositor
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/
-COPY packages/provider-health/package.json ./packages/provider-health/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/task-engine/package.json ./packages/task-engine/

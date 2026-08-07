@@ -355,6 +355,11 @@ export async function fetchProviderArtifact(input: FetchProviderArtifactInput): 
 
   try {
     while (true) {
+      // P2-04（已知限制，标注）：validateUrl 的主机名校验与这里的 fetch 各做一次
+      // DNS 解析，存在 TOCTOU 窗口——恶意主机可在校验时返回白名单解析结果、连接时
+      // 再解析到内网 IP。白名单 + 拒绝 IP 字面量已大幅缩小面，但未做「解析后 IP
+      // 固定」级别的防护（node:dns lookup 后以解析到的 IP 直连并校验该 IP）。产物
+      // URL 来自受信的 DashScope 结果域，暂不在 SSRF 威胁面内，升级时再收口。
       const response = await fetchImpl(current, {
         method: 'GET',
         headers: { accept: MIME_ALLOWLIST[input.kind].join(', ') },

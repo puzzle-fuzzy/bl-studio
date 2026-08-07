@@ -23,9 +23,9 @@ Web (web-vue Vue3 生产实现 24k行 / web React 参考实现 15k行)
               ▼
         apps/worker (任务认领 FOR UPDATE SKIP LOCKED → DashScope submit/poll → 产物持久化)
               │
-        packages/（15 个共享包：shared/model-core/event-bus/db/generation-repository/
+        packages/（14 个共享包：shared/model-core/event-bus/db/generation-repository/
                   auth/storage/provider-dashscope/task-engine/bailian-adapter/credit-ledger/
-                  media-repository/provider-health/api-client/design-tokens）
+                  media-repository/api-client/design-tokens）
 ```
 
 - **数据库**：Drizzle，18 张表（8 核心 + 10 支撑），33 个已提交迁移

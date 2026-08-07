@@ -73,8 +73,7 @@ Web (apps/web, React 19 + zustand + shadcn/ui)   Admin (apps/admin, 同源 /admi
               │
         packages/（shared / model-core / event-bus / db / generation-repository /
                   auth / storage / provider-dashscope / task-engine /
-                  credit-ledger / media-repository / provider-health /
-                  api-client / design-tokens）
+                  credit-ledger / media-repository / api-client / design-tokens）
 ```
 
 - **包边界即架构**：`check:boundaries` 用正则强制执行「谁可以 import 谁」；`provider-dashscope` 是唯一受边界约束的执行包（只被 worker 消费），`model-core` 是前后端共享的纯数据 + 纯函数叶子。

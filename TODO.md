@@ -339,10 +339,10 @@
 ## 3. 🟡 P2 —— 维护性 / 死代码 / 文档漂移
 
 ### Worker / 执行层
-- **P2-01 · provider-health 包完全未接线（死代码）** —— [provider-health/src/index.ts](packages/provider-health/src/index.ts) 的 `applyProviderOutcome`/`isDegraded` 从未被消费。若「暂未开通」机制已替代该策略应删除或标注。
+- **P2-01 · provider-health 包完全未接线（死代码）** — ✅ 已处理（2026-08-08，选择删除）——全仓 grep 无任何消费方；降级策略概念已被 manifest `availability`（enabled/notActivated「暂未开通」）+ 逐任务重试（P2-02/06）替代。整个 `packages/provider-health/` 删除，同步清理：pnpm-lock.yaml（pnpm install 重生成）、infra/docker/Dockerfile 两处 COPY、README.md 与 docs/01-assessment.md 包列表、CLAUDE.md 包表（其描述「健康探测」本就与真实内容「circuit-breaker」不符）。边界/typecheck 通过。
 - **P2-02 · 未知错误兜底一律判 retriable** — ✅ 已处理（2026-08-08）——[errors.ts:104](packages/provider-dashscope/src/errors.ts#L104) 兜底改为 `system` 不可重试；同时在兜底前显式识别未包装的网络故障字面（fetch failed / ECONNRESET / ENOTFOUND / getaddrinfo…）为 network 可重试——避免把瞬时网络抖动判成永久失败（task-executor「retries a submit-stage exception even without a providerTaskId」测试守住该契约）。网络/超时/429/5xx/408 都在状态码或关键词层先被标成可重试，兜底只剩代码 bug/未识别 4xx/畸形响应。
 - **P2-03 · 退避算法两处实现不一致** — ✅ 已处理（2026-08-08）——generation-task-handler 与 artifact-task-handler 各自的 `backoffRunAt`（`1000*2**attempt` 上限 60s）删除，统一走 task-engine `nextRunAt(now, attempt)`（base 1s、上限 30s）；thumbnail 本就走 task-engine，全仓唯一实现。`shiftMs` 随删。
-- **P2-04 · artifact-fetch DNS rebinding TOCTOU** —— [artifact-fetch.ts:126-149,358](apps/worker/src/artifact-fetch.ts#L126)：校验与 fetch 两次解析域名，恶意主机可先返回合法 IP 再解析到内网。白名单缓解但未做解析后 IP 固定（已知限制，标注即可）。
+- **P2-04 · artifact-fetch DNS rebinding TOCTOU** — ✅ 已处理（2026-08-08，标注）——[artifact-fetch.ts:358](apps/worker/src/artifact-fetch.ts#L358) fetch 调用处补注释：validateUrl 主机名校验与 fetch 各做一次 DNS 解析存在 TOCTOU 窗口，白名单 + 拒绝 IP 字面量已缩小面但未做「解析后 IP 固定」；产物 URL 来自受信 DashScope 结果域、暂不在 SSRF 威胁面内，升级时再收口。
 - **P2-05 · 损坏的 task 行毒化整个 worker loop** — ✅ 已处理（2026-08-08）——[repository.ts:3071](packages/generation-repository/src/repository.ts#L3071) `claimNextQueuedTask` 内 `toTaskRecord`+`transitionTask('claim')` 包 try/catch：确定性抛错（type/domain 配对错、非法状态）时在同一事务里把该行强制置为 `failed`（errorJson `TASK_CLAIM_INVALID` 携带原错误），返回 undefined；毒行终态化、永不再被选中，排在后面的健康任务照常消费。DB 写入错误仍在事务外抛、交给外层退避。测试：repository.test.ts「force-fails a corrupt task row on claim instead of poisoning the loop」。
 - **P2-06 · thumbnail/media 对瞬时失败无有效重试** — ✅ 已处理（2026-08-08）——新增 [transient-error.ts](apps/worker/src/transient-error.ts) 共享分类器（网络/超时/OSS 节流/5xx），thumbnail 的 `thumbnailErrorFromThrown` 正则与 media 的恒 `retriable:false` 都改用它；media 增加重试路径：瞬时失败且 attempts<maxAttempts 时 `failMediaJob({ retrying:true })`（job 回 queued）并返回 `status:'retry'` + task-engine 退避。测试：media/thumbnail handler 各加 transient→retry、permanent→failed 两例。
 
@@ -520,7 +520,7 @@
 - **位置**：worker `package.json` 声明 `@bailian-studio/event-bus`；api 声明 `@bailian-studio/task-engine`；credit-ledger + media-repository 各声明 `@bailian-studio/shared` + `postgres`；web 声明 `date-fns` —— 各自 src+tests 0 处 import
 - **修法**：删除这 6 条声明。
 
-**R2-P2-15 · provider-health 孤儿包被 Dockerfile 打进镜像**（印证 worker 轮 P2-01）—— [Dockerfile:59,90](infra/docker/Dockerfile#L59) 两处 COPY；降级策略从未接线；`lastErrorMessage` 若未来接线是潜在敏感字段落点。删包或接线并同步 Dockerfile。
+**R2-P2-15 · provider-health 孤儿包被 Dockerfile 打进镜像**（印证 worker 轮 P2-01）— ✅ 已处理（2026-08-08）——随 P2-01 删除整个包，Dockerfile 两处 COPY 移除（见 P2-01 处理记录）。
 **R2-P2-16 · pnpm-lock 双版本 zod（v3.25.76 由 shadcn CLI devDep 拉入 + 业务面 v4.4.3）** —— 仅 dev 依赖树，无运行时冲突，但 `pnpm exec`/类型环境偶发混用。
 **R2-P2-17 · 根 package.json 把 drizzle-kit/tsx/postgres 放 `dependencies`** —— [Dockerfile:95-98](infra/docker/Dockerfile#L95) 依赖它们是 prod 依赖才能进 runtime 镜像，改动需同步。
 **R2-P2-18 · runtime 镜像装进前端依赖** —— [Dockerfile:75-98](infra/docker/Dockerfile#L75) 全量 `pnpm install --prod` 使 runtime node_modules 含 react/recharts（worker/api 用不到）；可用 `--filter` 缩小。

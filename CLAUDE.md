@@ -74,7 +74,6 @@ pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate �
 | auth | argon2id 密码 + JWT 会话（http-only cookie） |
 | storage | local/OSS 存储适配器 |
 | provider-dashscope | DashScope 协议执行（仅 worker 消费） |
-| provider-health | provider 健康探测（worker 心跳/就绪检查） |
 | task-engine | 纯任务状态机 + 退避 |
 | credit-ledger | 积分账本（冻结/结算/释放） |
 | api-client | 前端共享的 zod 契约层（零 `as`） |
