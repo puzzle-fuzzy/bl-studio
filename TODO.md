@@ -473,7 +473,7 @@
 - **修法**：删死阈值 或 给 web 加 `test:coverage` script 并接进 verify。
 
 **R2-P1-12 · 登出数据清理注册表（`registerPrivateDataReset`）无测试**
-- **位置**：[auth-store.ts:16-24](apps/web/src/stores/auth-store.ts#L16)；6 个 store 模块级注册回调（generations/assets/notifications/credits/reference-assets/generation-artifacts）
+> ✅ 已处理（未提交，工作树中）——auth-store.test.ts：导入 6 个注册 store 播种标志数据→resetAllPrivateData 后全部清空（注册表漏掉任一 store 即红）+ allSettled 容错（单个回调 reject 不拖垮整体）。- **位置**：[auth-store.ts:16-24](apps/web/src/stores/auth-store.ts#L16)；6 个 store 模块级注册回调（generations/assets/notifications/credits/reference-assets/generation-artifacts）
 - **影响**：若某 store 忘注册，登出即跨用户残留数据；「每个 store 都注册了」这个不变量无测试保护。
 - **修法**：auth-store.test.ts 断言「注册→resetAllPrivateData→登出后各 store 清空」+「注册表包含预期 store 集合」。
 
