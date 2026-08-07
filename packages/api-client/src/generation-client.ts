@@ -680,6 +680,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         modelId: input.modelId,
         params: input.params,
         ...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
+        ...(input.batchId !== undefined ? { batchId: input.batchId } : {}),
         ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
       }
       return unwrapData(

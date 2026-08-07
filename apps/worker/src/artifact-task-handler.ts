@@ -60,18 +60,29 @@ export async function processArtifactPersistTask(
     return { status: 'succeeded', output }
   } catch (error) {
     const taskError = artifactTaskErrorFromThrown(error)
+    // 下载抖动 / OSS 5xx 属可重试瞬时故障：attempts 未超限时返回 retry，
+    // 由任务状态机重新入队。persistArtifactsForRecord 已把该 artifact 标记为
+    // failed，而 listPendingArtifactsForRecord 会再次捞回 failed 状态，故重试安全。
+    const retrying = taskError.retriable && task.attempts < task.maxAttempts
     deps.logger.error('artifact.persist.failed', {
       taskId: task.id,
       traceId: task.traceId,
       recordId,
       errorCode: taskError.code,
       message: taskError.message,
-      retriable: taskError.retriable,
+      retriable: retrying,
     })
-    deps.metrics?.increment('worker.artifact_persist', { status: 'failed', code: taskError.code ?? 'unknown' })
-    deps.metrics?.increment('worker.artifact_failure', { code: taskError.code ?? 'unknown', retriable: taskError.retriable ? 'true' : 'false' })
-    return { status: 'failed', error: taskError }
+    deps.metrics?.increment('worker.artifact_persist', { status: retrying ? 'retrying' : 'failed', code: taskError.code ?? 'unknown' })
+    deps.metrics?.increment('worker.artifact_failure', { code: taskError.code ?? 'unknown', retriable: retrying ? 'true' : 'false' })
+    return retrying
+      ? { status: 'retry', error: taskError, nextRunAt: backoffRunAt(task.attempts) }
+      : { status: 'failed', error: taskError }
   }
+}
+
+function backoffRunAt(attempt: number): string {
+  const delayMs = Math.min(1000 * 2 ** attempt, 60_000)
+  return new Date(Date.now() + delayMs).toISOString()
 }
 
 function isExpired(createdAt: string, maxDurationMs: number): boolean {

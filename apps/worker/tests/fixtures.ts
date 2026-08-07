@@ -60,6 +60,7 @@ import type {
   ScheduleGenerationPollInput,
   SetGenerationLibraryStateInput,
   StartProviderRequestInput,
+  ListStuckGenerationRecordsInput,
   UpdateGenerationRecordPatch,
   UnifiedAssetItem,
 } from '@bailian-studio/generation-repository'
@@ -150,6 +151,10 @@ export class FakeRepository implements GenerationRepository {
   getGenerationInputAssets(recordId: string): Promise<GenerationInputAsset[]> {
     this.generationInputAssetReads.push(recordId)
     return Promise.resolve([...(this.generationInputAssets.get(recordId) ?? [])])
+  }
+
+  listStuckGenerationRecords(_input?: ListStuckGenerationRecordsInput): Promise<GenerationRecord[]> {
+    return Promise.resolve([])
   }
 
   countGenerationCallsBetween(_since: string, _until: string): Promise<GenerationCallStats> {

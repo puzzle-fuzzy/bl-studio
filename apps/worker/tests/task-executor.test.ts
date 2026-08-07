@@ -474,6 +474,41 @@ describe('TaskExecutor.processTask', () => {
     expect(failedCodes(repo.mutations)).toEqual(['PROVIDER_BUSY'])
   })
 
+  it('fails a retriable provider error immediately for stream-mode tasks (P0-05)', async () => {
+    // stream（chat）请求没有幂等键：provider 可能已处理但响应丢失，重发会重复计费。
+    // 因此即使 error.retriable 且 attempts 未超限，也不重试。
+    const manifest = { ...qwenImage, id: 'qwen-stream-test', taskMode: 'stream' as const }
+    const { repo, runner, processTask } = setup({
+      manifest,
+      record: makeRecord({ modelId: 'qwen-stream-test', inputParams: { prompt: 'hello' } }),
+    })
+    runner.outputs.push({
+      success: false,
+      costCents: 0,
+      requiresPoll: false,
+      error: { code: 'PROVIDER_BUSY', message: 'busy', retryable: true, category: 'provider' },
+    })
+
+    const outcome = await processTask(makeTask({ attempts: 1, maxAttempts: 3 }))
+
+    expect(outcome.status).toBe('failed')
+    expect(failedCodes(repo.mutations)).toEqual(['PROVIDER_BUSY'])
+  })
+
+  it('still retries retriable provider errors for non-stream tasks (P0-05 regression guard)', async () => {
+    const { runner, processTask } = setup()
+    runner.outputs.push({
+      success: false,
+      costCents: 0,
+      requiresPoll: false,
+      error: { code: 'PROVIDER_BUSY', message: 'busy', retryable: true, category: 'provider' },
+    })
+
+    const outcome = await processTask(makeTask({ attempts: 1, maxAttempts: 3 }))
+
+    expect(outcome.status).toBe('retry')
+  })
+
   it('retries a retryable exception by rescheduling the same task', async () => {
     const { repo, runner, logger, processTask } = setup({
       record: makeRecord({ providerTaskId: 'prov_task_1' }),

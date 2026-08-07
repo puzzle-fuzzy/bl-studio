@@ -106,6 +106,9 @@ async function main(): Promise<void> {
         }),
     ...(env.workerLockHeartbeatMs === undefined ? {} : { lockHeartbeatMs: env.workerLockHeartbeatMs }),
     ...(env.workerHeartbeatIntervalMs === undefined ? {} : { workerHeartbeatIntervalMs: env.workerHeartbeatIntervalMs }),
+    ...(env.workerStaleGenerationSweepIntervalMs === undefined
+      ? {}
+      : { staleGenerationSweepIntervalMs: env.workerStaleGenerationSweepIntervalMs }),
     pollIntervalMs: env.workerPollIntervalMs ?? 100,
     idleSleepMs: env.workerIdleSleepMs ?? 1000,
   }

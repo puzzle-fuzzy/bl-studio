@@ -44,6 +44,8 @@ export interface WorkerLoopConfig {
   artifactFetch?: ArtifactFetchPolicy
   /** 更新 worker 存活行的间隔。默认 5s。 */
   workerHeartbeatIntervalMs?: number
+  /** 卡住 generation 记录（任务已终态失败但记录停在 submitting/processing）的清扫间隔。默认 60s。 */
+  staleGenerationSweepIntervalMs?: number
   /** 可选的结构化日志器；默认 createLogger(`worker:<workerId>`)。 */
   logger?: Logger
   /** 可选的进程内指标收集器，用于任务/provider 计数器与计时。 */
@@ -60,6 +62,7 @@ export class WorkerLoop {
   private readonly idleSleepMs: number
   private readonly errorBackoffMs: number
   private readonly workerHeartbeatIntervalMs: number
+  private readonly staleGenerationSweepIntervalMs: number
   private readonly metrics: MetricsCollector
 
   constructor(private readonly config: WorkerLoopConfig) {
@@ -99,12 +102,14 @@ export class WorkerLoop {
     this.idleSleepMs = config.idleSleepMs ?? 1000
     this.errorBackoffMs = config.errorBackoffMs ?? 5_000
     this.workerHeartbeatIntervalMs = config.workerHeartbeatIntervalMs ?? 5_000
+    this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
   }
 
   /** 一直运行直到调用 stop()。优雅停止时 resolve。 */
   async run(): Promise<void> {
     this.running = true
     const stopHeartbeat = this.startWorkerHeartbeat()
+    const stopSweeper = this.startStaleGenerationSweeper()
     try {
       while (this.running) {
         try {
@@ -116,6 +121,7 @@ export class WorkerLoop {
       }
     } finally {
       await stopHeartbeat()
+      stopSweeper()
     }
   }
 
@@ -186,6 +192,47 @@ export class WorkerLoop {
     }
   }
 
+  /** 周期清扫「任务已终态失败/取消、记录仍卡在 submitting/processing」的 generation。 */
+  private startStaleGenerationSweeper(): () => void {
+    if (this.config.repository.listStuckGenerationRecords === undefined) {
+      return () => {}
+    }
+    const timer = setInterval(() => {
+      void this.sweepStaleGenerations()
+    }, this.staleGenerationSweepIntervalMs)
+    return () => clearInterval(timer)
+  }
+
+  private async sweepStaleGenerations(): Promise<void> {
+    const repo = this.config.repository
+    const listStuck = repo.listStuckGenerationRecords
+    if (listStuck === undefined) return
+    let records
+    try {
+      records = await listStuck.call(repo, { now: currentIso() })
+    } catch (error) {
+      this.logger.error('stale_generations.list_failed', { error: errorMessage(error) })
+      return
+    }
+    for (const record of records) {
+      try {
+        await repo.failGeneration({
+          recordId: record.id,
+          error: {
+            category: 'system',
+            message: 'Generation was swept because its task reached a terminal failure state but the record was left in flight',
+            retriable: false,
+            code: 'GENERATION_STALE_SWEPT',
+          },
+          now: currentIso(),
+        })
+        this.logger.warn('stale_generations.swept', { recordId: record.id, userId: record.userId })
+      } catch (error) {
+        this.logger.error('stale_generations.fail_failed', { recordId: record.id, error: errorMessage(error) })
+      }
+    }
+  }
+
   private async processOnce(): Promise<void> {
     const now = new Date()
     const lockedUntil = new Date(now.getTime() + this.lockDurationMs)
@@ -220,10 +267,11 @@ export class WorkerLoop {
       await lease.stop()
       if (lease.isLost()) return
 
+      const taskError = thrownToTaskError(error)
       try {
         await this.saveTaskIfOwned(task, transitionTask(task, {
           type: 'fail',
-          error: thrownToTaskError(error),
+          error: taskError,
           now: currentIso(),
         }))
       } catch (persistError) {
@@ -233,6 +281,27 @@ export class WorkerLoop {
           recordId: task.recordId,
           error: errorMessage(persistError),
         })
+      }
+      // P0-04：异常穿透到 catch（如 DB 抖动导致 getGenerationRecord 抛错）时，
+      // 任务已 fail，但 generation 记录可能仍停在 submitting/processing——积分预扣
+      // 永不释放、用户看到永久 pending。尽力同步记录终态 + 退款；failGeneration 对
+      // 已终态记录幂等（直接返回），因此重复调用安全。失败只记日志（DB 全挂时
+      // 这里也会失败，由 stale-generations 清扫兜底）。
+      if (task.domain === 'generation' && task.recordId !== undefined) {
+        try {
+          await this.config.repository.failGeneration({
+            recordId: task.recordId,
+            error: taskError,
+            now: currentIso(),
+          })
+        } catch (recordError) {
+          this.logger.error('generation.record_fail_failed', {
+            taskId: task.id,
+            traceId: task.traceId,
+            recordId: task.recordId,
+            error: errorMessage(recordError),
+          })
+        }
       }
        this.logger.error('task.threw', { taskId: task.id, traceId: task.traceId, recordId: task.recordId, error: errorMessage(error) })
     }

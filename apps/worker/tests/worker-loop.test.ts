@@ -123,6 +123,33 @@ describe('WorkerLoop', () => {
     expect(repo.savedTasks[0]?.status).toBe('failed')
   })
 
+  it('fails the generation record in addition to the task when execution throws (P0-04)', async () => {
+    const { loop, repo, logger } = buildLoop()
+
+    // DB 抖动让 getGenerationRecord 抛错 → 异常穿透到 runTask catch。
+    // 任务应 fail，generation 记录也必须尽力 fail（否则积分预扣永不释放）。
+    repo.getGenerationRecord = () => Promise.reject(new Error('connection reset'))
+    await loop.runTask(makeTask({ recordId: 'rec_stuck' }))
+
+    expect(repo.savedTasks[0]?.status).toBe('failed')
+    const failMutation = repo.mutations.find(m => m.kind === 'fail')
+    expect(failMutation).toBeDefined()
+    if (failMutation?.kind === 'fail') {
+      expect(failMutation.input.recordId).toBe('rec_stuck')
+    }
+    expect(logger.entries.some(e => e.message === 'generation.record_fail_failed')).toBe(false)
+  })
+
+  it('does not fail a generation record for non-generation domains (P0-04)', async () => {
+    const { loop, repo } = buildLoop()
+
+    repo.listPendingArtifactsForRecord = () => Promise.reject(new Error('connection reset'))
+    await loop.runTask(makeTask({ type: 'artifact.persist', domain: 'artifact' }))
+
+    expect(repo.savedTasks[0]?.status).toBe('failed')
+    expect(repo.mutations.some(m => m.kind === 'fail')).toBe(false)
+  })
+
   it('persists malformed task input as a stable validation failure', async () => {
     const { loop, repo, logger } = buildLoop()
 
@@ -135,6 +162,24 @@ describe('WorkerLoop', () => {
       status: 'failed',
       errorJson: { code: 'TASK_RECORD_ID_INVALID', category: 'validation' },
     })
+  })
+
+  it('sweeps stuck generation records whose task already failed (P0-04)', async () => {
+    const { loop, repo } = buildLoop({ staleGenerationSweepIntervalMs: 1 })
+    repo.listStuckGenerationRecords = () =>
+      Promise.resolve([makeRecord({ id: 'rec_stuck', status: 'processing' })])
+
+    const running = loop.run()
+    await new Promise(resolve => setTimeout(resolve, 20))
+    loop.stop()
+    await resolveWithin(running, 500)
+
+    const failMutation = repo.mutations.find(m => m.kind === 'fail')
+    expect(failMutation).toBeDefined()
+    if (failMutation?.kind === 'fail') {
+      expect(failMutation.input.recordId).toBe('rec_stuck')
+      expect(failMutation.input.error.code).toBe('GENERATION_STALE_SWEPT')
+    }
   })
 
   it('stops a running loop that has no claimable tasks', async () => {

@@ -50,7 +50,7 @@ function ScreenplayTool() {
           assetKindLabel="视频"
           model={model?.id}
           modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(modelId, { videoUrl: asset.url ?? '' })}
+          run={(asset, modelId) => runGeneration(modelId, { videoUrl: [asset.id] })}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -75,7 +75,7 @@ function AsrTool() {
           assetKindLabel="音频"
           model={model?.id}
           modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(modelId, { audioUrl: asset.url ?? '' })}
+          run={(asset, modelId) => runGeneration(modelId, { fileUrls: [asset.id] })}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -225,11 +225,10 @@ function TextTool({
     if (asset === null || model === undefined) return
     setBusy(true)
     try {
-      const payload = { modelId: model, params: {}, assetRefs: {} }
-      const idempotencyKey = idempotencyKeyFor(payload)
-      const response = await apiClient.createGeneration({ ...payload, idempotencyKey })
-      clearIdempotencyKey(payload)
-      setResult(response.record)
+      // run 回调负责把所选素材按模型 manifest 的媒体参数名组装为 assetRefs，
+      // 幂等指纹也在其中处理（与 CreatePage 提交路径一致）。
+      const record = await run(asset, model)
+      setResult(record)
     } catch (error) {
       showMessage({ title: userErrorMessage(error), tone: 'warning' })
     } finally {
@@ -255,8 +254,8 @@ function TextTool({
   )
 }
 
-async function runGeneration(modelId: string, params: Record<string, unknown>): Promise<GenerationRecord> {
-  const payload = { modelId, params, assetRefs: {} }
+async function runGeneration(modelId: string, assetRefs: Record<string, string[]>): Promise<GenerationRecord> {
+  const payload = { modelId, params: {}, assetRefs }
   const idempotencyKey = idempotencyKeyFor(payload)
   const response = await apiClient.createGeneration({ ...payload, idempotencyKey })
   clearIdempotencyKey(payload)

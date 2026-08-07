@@ -20,6 +20,7 @@ export interface WorkerEnv {
   readonly artifactFetchAllowedHosts?: readonly string[]
   readonly workerLockHeartbeatMs?: number
   readonly workerHeartbeatIntervalMs?: number
+  readonly workerStaleGenerationSweepIntervalMs?: number
 }
 
 type EnvironmentSource = Readonly<Record<string, string | undefined>>
@@ -51,6 +52,7 @@ export function readWorkerEnv(
   const artifactFetchAllowedHosts = optionalHostList(source['ARTIFACT_FETCH_ALLOWED_HOSTS'])
   const workerLockHeartbeatMs = optionalPositiveInteger(source['WORKER_LOCK_HEARTBEAT_MS'], 'WORKER_LOCK_HEARTBEAT_MS')
   const workerHeartbeatIntervalMs = optionalPositiveInteger(source['WORKER_HEARTBEAT_INTERVAL_MS'], 'WORKER_HEARTBEAT_INTERVAL_MS')
+  const workerStaleGenerationSweepIntervalMs = optionalPositiveInteger(source['WORKER_STALE_GENERATION_SWEEP_INTERVAL_MS'], 'WORKER_STALE_GENERATION_SWEEP_INTERVAL_MS')
 
   if (localeValue !== 'zh-CN' && localeValue !== 'en-US') {
     throw configError(
@@ -85,6 +87,7 @@ export function readWorkerEnv(
     ...(artifactFetchAllowedHosts === undefined ? {} : { artifactFetchAllowedHosts }),
     ...(workerLockHeartbeatMs === undefined ? {} : { workerLockHeartbeatMs }),
     ...(workerHeartbeatIntervalMs === undefined ? {} : { workerHeartbeatIntervalMs }),
+    ...(workerStaleGenerationSweepIntervalMs === undefined ? {} : { workerStaleGenerationSweepIntervalMs }),
   })
 }
 

@@ -172,7 +172,7 @@ export async function processGenerationTask(
             error: providerRequestError(result.error),
           }, deps)
       recordProviderMetrics(deps.metrics, operation, result.success ? 'succeeded' : 'failed', Date.now() - auditStartedAt)
-      return applyProviderResult(record, task, result, deps)
+      return applyProviderResult(record, task, result, manifest, deps)
     } catch (error) {
       const info = classifyThrownProviderError(error)
       await finishProviderRequestAudit(audit, auditStartedAt, {
@@ -200,6 +200,7 @@ async function applyProviderResult(
   record: GenerationRecord,
   task: TaskRecord,
   result: ProviderExecuteOutput,
+  manifest: { readonly taskMode: string },
   deps: GenerationTaskHandlerDeps,
 ): Promise<TaskProcessOutcome> {
   const now = currentIso()
@@ -298,7 +299,12 @@ async function applyProviderResult(
   }
 
   const error = providerErrorToTaskError(result.error)
-  if (error.retriable && task.attempts < task.maxAttempts) {
+  // P0-05：stream（chat）任务不重试——这类请求没有幂等键，超时/断流时 provider 可能
+  // 已处理但响应丢失，重发整条 prompt 会重复计费（异步 submit 有幂等键兜底，这里没有）。
+  // stream 产物是文本、成本低，直接 fail 优于冒险重试。如需在起点失败时安全重试，
+  // 应先在 provider 侧返回「是否已消费任何 token」的信号。
+  const retriable = error.retriable && manifest.taskMode !== 'stream'
+  if (retriable && task.attempts < task.maxAttempts) {
     const nextRunAt = backoffRunAt(task.attempts)
     deps.logger.warn('task.retry', {
       taskId: task.id,

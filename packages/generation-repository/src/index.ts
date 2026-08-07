@@ -23,6 +23,7 @@ export {
   type GenerationUsageInput,
   type GenerationEstimate,
   type GenerationRepository,
+  type ListStuckGenerationRecordsInput,
   type RenewTaskLockInput,
   type SaveTaskOptions,
 } from './repository'
