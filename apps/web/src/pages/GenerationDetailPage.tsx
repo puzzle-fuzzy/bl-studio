@@ -22,7 +22,8 @@ import { userErrorMessage } from '@/lib/user-error'
 import { describeGenerationFailure } from '@/lib/generation-failure'
 import { formatCents } from '@/lib/money'
 import { resolveApiUrl } from '@/lib/api'
-import { parsePromptReferences } from '@/lib/reference-format'
+import { parsePromptReferences, referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
+import { generationMirrorAssetId, pickImageEditModel, supportsUpscaleSize } from '@/lib/edit-model'
 import { encodeDeepLinkParams } from '@/lib/deeplink-params'
 import { ACTIVE_GENERATION_STATUSES, generationStatusLabel, kindLabel } from '@/lib/labels'
 import { cn } from '@/lib/utils'
@@ -33,6 +34,11 @@ export function GenerationDetailPage() {
   const navigate = useNavigate()
   const showMessage = useNotificationsStore(state => state.showMessage)
   const refreshRecord = useGenerationsStore(state => state.refreshRecord)
+  // P1-04：详情页记录跟随 store —— SSE/降级轮询把最新 record 合并进 store.records 后，
+  // 这里取到的对象引用随之更新，页面开着也能看到 queued→succeeded 全过程。
+  const storeRecord = useGenerationsStore(state =>
+    id !== undefined ? state.records.find(candidate => candidate.id === id) ?? null : null,
+  )
   const [record, setRecord] = useState<GenerationRecord | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -41,6 +47,7 @@ export function GenerationDetailPage() {
     if (id === undefined) return
     setIsLoading(true)
     setError(null)
+    setRecord(null)
     apiClient
       .getGeneration(id)
       .then(setRecord)
@@ -48,7 +55,12 @@ export function GenerationDetailPage() {
       .finally(() => setIsLoading(false))
   }, [id])
 
-  if (isLoading) {
+  // 从 store 同步最新状态到本地渲染；无对应记录（如 store 被视图切换清空）时保持本地值。
+  useEffect(() => {
+    if (storeRecord !== null) setRecord(storeRecord)
+  }, [storeRecord])
+
+  if (isLoading && record === null) {
     return <div className="py-16 text-center text-sm text-muted-foreground">加载中…</div>
   }
   if (error !== null || record === null) {
@@ -138,7 +150,12 @@ function DetailContent({
   const handleSavePrompt = async () => {
     setBusy(true)
     try {
-      const prompt = typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : ''
+      // P1-06：落库前把 provider 语法（`<<<image_1>>>`）反解析回中性 `@图N` 标记，
+      // 复用时编辑器按标记渲染参考图 chip，而不是显示语法原文。
+      const models = useModelCatalogStore.getState().models
+      const format = referenceFormatOf(selectModelById(models, record.modelId))
+      const rawPrompt = typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : ''
+      const prompt = restorePromptReferences(rawPrompt, format)
       await apiClient.createPromptLibraryItem({
         name: `${record.modelId} 作品`,
         modelId: record.modelId,
@@ -528,6 +545,7 @@ function ArtifactCard({
   onPreview: () => void
 }) {
   const navigate = useNavigate()
+  const models = useModelCatalogStore(state => state.models)
   const src = artifact.readUrl ?? artifact.storageUrl ?? artifact.sourceUrl
   if (artifact.kind === 'text') {
     return (
@@ -537,7 +555,10 @@ function ArtifactCard({
     )
   }
   // 生成产物会镜像成 user_asset（id = asset_generation_<artifact>），可作编辑/参考图输入。
-  const assetId = `asset_generation_${artifact.id}`
+  const assetId = generationMirrorAssetId(artifact.id)
+  // P1-12：编辑目标模型按 capabilities 从目录派生，而非硬编码 qwen-image-edit。
+  const editModel = pickImageEditModel(models)
+  const upscaleAvailable = supportsUpscaleSize(editModel)
   const upscaleParams = encodeDeepLinkParams({ prompt: '高清重绘放大', size: '2048*2048' })
   return (
     <div className="group relative aspect-video overflow-hidden rounded-lg border">
@@ -583,20 +604,35 @@ function ArtifactCard({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="start">
           <DropdownMenuLabel>以图继续创作</DropdownMenuLabel>
-          <DropdownMenuItem onClick={() => navigate(`/create?select=qwen-image-edit&edit=${assetId}`)}>
-            图像编辑（重绘/换背景/增删物体）
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate(`/create?ref=${assetId}`)}>
-            用作参考图生成变体
-          </DropdownMenuItem>
-          <DropdownMenuItem onClick={() => navigate(`/create?select=qwen-image-edit&edit=${assetId}&params=${upscaleParams}`)}>
-            放大（编辑模型重绘到 2048×2048）
-          </DropdownMenuItem>
+          {editModel !== undefined ? (
+            <>
+              <DropdownMenuItem onClick={() => navigate(`/create?select=${editModel.id}&edit=${assetId}`)}>
+                图像编辑（重绘/换背景/增删物体）
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => navigate(`/create?ref=${assetId}`)}>
+                用作参考图生成变体
+              </DropdownMenuItem>
+              {upscaleAvailable && (
+                <DropdownMenuItem onClick={() => navigate(`/create?select=${editModel.id}&edit=${assetId}&params=${upscaleParams}`)}>
+                  放大（{editModel.displayName} 重绘到 2048×2048）
+                </DropdownMenuItem>
+              )}
+            </>
+          ) : (
+            <DropdownMenuItem onClick={() => navigate(`/create?ref=${assetId}`)}>
+              用作参考图生成变体
+            </DropdownMenuItem>
+          )}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>
   )
 }
+
+// P1-14：record.assetRefs/inputParams 缺省时的稳定空值。`?? {}` 每次渲染产生新对象，
+// 会经 refIds memo → effect 依赖造成「每渲染重跑 loadModels/getRefAssets」。
+const EMPTY_ASSET_REFS: Record<string, string[]> = {}
+const EMPTY_INPUT_PARAMS: Record<string, unknown> = {}
 
 function ParamsCard({ record }: { record: GenerationRecord }) {
   const models = useModelCatalogStore(state => state.models)
@@ -606,8 +642,8 @@ function ParamsCard({ record }: { record: GenerationRecord }) {
 
   const model = selectModelById(models, record.modelId)
   const format = model?.referenceFormat
-  const assetRefs = record.assetRefs ?? {}
-  const inputParams = record.inputParams ?? {}
+  const assetRefs = record.assetRefs ?? EMPTY_ASSET_REFS
+  const inputParams = record.inputParams ?? EMPTY_INPUT_PARAMS
 
   // 英文参数名 → manifest 中文 label；未命中的回退显示原 key。
   const labelMap = useMemo(() => {

@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
+import { resolvePostLoginRedirect } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -38,7 +39,8 @@ export function AuthDialog() {
     try {
       if (mode === 'login') {
         await login(email, password)
-        const target = callback ?? '/create'
+        // P1-11：cb 回跳过白名单校验，非法值 fail-closed 回退 /create。
+        const target = resolvePostLoginRedirect(callback, '/create', [window.location.origin])
         close()
         navigate(target)
       } else {

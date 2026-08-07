@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { PublicUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { clearIdempotencyKeys } from '@/lib/idempotency'
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
 
@@ -22,6 +23,10 @@ export function registerPrivateDataReset(fn: () => void | Promise<void>): void {
 export async function resetAllPrivateData(): Promise<void> {
   await Promise.allSettled([...privateDataResets].map(fn => fn()))
 }
+
+// P1-07：幂等指纹缓存是模块级跨用户残留——登出时一并清空，防止用户 A 失败后
+// 用户 B 提交相同 payload 复用同一 idempotencyKey。
+registerPrivateDataReset(clearIdempotencyKeys)
 
 interface AuthState {
   status: AuthStatus

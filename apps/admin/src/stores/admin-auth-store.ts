@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { PublicUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 
 export type AuthStatus = 'unknown' | 'authenticated' | 'anonymous'
 
@@ -52,7 +53,8 @@ export const useAdminAuthStore = create<AdminAuthState>(set => ({
       }
       set({ status: 'authenticated', user })
     } catch (error) {
-      set({ lastError: error instanceof Error ? error.message : String(error) })
+      // P1-13：错误走 user-error 映射，避免原始 message 泄漏到 lastError。
+      set({ lastError: userErrorMessage(error) })
       throw error
     } finally {
       set({ isPending: false })

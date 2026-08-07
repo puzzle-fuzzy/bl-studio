@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
+import { userErrorMessage } from '@/lib/user-error'
 
 /** 管理后台登录：仅邮箱/密码（复用主站会话）。 */
 export function LoginPage() {
@@ -24,7 +25,8 @@ export function LoginPage() {
       await login(email, password)
       navigate('/users', { replace: true })
     } catch (err) {
-      setError(err instanceof Error ? err.message : '登录失败')
+      // P1-13：错误走 user-error 映射，避免原始 message（可能含内部信息）泄漏到 UI。
+      setError(userErrorMessage(err))
     }
   }
 

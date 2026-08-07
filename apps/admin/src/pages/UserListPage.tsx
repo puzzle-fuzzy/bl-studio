@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { ChevronLeft, ChevronRight, Loader2, Search, UserPlus } from 'lucide-react'
 import type { AdminUser } from '@bailian-studio/api-client'
@@ -54,19 +54,24 @@ export function UserListPage() {
   const [grantBusy, setGrantBusy] = useState(false)
   const [grantError, setGrantError] = useState<string | null>(null)
 
+  /** 请求序号：搜索词/翻页快速切换时，旧响应晚到不得覆盖新结果（P1-08）。 */
+  const requestSeq = useRef(0)
+
   const load = useCallback(async (pageNo: number) => {
+    const seq = ++requestSeq.current
     setLoading(true)
     setError(null)
     setSelected(new Set())
     try {
       const result = await apiClient.listAdminUsers({ q: q || undefined, page: pageNo, pageSize: PAGE_SIZE })
+      if (seq !== requestSeq.current) return
       setItems(result.items)
       setTotal(result.total ?? 0)
       setPage(pageNo)
     } catch (err) {
-      setError(userErrorMessage(err))
+      if (seq === requestSeq.current) setError(userErrorMessage(err))
     } finally {
-      setLoading(false)
+      if (seq === requestSeq.current) setLoading(false)
     }
   }, [q])
 

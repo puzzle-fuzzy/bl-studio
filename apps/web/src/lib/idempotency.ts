@@ -56,3 +56,8 @@ export function idempotencyKeyFor(payload: IdempotencyPayload): string {
 export function clearIdempotencyKey(payload: IdempotencyPayload): void {
   fingerprintToKey.delete(payloadFingerprint(payload))
 }
+
+/** 清空全部指纹缓存。登出时调用，避免跨用户复用同一幂等键（P1-07）。 */
+export function clearIdempotencyKeys(): void {
+  fingerprintToKey.clear()
+}

@@ -23,6 +23,8 @@ export function UserDetailPage() {
   const [user, setUser] = useState<AdminUser | null>(null)
   const [balance, setBalance] = useState<CreditBalance | null>(null)
   const [assets, setAssets] = useState<AssetItem[]>([])
+  const [assetCursor, setAssetCursor] = useState<string | undefined>(undefined)
+  const [assetsLoadingMore, setAssetsLoadingMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -49,12 +51,28 @@ export function UserDetailPage() {
       setUser(detail.user)
       setBalance(detail.balance)
       setAssets(assetPage.items)
+      setAssetCursor(assetPage.nextCursor)
     } catch (err) {
       setError(userErrorMessage(err))
     } finally {
       setLoading(false)
     }
   }, [userId])
+
+  // P1-15：大账户资产可继续翻页，不再被首屏 50 条截断无法完整审计。
+  const loadMoreAssets = async () => {
+    if (assetCursor === undefined || assetsLoadingMore) return
+    setAssetsLoadingMore(true)
+    try {
+      const page = await apiClient.adminListUserAssets(userId, { limit: 50, cursor: assetCursor })
+      setAssets(current => [...current, ...page.items])
+      setAssetCursor(page.nextCursor)
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setAssetsLoadingMore(false)
+    }
+  }
 
   useEffect(() => {
     void load()
@@ -207,17 +225,18 @@ export function UserDetailPage() {
           </div>
 
           <div className="grid grid-cols-3 gap-4 border-t pt-4 text-center">
+            {/* P1-09：账本字段即积分（1 积分 = 1 分），不再除 100 —— 之前把 5000 积分显示成 50。 */}
             <div>
               <p className="text-xs text-muted-foreground">可用积分</p>
-              <p className="text-lg font-semibold">{(balance?.availableCents ?? 0) / 100}</p>
+              <p className="text-lg font-semibold">{balance?.availableCents ?? 0}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">冻结积分</p>
-              <p className="text-lg font-semibold">{(balance?.reservedCents ?? 0) / 100}</p>
+              <p className="text-lg font-semibold">{balance?.reservedCents ?? 0}</p>
             </div>
             <div>
               <p className="text-xs text-muted-foreground">总积分</p>
-              <p className="text-lg font-semibold">{(balance?.totalCents ?? 0) / 100}</p>
+              <p className="text-lg font-semibold">{balance?.totalCents ?? 0}</p>
             </div>
           </div>
         </CardContent>
@@ -231,31 +250,40 @@ export function UserDetailPage() {
           {assets.length === 0 ? (
             <p className="text-sm text-muted-foreground">该用户暂无资产</p>
           ) : (
-            <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8">
-              {assets.map(asset => (
-                <a
-                  key={asset.id}
-                  href={resolveApiUrl(asset.url)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="group relative aspect-square overflow-hidden rounded-md border"
-                  title={asset.fileName ?? asset.id}
-                >
-                  {(asset.kind === 'image' || asset.kind === 'video') && (asset.thumbnailUrl ?? asset.url) ? (
-                    <img
-                      src={resolveApiUrl(asset.thumbnailUrl ?? asset.url)}
-                      alt={asset.fileName ?? asset.id}
-                      loading="lazy"
-                      className="size-full object-cover"
-                    />
-                  ) : (
-                    <div className="flex size-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
-                      {asset.kind}
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8">
+                {assets.map(asset => (
+                  <a
+                    key={asset.id}
+                    href={resolveApiUrl(asset.url)}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="group relative aspect-square overflow-hidden rounded-md border"
+                    title={asset.fileName ?? asset.id}
+                  >
+                    {(asset.kind === 'image' || asset.kind === 'video') && (asset.thumbnailUrl ?? asset.url) ? (
+                      <img
+                        src={resolveApiUrl(asset.thumbnailUrl ?? asset.url)}
+                        alt={asset.fileName ?? asset.id}
+                        loading="lazy"
+                        className="size-full object-cover"
+                      />
+                    ) : (
+                      <div className="flex size-full items-center justify-center bg-muted/40 text-xs text-muted-foreground">
+                        {asset.kind}
+                      </div>
+                    )}
+                  </a>
+                ))}
+              </div>
+              {assetCursor !== undefined && (
+                <div className="flex justify-center pt-3">
+                  <Button variant="outline" size="sm" disabled={assetsLoadingMore} onClick={() => void loadMoreAssets()}>
+                    {assetsLoadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </CardContent>
       </Card>

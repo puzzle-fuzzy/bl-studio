@@ -171,6 +171,7 @@ function PageVariant() {
   const isLoadingMore = useGenerationsStore(state => state.isLoadingMore)
   const load = useGenerationsStore(state => state.load)
   const loadMore = useGenerationsStore(state => state.loadMore)
+  const viewFilters = useGenerationsStore(state => state.viewFilters)
   const setViewFilters = useGenerationsStore(state => state.setViewFilters)
   const setLibraryState = useGenerationsStore(state => state.setLibraryState)
 
@@ -184,7 +185,8 @@ function PageVariant() {
 
   return (
     <div className="space-y-3">
-      <GenerationStatusFilter onFiltersChange={setViewFilters} />
+      {/* P1-05：value 从 store viewFilters 回传，筛选选中态不再被复位。 */}
+      <GenerationStatusFilter value={viewFilters} onFiltersChange={setViewFilters} />
       <div className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden rounded-lg border">
         {records.length === 0 ? (
           // R2-P1-07：空列表区分「加载中 / 加载失败 / 真没有任务」三种情况。

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
+import { resolvePostLoginRedirect } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -54,7 +55,8 @@ export function LoginPage() {
         navigate(verificationRequired ? '/auth/check-email' : '/create')
         return
       }
-      navigate(callback ?? '/create')
+      // P1-11：cb 回跳过白名单校验（防开放重定向），非法值 fail-closed 回退 /create。
+      navigate(resolvePostLoginRedirect(callback, '/create', [window.location.origin]))
     } catch (err) {
       setError(userErrorMessage(err))
     }
