@@ -283,6 +283,25 @@ describe('createApiClient', () => {
     }))
   })
 
+  it('passes batchId through to the request body for compare-mode grouping', async () => {
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await client.createGeneration({
+      modelId: 'qwen-image',
+      params: { prompt: 'lantern' },
+      batchId: 'batch_compare_1',
+    })
+
+    expect(calls[0]?.body).toEqual(JSON.stringify({
+      modelId: 'qwen-image',
+      params: { prompt: 'lantern' },
+      batchId: 'batch_compare_1',
+    }))
+  })
+
   it('parses the estimate success envelope used by the API route', async () => {
     const { fetch, calls } = queuedFetch([jsonResponse({
       success: true,
@@ -743,7 +762,8 @@ describe('createApiClient', () => {
   it('registers without a session and completes the verified email lifecycle', async () => {
     const registration: RegistrationResult = {
       status: 'verification_required',
-      email: 'a***@b.test',
+      email: 'a@b.test',
+      displayEmail: '***@b.test',
       resendAvailableAt: '2026-07-25T00:01:00.000Z',
     }
     const { fetch, calls } = queuedFetch([

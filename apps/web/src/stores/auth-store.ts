@@ -26,7 +26,10 @@ export async function resetAllPrivateData(): Promise<void> {
 interface AuthState {
   status: AuthStatus
   user: PublicUser | null
+  /** 注册后待验证的原始邮箱：重发验证邮件用（R2-P0-01，必须是真实邮箱）。 */
   pendingVerificationEmail: string | null
+  /** 注册后待验证邮箱的掩码展示值（如 j***@163.com），仅供渲染。 */
+  pendingVerificationDisplayEmail: string | null
   isPending: boolean
   lastError: string | null
 
@@ -53,6 +56,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   status: 'unknown',
   user: null,
   pendingVerificationEmail: null,
+  pendingVerificationDisplayEmail: null,
   isPending: false,
   lastError: null,
 
@@ -88,7 +92,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         displayName,
       })
       if (result.status === 'verification_required') {
-        set({ pendingVerificationEmail: result.email })
+        // R2-P0-01：存原始邮箱（重发用）+ 掩码展示值（渲染用），二者分离。
+        set({
+          pendingVerificationEmail: result.email,
+          pendingVerificationDisplayEmail: result.displayEmail,
+        })
         return true
       }
       return false
@@ -102,7 +110,12 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async verifyEmail(token) {
     const user = await apiClient.verifyEmail({ token })
-    set({ status: 'authenticated', user, pendingVerificationEmail: null })
+    set({
+      status: 'authenticated',
+      user,
+      pendingVerificationEmail: null,
+      pendingVerificationDisplayEmail: null,
+    })
   },
 
   async resendVerification(email) {

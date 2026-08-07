@@ -43,7 +43,8 @@ export function createFakeAuthService(
     },
     register: async () => ({
       status: 'verification_required',
-      email: 'u***@e.test',
+      email: 'user@e.test',
+      displayEmail: 'u***@e.test',
       resendAvailableAt: '2026-07-25T00:01:00.000Z',
     }),
     verifyEmail: async () => {

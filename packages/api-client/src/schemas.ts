@@ -492,7 +492,10 @@ export const AuthResponseSchema = z.object({
 
 export const RegistrationResultSchema = z.object({
   status: z.literal('verification_required'),
+  /** 原始邮箱（供持久化 + 重发）。 */
   email: z.string(),
+  /** 掩码邮箱（如 j***@163.com），仅供展示，不可用于重发。 */
+  displayEmail: z.string(),
   resendAvailableAt: z.string(),
 })
 

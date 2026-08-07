@@ -64,7 +64,8 @@ describe('auth service', () => {
 
     expect(result).toMatchObject({
       status: 'verification_required',
-      email: 'p*****g@x.test',
+      email: 'pending@x.test',
+      displayEmail: 'p*****g@x.test',
     })
     expect(emailSender.verifications.at(-1)?.to).toBe('pending@x.test')
     expect(emailSender.verifications.at(-1)?.url?.startsWith(
@@ -118,6 +119,32 @@ describe('auth service', () => {
       code: 'AUTH_TOKEN_CONSUMED',
     })
     await expect(handle.authService.verifyEmail(secondToken)).resolves.toBeDefined()
+  })
+
+  it('returns the real email for resend and a masked displayEmail only (R2-P0-01 regression)', async () => {
+    const result = await handle.authService.register({
+      email: 'resend-flow@x.test',
+      password: 'password1',
+    })
+    // 真实邮箱可回传（用户自己刚提交的，无泄漏风险），掩码只存在于 displayEmail。
+    expect(result.email).toBe('resend-flow@x.test')
+    expect(result.displayEmail).toBe('r*********w@x.test')
+    expect(result.displayEmail).not.toBe(result.email)
+
+    const firstToken = tokenFrom(emailSender.verifications.at(-1)!.url)
+    nowMs += 61_000
+    // 前端正是拿 register 返回的 email 字段去重发 —— 此前返回的是掩码，这里必然查无此人。
+    const accepted = await handle.authService.resendVerification(result.email)
+    expect(accepted.accepted).toBe(true)
+    const secondToken = tokenFrom(emailSender.verifications.at(-1)!.url)
+    expect(secondToken).not.toBe(firstToken)
+
+    // 用 displayEmail（掩码）重发必须静默接受但不产生新邮件（防枚举兜底，不能真发信）。
+    const beforeCount = emailSender.verifications.length
+    nowMs += 61_000
+    const masked = await handle.authService.resendVerification(result.displayEmail)
+    expect(masked).toEqual({ accepted: true })
+    expect(emailSender.verifications.length).toBe(beforeCount)
   })
 
   it('rejects expired verification tokens', async () => {

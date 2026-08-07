@@ -85,7 +85,10 @@ export interface VerifiedSession {
 
 export interface RegistrationResult {
   status: 'verification_required'
+  /** 原始（规范化后）邮箱：供前端持久化并用于重发验证邮件。 */
   email: string
+  /** 掩码展示用邮箱（如 j***@163.com），只允许渲染，不可回传。 */
+  displayEmail: string
   resendAvailableAt: string
 }
 
@@ -435,9 +438,13 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       }
 
       await sendVerification(user, { rawToken, expiresAt })
+      // R2-P0-01：email 返回原始邮箱（用户自己刚提交的，回传无泄漏风险），供前端
+      // 持久化并用于重发；displayEmail 是掩码，仅供展示。此前这里直接返回掩码，
+      // 前端拿它去重发 → findActiveUserByEmail(掩码) 查无此人 → 假成功、验证邮件永不到达。
       return {
         status: 'verification_required',
-        email: maskEmail(email),
+        email,
+        displayEmail: maskEmail(email),
         resendAvailableAt: resendAvailableAt.toISOString(),
       }
     },

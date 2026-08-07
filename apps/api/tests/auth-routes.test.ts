@@ -123,12 +123,21 @@ describe('auth routes', () => {
     const text = await response.text()
     const body = JSON.parse(text) as {
       success: true
-      data: { registration: { status: string; email: string; resendAvailableAt: string } }
+      data: {
+        registration: {
+          status: string
+          email: string
+          displayEmail: string
+          resendAvailableAt: string
+        }
+      }
     }
 
     expect(response.status).toBe(200)
     expect(body.data.registration.status).toBe('verification_required')
-    expect(body.data.registration.email).toBe('r***e@x.test')
+    // R2-P0-01：email 是真实邮箱（供重发），掩码只出现在 displayEmail（仅供展示）。
+    expect(body.data.registration.email).toBe('route@x.test')
+    expect(body.data.registration.displayEmail).toBe('r***e@x.test')
     expect(response.headers.get('set-cookie')).toBeNull()
     expect(text).not.toContain(tokenFrom(sender.verifications.at(-1)!.url))
     expect(text).not.toContain(sender.verifications.at(-1)!.url)

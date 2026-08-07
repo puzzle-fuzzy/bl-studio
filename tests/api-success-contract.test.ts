@@ -70,7 +70,8 @@ let app: ReturnType<typeof createTestApp>['app']
 const contractAuthService: AuthService = {
   register: async () => ({
     status: 'verification_required',
-    email: 'a***********@example.test',
+    email: 'contract-user@example.test',
+    displayEmail: 'c***********r@example.test',
     resendAvailableAt: '2026-07-25T00:01:00.000Z',
   }),
   verifyEmail: async () => ({ token: 'contract-token', user: CONTRACT_USER, expiresAt: new Date(Date.now() + 3600_000) }),
@@ -254,7 +255,8 @@ describe('API success response contracts', () => {
     expect(response.status).toBe(200)
     expect(data.registration).toEqual({
       status: 'verification_required',
-      email: 'a***********@example.test',
+      email: 'contract-user@example.test',
+      displayEmail: 'c***********r@example.test',
       resendAvailableAt: '2026-07-25T00:01:00.000Z',
     })
     expect(response.headers.get('set-cookie')).toBeNull()
