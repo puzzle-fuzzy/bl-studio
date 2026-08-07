@@ -119,60 +119,72 @@
 - **修法**：未分类错误对客户端只回 `{ code: 'INTERNAL_ERROR', message: 'Internal server error' }`，细节只写服务端日志（配 traceId）。
 
 ### P1-04 · 生成详情页不随 SSE 更新
+> ✅ 已处理（commit `820e76d`，2026-08-08）——详情页记录改为跟随 store：SSE/降级轮询（use-generation-events → refreshRecord）把最新 record 合并进 store.records 后，页面自动同步本地渲染，queued→succeeded 全程可见，无需手动刷新。
 - **位置**：[GenerationDetailPage.tsx:36-49](apps/web/src/pages/GenerationDetailPage.tsx#L36-L49)（record 是本地 state，仅 mount 拉一次）
 - **影响**：页面开着时 queued→succeeded 全程 UI 不动，需手动刷新。
 - **修法**：详情页从 store `records` 取（`records.find(id)`），或 SSE 回写后 setRecord。
 
 ### P1-05 · 任务筛选 ToggleGroup 永远不显示选中态
+> ✅ 已处理（commit `820e76d`，2026-08-08）——PageVariant 把 store `viewFilters` 传入 `value`，筛选按钮选中态跟随真实筛选条件。
 - **位置**：[GenerationsPanel.tsx:158](apps/web/src/components/generations/GenerationsPanel.tsx#L158)（未传 `value`）；[GenerationStatusFilter.tsx:13-25](apps/web/src/components/generations/GenerationStatusFilter.tsx#L13-L25)（`value=[]` 默认）
 - **影响**：筛选确实生效（store 被更新），但按钮被复位，用户误以为没生效。
 - **修法**：PageVariant 读 `viewFilters` 传入 `value`。
 
 ### P1-06 · 提示词库存取 provider 语法，参考图引用丢失
+> ✅ 已处理（commit `820e76d`，2026-08-08）——详情页「保存为提示词」落库前按模型 referenceFormat 用 `restorePromptReferences` 反解析回 `@图N` 中性标记，复用进编辑器渲染为参考图 chip。
 - **位置**：[GenerationDetailPage.tsx:140](apps/web/src/pages/GenerationDetailPage.tsx#L140)（存 `<<<image_1>>>` 形态）；[PromptsPage.tsx:131](apps/web/src/pages/PromptsPage.tsx#L131)（复用深链回填）
 - **影响**：保存/复用后编辑器显示 provider 语法原文、参考图引用失效（表单里是 `@图N` 中性标记）。
 - **修法**：入库存 `@图N` 中性标记（反解析）或原始表单值；复用前做 marker 还原。
 
 ### P1-07 · 幂等指纹缓存不随登出清理（跨用户串 key 窗口）
+> ✅ 已处理（commit `820e76d`，2026-08-08）——`clearIdempotencyKeys()` 注册进 auth-store 的 `registerPrivateDataReset`，登出/登出全部设备时清空 `fingerprintToKey`。
 - **位置**：[idempotency.ts:35-36](apps/web/src/lib/idempotency.ts#L35-L36)（模块级 `fingerprintToKey` Map，未注册进 `registerPrivateDataReset`）
 - **影响**：共用机器时用户 A 提交失败 → 登出 → 用户 B 提交相同 payload 复用同一 idempotencyKey，服务端冲突或命中 A 的记录。正是 resetPrivateData 注册表要防的跨用户残留。
 - **修法**：登出/登出全部设备时清空 `fingerprintToKey`。
 
 ### P1-08 · 管理后台用户列表无请求序号防竞态
+> ✅ 已处理（commit `820e76d`，2026-08-08）——load 加 `requestSeq` 守卫，搜索词/翻页快速切换时旧响应不再覆盖新结果。
 - **位置**：[UserListPage.tsx:57-71](apps/admin/src/pages/UserListPage.tsx#L57-L71)（`load` 无 seq guard；FeedbackPage/GalleryManagePage 都有，此处是遗漏）
 - **影响**：快速改搜索词时旧响应晚到覆盖新结果，并清空已勾选项。
 - **修法**：加 `requestSeq` 守卫。
 
 ### P1-09 · 积分展示单位不一致（admin）
+> ✅ 已处理（commit `820e76d`，2026-08-08）——账本字段即积分（1 积分 = 1 分），去掉 `/100`，直接显示 availableCents/reservedCents/totalCents，与「1 元 = 100 积分」弹窗口径一致。
 - **位置**：[UserDetailPage.tsx:212-220](apps/admin/src/pages/UserDetailPage.tsx#L212-L220)（`availableCents/100` 标「积分」）
 - **影响**：数量级差 100 倍，管理员易误判误操作（与「1 元=100 积分」弹窗口径冲突）。
 - **修法**：统一口径 —— 显示分不除 100，或标签改「余额（元）」且弹窗同步。
 
 ### P1-10 · useMediaJob 无退避/无最大重试，jobId 置空不清理旧状态
+> ✅ 已处理（commit `820e76d`，2026-08-08）——轮询间隔指数退避（1.5s → 15s 封顶）+ 最大 30 次停止；jobId 变 undefined 时 `setJob(null)` + 停轮询。
 - **位置**：[use-media-job.ts:26-39](apps/web/src/hooks/use-media-job.ts#L26-L39)（失败/非终态一律 1.5s 重试无上限）；[:21-22](apps/web/src/hooks/use-media-job.ts#L21-L22)（jobId 变 undefined 时直接 return）
 - **影响**：永久失败任务每 1.5s 打一次请求；重选素材后 UI 残留过期 job。
 - **修法**：加最大重试/指数退避；jobId 变 undefined 时 setJob(null)。
 
 ### P1-11 · 登录回跳 cb 未过 `resolvePostLoginRedirect`，写好的防御是死代码
+> ✅ 已处理（commit `820e76d`，2026-08-08）——LoginPage 与 AuthDialog 跳转前统一走 `resolvePostLoginRedirect(callback, '/create', [window.location.origin])`，白名单校验（防开放重定向）真正接线。
 - **位置**：[LoginPage.tsx:57](apps/web/src/pages/auth/LoginPage.tsx#L57)、[AuthDialog.tsx:41](apps/web/src/components/auth/AuthDialog.tsx#L41)（均 `navigate(callback ?? '/create')`）；[auth-dialog-store.ts:5](apps/web/src/stores/auth-dialog-store.ts#L5) 注释宣称「已安全校验」
 - **问题**：`packages/api-client/src/auth-callback.ts` 的 `isAllowedCallback`/`resolvePostLoginRedirect` 有测试但全仓零调用。AuthDialog 的 callback 实际恒为 null，「登录回跳」流程本身不工作。
 - **修法**：两处统一走 `resolvePostLoginRedirect(callback) ?? '/create'`；接线或删注释。
 
 ### P1-12 · 详情页硬编码模型 id / 尺寸魔法数
+> ✅ 已处理（commit `820e76d`，2026-08-08）——「以图继续创作」目标模型按 capabilities 从目录派生（新 `apps/web/src/lib/edit-model.ts`，含单测）：优先带 size select 的图像编辑模型、回退任意 image_input；`asset_generation_` 前缀抽常量；放大入口仅当所选模型支持 2048×2048 时展示，模型下线/改名不再出现死入口。FunctionsPage 的 SCREENPLAY/ASR 模型 id 已在 R2-P1-09 下沉到 tool-submission.ts（能力分发部分随 P1-37）。
 - **位置**：[GenerationDetailPage.tsx:573,579](apps/web/src/pages/GenerationDetailPage.tsx#L573)（`qwen-image-edit`）、[:527](apps/web/src/pages/GenerationDetailPage.tsx#L527)（`asset_generation_` 前缀）、[:528](apps/web/src/pages/GenerationDetailPage.tsx#L528)（`size:'2048*2048'`）；[FunctionsPage.tsx:16-17](apps/web/src/pages/FunctionsPage.tsx#L16-L17)（SCREENPLAY/ASR 模型 id）
 - **影响**：绕过 manifest 单一数据源；模型下线/改名后出现死入口。
 - **修法**：编辑入口按 capabilities 从 catalog 派生；镜像 id 前缀抽常量或由后端产物字段返回。
 
 ### P1-13 · 管理后台登录错误用原始 `err.message`
+> ✅ 已处理（commit `820e76d`，2026-08-08）——LoginPage 与 admin-auth-store 的 `lastError` 均改走 `userErrorMessage(err)`。
 - **位置**：[LoginPage.tsx:27](apps/admin/src/pages/LoginPage.tsx#L27) + store 的 `lastError` 同样原始 message
 - **影响**：未走 `user-error.ts` 映射，ApiClientError 原始 message 可能含内部信息；文案不一致。
 - **修法**：`setError(userErrorMessage(err))`。
 
 ### P1-14 · 详情页 ParamsCard effect 每渲染重跑
+> ✅ 已处理（commit `820e76d`，2026-08-08）——空 assetRefs/inputParams 改用模块级空常量，refIds memo 稳定后 effect 只随真实数据变化运行。
 - **位置**：[GenerationDetailPage.tsx:596,607-616](apps/web/src/pages/GenerationDetailPage.tsx#L596)（`record.assetRefs ?? {}` 每渲染新对象 → `refIds` memo 变 → effect 每次渲染重跑 `loadModels()`）
 - **修法**：`assetRefs ??` 用模块级空常量。
 
 ### P1-15 · 管理后台用户详情资产仅前 50 条，无分页
+> ✅ 已处理（commit `820e76d`，2026-08-08）——游标「加载更多」接入 adminListUserAssets 的 cursor 分页，大账户资产可完整审计。
 - **位置**：[UserDetailPage.tsx:228](apps/admin/src/pages/UserDetailPage.tsx#L228)
 - **影响**：大账户资产无法完整审计。
 - **修法**：加翻页或「加载更多」。
