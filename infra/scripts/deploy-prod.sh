@@ -91,6 +91,12 @@ DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM "$ENV_INFRA")"
 [[ -n "$SITE_DOMAIN" ]] || fail "缺少 SITE_DOMAIN"
 DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 
+# P1-41：本机 Clash fake-ip 劫持 DNS，本地 dig/curl 解析不可信（CLAUDE.md 已注明，
+# 查 DNS 要在服务器上 getent hosts）。公网冒烟直接按服务器 IP 连接（curl --resolve
+# 仍保留 SNI 与证书校验，功能等价于走域名），避免被 fake-ip 解析到 127.0.0.1。
+SERVER_HOST="${DEPLOY_HOST##*@}"
+SERVER_HOST="${SERVER_HOST%%:*}"
+
 # 不用数组（macOS bash 3.2 下 set -u + 空数组展开会误报 unbound variable）。
 ssh_cmd() {
   if [[ -n "$DEPLOY_SSH_KEY" ]]; then
@@ -186,7 +192,7 @@ done
 echo "==> 公网冒烟（给 Let's Encrypt 首次签发留时间，最多 ~2 分钟）"
 smoke_ok=""
 for _ in $(seq 1 24); do
-  if curl -fsS --max-time 10 "https://$SITE_DOMAIN/api/health/ready" >/dev/null 2>&1; then
+  if curl -fsS --max-time 10 --resolve "$SITE_DOMAIN:443:$SERVER_HOST" "https://$SITE_DOMAIN/api/health/ready" >/dev/null 2>&1; then
     smoke_ok=1
     break
   fi

@@ -3,49 +3,56 @@
  *
  * 这里刻意采用一个小而封闭的动作集合。Provider 请求审计是另一条独立关注点，
  * 因为它描述的是出站 provider 调用，而非用户意图或对产品资源的访问。
+ *
+ * P1-44：AUDIT_ACTIONS 是本仓库动作集合的唯一运行时事实源。类型由它派生；
+ * schema.ts 的 CHECK 内联列表、ensure-audit-action-constraint.ts、迁移内嵌 CHECK
+ * 均由 infra/scripts/audit-action-consistency.test.ts 与它逐项比对（进 verify）。
  */
-export type AuditAction =
-  | 'auth.register'
-  | 'auth.verify-email'
-  | 'auth.resend-verification'
-  | 'auth.login'
-  | 'auth.github'
-  | 'auth.forgot-password'
-  | 'auth.reset-password'
-  | 'auth.change-password'
-  | 'auth.logout'
-  | 'auth.logout-all'
-  | 'auth.profile.update'
-  | 'auth.avatar.update'
-  | 'auth.avatar.remove'
-  | 'generation.create'
-  | 'generation.cancel'
-  | 'generation.retry'
-  | 'generation.hide'
-  | 'generation.delete'
-  | 'generation.restore'
-  | 'artifact.read'
-  | 'asset.upload'
-  | 'asset.import'
-  | 'asset.delete'
-  | 'share.create'
-  | 'share.revoke'
-  | 'points.grant'
-  | 'points.adjustment'
-  | 'admin.user.create'
-  | 'admin.user.update'
-  | 'admin.user.delete'
-  | 'admin.user.ban'
-  | 'admin.user.unban'
-  | 'gallery.like'
-  | 'gallery.favorite'
-  | 'gallery.visibility-change'
-  | 'admin.gallery.hide'
-  | 'admin.gallery.unhide'
-  | 'feedback.submit'
-  | 'feedback.update'
-  | 'prompt-library.create'
-  | 'prompt-library.delete'
+export const AUDIT_ACTIONS = [
+  'auth.register',
+  'auth.verify-email',
+  'auth.resend-verification',
+  'auth.login',
+  'auth.github',
+  'auth.forgot-password',
+  'auth.reset-password',
+  'auth.change-password',
+  'auth.logout',
+  'auth.logout-all',
+  'auth.profile.update',
+  'auth.avatar.update',
+  'auth.avatar.remove',
+  'generation.create',
+  'generation.cancel',
+  'generation.retry',
+  'generation.hide',
+  'generation.delete',
+  'generation.restore',
+  'artifact.read',
+  'asset.upload',
+  'asset.import',
+  'asset.delete',
+  'share.create',
+  'share.revoke',
+  'points.grant',
+  'points.adjustment',
+  'admin.user.create',
+  'admin.user.update',
+  'admin.user.delete',
+  'admin.user.ban',
+  'admin.user.unban',
+  'gallery.like',
+  'gallery.favorite',
+  'gallery.visibility-change',
+  'admin.gallery.hide',
+  'admin.gallery.unhide',
+  'feedback.submit',
+  'feedback.update',
+  'prompt-library.create',
+  'prompt-library.delete',
+] as const
+
+export type AuditAction = (typeof AUDIT_ACTIONS)[number]
 
 export type AuditOutcome = 'succeeded' | 'failed'
 

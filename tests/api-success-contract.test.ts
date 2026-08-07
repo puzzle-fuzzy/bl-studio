@@ -137,9 +137,10 @@ const contractAuthService: AuthService = {
   softDeleteUser: async () => {},
   adminBanUser: async () => {},
   adminUnbanUser: async () => {},
-  adminBatchBanUsers: async () => {},
-  adminBatchUnbanUsers: async () => {},
-  adminBatchDeleteUsers: async () => {},
+  // 批量操作返回实际生效行数（接口契约：Promise<number>）。
+  adminBatchBanUsers: async ids => ids.length,
+  adminBatchUnbanUsers: async ids => ids.length,
+  adminBatchDeleteUsers: async ids => ids.length,
 }
 
 class ContractStorage implements StorageAdapter {

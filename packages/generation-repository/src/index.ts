@@ -40,6 +40,7 @@ export type {
   ProviderRequestStatus,
   StartProviderRequestInput,
 } from './provider-request-types'
+export { AUDIT_ACTIONS } from './audit-types'
 export type {
   AuditAction,
   AuditEventMetadata,

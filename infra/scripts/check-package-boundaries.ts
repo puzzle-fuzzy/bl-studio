@@ -132,6 +132,64 @@ export const rules: Array<{
     ],
   },
   {
+    scope: 'apps/web',
+    banned: [
+      // P1-40：前端运行时禁止直连持久化 / provider 执行 / 后端仓库包
+      // （CLAUDE.md「运行时应用禁止直接 import @bailian-studio/db」的可执行化）。
+      // web 合法消费面 = api-client / model-core / shared / design-tokens / event-bus。
+      /@bailian-studio\/(db|provider-dashscope|generation-repository|media-repository|auth|storage|credit-ledger|task-engine)\b/,
+      importsApps,
+      importsServices,
+      importsWorkerSibling,
+    ],
+  },
+  {
+    scope: 'apps/admin',
+    banned: [
+      // P1-40：与 web 同源挂载，约束一致——后端仓库包与执行层一律禁入。
+      /@bailian-studio\/(db|provider-dashscope|generation-repository|media-repository|auth|storage|credit-ledger|task-engine)\b/,
+      importsApps,
+      importsServices,
+      importsWorkerSibling,
+    ],
+  },
+  {
+    scope: 'packages/api-client',
+    banned: [
+      // P1-40：api-client 是纯 zod 契约层（schemas.ts 注释自称只依赖 shared+zod，
+      // 实际零 workspace 依赖）。禁入任何 @bailian-studio 包——用 importSpecifier
+      // 只匹配真实 import，不误伤源内自我引述的注释。
+      importSpecifier(String.raw`@bailian-studio\/[a-z-]+`),
+      importsApps,
+      importsServices,
+    ],
+  },
+  {
+    scope: 'packages/storage',
+    banned: [
+      // P1-40：storage 只允许依赖叶子 shared（本地/OSS 适配器）。其它 @bailian-studio
+      // 一律禁入（含 model-core / db / provider-dashscope）。
+      importSpecifier(String.raw`@bailian-studio\/(?!shared\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsReact,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/design-tokens',
+    banned: [
+      // P1-40：design-tokens 是纯令牌包，禁入所有 @bailian-studio 包与运行时。
+      // 豁免自身包名——src/index.ts 的 doc 注释会用 `import '@bailian-studio/design-tokens/tokens.css'`
+      // 给消费方演示 CSS 引入语法。
+      importSpecifier(String.raw`@bailian-studio\/(?!design-tokens\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsReact,
+      importsElysia,
+    ],
+  },
+  {
        scope: 'apps/api',
     banned: [
       /@bailian-studio\/(db|provider-dashscope)\b/,

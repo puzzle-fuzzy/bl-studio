@@ -16,6 +16,7 @@ var
 .env.local
 .env.test
 .env.production
+.env.prod-infra
 .env*.example
 *.log
 Dockerfile*

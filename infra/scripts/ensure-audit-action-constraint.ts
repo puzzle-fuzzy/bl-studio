@@ -4,57 +4,21 @@
  *
  * P2-30：此前每次 push 都无条件 DROP/ADD 同一约束。现在先查 pg_constraint 现值，
  * 与期望 action 集合一致则跳过（幂等 no-op），仅在不一致/缺失时重建。
+ *
+ * P1-44：期望 action 集合不再内联手抄——直接 import @bailian-studio/generation-repository
+ * 的 AUDIT_ACTIONS（唯一运行时事实源，见 audit-types.ts）。重建改为
+ * `ADD CONSTRAINT ... NOT VALID` + `VALIDATE CONSTRAINT`：NOT VALID 先装约束（跳过整表
+ * 扫描，避免大表 ACCESS EXCLUSIVE），VALIDATE 再以允许并发读写的模式校验存量行。
  */
 import postgres from 'postgres'
+import { AUDIT_ACTIONS } from '@bailian-studio/generation-repository'
 
 const databaseUrl = process.env['DATABASE_URL']?.trim()
 if (databaseUrl === undefined || databaseUrl.length === 0) {
   throw new Error('DATABASE_URL is required for audit action constraint sync')
 }
 
-const EXPECTED_ACTIONS = [
-  'auth.register',
-  'auth.verify-email',
-  'auth.resend-verification',
-  'auth.login',
-  'auth.github',
-  'auth.forgot-password',
-  'auth.reset-password',
-  'auth.change-password',
-  'auth.logout',
-  'auth.logout-all',
-  'auth.profile.update',
-  'auth.avatar.update',
-  'auth.avatar.remove',
-  'generation.create',
-  'generation.cancel',
-  'generation.retry',
-  'generation.hide',
-  'generation.delete',
-  'generation.restore',
-  'artifact.read',
-  'asset.upload',
-  'asset.import',
-  'asset.delete',
-  'share.create',
-  'share.revoke',
-  'points.grant',
-  'points.adjustment',
-  'admin.user.create',
-  'admin.user.update',
-  'admin.user.delete',
-  'admin.user.ban',
-  'admin.user.unban',
-  'gallery.like',
-  'gallery.favorite',
-  'gallery.visibility-change',
-  'admin.gallery.hide',
-  'admin.gallery.unhide',
-  'feedback.submit',
-  'feedback.update',
-  'prompt-library.create',
-  'prompt-library.delete',
-] as const
+const EXPECTED_ACTIONS = AUDIT_ACTIONS
 
 const sql = postgres(databaseUrl, { max: 1 })
 try {
@@ -95,8 +59,11 @@ try {
       await transaction.unsafe(`
         alter table audit_logs
         add constraint audit_logs_action_check
-        check (action in (${EXPECTED_ACTIONS.map(action => `'${action}'`).join(', ')}))
+        check (action in (${EXPECTED_ACTIONS.map(action => `'${action}'`).join(', ')})) not valid
       `)
+      // P1-44：VALIDATE 单独扫描存量行，期间表允许并发读写（SHARE UPDATE EXCLUSIVE），
+      // 而非 ADD CONSTRAINT 默认的整表 ACCESS EXCLUSIVE。
+      await transaction`alter table audit_logs validate constraint audit_logs_action_check`
     })
     console.log('Audit action constraint is current.')
   }

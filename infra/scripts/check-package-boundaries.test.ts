@@ -180,4 +180,34 @@ describe('package boundary rules', () => {
     expect(matchesRule('packages/credit-ledger', "import { createAuthService } from '@bailian-studio/auth'")).toBe(true)
     expect(matchesRule('packages/credit-ledger', "import { Elysia } from 'elysia'")).toBe(true)
   })
+
+  it('keeps web and admin frontends isolated from persistence and provider execution (P1-40)', () => {
+    // CLAUDE.md「运行时应用禁止直接 import @bailian-studio/db」此前无规则可执行，
+    // web/admin 完全裸奔。现在 web/admin 禁入持久化 / 执行 / 后端仓库包。
+    for (const scope of ['apps/web', 'apps/admin']) {
+      expect(matchesRule(scope, "import { createDb } from '@bailian-studio/db'")).toBe(true)
+      expect(matchesRule(scope, "import { buildDashScopeRequest } from '@bailian-studio/provider-dashscope'")).toBe(true)
+      expect(matchesRule(scope, "import { createGenerationRepository } from '@bailian-studio/generation-repository'")).toBe(true)
+      expect(matchesRule(scope, "import { app } from '../../apps/api'")).toBe(true)
+      expect(matchesRule(scope, "import { runWorkerOnce } from '../../apps/worker'")).toBe(true)
+      expect(matchesRule(scope, "import { apiClient } from '@bailian-studio/api-client'")).toBe(false)
+      expect(matchesRule(scope, "import { listModels } from '@bailian-studio/model-core'")).toBe(false)
+    }
+  })
+
+  it('keeps api-client, storage, and design-tokens as leaves (P1-40)', () => {
+    // api-client 是纯 zod 契约层：零 workspace 依赖。
+    expect(matchesRule('packages/api-client', "import { z } from 'zod'")).toBe(false)
+    expect(matchesRule('packages/api-client', "import { createLogger } from '@bailian-studio/shared'")).toBe(true)
+    expect(matchesRule('packages/api-client', "import { listModels } from '@bailian-studio/model-core'")).toBe(true)
+
+    // storage 只允许叶子 shared。
+    expect(matchesRule('packages/storage', "import { createLogger } from '@bailian-studio/shared'")).toBe(false)
+    expect(matchesRule('packages/storage', "import { createDb } from '@bailian-studio/db'")).toBe(true)
+    expect(matchesRule('packages/storage', "import { listModels } from '@bailian-studio/model-core'")).toBe(true)
+
+    // design-tokens 是纯令牌包：禁入所有 @bailian-studio 包。
+    expect(matchesRule('packages/design-tokens', "import { db } from '@bailian-studio/db'")).toBe(true)
+    expect(matchesRule('packages/design-tokens', "import { GenerationStatus } from '@bailian-studio/event-bus'")).toBe(true)
+  })
 })
