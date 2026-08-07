@@ -22,7 +22,6 @@
     "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
     "@bailian-studio/storage": "workspace:*",
-    "@bailian-studio/task-engine": "workspace:*",
     "elysia": "catalog:",
     "nodemailer": "catalog:",
     "zod": "catalog:"

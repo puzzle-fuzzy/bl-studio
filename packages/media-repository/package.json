@@ -14,10 +14,8 @@
   },
   "dependencies": {
     "@bailian-studio/db": "workspace:*",
-    "@bailian-studio/shared": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",
-    "drizzle-orm": "catalog:",
-    "postgres": "catalog:"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

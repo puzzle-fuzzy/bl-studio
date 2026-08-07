@@ -514,7 +514,7 @@
 - **影响**：api.request 状态码分布、provider 请求耗时/失败率在 Loki/Grafana 里不可见 —— 观测栈白装。
 - **修法**：最低成本 —— admin 鉴权的 `GET /api/metrics`，或按周期把 `snapshot()` 打一条 json 日志进 Loki。
 
-**R2-P1-16 · 未使用依赖声明（6 条，零 import）**
+**R2-P1-16 · 未使用依赖声明（6 条，零 import）** — ✅ 已处理（2026-08-08）
 - **位置**：worker `package.json` 声明 `@bailian-studio/event-bus`；api 声明 `@bailian-studio/task-engine`；credit-ledger + media-repository 各声明 `@bailian-studio/shared` + `postgres`；web 声明 `date-fns` —— 各自 src+tests 0 处 import
 - **修法**：删除这 6 条声明。
 

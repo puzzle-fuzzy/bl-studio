@@ -14,7 +14,6 @@
   },
   "dependencies": {
     "@bailian-studio/credit-ledger": "workspace:*",
-    "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/media-repository": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
