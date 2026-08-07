@@ -194,6 +194,7 @@ function validInfrastructure(): Record<string, string> {
     POSTGRES_DB: 'bailian-studio',
     BACKUP_DIR: '/backups',
     BACKUP_RETENTION_DAYS: '14',
+    BACKUP_OSS_UPLOAD: 'true',
     LOKI_RETENTION_DAYS: '31',
     DEPLOY_HOST: 'deploy@203.0.113.5',
   }
@@ -226,5 +227,32 @@ describe('production infrastructure preflight', () => {
       'DEPLOY_HOST',
     ])
     expect(formatProductionPreflightFailure(result)).not.toContain('https://logs.example.com/path')
+  })
+
+  it('requires an explicit OSS disaster-recovery choice (P0-07)', () => {
+    const missing = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      BACKUP_OSS_UPLOAD: undefined,
+    })
+    expect(missing.issues.map(issue => issue.key)).toContain('BACKUP_OSS_UPLOAD')
+
+    const offWithoutAck = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      BACKUP_OSS_UPLOAD: 'false',
+    })
+    expect(offWithoutAck.issues.map(issue => issue.key)).toEqual(['BACKUP_OSS_UPLOAD'])
+
+    const offWithAck = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      BACKUP_OSS_UPLOAD: 'false',
+      BACKUP_OSS_DISABLED_ACK: 'confirmed',
+    })
+    expect(offWithAck.issues).toEqual([])
+
+    const invalidValue = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      BACKUP_OSS_UPLOAD: 'maybe',
+    })
+    expect(invalidValue.issues.map(issue => issue.key)).toEqual(['BACKUP_OSS_UPLOAD'])
   })
 })

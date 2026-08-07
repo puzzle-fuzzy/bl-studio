@@ -206,6 +206,23 @@ export function checkProductionInfrastructure(
     checkInteger(value(key), key, false, addIssue)
   }
 
+  // P0-07：灾备必须显式选择，不能默默用默认值关掉 —— 默认 false 时备份与 DB 同宿主，
+  // 整机故障即丢数据。要么开启 OSS 灾备，要么用 BACKUP_OSS_DISABLED_ACK=confirmed
+  // 显式确认接受该风险，否则预检不过、无法部署。
+  const backupOss = value('BACKUP_OSS_UPLOAD')?.toLowerCase()
+  if (backupOss === undefined) {
+    addIssue('BACKUP_OSS_UPLOAD', '必须显式设置为 true 或 false（省略会静默关闭 OSS 灾备）')
+  } else if (backupOss !== 'true' && backupOss !== 'false') {
+    addIssue('BACKUP_OSS_UPLOAD', '只能是 true 或 false')
+  } else if (backupOss === 'false' && value('BACKUP_OSS_DISABLED_ACK') !== 'confirmed') {
+    addIssue(
+      'BACKUP_OSS_UPLOAD',
+      'OSS 灾备已关闭：备份与 DB 在同一台宿主机磁盘，整机故障/误删卷时无恢复路径。' +
+        '开启灾备（BACKUP_OSS_UPLOAD=true 且服务器装 ossutil/aliyun）或显式接受该风险' +
+        '（BACKUP_OSS_DISABLED_ACK=confirmed）',
+    )
+  }
+
   if (value('DEPLOY_HOST') === undefined || looksLikePlaceholder(value('DEPLOY_HOST')!)) {
     addIssue('DEPLOY_HOST', '不能为空或使用模板占位值（格式 user@host）')
   }

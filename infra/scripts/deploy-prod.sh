@@ -8,7 +8,8 @@
 #   - 本地与服务器都安装 docker + docker compose（v2）；本地有 rsync。
 #   - 服务器已按 docs/03-ops.md「首次初始化」准备（SSH 可达、域名 DNS 指向服务器）。
 #   - infra/env/.env.production 与 infra/env/.env.prod-infra 已填真实值（gitignored）。
-#   - 部署前请确保 `pnpm run verify` 全绿。
+#   - verify 门禁：脚本会在干净工作区上强制跑 `pnpm run verify`（test DB 环境），
+#     未全绿即中止。紧急时可 DEPLOY_SKIP_VERIFY=1 显式绕过。
 #
 # 安全：本脚本绝不在 stdout 打印任何凭据/环境变量值，只打印状态信息。
 set -euo pipefail
@@ -52,6 +53,23 @@ inject_release_tag() {
 }
 inject_release_tag "$ENV_APP"
 inject_release_tag "$ENV_INFRA"
+
+# ── 预检 2.5：verify 硬门禁（P0-08）─────────────────────────────
+# CI 只覆盖「推送 main 的 commit」；本地未推送/分支 commit 直接 deploy 会绕过 CI。
+# 因此这里在干净工作区（= 已捕获 SHA）之后强制跑完整 verify。
+# 环境：test DB 连接串来自 infra/env/.env.test（测试库 :55432）。
+# 紧急热修可用 DEPLOY_SKIP_VERIFY=1 显式绕过（会打印告警，需自行评估）。
+if [[ "${DEPLOY_SKIP_VERIFY:-0}" != "1" ]]; then
+  if [[ -f "$REPO_ROOT/infra/env/.env.test" ]]; then
+    echo "==> 前置 verify 门禁（test DB 环境，全绿才继续）"
+    pnpm exec dotenv -e "$REPO_ROOT/infra/env/.env.test" -- pnpm run verify \
+      || fail "verify 未通过；修好后重新部署（紧急时可 DEPLOY_SKIP_VERIFY=1 绕过，需自行评估）"
+  else
+    fail "缺少 infra/env/.env.test：verify 门禁需要 test DB 连接串（参考 infra/env/.env.test.example）"
+  fi
+else
+  echo "!! 已跳过 verify 门禁（DEPLOY_SKIP_VERIFY=1），请自行确认改动质量" >&2
+fi
 
 # ── 预检 3：生产预检（不联网、不打印值）──────────────────────────
 pnpm exec dotenv -e "$ENV_APP" -- tsx infra/scripts/check-production-env.ts \

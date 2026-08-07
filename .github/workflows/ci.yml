@@ -37,5 +37,7 @@ jobs:
           node-version: 24
           cache: pnpm
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run db:push:test
+      # 用 migrate（而非 push）准备 test DB：生产只走 migrate，CI 必须覆盖同一条路径；
+      # schema↔迁移链一致性由 verify 里的 check:db-migrations（drizzle-kit generate 离线对账）把关。
+      - run: pnpm run db:migrate:test
       - run: pnpm run verify

@@ -88,14 +88,17 @@ pnpm run prod:down     # 停止（数据保留在命名卷）
 镜像按 SHA 不可变保存，滚动部署为「先停旧后起新」（非零停机，个人部署可接受）。
 
 ```bash
-# 1) 切到旧版本 commit（旧 SHA 镜像仍在服务器 docker 里）
-git checkout <old-sha>
+# 一键回滚到服务器上已有的旧镜像（P0-08）：确认镜像存在 → 把
+# BAILIAN_STUDIO_RELEASE_TAG 写回旧 SHA → 同步 env → 服务器 up -d --no-build。
+# 不重传镜像、不重跑迁移。
+pnpm run deploy:rollback <旧SHA>          # 例如 pnpm run deploy:rollback $(git rev-parse HEAD~1)
+```
 
-# 2) 用旧版本 env 的 tag 重新部署（脚本会把 BAILIAN_STUDIO_RELEASE_TAG 写回旧 SHA）
-pnpm run deploy:prod
+若旧 SHA 镜像不在服务器上（从未全量部署过），回滚脚本会中止并提示改用重新部署：
 
-# 3) 若只想用服务器上已有的旧镜像（不重传），手动改 BAILIAN_STUDIO_RELEASE_TAG=<旧SHA> 后：
-pnpm run prod:up
+```bash
+git checkout <old-sha>                     # 切到旧版本 commit
+pnpm run deploy:prod                       # 会先在干净工作区强制跑 verify 门禁
 ```
 
 > `docker image prune -f` 只清理无 tag 悬空镜像；带 SHA tag 的旧镜像会保留，便于快速回滚。
@@ -159,7 +162,10 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 - **自动备份**：`backup` 容器每 24h 执行 `infra/scripts/backup-postgres.sh`，`pg_dump | gzip` 写入 `backups` 命名卷（保留 `BACKUP_RETENTION_DAYS` 天）。备份文件带 UTC 时间戳。
 - **手动触发**：`pnpm run db:backup:production`。
 - **查看备份**：`docker compose ... exec backup ls -lh /backups`。
-- **OSS 灾备（可选）**：`BACKUP_OSS_UPLOAD=true` 且服务器装有 `ossutil`/`aliyun` CLI 时自动上传；ACCESS_KEY 由服务器环境配置，不进脚本。
+- **OSS 灾备（强制二选一，P0-07）**：deploy 预检（`check-production-env infra`）要求显式选择——
+  - `BACKUP_OSS_UPLOAD=true`：服务器装有 `ossutil`/`aliyun` CLI 时自动上传；ACCESS_KEY 由服务器环境配置，不进脚本。**上传失败会让备份任务以非零退出**（compose 循环 5 分钟后重试），日志里 `[backup] OSS 上传失败` 即为标红信号。
+  - `BACKUP_OSS_UPLOAD=false` + `BACKUP_OSS_DISABLED_ACK=confirmed`：显式接受「备份与 DB 同宿主，整机故障即丢数据」的风险。
+  - 缺省/非法值会让 `deploy:prod` 预检直接失败。
 - **恢复**（先停止写入方，一般停 api/worker）：
   ```bash
   gunzip -c <backup.sql.gz> | psql "$DATABASE_URL"

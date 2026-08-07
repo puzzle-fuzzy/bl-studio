@@ -21,10 +21,13 @@ pnpm run dev              # turbo 并行：api(bun,5003) / worker(tsx) / web(vit
 pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行；这就是 lint，无 ESLint）
 pnpm run typecheck:root   # 根作用域 tsc --noEmit：infra/scripts/ + 根 tests/（per-package typecheck 不含这两处）
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
-pnpm run verify           # boundaries + manifests + typecheck:root + typecheck + test
+pnpm run verify           # check:db-migrations + boundaries + manifests + typecheck:root + typecheck + test
 pnpm run check:boundaries # 包边界
 pnpm run check:manifests  # manifest 一致性
-pnpm run db:push / db:push:test
+pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 infra/scripts/check-db-migrations.ts）
+# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库）：
+# 改了 schema.ts 后正式流程是 `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 提交迁移，
+# 生产/CI 一律走 `db:migrate`（db:migrate:test / db:migrate:production）——push 掩盖漂移正是 P0-06 要堵的。
 ```
 
 ## 生产部署（做部署前必读）
