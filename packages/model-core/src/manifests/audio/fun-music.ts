@@ -21,7 +21,9 @@ export const funMusicV1: ModelManifest = {
       name: 'prompt',
       label: '提示词',
       type: 'text',
-      required: true,
+      // P1-34：prompt 与 lyrics 二选一（required-one-of 规则兜底），不能单独 required:true，
+      // 否则官方允许的「仅歌词」提交会被 REQUIRED_PARAMETER(prompt) 拒绝。
+      required: false,
       maxLength: 2000,
       description: '描述音乐风格和用途，模型将自动创作歌词',
     },

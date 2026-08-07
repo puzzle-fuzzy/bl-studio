@@ -8,7 +8,7 @@ export const qwenOmniScreenplay: ModelManifest = {
   description: '从视频中提取画面与镜头信息，生成高质量的视频生成剧本',
   category: 'video',
   taskMode: 'stream',
-  capabilities: ['video_input', 'streaming'],
+  capabilities: ['screenplay', 'video_input', 'streaming'],
   parameters: [
     {
       name: 'videoUrl',

@@ -476,6 +476,16 @@ describe('validateModelParams', () => {
     expect(validateModelParams(requiredOneOf, { lyrics: '春天来了' }).valid).toBe(true)
   })
 
+  it('accepts a lyrics-only submission on the real fun-music manifest (P1-34)', () => {
+    // P1-34 回归：prompt 不再单独 required:true，「仅歌词」提交必须通过
+    // （此前会被 REQUIRED_PARAMETER(prompt) 拒绝）。
+    const funMusic = getModelById('fun-music-v1')
+    expect(funMusic).toBeDefined()
+    const result = validateModelParams(funMusic!, { lyrics: '春天来了，万物复苏' })
+    expect(result.valid).toBe(true)
+    expect(result.errors).toEqual([])
+  })
+
   it('enforces text-length rules and filters them by transport mode', () => {
     const textLength: ModelManifest = {
       ...manifest,

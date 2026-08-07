@@ -57,6 +57,9 @@ export type ModelCapability =
   | 'negative_prompt'
   | 'seed'
   | 'streaming'
+  // P1-37：视频理解→剧本类模型（qwen-omni-screenplay 家族）。capability 是单一事实源——
+  // 前端子模式分组、辅助工具页、provider chat 流都由它按能力分发，而非硬编码模型 ID。
+  | 'screenplay'
 
 /** manifest 参数的取值类型，决定 UI 控件形态与 validation.ts 的校验分支。 */
 export type ModelParameterType =

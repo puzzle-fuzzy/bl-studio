@@ -1,9 +1,10 @@
 import { describe, expect, test } from 'vitest'
 import { buildChatRequest } from '../src/chat-builder'
 
-// 测试用的 manifest stub
+// 测试用的 manifest stub（P1-37：必须带 screenplay capability 才能进入剧本流传输）
 const stubManifest = {
   providerModel: 'qwen3.5-omni-plus',
+  capabilities: ['screenplay', 'video_input', 'streaming'],
 } as const
 
 test('buildChatRequest 生成正确的 messages 结构', () => {
@@ -77,6 +78,12 @@ test('buildChatRequest 双语模式包含中英对白要求', () => {
   expect(prompt!.text as string).toContain('剧本格式')
   expect(prompt!.text as string).toContain('对白')
   expect(prompt!.text as string).toContain("Let's go.") // 英文对白示例
+})
+
+test('拒绝无 screenplay capability 的 manifest（P1-37 改错即红）', () => {
+  const nonScreenplay = { providerModel: 'some-chat-model', capabilities: ['text_prompt'] }
+  expect(() => buildChatRequest(nonScreenplay as any, { videoUrl: 'https://example.com/v.mp4' }))
+    .toThrow(/requires the 'screenplay' capability/)
 })
 
 test('detailed 模式包含更细致的描述要求', () => {

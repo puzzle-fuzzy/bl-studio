@@ -81,6 +81,10 @@ describe('subModeOf 派生对级联下拉的回归不变量', () => {
     ['video', ['multi_reference'], 'r2v'],
     ['video', ['image_input'], 'i2v'],
     ['video', ['text_prompt'], 't2v'],
+    // P1-35：剧本类（视频理解）模型按 screenplay capability 归到 understand，
+    // 不再混进 vedit；即使同时带 video_input（screenplay 优先判定）。
+    ['video', ['screenplay'], 'understand'],
+    ['video', ['screenplay', 'video_input', 'streaming'], 'understand'],
     ['image', ['image_input'], 'i2i'],
     ['image', ['text_prompt'], 't2i'],
     ['audio', ['audio_input'], 'asr'],

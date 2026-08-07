@@ -17,9 +17,15 @@ export interface ChatRequest {
  * 不经过 buildDashScopeRequest 的 bindings 分发。
  */
 export function buildChatRequest(
-  manifest: Pick<FrozenModelManifest, 'providerModel'>,
+  manifest: Pick<FrozenModelManifest, 'providerModel' | 'capabilities'>,
   params: Record<string, unknown>,
 ): ChatRequest {
+  // P1-37：该传输是剧本类（screenplay capability）专属。非剧本模型被路由到这里直接
+  // 抛错（改错即红），防止新增 chat 模型被静默错配——例如 video_url 空 URL 或误用
+  // 剧本 prompt 模板。剧本流新增模型只改 manifest capability，无需改本函数。
+  if (!manifest.capabilities.includes('screenplay')) {
+    throw new Error(`dashscope-chat screenplay transport requires the 'screenplay' capability: ${manifest.providerModel}`)
+  }
   const videoUrl = String(params['videoUrl'] ?? '')
   const language = String(params['language'] ?? 'zh')
   const detailLevel = String(params['detailLevel'] ?? 'standard')

@@ -1,22 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Clapperboard, FileAudio, Mic } from 'lucide-react'
-import type { AssetItem, CreateGenerationRequest, GenerationRecord } from '@bailian-studio/api-client'
+import type { AssetItem, CreateGenerationRequest, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
-import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
+import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { useMediaJob } from '@/hooks/use-media-job'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { resolveApiUrl } from '@/lib/api'
-import {
-  TOOL_ASR_MODEL_IDS,
-  TOOL_SCREENPLAY_MODEL_IDS,
-  buildToolGenerationPayload,
-} from '@/lib/tool-submission'
+import { buildToolGenerationPayload, selectToolModel } from '@/lib/tool-submission'
 
 /** 辅助工具：视频理解→剧本 / 提取音频 / 语音识别。 */
 export function FunctionsPage() {
@@ -37,7 +33,8 @@ export function FunctionsPage() {
 
 function ScreenplayTool() {
   const models = useModelCatalogStore(state => state.models)
-  const model = TOOL_SCREENPLAY_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
+  // P1-37：按 screenplay capability 选首个已启用模型，而非硬编码模型 ID。
+  const model = selectToolModel(models, 'screenplay')
   return (
     <ToolCard
       icon={<Clapperboard className="size-5" />}
@@ -50,9 +47,8 @@ function ScreenplayTool() {
           onPickerOpen={render.onPickerOpen}
           onAssetChange={render.onAssetChange}
           assetKindLabel="视频"
-          model={model?.id}
-          modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(buildToolGenerationPayload(modelId, asset.id))}
+          model={model}
+          run={(asset, selected) => runGeneration(buildToolGenerationPayload(selected, asset.id))}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -62,7 +58,8 @@ function ScreenplayTool() {
 
 function AsrTool() {
   const models = useModelCatalogStore(state => state.models)
-  const model = TOOL_ASR_MODEL_IDS.map(id => selectModelById(models, id)).find(Boolean)
+  // P1-37：按 audio_input capability 选首个已启用模型，而非硬编码模型 ID。
+  const model = selectToolModel(models, 'asr')
   return (
     <ToolCard
       icon={<Mic className="size-5" />}
@@ -75,9 +72,8 @@ function AsrTool() {
           onPickerOpen={render.onPickerOpen}
           onAssetChange={render.onAssetChange}
           assetKindLabel="音频"
-          model={model?.id}
-          modelLabel={model?.displayName}
-          run={(asset, modelId) => runGeneration(buildToolGenerationPayload(modelId, asset.id))}
+          model={model}
+          run={(asset, selected) => runGeneration(buildToolGenerationPayload(selected, asset.id))}
           renderResult={record => <GenerationResult record={record} />}
         />
       )}
@@ -205,7 +201,6 @@ function TextTool({
   onAssetChange,
   assetKindLabel,
   model,
-  modelLabel,
   run,
   renderResult,
 }: {
@@ -214,9 +209,8 @@ function TextTool({
   onPickerOpen: (open: boolean) => void
   onAssetChange: (asset: AssetItem | null) => void
   assetKindLabel: string
-  model: string | undefined
-  modelLabel: string | undefined
-  run: (asset: AssetItem, modelId: string) => Promise<GenerationRecord>
+  model: ModelCatalogItem | undefined
+  run: (asset: AssetItem, model: ModelCatalogItem) => Promise<GenerationRecord>
   renderResult: (record: GenerationRecord) => React.ReactNode
 }) {
   const showMessage = useNotificationsStore(state => state.showMessage)
@@ -250,7 +244,7 @@ function TextTool({
       <Button onClick={() => void submit()} disabled={asset === null || busy || model === undefined}>
         {busy ? '处理中…' : model === undefined ? '模型暂不可用' : '开始分析'}
       </Button>
-      {modelLabel !== undefined && <p className="text-xs text-muted-foreground">模型：{modelLabel}</p>}
+      {model !== undefined && <p className="text-xs text-muted-foreground">模型：{model.displayName}</p>}
       {result !== null && renderResult(result)}
     </div>
   )

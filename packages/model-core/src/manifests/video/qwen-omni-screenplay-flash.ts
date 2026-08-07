@@ -8,7 +8,7 @@ export const qwenOmniScreenplayFlash: ModelManifest = {
   description: '从视频中快速提取关键信息生成剧本，速度优先',
   category: 'video',
   taskMode: 'stream',
-  capabilities: ['video_input', 'streaming'],
+  capabilities: ['screenplay', 'video_input', 'streaming'],
   parameters: [
     {
       name: 'videoUrl',

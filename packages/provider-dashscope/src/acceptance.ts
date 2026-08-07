@@ -59,6 +59,25 @@ export function buildOfflineFixtureParams(manifest: FrozenModelManifest): Record
   }
 
   for (const rule of manifest.rules ?? []) {
+    // P1-34：required-one-of（如 fun-music 的 lyrics/prompt 至少其一）在任一字段
+    // 已有值时即满足；全空时补第一个未填字段，避免 fixture 因「一个都不给」而校验失败。
+    if (rule.kind === 'required-one-of') {
+      const minimum = rule.minimum ?? 1
+      const filledCount = rule.fields.reduce((count, name) => count + (params[name] === undefined ? 0 : 1), 0)
+      if (filledCount >= minimum) continue
+      // 优先填 prompt 类文本字段（fixtureValue 会给出真实文本而非 URL，更可能过 text-length 规则），
+      // 否则取第一个未填字段。
+      const byName = rule.fields.find(name => params[name] === undefined
+        && manifest.parameters.some(candidate => candidate.name === name
+          && candidate.type === 'text' && name.toLowerCase().includes('prompt')))
+      const target = byName ?? rule.fields.find(name => params[name] === undefined)
+      if (target === undefined) continue
+      const parameter = manifest.parameters.find(candidate => candidate.name === target)
+      if (parameter === undefined) continue
+      params[target] = fixtureValue(parameter)
+      continue
+    }
+
     if (rule.kind !== 'media-group' || rule.minItems === undefined) continue
     if (!fixtureRuleConditionMatches(rule.condition, params)) continue
 

@@ -11,7 +11,7 @@ import type { ModelCatalogItem } from '@bailian-studio/api-client'
  */
 
 export type ModelCategory = 'video' | 'image' | 'audio'
-export type SubMode = 'r2v' | 'i2v' | 't2v' | 'vedit' | 'r2i' | 'i2i' | 't2i' | 'music' | 'asr'
+export type SubMode = 'r2v' | 'i2v' | 't2v' | 'vedit' | 'understand' | 'r2i' | 'i2i' | 't2i' | 'music' | 'asr'
 
 /** 一级分类下拉（只列出实际存在模型的分类）。 */
 export const CATEGORY_OPTIONS: ReadonlyArray<{ value: ModelCategory; label: string }> = [
@@ -26,6 +26,7 @@ export const SUB_MODE_LABELS: Record<SubMode, string> = {
   i2v: '图生视频',
   t2v: '文生视频',
   vedit: '视频编辑',
+  understand: '视频理解',
   r2i: '参考生图',
   i2i: '图生图',
   t2i: '文生图',
@@ -35,7 +36,7 @@ export const SUB_MODE_LABELS: Record<SubMode, string> = {
 
 /** 每个分类的子模式下拉顺序。 */
 export const SUB_MODE_ORDER: Record<ModelCategory, readonly SubMode[]> = {
-  video: ['r2v', 'i2v', 't2v', 'vedit'],
+  video: ['r2v', 'i2v', 't2v', 'vedit', 'understand'],
   image: ['r2i', 'i2i', 't2i'],
   audio: ['music', 'asr'],
 }
@@ -44,6 +45,9 @@ export const SUB_MODE_ORDER: Record<ModelCategory, readonly SubMode[]> = {
 export function subModeOf(model: Pick<ModelCatalogItem, 'category' | 'capabilities'>): SubMode {
   const caps = new Set(model.capabilities)
   if (model.category === 'video') {
+    // P1-35：剧本类（视频理解）模型按 screenplay capability 先行归类到「视频理解」，
+    // 不再混进 vedit；其余 video_input 模型仍视为视频编辑。
+    if (caps.has('screenplay')) return 'understand'
     if (caps.has('video_input')) return 'vedit'
     if (caps.has('multi_reference')) return 'r2v'
     if (caps.has('image_input')) return 'i2v'
