@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createLogger, resolveLogFormat } from '../src/logger'
+import {
+  createLogger,
+  redactCredentialSubstrings,
+  resolveLogFormat,
+  safeJsonStringify,
+} from '../src/logger'
 
 const originalInfo = console.info
 
@@ -136,6 +141,67 @@ describe('createLogger (json 模式)', () => {
     expect(writeMock).toHaveBeenCalledTimes(2)
     expect(JSON.parse(String(writeMock.mock.calls[1]?.[0]))).toMatchObject({ level: 'error', msg: 'task.threw' })
     errorSpy.mockRestore()
+  })
+})
+
+describe('值级凭据脱敏（R2-P0-04）', () => {
+  it('redacts credential-looking substrings from arbitrary string values', () => {
+    expect(safeJsonStringify({
+      // 非名单 key（message/error 等）里的错误文本同样会被扫描。
+      message: 'provider error: connection refused to postgres://admin:S3cretPass@db.internal:5432',
+    })).not.toContain('S3cretPass')
+    expect(safeJsonStringify({
+      error: 'upload failed: Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjM0NTY3ODkwIn0.dozjgNryP4J3jVmNHl0w5N_XgL0n3I9PlFUP0THsR8U',
+    })).not.toContain('eyJhbGci')
+    expect(safeJsonStringify({ error: 'invalid key sk-aBcDeFg123456' })).not.toContain('sk-aBcDeFg')
+    expect(safeJsonStringify({ error: 'denied AKIAIOSFODNN7EXAMPLE' })).not.toContain('AKIAIOSFODNN7EXAMPLE')
+  })
+
+  it('keeps non-sensitive values and short constants intact', () => {
+    const output = safeJsonStringify({
+      status: 'OK',
+      code: 'HTTP_200_OK',
+      ts: '2026-08-08T01:00:00.000Z',
+      msg: 'task completed',
+    })
+    expect(output).toContain('"status":"OK"')
+    expect(output).toContain('"code":"HTTP_200_OK"')
+    expect(output).toContain('2026-08-08T01:00:00.000Z')
+    expect(output).toContain('task completed')
+  })
+
+  it('redacts the message argument before writing in console mode', () => {
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {})
+    const logger = createLogger('api')
+    logger.info('dashscope rejected Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJ1c2VyIn0.sig123')
+    expect(String(info.mock.calls[0]?.[0])).not.toContain('eyJhbGci')
+    info.mockRestore()
+  })
+
+  it('redacts the message argument in json mode too', () => {
+    const writeMock = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    const restore = withEnv({ LOG_FORMAT: 'json', NODE_ENV: 'test' })
+    try {
+      const logger = createLogger('worker')
+      logger.error('signature LTAI5tJz0SecretKey0123456 expired')
+      const line = String(writeMock.mock.calls[0]?.[0])
+      expect(line).not.toContain('LTAI5tJz0')
+      expect(JSON.parse(line)).toMatchObject({ level: 'error' })
+    } finally {
+      writeMock.mockRestore()
+      restore()
+    }
+  })
+})
+
+describe('redactCredentialSubstrings', () => {
+  it('replaces each credential pattern while preserving surrounding context', () => {
+    expect(redactCredentialSubstrings('Bearer abc.def.ghi done'))
+      .toBe('[Redacted] done')
+    expect(redactCredentialSubstrings('key=sk-abc123456 done'))
+      .toBe('key=[Redacted] done')
+    expect(redactCredentialSubstrings('plain text'))
+      .toBe('plain text')
   })
 })
 

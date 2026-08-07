@@ -217,8 +217,10 @@ export function createApp(options: ApiAppOptions) {
 
 export type App = ReturnType<typeof createApp>
 
+/** 错误文本进日志前截断（R2-P0-03）；值级凭据脱敏由 logger 统一做。 */
 function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error)
+  const text = error instanceof Error ? error.message : String(error)
+  return text.length > 2000 ? `${text.slice(0, 2000)}…[truncated]` : text
 }
 
 /** 从领域错误中提取稳定的错误码；无 code 时回退为错误名或 unknown。 */

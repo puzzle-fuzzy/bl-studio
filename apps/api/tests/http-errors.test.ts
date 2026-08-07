@@ -127,16 +127,17 @@ describe('errorResponseBody', () => {
     expect(body.error.message).toMatch(/^code:/)
   })
 
-  it('wraps unknown errors as INTERNAL_ERROR, attaching a cause when present', () => {
+  it('wraps unknown errors as stable INTERNAL_ERROR without leaking message/cause (R2-P0-03)', () => {
+    // 未分类错误的 message/cause 原文只进服务端日志，绝不回传客户端。
     expect(errorResponseBody(new Error('boom'))).toEqual({
       success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'boom' },
+      error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
     })
 
     const withCause = new Error('outer', { cause: new Error('root cause') })
     expect(errorResponseBody(withCause)).toEqual({
       success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'outer', cause: 'root cause' },
+      error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
     })
 
     // 非 Error 值回退到通用消息。

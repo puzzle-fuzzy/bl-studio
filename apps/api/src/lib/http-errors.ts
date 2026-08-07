@@ -187,11 +187,11 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
     return { success: false, error: { code: 'VALIDATION_ERROR', message } }
   }
 
-  const message = error instanceof Error ? error.message : 'Internal server error'
-  const cause = error instanceof Error && 'cause' in error && error.cause instanceof Error
-    ? error.cause.message
-    : undefined
-  return { success: false, error: { code: 'INTERNAL_ERROR', message, ...(cause !== undefined ? { cause } : {}) } }
+  // R2-P0-03：未分类错误对客户端只回稳定 INTERNAL_ERROR + traceId。
+  // message/cause 原文（DB 连接信息、provider 网络错误、被包装的 prompt/签名 URL 片段）
+  // 只进服务端日志（经 logger 值级脱敏 + 截断），绝不回传——此前这里把
+  // error.message 与 error.cause.message 原样塞进响应，等于把内部细节交给任意客户端。
+  return { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }
 }
 
 function requestBodyTooLargeError(error: unknown): RequestBodyTooLargeError | undefined {

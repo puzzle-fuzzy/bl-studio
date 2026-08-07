@@ -29,8 +29,38 @@ export interface Logger {
 /**
  * 敏感 metadata key 名单。命中即脱敏为 `[Redacted]`，防止 prompt/body/secret
  * 等出现在日志中；与格式无关，console 与 json 模式同样生效。
+ *
+ * R2-P0-04：补齐 accessKeyId/accessKey/jwt/cookie/credential/signature/session。
  */
-const SENSITIVE_METADATA_KEY = /(?:prompt|input(?:Params)?|\binput\b|params|raw|body|response|authorization|api[-_]?key|password|secret|token|signed[-_]?url|source[-_]?url|read[-_]?url)/i
+const SENSITIVE_METADATA_KEY = /(?:prompt|input(?:Params)?|\binput\b|params|raw|body|response|authorization|api[-_]?key|access[-_]?key|password|secret|token|credential|signature|jwt|session|cookie|signed[-_]?url|source[-_]?url|read[-_]?url)/i
+
+/**
+ * 值级凭据形态。key 名不在脱敏名单里也可能在值中出现凭据（R2-P0-03：错误文本里的
+ * DB 连接串 / provider 网络错误 / 被包装的 prompt 或签名 URL 片段），因此对每个
+ * 字符串值做一次模式扫描，命中即整段替换为 `[Redacted]`。
+ *
+ * 覆盖：JWT、sk-/AK-/secret- 前缀密钥、云厂商 access key（LTAI/AKIA/ASIA/AKID）、
+ * Bearer token、≥20 位连续大写/数字/下划线/中划线的 token 形态（首字符必须是字母，
+ * 避免误伤纯数字时间戳）。
+ */
+const CREDENTIAL_VALUE_PATTERNS = [
+  /\beyJ[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\.[A-Za-z0-9_-]{6,}\b/g, // JWT（以 eyJ 开头的三段式）
+  /\b(?:sk|ak|secret|apikey|api[-_]?key)[-_:][A-Za-z0-9]{6,}\b/gi, // sk-xxx / AK_xxx / secret:xxx
+  /\b(?:LTAI|AKIA|ASIA|AKID)[A-Za-z0-9]{6,}\b/g, // 云厂商 access key 前缀
+  /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/gi, // Bearer token（真实 token 远比 8 位长）
+  /\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s/@]+:[^\s/@]+@/g, // scheme://user:pass@host（DB/URL 内嵌凭据）
+  /\b(?:password|passwd|pwd|secret|token|apikey|api[-_]?key)=[^\s&]+/gi, // key=value 凭据
+  /\b[A-Z][A-Z0-9_\-]{19,}\b/g, // 长连续大写/数字 token（≥20，首字符为字母）
+] as const
+
+/** 把字符串值里出现的凭据形态替换为 [Redacted]，剩余上下文保留以便排查。 */
+export function redactCredentialSubstrings(value: string): string {
+  let result = value
+  for (const pattern of CREDENTIAL_VALUE_PATTERNS) {
+    result = result.replace(pattern, '[Redacted]')
+  }
+  return result
+}
 
 /**
  * 把任意值安全地序列化为 JSON 字符串。
@@ -38,10 +68,12 @@ const SENSITIVE_METADATA_KEY = /(?:prompt|input(?:Params)?|\binput\b|params|raw|
  * 关键处理：
  *  - bigint 转为字符串（JSON 原生不支持 bigint，直接序列化会抛错）；
  *  - 用 WeakSet 记录已访问对象，遇到循环引用时输出 '[Circular]' 占位，避免抛 TypeError；
- *  - 命中 SENSITIVE_METADATA_KEY 的 key 输出 '[Redacted]'；
+ *  - 命中 SENSITIVE_METADATA_KEY 的 key 输出 '[Redacted]'（键名级）；
+ *  - 任何字符串值再做值级凭据模式扫描（R2-P0-04：message/error 等非名单 key 的
+ *    错误文本里的凭据也会被模糊化）；
  *  - 整体 try/catch 兜底：若 metadata 中含 JSON 无法序列化的值（如函数），返回固定占位字符串。
  *
- * 上述三重防护共同保证「日志调用本身永远不会抛出」——日志绝不能成为新的故障源。
+ * 上述多重防护共同保证「日志调用本身永远不会抛出」——日志绝不能成为新的故障源。
  */
 export function safeJsonStringify(value: unknown): string {
   const seen = new WeakSet<object>()
@@ -49,6 +81,8 @@ export function safeJsonStringify(value: unknown): string {
   try {
     return JSON.stringify(value, (key, raw) => {
       if (key.length > 0 && SENSITIVE_METADATA_KEY.test(key)) return '[Redacted]'
+
+      if (typeof raw === 'string') return redactCredentialSubstrings(raw)
 
       if (typeof raw === 'bigint') return raw.toString()
 
@@ -85,13 +119,15 @@ export function resolveLogFormat(
  */
 export function createLogger(scope: string): Logger {
   const write = (level: 'info' | 'warn' | 'error', message: string, meta?: Record<string, unknown>) => {
+    // R2-P0-04：message 参数也会被值级扫描（错误文本放 message 第一参时同样脱敏）。
+    const safeMessage = redactCredentialSubstrings(message)
     if (resolveLogFormat() === 'json') {
-      writeJsonLine(level, scope, message, meta)
+      writeJsonLine(level, scope, safeMessage, meta)
       return
     }
 
     const payload = meta ? ` ${safeJsonStringify(meta)}` : ''
-    console[level](`[${scope}] ${message}${payload}`)
+    console[level](`[${scope}] ${safeMessage}${payload}`)
   }
 
   return {
