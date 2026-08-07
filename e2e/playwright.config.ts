@@ -24,6 +24,9 @@ for (const [key, value] of Object.entries(inheritedTestEnv)) {
 
 export default defineConfig({
   testDir: '.',
+  // Vue 时代遗留的浏览器 spec 已随 React 重写而失效（无 data-testid、路由/文案全变），
+  // 归档到 legacy-vue/ 保留历史价值；资产闭环由 asset-loop.spec.ts（纯 API 驱动）覆盖。
+  testIgnore: 'legacy-vue/**',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

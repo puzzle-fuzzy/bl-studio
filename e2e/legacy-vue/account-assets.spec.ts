@@ -7,7 +7,7 @@ import { hash as hashPassword } from '@node-rs/argon2'
 import postgres from 'postgres'
 
 const databaseUrl = 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
-const apiOrigin = 'http://127.0.0.1:5103'
+const apiOrigin = 'http://127.0.0.1:5003'
 const email = `vue-e2e-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`
 const userId = `user_vue_e2e_${Date.now()}_${Math.random().toString(16).slice(2)}`
 const password = 'vue-e2e-password-123'
@@ -180,7 +180,7 @@ test('verified account can upload, reuse, generate with, and clear private asset
     await expect(image).toBeVisible()
     await expect(image).toHaveAttribute(
       'src',
-      /^http:\/\/127\.0\.0\.1:5103\/api\/artifacts\/local\//,
+      /^http:\/\/127\.0\.0\.1:5003\/api\/artifacts\/local\//,
     )
     await drawer.getByRole('button', { name: '关闭资产预览' }).click()
   })
@@ -195,7 +195,7 @@ test('verified account can upload, reuse, generate with, and clear private asset
     await expect(video).toHaveAttribute('controls', '')
     await expect(video).toHaveAttribute(
       'src',
-      /^http:\/\/127\.0\.0\.1:5103\/api\/artifacts\/local\//,
+      /^http:\/\/127\.0\.0\.1:5003\/api\/artifacts\/local\//,
     )
     await drawer.getByRole('button', { name: '关闭资产预览' }).click()
   })
@@ -231,7 +231,7 @@ test('verified account can upload, reuse, generate with, and clear private asset
     const selectedPreview = page.getByTestId(`reference-image-tile-${imageAsset.id}`)
     await expect(selectedPreview.getByRole('img', { name: 'e2e-image.png' })).toHaveAttribute(
       'src',
-      /^http:\/\/127\.0\.0\.1:5103\/api\/artifacts\/local\//,
+      /^http:\/\/127\.0\.0\.1:5003\/api\/artifacts\/local\//,
     )
     await page.getByTestId('parameter-prompt').fill('把参考图改成蓝色海报')
 

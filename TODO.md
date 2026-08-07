@@ -298,10 +298,11 @@
 
 ### 2.6 工程化 / CI / 运维
 
-### P1-38 · e2e 被死端口 spec 打挂 + 不覆盖 SSE/资产闭环
-- **位置**：[account-assets.spec.ts:10](e2e/account-assets.spec.ts#L10)（`apiOrigin='http://127.0.0.1:5103'`，全仓无进程监听）；[playwright.config.ts:37-50](e2e/playwright.config.ts#L37-L50)（webServer 用 5003）；[workbench.spec.ts:3-30](e2e/workbench.spec.ts#L3-L30)（只到「任务 queued」）
+### P1-38 · e2e 被死端口 spec 打挂 + 不覆盖 SSE/资产闭环 — ✅ 已处理（2026-08-08）
+- **位置**：[account-assets.spec.ts:10](e2e/legacy-vue/account-assets.spec.ts#L10)（`apiOrigin='http://127.0.0.1:5103'`，全仓无进程监听）；[playwright.config.ts](e2e/playwright.config.ts)（webServer 用 5003）；[workbench.spec.ts:3-30](e2e/legacy-vue/workbench.spec.ts#L3-L30)（只到「任务 queued」）
 - **问题**：`pnpm run e2e` 必然失败；该 spec 是 Vue 时代遗留未随 React 重写迁移。e2e 不启 worker、无 SSE/产物断言 —— 队列消费→SSE→资产落库这条最关键链路无自动化兜底。
 - **修法**：改 5003 或归档遗留 spec；补一条「seeded 用户 + succeeded generation + 真实 API」的资产闭环断言；把 e2e 挂进 CI 独立 job。
+- **处理**：① 两个 Vue 时代浏览器 spec（account-assets / workbench，均依赖已消失的 `data-testid`/路由/文案，与 React 重写完全脱节）归档到 [e2e/legacy-vue/](e2e/legacy-vue/)，[playwright.config.ts](e2e/playwright.config.ts) 加 `testIgnore: 'legacy-vue/**'`；② 新增 [asset-loop.spec.ts](e2e/asset-loop.spec.ts)：**纯 API 驱动**（request fixture，无需浏览器）的真实资产闭环——seeded 用户登录 → `POST /api/assets/upload` 传真实图片 → `POST /api/generations` 以 `assetRefs.image` 引用（断言媒体引用不残留进 inputParams）→ DB seed `succeeded` 状态 + 产物（`status='stored'`）+ 生成资产 → 真实 API 断言产物可列出出 signed URL、生成资产进资产库（source='generation'）、登出后 `/api/assets` 与 `/api/generations/:id` 均 401；③ [ci.yml](.github/workflows/ci.yml) 新增独立 `e2e` job（`needs: verify`，`setup-bun` + migrate + playwright，走 migrate 而非 `pnpm run e2e` 的 push 路径）。本地 `1 passed`，清理后无残留行。
 
 ### P1-39 · `verify`/`test` 不自动加载 test env，开箱跑不了 — ✅ 已处理（2026-08-08）
 - **位置**：[package.json:20-23](package.json#L20-L23)（无 dotenv 前缀）；[test-utils.ts:31-33](packages/db/src/test-utils.ts#L31-L33)（`requireDatabaseUrl` 缺失即抛）
@@ -481,7 +482,7 @@
 - **影响**：若某 store 忘注册，登出即跨用户残留数据；「每个 store 都注册了」这个不变量无测试保护。
 - **修法**：auth-store.test.ts 断言「注册→resetAllPrivateData→登出后各 store 清空」+「注册表包含预期 store 集合」。
 
-**R2-P1-13 · e2e 死端口 spec 无回归（印证 P1-38）** —— [account-assets.spec.ts:10](e2e/account-assets.spec.ts#L10) 5103 vs [playwright.config.ts](e2e/playwright.config.ts) 5003；该 spec 是**唯一「上传→复用→生成→登出后直访被拒」真实资产闭环 e2e**，改 5003 跑通后价值高。
+**R2-P1-13 · e2e 死端口 spec 无回归（印证 P1-38）** —— [account-assets.spec.ts:10](e2e/legacy-vue/account-assets.spec.ts#L10) 5103 vs [playwright.config.ts](e2e/playwright.config.ts) 5003；该 spec 曾是**唯一「上传→复用→生成→登出后直访被拒」真实资产闭环 e2e**。已随 P1-38 处理：legacy spec 归档（选择器/路由与 React 重写脱节，改端口无意义），闭环由 [asset-loop.spec.ts](e2e/asset-loop.spec.ts)（API 驱动）接手。
 
 **R2-P2-11 · 6 个 web lib 纯函数文件完全无测试** —— [chunk-recovery.ts](apps/web/src/lib/chunk-recovery.ts)(64：5 个 chunk 错误模式 + sessionStorage 单次 reload 守卫)、[creation-presets.ts](apps/web/src/lib/creation-presets.ts)(97：同名覆盖/容量 12 淘汰/版本化/`buildParamsFromRecord`)、labels.ts(69)、model-description.ts(14)、money.ts(16)、utils.ts(12)。前两个有真实状态逻辑，优先补。
 **R2-P2-12 · worker 集成测试共享同一隔离库、无 beforeEach 重置** —— [integration.test.ts:18-29](apps/worker/tests/integration.test.ts#L18) 靠注释要求手动排空避免顺序依赖；回归留下排队任务会泄漏进下一用例。补 afterEach「无遗留 queued 任务」断言。
