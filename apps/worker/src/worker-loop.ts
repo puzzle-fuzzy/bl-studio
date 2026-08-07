@@ -33,6 +33,12 @@ export interface WorkerLoopConfig {
   pollIntervalMs?: number
   /** 无任务可认领时的休眠（毫秒）。默认 1000ms。 */
   idleSleepMs?: number
+  /**
+   * P1-26：单 worker 同时执行的任务上限（有界并发）。默认 3。
+   * 锁/心跳/保存均按任务隔离，并发安全前提已具备；视频等长任务期间
+   * 不再串行阻塞整进程。调 1 即回到纯串行。
+   */
+  concurrency?: number
   /** 一次迭代抛错后的退避（毫秒）。默认 5000ms。 */
   errorBackoffMs?: number
   /** generation submit 任务超过该时长即判定失败。 */
@@ -57,6 +63,8 @@ export interface WorkerLoopConfig {
 
 export class WorkerLoop {
   private running = false
+  /** P1-26：当前在途任务数（认领后未落终态）。 */
+  private inFlight = 0
   private readonly executor: TaskExecutor
   private readonly logger: Logger
   private readonly lockDurationMs: number
@@ -66,6 +74,7 @@ export class WorkerLoop {
   private readonly errorBackoffMs: number
   private readonly workerHeartbeatIntervalMs: number
   private readonly staleGenerationSweepIntervalMs: number
+  private readonly concurrency: number
   private readonly creditLedger?: Pick<CreditLedger, 'releaseStaleReservations'>
   private readonly metrics: MetricsCollector
 
@@ -107,10 +116,11 @@ export class WorkerLoop {
     this.errorBackoffMs = config.errorBackoffMs ?? 5_000
     this.workerHeartbeatIntervalMs = config.workerHeartbeatIntervalMs ?? 5_000
     this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
+    this.concurrency = config.concurrency ?? 3
     this.creditLedger = config.creditLedger
   }
 
-  /** 一直运行直到调用 stop()。优雅停止时 resolve。 */
+  /** 一直运行直到调用 stop()。优雅停止时 resolve（等待所有在途任务收尾）。 */
   async run(): Promise<void> {
     this.running = true
     const stopHeartbeat = this.startWorkerHeartbeat()
@@ -118,12 +128,44 @@ export class WorkerLoop {
     const stopReserveSweeper = this.startStaleReserveSweeper()
     try {
       while (this.running) {
+        // P1-26：达到并发上限时不抢新任务，等一个槽位空出来。
+        if (this.inFlight >= this.concurrency) {
+          await sleep(this.pollIntervalMs)
+          continue
+        }
         try {
-          await this.processOnce()
+          const now = new Date()
+          const lockedUntil = new Date(now.getTime() + this.lockDurationMs)
+          const task = await this.config.repository.claimNextQueuedTask({
+            workerId: this.config.workerId,
+            now: now.toISOString(),
+            lockedUntil: lockedUntil.toISOString(),
+          })
+          if (task === undefined) {
+            await sleep(this.idleSleepMs)
+            continue
+          }
+          this.inFlight += 1
+          void this.runTask(task)
+            .catch(error => {
+              this.logger.error('task.background_failed', {
+                taskId: task.id,
+                traceId: task.traceId,
+                recordId: task.recordId,
+                error: errorMessage(error),
+              })
+            })
+            .finally(() => {
+              this.inFlight -= 1
+            })
         } catch (error) {
           this.logger.error('worker.iteration_failed', { error: errorMessage(error) })
           await sleep(this.errorBackoffMs)
         }
+      }
+      // 优雅停止：等所有已认领的在途任务落终态，避免丢工作。
+      while (this.inFlight > 0) {
+        await sleep(this.pollIntervalMs)
       }
     } finally {
       await stopHeartbeat()
@@ -274,26 +316,7 @@ export class WorkerLoop {
     }
   }
 
-  private async processOnce(): Promise<void> {
-    const now = new Date()
-    const lockedUntil = new Date(now.getTime() + this.lockDurationMs)
-
-    const task = await this.config.repository.claimNextQueuedTask({
-      workerId: this.config.workerId,
-      now: now.toISOString(),
-      lockedUntil: lockedUntil.toISOString(),
-    })
-
-    if (task === undefined) {
-      await sleep(this.idleSleepMs)
-      return
-    }
-
-    await this.runTask(task)
-    await sleep(this.pollIntervalMs)
-  }
-
-  /** 处理单个任务。为针对性测试而暴露。 */
+  /** 处理单个任务。为针对性测试而暴露；run() 会按 concurrency 限制并行调用它。 */
   async runTask(task: TaskRecord): Promise<void> {
     const lease = this.startLease(task)
 

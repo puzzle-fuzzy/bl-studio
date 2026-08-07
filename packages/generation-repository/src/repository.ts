@@ -2259,12 +2259,32 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           throw new GenerationRepositoryError('GENERATION_NOT_PROCESSABLE', `Generation cannot schedule polling from status '${current.status}': ${input.recordId}`)
         }
 
+        // P1-22：插入前查重——同一 record 已存在非终态 poll 任务（上一次 submit 在
+        // 落成功态前崩溃/锁丢失、重跑 submit 续轮询）时不重复插，否则 poll 任务会
+        // 随重跑指数增长。
+        const [existingPoll] = await tx
+          .select()
+          .from(taskRecords)
+          .where(and(
+            eq(taskRecords.recordId, updatedRecord.id),
+            eq(taskRecords.type, 'generation.poll'),
+            inArray(taskRecords.status, ['queued', 'running']),
+          ))
+          .limit(1)
+
+        if (existingPoll) {
+          return {
+            record: toGenerationRecord(updatedRecord),
+            task: toTaskRecord(existingPoll),
+          }
+        }
+
         const task = followUpTaskValues(
           updatedRecord,
           'generation.poll',
           { recordId: updatedRecord.id, providerTaskId: input.providerTaskId },
           now,
-          input.nextRunAt,
+          input.nextRunAt ?? now,
         )
         const [insertedTask] = await tx
           .insert(taskRecords)

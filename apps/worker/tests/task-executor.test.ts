@@ -276,6 +276,21 @@ describe('TaskExecutor.processTask', () => {
     expect(logger.entries.some(e => e.message === 'task.timeout')).toBe(true)
   })
 
+  it('measures the submit timeout from the claim time (startedAt), not the record creation time (P1-24)', async () => {
+    const { repo, runner, processTask } = setup({
+      record: makeRecord({ createdAt: '2020-01-01T00:00:00.000Z' }),
+      submitTimeoutMs: 60 * 1000,
+    })
+    runner.outputs.push({ success: true, output: makeImageOutput(), costCents: 20, requiresPoll: false })
+
+    // 队列积压很久（createdAt 2020）但本次认领刚开始（startedAt=now）→ 不判超时。
+    const outcome = await processTask(makeTask({ startedAt: new Date().toISOString() }))
+
+    expect(outcome.status).toBe('succeeded')
+    expect(runner.inputs).toHaveLength(1)
+    expect(repo.mutations.map(m => m.kind)).toEqual(['complete'])
+  })
+
   it('fails an overdue provider poll without invoking the provider', async () => {
     const { repo, runner, processTask } = setup({
       record: makeRecord({ createdAt: '2020-01-01T00:00:00.000Z', providerTaskId: 'provider-task-1' }),
@@ -510,8 +525,10 @@ describe('TaskExecutor.processTask', () => {
   })
 
   it('retries a retryable exception by rescheduling the same task', async () => {
+    // providerTaskId 置空代表真实的首次 submit——P1-22 之后，记录已持有
+    // providerTaskId 的 submit 任务会被拦截为续跑轮询，不再执行 provider。
     const { repo, runner, logger, processTask } = setup({
-      record: makeRecord({ providerTaskId: 'prov_task_1' }),
+      record: makeRecord({ providerTaskId: undefined }),
     })
     runner.throwError = new Error('upstream network timeout')
 
@@ -560,13 +577,49 @@ describe('TaskExecutor.processTask', () => {
   })
 
   it('fails on a non-retryable (auth) exception', async () => {
-    const { repo, runner, processTask } = setup({ record: makeRecord({ providerTaskId: 'prov_task_1' }) })
+    const { repo, runner, processTask } = setup({ record: makeRecord({ providerTaskId: undefined }) })
     runner.throwError = new Error('unauthorized: invalid api key')
 
     const outcome = await processTask(makeTask({ attempts: 0 }))
 
     expect(outcome.status).toBe('failed')
     expect(failedCodes(repo.mutations)).toEqual(['TASK_EXECUTION_ERROR'])
+  })
+
+  it('rerunning a submit task against a record with an existing providerTaskId continues polling instead of re-submitting (P1-22)', async () => {
+    // 上一次 submit 已提交 provider、但 submit 任务在落成功态前崩溃/锁丢失后被重认领：
+    // 记录已持有 providerTaskId。此时绝不能再次向 provider 重复 submit（幂等窗口过期
+    // 后会产生第二个 provider 任务 → 双份成本），应续跑轮询。
+    const { repo, runner, processTask } = setup({
+      record: makeRecord({ providerTaskId: 'prov_task_1', status: 'processing' }),
+    })
+
+    const outcome = await processTask(makeTask({ attempts: 0 }))
+
+    expect(outcome.status).toBe('polling')
+    // provider 绝不被再次调用。
+    expect(runner.inputs).toHaveLength(0)
+    expect(repo.mutations.map(m => m.kind)).toEqual(['schedulePoll'])
+    expect(repo.mutations[0]?.kind === 'schedulePoll' && repo.mutations[0].input.providerTaskId).toBe('prov_task_1')
+  })
+
+  it('does not retry a post-execution local persistence failure even when the message contains retry keywords (P1-23)', async () => {
+    // provider 已执行成功，仅本地结算（completeGeneration）抛 DB 超时错误——消息带
+    // "timeout" 关键字若走 DashScope 分类器会被标成可重试 → 重跑 provider → 同步模型
+    // 重复计费。必须收口为 system 不可重试并直接判失败（failGeneration 退款）。
+    const { repo, runner, processTask } = setup()
+    repo.completeGeneration = () => Promise.reject(new Error('connection terminated due to statement timeout'))
+    runner.outputs.push({ success: true, output: makeImageOutput(), costCents: 20, requiresPoll: false })
+
+    const outcome = await processTask(makeTask())
+
+    // provider 恰好执行一次，绝无第二次调用。
+    expect(runner.inputs).toHaveLength(1)
+    expect(outcome.status).toBe('failed')
+    if (outcome.status === 'failed') {
+      expect(outcome.error.code).toBe('WORKER_INFRASTRUCTURE_ERROR')
+    }
+    expect(failedCodes(repo.mutations)).toEqual(['WORKER_INFRASTRUCTURE_ERROR'])
   })
 
   it('forwards the providerTaskId and completes on a generation.poll task', async () => {

@@ -52,7 +52,12 @@ class ScriptedRunner implements ProviderRunner {
   }
 }
 
-function buildLoop(outputs: ProviderExecuteOutput[], workerId = 'e2e', executeDelayMs = 0): WorkerLoop {
+function buildLoop(
+  outputs: ProviderExecuteOutput[],
+  workerId = 'e2e',
+  executeDelayMs = 0,
+  concurrency = 3,
+): WorkerLoop {
   const registry = new ProviderRegistry()
   registry.register(new ScriptedRunner(outputs, executeDelayMs))
   return new WorkerLoop({
@@ -64,6 +69,7 @@ function buildLoop(outputs: ProviderExecuteOutput[], workerId = 'e2e', executeDe
     mediaProcessor: new FakeMediaProcessor(),
     pollIntervalMs: 5,
     idleSleepMs: 5,
+    concurrency,
   })
 }
 
@@ -204,19 +210,21 @@ describe('worker e2e', () => {
       params: { prompt: 'multi worker two', n: 1, size: '1328*1328' },
     })
 
+    // P1-26：本测试验证共享队列「不重复完成」的契约，不测并发分发；
+    // 每个 runner 只预置 1 个 output，须用 concurrency=1 保证两 worker 各认领一条。
     await Promise.all([
       runUntilSucceeded(buildLoop([{
         success: true,
         costCents: 20,
         requiresPoll: false,
         output: { artifacts: [{ kind: 'image', sourceUrl: IMAGE_DATA_URL }], raw: { worker: 'a' } },
-      }], 'worker-a', 50), first.record.id, 5000),
+      }], 'worker-a', 50, 1), first.record.id, 5000),
       runUntilSucceeded(buildLoop([{
         success: true,
         costCents: 20,
         requiresPoll: false,
         output: { artifacts: [{ kind: 'image', sourceUrl: IMAGE_DATA_URL }], raw: { worker: 'b' } },
-      }], 'worker-b', 50), second.record.id, 5000),
+      }], 'worker-b', 50, 1), second.record.id, 5000),
     ])
 
     expect((await iso.repository.getGenerationRecord(first.record.id))?.status).toBe('succeeded')

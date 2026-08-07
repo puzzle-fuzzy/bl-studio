@@ -73,10 +73,22 @@ export async function processGenerationTask(
     return cancelBeforeExecution(record, task, deps)
   }
 
+  // P1-22：submit 任务重跑但记录已持有 providerTaskId —— 上一次 submit 已成功向
+  // provider 提交（轮询链路已建），只是本任务在落成功态前崩溃/锁丢失。此时绝不能
+  // 再次向 provider 重复 submit（幂等窗口过期后会产生第二个 provider 任务 → 双份
+  // 成本），而是确认轮询任务存在并续跑轮询。放在超时检查之前：provider 任务已在
+  // 途，不该按 submit 超时（从 createdAt 起算）判失败。
+  if (task.type === 'generation.submit' && record.providerTaskId !== undefined) {
+    return continuePolling(record, task, record.providerTaskId, deps)
+  }
+
   const timeoutMs = task.type === 'generation.poll'
     ? deps.asyncMaxDurationMs ?? DEFAULT_PROVIDER_ASYNC_MAX_DURATION_MS
     : deps.submitTimeoutMs ?? DEFAULT_GENERATION_SUBMIT_TIMEOUT_MS
-  if (isExpired(record.createdAt, timeoutMs)) {
+  // P1-24：超时从任务认领时间（startedAt）起算，而不是 record.createdAt——后者
+  // 包含排队时间，队列积压时任务还没轮到就被判超时失败。startedAt 在每次 claim
+  // 时更新（含僵尸复活重认领），衡量的是本次执行时长。
+  if (isExpired(task.startedAt ?? record.createdAt, timeoutMs)) {
     const error: TaskError = {
       category: 'timeout',
       message: task.type === 'generation.poll'
@@ -150,8 +162,14 @@ export async function processGenerationTask(
       }
     }
 
+    // P1-23：runner.execute 是唯一可能产生「可重试 provider 传输错误」的地方。
+    // 执行成功后的一切本地结算/持久化失败都不能触发重跑 provider——同步/stream 模型
+    // 没有幂等键，重跑 = 已计费的调用重复计费。因此把 execute 的异常单独接住（可
+    // 正常按 provider 错误分类，允许重试），execute 之后的本地持久化异常则一律按
+    // 基础设施错误判失败（failGeneration 会退款），绝不 retry。
+    let result: ProviderExecuteOutput
     try {
-      const result = await runner.execute({
+      result = await runner.execute({
         manifest,
         inputParams,
         taskId: task.id,
@@ -159,21 +177,6 @@ export async function processGenerationTask(
         ...(providerTaskId !== undefined ? { providerTaskId } : {}),
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
       })
-      await finishProviderRequestAudit(audit, auditStartedAt, result.success
-        ? {
-            status: 'succeeded',
-            ...(result.providerTaskId !== undefined ? { providerTaskId: result.providerTaskId } : {}),
-            ...(result.requestId !== undefined ? { providerRequestId: result.requestId } : {}),
-            ...(result.requiresPoll ? {} : { billedCostCents: result.costCents }),
-          }
-        : {
-            status: 'failed',
-            ...(result.providerTaskId !== undefined ? { providerTaskId: result.providerTaskId } : {}),
-            ...(result.requestId !== undefined ? { providerRequestId: result.requestId } : {}),
-            error: providerRequestError(result.error),
-          }, deps)
-      recordProviderMetrics(deps.metrics, operation, result.success ? 'succeeded' : 'failed', Date.now() - auditStartedAt)
-      return applyProviderResult(record, task, result, manifest, deps)
     } catch (error) {
       const info = classifyThrownProviderError(error)
       await finishProviderRequestAudit(audit, auditStartedAt, {
@@ -187,6 +190,26 @@ export async function processGenerationTask(
       }, deps)
       recordProviderMetrics(deps.metrics, operation, 'failed', Date.now() - auditStartedAt)
       return applyUnexpectedError(record.id, task, error, deps)
+    }
+
+    await finishProviderRequestAudit(audit, auditStartedAt, result.success
+      ? {
+          status: 'succeeded',
+          ...(result.providerTaskId !== undefined ? { providerTaskId: result.providerTaskId } : {}),
+          ...(result.requestId !== undefined ? { providerRequestId: result.requestId } : {}),
+          ...(result.requiresPoll ? {} : { billedCostCents: result.costCents }),
+        }
+      : {
+          status: 'failed',
+          ...(result.providerTaskId !== undefined ? { providerTaskId: result.providerTaskId } : {}),
+          ...(result.requestId !== undefined ? { providerRequestId: result.requestId } : {}),
+          error: providerRequestError(result.error),
+        }, deps)
+    recordProviderMetrics(deps.metrics, operation, result.success ? 'succeeded' : 'failed', Date.now() - auditStartedAt)
+    try {
+      return await applyProviderResult(record, task, result, manifest, deps)
+    } catch (error) {
+      return applyInfrastructureError(recordId, task, error, deps)
     }
   } catch (error) {
     return applyUnexpectedError(recordId, task, error, deps)
@@ -359,6 +382,34 @@ async function applyProviderResult(
   return { status: 'failed', error }
 }
 
+/**
+ * P1-23：provider 已执行（已按结果记审计）之后发生的本地持久化/基础设施错误。
+ * 这些错误消息里可能带 "timeout"/"invalid"/"network" 等关键词，若走 DashScope
+ * 分类器会被误标成可重试 → 重跑 provider → 同步/stream 模型重复计费。这里一律
+ * 归 system、不可重试，直接 fail（failGeneration 会退款），把「已计费的调用」收口。
+ */
+async function applyInfrastructureError(
+  recordId: string,
+  task: TaskRecord,
+  error: unknown,
+  deps: GenerationTaskHandlerDeps,
+): Promise<TaskProcessOutcome> {
+  const taskError: TaskError = {
+    category: 'system',
+    message: `Local infrastructure error while finalizing generation: ${errorMessage(error)}`,
+    retriable: false,
+    code: 'WORKER_INFRASTRUCTURE_ERROR',
+  }
+  deps.logger.error('task.infrastructure_error', {
+    taskId: task.id,
+    recordId,
+    traceId: task.traceId,
+    error: errorMessage(error),
+  })
+  await failRecord(recordId, taskError, deps)
+  return { status: 'failed', error: taskError }
+}
+
 async function applyUnexpectedError(
   recordId: string,
   task: TaskRecord,
@@ -409,6 +460,52 @@ async function applyUnexpectedError(
   })
   await failRecord(recordId, taskError, deps)
   return { status: 'failed', error: taskError }
+}
+
+/**
+ * P1-22：submit 已提交 provider、但 submit 任务在落成功态前丢失时的续跑路径。
+ * 调用 scheduleGenerationPoll（内部已对非终态 poll 任务查重），把 submit 任务
+ * 收敛为「已在轮询中」的结果，绝不重复执行 provider。
+ */
+async function continuePolling(
+  record: GenerationRecord,
+  task: TaskRecord,
+  providerTaskId: string,
+  deps: GenerationTaskHandlerDeps,
+): Promise<TaskProcessOutcome> {
+  try {
+    const result = await deps.repository.scheduleGenerationPoll({
+      recordId: record.id,
+      providerTaskId,
+      now: currentIso(),
+    })
+    deps.logger.info('task.polling_recovered', {
+      taskId: task.id,
+      recordId: record.id,
+      traceId: record.traceId,
+      providerTaskId,
+    })
+    return { status: 'polling', nextPollAt: result.task.nextRunAt }
+  } catch (error) {
+    // 记录已不在 submitting/processing（被其它路径推进到终态）时 scheduleGenerationPoll
+    // 会抛错。此时重试让下一次 claim 重新判定，而不是把 submit 判成失败。
+    deps.logger.warn('task.poll_recovery_failed', {
+      taskId: task.id,
+      recordId: record.id,
+      traceId: record.traceId,
+      error: errorMessage(error),
+    })
+    return {
+      status: 'retry',
+      nextRunAt: nextRunAt(currentIso(), task.attempts),
+      error: {
+        category: 'system',
+        message: 'Could not confirm the polling task for an already-submitted generation',
+        retriable: true,
+        code: 'POLL_RECOVERY_FAILED',
+      },
+    }
+  }
 }
 
 async function cancelBeforeExecution(

@@ -297,7 +297,12 @@ export interface MarkGenerationProcessingInput {
  */
 export interface ScheduleGenerationPollInput extends MarkGenerationProcessingInput {
   providerTaskId: string
-  nextRunAt: string
+  /**
+   * 轮询任务的 nextRunAt。P1-22 的续跑路径（submit 重跑且记录已持有
+   * providerTaskId）不关心调度时机——已有非终态 poll 任务会被直接复用，
+   * 缺省时按「立即可认领」处理。
+   */
+  nextRunAt?: string
 }
 
 /** 完成生成（status=succeeded）的入参；可选择是否入队 artifact.persist 任务。 */

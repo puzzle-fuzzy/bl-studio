@@ -25,6 +25,8 @@ export interface SpawnProcessOptions {
   stderr?: 'pipe' | 'inherit' | 'ignore'
   cwd?: string
   env?: Record<string, string | undefined>
+  /** 独立进程组（POSIX：子进程成为新进程组组长）。开启后 kill() 会向整组发信号。 */
+  detached?: boolean
 }
 
 function emptyStream(): ReadableStream<Uint8Array> {
@@ -66,6 +68,7 @@ export function spawnProcess(command: string[], options: SpawnProcessOptions = {
     cwd: options.cwd,
     env: options.env,
     stdio,
+    detached: options.detached ?? false,
   })
 
   let resolveExit!: (code: number) => void
@@ -80,7 +83,24 @@ export function spawnProcess(command: string[], options: SpawnProcessOptions = {
     stdout: toWebReadable(child.stdout),
     stderr: toWebReadable(child.stderr),
     kill: () => {
-      child.kill()
+      // P1-25：detached 子进程是独立进程组组长，向负 pid 发信号可连所有派生的
+      // 子进程一起终止（如 ffmpeg 的子线程/子进程），否则只杀主进程会遗留孤儿。
+      // 先 SIGTERM，宽限 2s 仍未退出再 SIGKILL，避免干净进程被立即强杀。
+      const pid = child.pid
+      if (pid === undefined) return
+      const target = options.detached === true ? -pid : pid
+      const signal = (sig: NodeJS.Signals) => {
+        try {
+          process.kill(target, sig)
+        } catch {
+          // 进程已退出或不存在，忽略。
+        }
+      }
+      signal('SIGTERM')
+      const escalateTimer = setTimeout(() => {
+        if (child.exitCode === null) signal('SIGKILL')
+      }, 2_000)
+      escalateTimer.unref()
     },
   }
 }

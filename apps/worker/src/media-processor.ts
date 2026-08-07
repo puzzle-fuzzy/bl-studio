@@ -54,7 +54,7 @@ export interface FfmpegProcess {
 
 export type FfmpegSpawn = (
   command: string[],
-  options: { stdout: 'pipe'; stderr: 'pipe' },
+  options: { stdout: 'pipe'; stderr: 'pipe'; detached?: boolean },
 ) => FfmpegProcess
 
 export class FfmpegMediaProcessor implements MediaProcessor {
@@ -69,7 +69,8 @@ export class FfmpegMediaProcessor implements MediaProcessor {
     this.maxInputBytes = options.maxInputBytes ?? 100 * 1024 * 1024
     this.processTimeoutMs = options.processTimeoutMs ?? 5 * 60 * 1000
     this.maxThumbnailOutputBytes = options.maxThumbnailOutputBytes ?? 5 * 1024 * 1024
-    this.spawn = options.spawn ?? ((command, spawnOptions) => spawnProcess(command, spawnOptions))
+    // P1-25：默认 spawn 走 detached 独立进程组，超时 kill 才能连 ffmpeg 的子进程一起杀。
+    this.spawn = options.spawn ?? ((command, spawnOptions) => spawnProcess(command, { ...spawnOptions, detached: true }))
   }
 
   async extractAudio(input: ExtractAudioInput): Promise<ExtractAudioOutput> {
@@ -124,11 +125,14 @@ export class FfmpegMediaProcessor implements MediaProcessor {
       const proc = this.spawn([this.ffmpegPath, ...input.buildArgs(inputPath, outputPath)], {
         stdout: 'pipe',
         stderr: 'pipe',
+        detached: true,
       })
       let timeoutId: ReturnType<typeof setTimeout> | undefined
+      // P1-25：stderr 增量滚动只保留尾部 N KB，异常媒体输出大量 stderr 不再无界占内存。
+      const stderrTail = collectStderrTail(proc.stderr, MAX_FFMPEG_STDERR_BYTES).catch(() => '')
       try {
-        const result = await Promise.race([
-          Promise.all([proc.exited, new Response(proc.stderr).text()]).then(([exitCode, stderr]) => ({ exitCode, stderr })),
+        const exitCode = await Promise.race([
+          proc.exited,
           new Promise<never>((_, reject) => {
             timeoutId = setTimeout(() => {
               proc.kill()
@@ -136,9 +140,10 @@ export class FfmpegMediaProcessor implements MediaProcessor {
             }, this.processTimeoutMs)
           }),
         ])
-        if (result.exitCode !== 0) {
+        const stderr = await stderrTail
+        if (exitCode !== 0) {
           throw mediaProcessingError(
-            `ffmpeg failed with exit code ${result.exitCode}: ${result.stderr.trim() || 'no stderr output'}`,
+            `ffmpeg failed with exit code ${exitCode}: ${stderr.trim() || 'no stderr output'}`,
             'FFMPEG_FAILED',
           )
         }
@@ -205,6 +210,51 @@ export function ffmpegThumbnailArgs(
     '-compression_level', '4',
     outputPath,
   ]
+}
+
+/** ffmpeg stderr 滚动保留的尾部字节上限（P1-25）。 */
+export const MAX_FFMPEG_STDERR_BYTES = 16 * 1024
+
+/** 增量消费 stderr 流，只保留尾部 maxBytes 字节；流永不关闭时返回挂起的 Promise。 */
+function collectStderrTail(stream: ReadableStream<Uint8Array>, maxBytes: number): Promise<string> {
+  const reader = stream.getReader()
+  const chunks: Uint8Array[] = []
+  let total = 0
+  const readAll = async (): Promise<string> => {
+    try {
+      for (;;) {
+        const { done, value } = await reader.read()
+        if (done) break
+        if (value === undefined || value.byteLength === 0) continue
+        chunks.push(value)
+        total += value.byteLength
+        // 保持 total ≤ maxBytes：整块丢弃不掉的，从第一个块的头部裁掉多余字节
+        // （单块超大的情况也必须裁，不能只做整块级丢弃）。
+        while (total > maxBytes) {
+          const first = chunks[0]
+          if (first === undefined) break
+          const excess = total - maxBytes
+          if (first.byteLength <= excess) {
+            chunks.shift()
+            total -= first.byteLength
+          } else {
+            chunks[0] = first.subarray(excess)
+            total -= excess
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock()
+    }
+    const out = new Uint8Array(total)
+    let offset = 0
+    for (const chunk of chunks) {
+      out.set(chunk, offset)
+      offset += chunk.byteLength
+    }
+    return new TextDecoder().decode(out)
+  }
+  return readAll()
 }
 
 function sourceExtension(fileName: string | undefined, mimeType?: string): string {

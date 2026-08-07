@@ -23,7 +23,8 @@ export async function processArtifactPersistTask(
   deps: ArtifactTaskHandlerDeps,
 ): Promise<TaskProcessOutcome> {
   const maxDurationMs = deps.maxDurationMs ?? DEFAULT_ARTIFACT_PERSIST_TIMEOUT_MS
-  if (isExpired(task.createdAt, maxDurationMs)) {
+  // P1-24：超时从任务认领时间（startedAt）起算，task.createdAt 含排队时间。
+  if (isExpired(task.startedAt ?? task.createdAt, maxDurationMs)) {
     const error: TaskError = {
       category: 'timeout',
       message: `Artifact persistence exceeded its ${Math.round(maxDurationMs / 60_000)} minute timeout`,

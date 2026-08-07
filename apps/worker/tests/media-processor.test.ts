@@ -44,6 +44,61 @@ describe('FfmpegMediaProcessor source boundary', () => {
     expect(args.at(-1)).toBe('thumbnail.webp')
   })
 
+  it('spawns ffmpeg detached so timeout kills cover the whole process group (P1-25)', async () => {
+    let receivedOptions: { stdout: 'pipe'; stderr: 'pipe'; detached?: boolean } | undefined
+    const processor = new FfmpegMediaProcessor({
+      spawn: (command, options) => {
+        receivedOptions = options
+        return {
+          exited: Promise.resolve(1),
+          stderr: new ReadableStream<Uint8Array>({ start(controller) { controller.close() } }),
+          kill: () => {},
+        } as FfmpegProcess
+      },
+    })
+
+    // exit 1 → 处理器抛结构化 FFMPEG_FAILED，不尝试读输出文件。
+    await processor.extractAudio({
+      jobId: 'media_job_detached',
+      sourceBody: new Uint8Array([1]),
+      sourceFileName: 'video.mp4',
+      format: 'wav',
+    }).then(
+      () => { throw new Error('expected ffmpeg failure') },
+      () => {},
+    )
+
+    expect(receivedOptions?.detached).toBe(true)
+  })
+
+  it('keeps only a bounded tail of ffmpeg stderr instead of buffering it all (P1-25)', async () => {
+    const headMarker = 'HEAD-MARKER-DISTINCTIVE'
+    const tailMarker = 'TAIL-MARKER-DISTINCTIVE'
+    const stderrBytes = new TextEncoder().encode(`${headMarker}${'B'.repeat(20 * 1024)}${tailMarker}\n`)
+    const processor = new FfmpegMediaProcessor({
+      spawn: () => ({
+        exited: Promise.resolve(1),
+        stderr: new ReadableStream<Uint8Array>({ start(controller) { controller.enqueue(stderrBytes); controller.close() } }),
+        kill: () => {},
+      }) as FfmpegProcess,
+    })
+
+    const error = await processor.extractAudio({
+      jobId: 'media_job_stderr',
+      sourceBody: new Uint8Array([1]),
+      sourceFileName: 'video.mp4',
+      format: 'mp3',
+    }).then(
+      () => { throw new Error('expected ffmpeg failure') },
+      err => err as { taskError: { code: string; message: string } },
+    )
+
+    expect(error.taskError.code).toBe('FFMPEG_FAILED')
+    expect(error.taskError.message).toContain(tailMarker)
+    // 20KB 头部内容被截断：头部标记不应残留在 16KB 尾部里。
+    expect(error.taskError.message).not.toContain(headMarker)
+  })
+
   it('rejects oversized thumbnail sources before spawning ffmpeg', async () => {
     let spawned = false
     const processor = new FfmpegMediaProcessor({
