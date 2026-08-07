@@ -85,9 +85,10 @@ export function createGenerationRoutes(deps: ApiDependencies) {
 
        const event = {
          // 事件 id 由 repository 在与 record/task 同一事务内生成并提交。
-         // 它是 SSE 重连游标。
+         // 它是 SSE 重连游标。事件名与 outbox listener/重放路径一致（P2-21）：
+         // 创建即首个 status 事件，统一发 generation.status，由 hub 按 id 去重。
          id: result.event.id,
-         ...makeGenerationEvent('generation.created', {
+         ...makeGenerationEvent('generation.status', {
            recordId: result.record.id,
            userId: result.record.userId,
            status: result.record.status,
@@ -449,7 +450,7 @@ export function createGenerationRoutes(deps: ApiDependencies) {
       })
       const event = {
         id: result.event.id,
-        ...makeGenerationEvent('generation.created', {
+        ...makeGenerationEvent('generation.status', {
           recordId: result.record.id,
           userId: result.record.userId,
           status: result.record.status,
@@ -517,8 +518,6 @@ function toEstimateResponse(
       estimatedCents: usage.estimatedCents,
       chargedCents: usage.chargedCents,
       providerCostCents: usage.providerCostCents,
-      // 客户端迁移期间在 HTTP 边界保留的已弃用别名。
-      finalCents: usage.providerCostCents,
     },
     limits: {
       ...(limits.dailyTaskLimit !== undefined ? { dailyTaskLimit: limits.dailyTaskLimit } : {}),

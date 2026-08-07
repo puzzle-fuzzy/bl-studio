@@ -469,10 +469,10 @@ describe('generation routes', () => {
 
     const response = await app.handle(authed('http://localhost/api/generations/events'))
     expect(response.headers.get('content-type')).toContain('text/event-stream')
-    // 长连接流：读到 generation.created 即可，无需等待流结束（流现在永不结束）。
-    const text = await readUntil(response, 'event: generation.created')
+    // 长连接流：读到 generation.status 即可，无需等待流结束（流现在永不结束）。
+    const text = await readUntil(response, 'event: generation.status')
 
-    expect(text).toContain('event: generation.created')
+    expect(text).toContain('event: generation.status')
     expect(text).toContain('"userId":"user_sse"')
   })
 
@@ -507,9 +507,9 @@ describe('generation routes', () => {
     const created = await postGeneration({ modelId: 'qwen-image', params: { prompt: 'live', n: 1, size: '1328*1328' } })
     const createdBody = await created.json() as { success: true; data: { record: { id: string } } }
 
-    // 持续读，直到拿到包含新 recordId 的 generation.created。
+    // 持续读，直到拿到包含新 recordId 的 generation.status。
     const text = await readUntilReader(reader, createdBody.data.record.id)
-    expect(text).toContain('event: generation.created')
+    expect(text).toContain('event: generation.status')
     expect(text).toContain(createdBody.data.record.id)
     reader.cancel()
   })
@@ -527,16 +527,16 @@ describe('generation routes', () => {
     const created = await postGeneration({ modelId: 'qwen-image', params: { prompt: 'replay', n: 1, size: '1328*1328' } })
     const createdBody = await created.json() as { success: true; data: { record: { id: string } } }
     const liveText = await readUntilReader(firstReader, createdBody.data.record.id)
-    expect(liveText).toContain('event: generation.created')
+    expect(liveText).toContain('event: generation.status')
     firstReader.cancel()
 
     // 重连（第二个连接）：因为事件当时已被实时送达、未进缓冲，所以这里只能拿到
-    // connected，不应再重放已交付的 generation.created。
+    // connected，不应再重放已交付的 generation.status。
     const secondResponse = await app.handle(authed('http://localhost/api/generations/events'))
     const secondText = await readUntil(secondResponse, 'event: connected')
 
     expect(secondText).toContain('event: connected')
-    expect(secondText).not.toContain('event: generation.created')
+    expect(secondText).not.toContain('event: generation.status')
     expect(secondText).not.toContain(createdBody.data.record.id)
   })
 
@@ -545,14 +545,14 @@ describe('generation routes', () => {
     await postGeneration({ modelId: 'qwen-image', params: { prompt: 'lantern', n: 1, size: '1328*1328' } })
 
     const firstResponse = await app.handle(authed('http://localhost/api/generations/events'))
-    const firstText = await readUntil(firstResponse, 'event: generation.created')
+    const firstText = await readUntil(firstResponse, 'event: generation.status')
 
     // 第二次连接：缓冲已被第一次 drain 排空，只会拿到 connected。
     const secondResponse = await app.handle(authed('http://localhost/api/generations/events'))
     const secondText = await readUntil(secondResponse, 'event: connected')
 
-    expect(firstText).toContain('event: generation.created')
-    expect(secondText).not.toContain('event: generation.created')
+    expect(firstText).toContain('event: generation.status')
+    expect(secondText).not.toContain('event: generation.status')
     expect(secondText).toContain('event: connected')
   })
 
@@ -574,7 +574,7 @@ describe('generation routes', () => {
     }))
     const resumedText = await readUntil(resumed, secondBody.data.record.id)
 
-    expect(resumedText).toContain('event: generation.created')
+    expect(resumedText).toContain('event: generation.status')
     expect(resumedText).toContain(secondBody.data.record.id)
     expect(resumedText).not.toContain(firstBody.data.record.id)
   })

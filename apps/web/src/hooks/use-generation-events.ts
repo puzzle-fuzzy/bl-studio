@@ -56,7 +56,6 @@ export function useGenerationEvents(enabled: boolean): void {
       }
 
       for (const name of [
-        'generation.created',
         'generation.status',
         'generation.completed',
         'generation.failed',

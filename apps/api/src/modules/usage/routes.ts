@@ -18,9 +18,6 @@ export function createUsageRoutes(deps: ApiDependencies) {
       data: {
         usage: {
           ...usage,
-          // 客户端迁移期间在 HTTP 边界保留的已弃用别名；
-          // providerCostCents 才是规范化的 provider 上报值。
-          finalCents: usage.providerCostCents,
           period,
           currency: 'CNY' as const,
         },

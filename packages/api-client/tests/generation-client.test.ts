@@ -242,7 +242,7 @@ describe('createApiClient', () => {
 
   it('creates a generation with stable asset references and no client-supplied userId', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
+      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -266,7 +266,7 @@ describe('createApiClient', () => {
 
   it('preserves ordered multi-asset references in generation requests', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
+      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -285,7 +285,7 @@ describe('createApiClient', () => {
 
   it('passes batchId through to the request body for compare-mode grouping', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
+      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -315,7 +315,7 @@ describe('createApiClient', () => {
           costEstimate: 20,
           currency: 'CNY',
           credits: { availableCents: 100, reservedCents: 0, canAfford: true },
-          usage: { attemptCount: 0, successfulCount: 0, generationCount: 0, estimatedCents: 0, chargedCents: 0, providerCostCents: 0, finalCents: 0 },
+          usage: { attemptCount: 0, successfulCount: 0, generationCount: 0, estimatedCents: 0, chargedCents: 0, providerCostCents: 0 },
           limits: { dailyQuotaMode: 'attempts' },
         },
       },
@@ -679,8 +679,8 @@ describe('createApiClient', () => {
     const retriedRecord = { ...record, id: 'rec_2', parentRecordId: 'rec_1' }
     // 两次调用：一次带 idempotencyKey（发 JSON body），一次不带（空 POST）。
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
-      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.created' } } }),
+      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
+      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 

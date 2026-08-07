@@ -17,10 +17,10 @@ describe('encodeSSE', () => {
   it('encodes an event id for reconnect cursors', () => {
     expect(encodeSSE({
       id: 'generation_event_1',
-      event: 'generation.created',
+      event: 'generation.status',
       data: { recordId: 'record_1' },
     })).toBe(
-      'id: generation_event_1\nevent: generation.created\ndata: {"recordId":"record_1"}\n\n',
+      'id: generation_event_1\nevent: generation.status\ndata: {"recordId":"record_1"}\n\n',
     )
   })
 })

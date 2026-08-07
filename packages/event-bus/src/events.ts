@@ -83,7 +83,6 @@ export interface NotificationPayload {
 export interface BailianStudioSSEEventMap {
   connected: { serverTime: string }
   heartbeat: { serverTime: string }
-  'generation.created': GenerationEventPayload
   'generation.status': GenerationEventPayload
   'generation.completed': GenerationEventPayload
   'generation.failed': GenerationEventPayload
@@ -131,9 +130,11 @@ export function makeGenerationEvent<TEvent extends GenerationEventName>(
  * 把一个 status 字符串映射为 SSE 上应当发出的生成事件名。
  *
  * 三个终态（succeeded/failed/cancelled）映射到专用事件，方便前端按事件名直接
- * 路由到完成/失败/取消的处理分支；其余所有过渡态（含 repository 专用的
- * `processing`、provider_processing、saving_output 等）一律映射到通用的
- * `generation.status`，由前端按需读取 payload.status 细分。
+ * 路由到完成/失败/取消的处理分支；其余所有状态——包括「记录刚创建」的初始态
+ * 与所有过渡态（draft/submitting/processing/provider_processing/saving_output
+ * 等）——一律映射到通用的 `generation.status`，由前端按需读取 payload.status
+ * 细分。创建事件没有独立的名字（P2-21）：创建即首个 status 事件，从 outbox
+ * 流出，listener 与 POST 路由用同一名字发布，hub 再按事件 id 去重。
  */
 export function generationEventNameForStatus(status: string): GenerationEventName {
   switch (status) {

@@ -2795,7 +2795,7 @@ describe('generation repository', () => {
       recordId: created.record.id,
       providerTaskId: 'provider-task-after-cancel',
       nextRunAt: new Date().toISOString(),
-    })).rejects.toMatchObject({ code: 'GENERATION_NOT_CANCELLABLE' })
+    })).rejects.toMatchObject({ code: 'GENERATION_NOT_PROCESSABLE' })
     await expect(repository.getGenerationRecord(created.record.id)).resolves.toMatchObject({ status: 'cancelled' })
   })
 

@@ -145,7 +145,7 @@ export interface RegisterWorkerHeartbeatInput {
 export interface CreateGenerationResult {
   record: GenerationRecord
   task: TaskRecord
-  /** 与 record/task 一起提交的持久化 `generation.created` 事件。 */
+  /** 与 record/task 一起提交的持久化初始 status 事件（即创建事件的 outbox 记录）。 */
   event: GenerationEvent
 }
 

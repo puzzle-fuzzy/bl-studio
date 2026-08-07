@@ -85,12 +85,29 @@ const ModelRuleConditionSchema = z.discriminatedUnion('kind', [
  * catalog 把 rules 原样透传，web 表单因此能直接用 model-core validateModelParams
  * 做与服务端等价的提交前校验（media 数量上限 / 文本长度 / 条件必填等）。
  */
+/**
+ * rule.code 投影：与 model-core 的 ParameterIssueCode 联合逐字一致（P2-12 白名单）。
+ * 用 z.enum 而非 z.string 让 api-client 的规则类型与 model-core 的 ParameterIssueCode
+ * 同构——前端把 catalog 项直接交给 validateModelParams 时类型天然吻合，无需 as。
+ * 漂移防护：catalog 投影完整性测试会对每个已注册模型的每条 rule 执行本 schema 的
+ * parse，model-core 新增码而未同步到这里时 parse 即抛（改错即红）。
+ */
+export const ParameterIssueCodeSchema = z.enum([
+  'REQUIRED_PARAMETER',
+  'INVALID_TYPE',
+  'OUT_OF_RANGE',
+  'INVALID_VALUE',
+  'UNKNOWN_PARAMETER',
+  'REQUIRED_MEDIA',
+  'TOO_MANY_MEDIA',
+])
+
 export const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
   z.object({
     kind: z.literal('required-one-of'),
     fields: z.array(z.string()),
     minimum: z.number().optional(),
-    code: z.string(),
+    code: ParameterIssueCodeSchema,
     message: LocalizedModelMessageSchema,
   }),
   z.object({
@@ -99,21 +116,21 @@ export const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
     cjk: z.object({ min: z.number().optional(), max: z.number() }),
     other: z.object({ min: z.number().optional(), max: z.number() }),
     modes: z.array(z.enum(['sync', 'provider_async', 'stream'])).optional(),
-    code: z.string(),
+    code: ParameterIssueCodeSchema,
     message: LocalizedModelMessageSchema,
   }),
   z.object({
     kind: z.literal('field-required-when'),
     field: z.string(),
     condition: ModelRuleConditionSchema,
-    code: z.string(),
+    code: ParameterIssueCodeSchema,
     message: LocalizedModelMessageSchema,
   }),
   z.object({
     kind: z.literal('field-allowed-when'),
     field: z.string(),
     condition: ModelRuleConditionSchema,
-    code: z.string(),
+    code: ParameterIssueCodeSchema,
     message: LocalizedModelMessageSchema,
   }),
   z.object({
@@ -122,7 +139,7 @@ export const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
     minItems: z.number().optional(),
     maxItems: z.number().optional(),
     condition: ModelRuleConditionSchema.optional(),
-    code: z.string().optional(),
+    code: ParameterIssueCodeSchema.optional(),
     message: LocalizedModelMessageSchema.optional(),
   }),
   z.object({
@@ -131,7 +148,7 @@ export const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
     itemProperty: z.string(),
     maximumField: z.string(),
     defaultMaximum: z.number(),
-    code: z.string(),
+    code: ParameterIssueCodeSchema,
     message: LocalizedModelMessageSchema,
   }),
 ])
@@ -358,8 +375,6 @@ export const GenerationEstimateSchema = z.object({
     estimatedCents: z.number().int().nonnegative(),
     chargedCents: z.number().int().nonnegative(),
     providerCostCents: z.number().int().nonnegative(),
-    // 已废弃的 HTTP 别名；provider 侧成本请改用 providerCostCents。
-    finalCents: z.number().int().nonnegative(),
   }),
   limits: z.object({
     dailyTaskLimit: z.number().int().positive().optional(),
@@ -626,8 +641,6 @@ export const UsageSummarySchema = z.object({
   estimatedCents: z.number().int().nonnegative(),
   chargedCents: z.number().int().nonnegative(),
   providerCostCents: z.number().int().nonnegative(),
-  // 已废弃的 HTTP 别名；provider 侧成本请改用 providerCostCents。
-  finalCents: z.number().int().nonnegative(),
   period: z.object({
     since: z.string(),
     until: z.string(),

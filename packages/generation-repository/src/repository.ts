@@ -2220,7 +2220,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
         if (!current) {
           throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Generation record not found: ${input.recordId}`)
         }
-        throw new GenerationRepositoryError('GENERATION_NOT_CANCELLABLE', `Generation cannot enter processing from status '${current.status}': ${input.recordId}`)
+        throw new GenerationRepositoryError('GENERATION_NOT_PROCESSABLE', `Generation cannot enter processing from status '${current.status}': ${input.recordId}`)
       }
 
       return toGenerationRecord(updated)
@@ -2256,7 +2256,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           if (!current) {
             throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Generation record not found: ${input.recordId}`)
           }
-          throw new GenerationRepositoryError('GENERATION_NOT_CANCELLABLE', `Generation cannot schedule polling from status '${current.status}': ${input.recordId}`)
+          throw new GenerationRepositoryError('GENERATION_NOT_PROCESSABLE', `Generation cannot schedule polling from status '${current.status}': ${input.recordId}`)
         }
 
         const task = followUpTaskValues(

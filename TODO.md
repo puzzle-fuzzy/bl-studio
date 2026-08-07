@@ -365,9 +365,9 @@
 - **P2-20 · selectRate 的 `pool[0]` 静默回退可能低估费用** —— ✅ 已处理（2026-08-08）：`pricing.ts` 新增 `conservativeFallback`——conditions 未命中且无默认价时取池中每单位分值最高 rate（保守上界），不再静默取第一条；`selectRate` 与 `tokenRateCents` 均接线。两个剧本 manifest 把「视觉文本输入 / 多模态文本输出」设为默认价，使常见路径不被保守回退高估（音频档仍按 mode 区分）。新增两条定价测试锁定行为。
 
 ### API
-- **P2-21 · SSE 事件名不一致** —— [generations/routes.ts:86-98](apps/api/src/modules/generations/routes.ts#L86) 手工发 `generation.created`，[events.ts:138-145](packages/event-bus/src/events.ts#L138) 重放/listener 发 `generation.status`；同一事件发出的名字取决于时序。统一固定事件名语义。
-- **P2-22 · `finalCents` 弃用别名保留 3 处** —— [generations/routes.ts:521](apps/api/src/modules/generations/routes.ts#L521)、[usage/routes.ts:23](apps/api/src/modules/usage/routes.ts#L23)、[schemas.ts:362,627](packages/api-client/src/schemas.ts#L362)；已无消费者。定版本删除。
-- **P2-23 · `markGenerationProcessing`/`scheduleGenerationPoll` 迁移失败误抛 `GENERATION_NOT_CANCELLABLE`** —— [repository.ts:2182,2218](packages/generation-repository/src/repository.ts#L2182)：语义是「不可进入 processing」与「不可取消」无关。换专用错误码。
+- **P2-21 · SSE 事件名不一致** —— ✅ 已处理（2026-08-08）：创建/重试的路由手工发布统一改为 `generation.status`，`BailianStudioSSEEventMap` 删除 `generation.created`，前端监听列表同步去掉。调查确认 hub 已按事件 id 去重（sse-hub.ts），生产无重复投递——真正的 bug 只是「同一事件名取决于时序」（live 由路由发 `created`、重放/listener 发 `status`）。现在创建即首个 status 事件，live/重放/listener 三路同名。
+- **P2-22 · `finalCents` 弃用别名保留 3 处** —— ✅ 已处理（2026-08-08）：已无消费者，按计划删除。删 generations/routes.ts、usage/routes.ts 两处响应字段 + api-client schemas 两处 schema 字段 + 测试 mock 引用。credit-ledger / generation-repository 的 `finalCents` 是结算内部参数名（与 HTTP 别名无关），保留。
+- **P2-23 · `markGenerationProcessing`/`scheduleGenerationPoll` 迁移失败误抛 `GENERATION_NOT_CANCELLABLE`** —— ✅ 已处理（2026-08-08）：新增专用错误码 `GENERATION_NOT_PROCESSABLE`（repository errors.ts 联合 + api http-errors 409 映射），两处 throw 换用；repository.test 同步断言。cancel 路径的 `GENERATION_NOT_CANCELLABLE` 保留不动。
 
 ### 前端
 - **P2-24 · assets-store `getFreshAsset` 的 set() 形状错误（死代码）** —— [assets-store.ts:131-148](apps/web/src/stores/assets-store.ts#L131) 返回顶层 Record 而非 `{ queries: {...} }`，调用会污染根状态；grep 无调用方。修正或删除。
