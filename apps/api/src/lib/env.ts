@@ -34,7 +34,8 @@ export function readApiEnvOrThrow(source: EnvironmentSource = process.env): ApiE
     authJwtSecret,
     authPublicWebOrigin: source['AUTH_PUBLIC_WEB_ORIGIN']?.trim()
       || source['VITE_WEB_ORIGIN']?.trim()
-      || 'http://localhost:5004',
+      // P1-21：web dev server 实际跑在 5002（Vite），默认回退不能指向不存在的 5004。
+      || 'http://localhost:5002',
     host: source['API_HOST']?.trim() || (source['NODE_ENV']?.trim().toLowerCase() === 'production' ? '0.0.0.0' : '127.0.0.1'),
     port: readPort(source['API_PORT']),
     ...(limits.dailyTaskLimit !== undefined ? { generationDailyTaskLimit: limits.dailyTaskLimit } : {}),

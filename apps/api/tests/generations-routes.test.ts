@@ -9,6 +9,8 @@ import { createCreditLedger, type CreditLedger } from '@bailian-studio/credit-le
 import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from '@bailian-studio/storage'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
+import { replayGenerationEvents } from '../src/modules/generations/routes'
+import type { GenerationEvent, GenerationRepository } from '@bailian-studio/generation-repository'
 
 let iso!: IsolatedGenerationRepository
 let testCreditLedger!: CreditLedger
@@ -484,15 +486,17 @@ describe('generation routes', () => {
     expect(body.error.code).toBe('AUTH_UNAUTHORIZED')
   })
 
-  it('returns 410 when an SSE reconnect cursor has expired or is not owned', async () => {
+  it('signals a stale reconnect cursor via a cursor-expired SSE event instead of an opaque 410', async () => {
+    // P1-17：410 响应体浏览器读不到，会带同一 Last-Event-ID 无限重试；改为
+    // 200 SSE 流内发 `cursor-expired` 事件后关闭，前端据此重建 EventSource。
     currentUserId = 'user_sse_expired'
     const response = await app.handle(authed('http://localhost/api/generations/events', {
       headers: { 'last-event-id': 'generation_event_missing' },
     }))
-    const body = await response.json() as { success: false; error: { code: string } }
-
-    expect(response.status).toBe(410)
-    expect(body.error.code).toBe('EVENT_CURSOR_EXPIRED')
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/event-stream')
+    const text = await readUntil(response, 'event: cursor-expired')
+    expect(text).toContain('event: cursor-expired')
   })
 
   it('delivers live events to an open SSE stream without reconnect', async () => {
@@ -578,6 +582,56 @@ describe('generation routes', () => {
     expect(resumedText).toContain(secondBody.data.record.id)
     expect(resumedText).not.toContain(firstBody.data.record.id)
   })
+
+  describe('replayGenerationEvents pagination (P1-17)', () => {
+    function fakeEvent(id: string, createdAt: string): GenerationEvent {
+    return { id, recordId: `r_${id}`, userId: 'user_sse', status: 'pending', modelId: 'qwen-image', updatedAt: createdAt, createdAt }
+  }
+
+  function pageRepository(pages: GenerationEvent[][]) {
+    const calls: Array<Record<string, unknown>> = []
+    let index = 0
+    return {
+      calls,
+      async listGenerationEvents(input: Parameters<GenerationRepository['listGenerationEvents']>[0]) {
+        calls.push({ ...input })
+        if (index >= pages.length) return []
+        const page = pages[index]
+        index += 1
+        return page ?? []
+      },
+    }
+  }
+
+  it('returns a single short page in one call with afterId', async () => {
+    const repo = pageRepository([[fakeEvent('e1', '2026-01-01T00:00:00.000Z')]])
+    const events = await replayGenerationEvents(repo, { userId: 'user_sse', afterId: 'prev' })
+    expect(events).toHaveLength(1)
+    expect(repo.calls).toHaveLength(1)
+    expect(repo.calls[0]).toMatchObject({ userId: 'user_sse', afterId: 'prev', limit: 500 })
+  })
+
+  it('keeps paging past a full 500-event page using the last event as afterCursor', async () => {
+    const firstPage = Array.from({ length: 500 }, (_, i) => fakeEvent(`p1_${i}`, `2026-01-01T00:00:${String(i).padStart(2, '0')}.000Z`))
+    const secondPage = [fakeEvent('p2_0', '2026-01-01T00:01:00.000Z')]
+    const repo = pageRepository([firstPage, secondPage])
+
+    const events = await replayGenerationEvents(repo, { userId: 'user_sse', afterId: 'prev' })
+    expect(events).toHaveLength(501)
+    expect(repo.calls).toHaveLength(2)
+    const secondCall = repo.calls[1] as { afterCursor?: { id: string; createdAt: string } }
+    expect(secondCall.afterCursor).toEqual({ id: 'p1_499', createdAt: firstPage[499]!.createdAt })
+  })
+
+  it('stops after REPLAY_MAX_PAGES even if every page is full', async () => {
+    const fullPage = Array.from({ length: 500 }, (_, i) => fakeEvent(`f_${i}`, '2026-01-01T00:00:00.000Z'))
+    const repo = pageRepository(Array.from({ length: 30 }, () => fullPage))
+
+    const events = await replayGenerationEvents(repo, { userId: 'user_sse', afterId: 'prev' })
+    expect(events).toHaveLength(500 * 20)
+    expect(repo.calls).toHaveLength(20)
+  })
+})
 
   it('returns a single generation record with input params for the owner', async () => {
     currentUserId = 'user_detail'

@@ -17,4 +17,4 @@ export {
   type OssClientLike,
   type OssStorageAdapterOptions,
 } from './oss'
-export type { StorageAdapter, StorageDeleteInput, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from './types'
+export type { StorageAdapter, StorageDeleteInput, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'

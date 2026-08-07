@@ -16,6 +16,14 @@ export interface StorageWriteInput {
   contentType?: string
 }
 
+/** 流式写入请求：对象在存储中的逻辑 key、可读字节流，可选 Content-Type。 */
+export interface StorageWriteStreamInput {
+  key: string
+  /** Web 字节流（File.stream() / fetch body）；不要求可回放，适配器单遍消费。 */
+  stream: ReadableStream<Uint8Array>
+  contentType?: string
+}
+
 /** 写入结果：实际使用的 key、可访问的 url（可能为空）、字节数。 */
 export interface StorageWriteResult {
   provider: StorageProvider
@@ -67,6 +75,12 @@ export interface StorageAdapter {
   readonly provider: StorageProvider
   readonly keyPrefix: string
   writeObject(input: StorageWriteInput): Promise<StorageWriteResult>
+  /**
+   * 流式写入大对象（可选能力，P1-16）。调用方应在存在该方法时优先使用，
+   * 避免大文件整块载入内存；未实现时调用方退化为 writeObject 缓冲写。
+   * 入参流不要求可回放，适配器必须单遍消费。
+   */
+  writeObjectStream?(input: StorageWriteStreamInput): Promise<StorageWriteResult>
   /** 对配置后端执行可选连通性/就绪探测。 */
   healthCheck?(): Promise<void>
   /** worker 侧媒体处理使用的可选读能力。 */

@@ -13,6 +13,7 @@ import type {
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { ValidationError } from '@bailian-studio/shared'
 import type { AssetConfig } from '../../lib/asset-config'
+import { assertFileMatchesMime } from '../../lib/file-sniff'
 import { probeMediaDuration } from './media-metadata'
 
 export type AssetKind = 'image' | 'video' | 'audio' | 'text' | 'archive'
@@ -100,6 +101,10 @@ export async function uploadAsset(args: {
     throw new ValidationError(`File exceeds maximum size of ${config.maxAssetSizeBytes} bytes`, 'file')
   }
 
+  // P1-16：先做魔数校验（只读前 64 字节），媒体类型与声明不符直接拒绝，
+  // 避免伪装的 Content-Type 进入存储，也为后续 ffprobe/写盘省掉白读。
+  await assertFileMatchesMime(file)
+
   const durationSeconds = isMediaMimeType(file.type)
     ? await readAndValidateMediaDuration(file, config, args.probeMediaDuration)
     : undefined
@@ -111,8 +116,10 @@ export async function uploadAsset(args: {
   const uuid = crypto.randomUUID()
   const key = `user_uploads/${userId}/${uuid}.${ext}`
 
-  const buffer = Buffer.from(await file.arrayBuffer())
-  const stored = await storage.writeObject({ key, body: buffer, contentType: mimeType })
+  // P1-16：适配器支持流式时直接 pipeTo（大上传不整块载入内存），否则退化缓冲写。
+  const stored = storage.writeObjectStream !== undefined
+    ? await storage.writeObjectStream({ key, stream: file.stream(), contentType: mimeType })
+    : await storage.writeObject({ key, body: Buffer.from(await file.arrayBuffer()), contentType: mimeType })
 
   const assetId = `asset_${uuid.replace(/-/g, '').slice(0, 32)}`
   const input: CreateUserAssetInput = {

@@ -62,6 +62,8 @@ export interface ApiRateLimitConfig {
   authRequestsPerMinute: number
   generationRequestsPerMinute: number
   uploadRequestsPerMinute: number
+  /** 社区写端点（画廊互动 / 提示词库 / 反馈）低频桶，防通知洪泛。 */
+  communityRequestsPerMinute: number
 }
 
 export function readApiRateLimitConfig(
@@ -69,11 +71,12 @@ export function readApiRateLimitConfig(
 ): ApiRateLimitConfig {
   const production = source['NODE_ENV']?.trim().toLowerCase() === 'production'
   // 各桶默认配额（请求/分钟）。生产更严格：auth 10 防爆破、generation 30 防刷量、
-  // upload 10 防存储滥用、write 120 兜底；开发放宽便于本地联调。单实例进程内
-  // 限流，多副本水平扩展前需换 Redis/网关（见 docs）。
+  // upload 10 防存储滥用、community 30 防点赞/收藏/入库/反馈洪泛（每条还可能触发
+  // 社交通知 + SSE，是通知洪泛面）、write 120 兜底；开发放宽便于本地联调。单实例
+  // 进程内限流，多副本水平扩展前需换 Redis/网关（见 docs）。
   const defaults = production
-    ? { requests: 120, auth: 10, generation: 30, upload: 10 }
-    : { requests: 600, auth: 30, generation: 120, upload: 30 }
+    ? { requests: 120, auth: 10, generation: 30, upload: 10, community: 30 }
+    : { requests: 600, auth: 30, generation: 120, upload: 30, community: 120 }
 
   return {
     enabled: source['API_RATE_LIMIT_ENABLED']?.trim().toLowerCase() !== 'false',
@@ -82,6 +85,7 @@ export function readApiRateLimitConfig(
     authRequestsPerMinute: positiveInteger(source['API_RATE_LIMIT_AUTH_PER_MINUTE'], defaults.auth, 'API_RATE_LIMIT_AUTH_PER_MINUTE'),
     generationRequestsPerMinute: positiveInteger(source['API_RATE_LIMIT_GENERATIONS_PER_MINUTE'], defaults.generation, 'API_RATE_LIMIT_GENERATIONS_PER_MINUTE'),
     uploadRequestsPerMinute: positiveInteger(source['API_RATE_LIMIT_UPLOADS_PER_MINUTE'], defaults.upload, 'API_RATE_LIMIT_UPLOADS_PER_MINUTE'),
+    communityRequestsPerMinute: positiveInteger(source['API_RATE_LIMIT_COMMUNITY_PER_MINUTE'], defaults.community, 'API_RATE_LIMIT_COMMUNITY_PER_MINUTE'),
   }
 }
 
@@ -120,9 +124,6 @@ export function rateLimitRule(
 
   const pathname = new URL(request.url).pathname
   if (!pathname.startsWith('/api/')) return undefined
-  // 社区写端点豁免限流（有意偏离标准实践：内部工具、无真实用户）。
-  // 如需重新启用限流，删除以下豁免分支即可（auth/generation/upload/write 桶仍生效）。
-  if (isCommunityPath(pathname)) return undefined
   if (pathname.startsWith('/api/auth/')) {
     return { bucket: 'auth', limit: config.authRequestsPerMinute }
   }
@@ -132,10 +133,20 @@ export function rateLimitRule(
   if (request.method === 'POST' && pathname === '/api/assets/upload') {
     return { bucket: 'upload', limit: config.uploadRequestsPerMinute }
   }
+  // P1-18：社区写端点不再豁免——点赞/收藏/提示词入库/反馈各配低频 per-IP 桶，
+  // 防止脚本批量刷写触发社交通知 + SSE 的洪泛。admin 治理（/api/admin/*）不走此桶，
+  // 仍由通用 write 兜底。
+  if (isCommunityPath(pathname)) {
+    return { bucket: 'community', limit: config.communityRequestsPerMinute }
+  }
   return { bucket: 'write', limit: config.requestsPerMinute }
 }
 
-/** 社区用户写端点（画廊互动 / 提示词库 / 反馈通道）不参与进程内限流。 */
+/**
+ * 社区用户写端点（画廊互动 / 提示词库 / 反馈通道）。限流身份取
+ * `clientIdentity(request, trustProxy)` —— 生产 API_TRUST_PROXY=true 且宿主机
+ * nginx 用 `$remote_addr` 覆写 X-Forwarded-For，首项即真实客户端 IP。
+ */
 function isCommunityPath(pathname: string): boolean {
   return pathname === '/api/gallery'
     || pathname.startsWith('/api/gallery/')

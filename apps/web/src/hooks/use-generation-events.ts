@@ -36,6 +36,14 @@ export function useGenerationEvents(enabled: boolean): void {
 
       next.addEventListener('open', () => setEventStreamStatus('connected'))
 
+      // P1-17：游标过期信号——服务端在 Last-Event-ID 已不可用时发出。
+      // 立即关闭并用全新 EventSource 重连（清掉 stale 的 Last-Event-ID），
+      // 否则浏览器会带同一游标无限重试。后端事件名与 routes.ts 对齐。
+      next.addEventListener('cursor-expired', () => {
+        next.close()
+        connect()
+      })
+
       // EventSource 断线后自动重连；这里只更新降级状态。
       next.addEventListener('error', () => setEventStreamStatus('degraded'))
 

@@ -4,6 +4,7 @@ import { AuthError, type PublicUser } from '@bailian-studio/auth'
 import { validateInput, ValidationError } from '@bailian-studio/shared'
 import type { ApiDependencies } from '../../dependencies'
 import { auditErrorCode, recordApiAuditEvent } from '../../lib/audit'
+import { assertFileMatchesMime } from '../../lib/file-sniff'
 import {
   clearedCookieAttributes,
   readCookie,
@@ -336,10 +337,14 @@ export function createAuthRoutes(deps: ApiDependencies) {
           throw new ValidationError('头像文件大小不能超过 2MB', 'file')
         }
 
+        // P1-16：魔数校验，防止伪装 image/png 等类型上传任意内容。
+        await assertFileMatchesMime(file)
+
         const ext = AVATAR_MIME_TO_EXT[file.type]
         const key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`
-        const buffer = Buffer.from(await file.arrayBuffer())
-        const stored = await deps.storage.writeObject({ key, body: buffer, contentType: file.type })
+        const stored = deps.storage.writeObjectStream !== undefined
+          ? await deps.storage.writeObjectStream({ key, stream: file.stream(), contentType: file.type })
+          : await deps.storage.writeObject({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type })
 
         // 先记旧 key（updateAvatar 成功后旧值就丢了），再落库新头像。
         const previousKey = await deps.authService.getUserAvatarStorageKey(user.id)

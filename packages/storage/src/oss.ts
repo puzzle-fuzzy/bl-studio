@@ -1,5 +1,7 @@
 import OSS from 'ali-oss'
-import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from './types'
+import { Readable } from 'node:stream'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
+import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
 import { attachmentContentDisposition } from './content-disposition'
 
 /**
@@ -10,6 +12,8 @@ import { attachmentContentDisposition } from './content-disposition'
  */
 export interface OssClientLike {
   put(key: string, body: Uint8Array, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
+  /** P1-16：流式上传（ali-oss `putStream`）。未实现时 OSS 适配器退化为缓冲写。 */
+  putStream?(key: string, stream: Readable, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
   delete?(key: string): Promise<unknown>
   head?(key: string): Promise<unknown>
   signatureUrl(key: string, options: {
@@ -76,6 +80,31 @@ export class OssStorageAdapter implements StorageAdapter {
       key: fullKey,
       ...(result.url !== undefined ? { url: result.url } : {}),
       byteSize: input.body.byteLength,
+    }
+  }
+
+  async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
+    // P1-16：流式上传。ali-oss `putStream` 对未知长度的流走 chunked 分片上传，
+    // 单遍消费入参流。字节数边流边计，不依赖服务端返回。
+    const putStream = this.options.client.putStream
+    if (putStream === undefined) throw new Error('OSS storage stream write is not configured')
+    const fullKey = this.resolveWriteKey(input.key)
+    const source = Readable.fromWeb(input.stream as unknown as NodeReadableStream)
+    let byteSize = 0
+    source.on('data', (chunk: Uint8Array) => {
+      byteSize += chunk.byteLength
+    })
+    const result = await putStream.call(
+      this.options.client,
+      fullKey,
+      source,
+      { ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}) },
+    )
+    return {
+      provider: this.provider,
+      key: fullKey,
+      ...(result.url !== undefined ? { url: result.url } : {}),
+      byteSize,
     }
   }
 

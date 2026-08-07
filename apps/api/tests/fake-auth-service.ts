@@ -106,11 +106,13 @@ export function createFakeAuthService(
     },
     adminBatchBanUsers: async () => {
       banned = true
+      return 1
     },
     adminBatchUnbanUsers: async () => {
       banned = false
+      return 1
     },
-    adminBatchDeleteUsers: async () => {},
+    adminBatchDeleteUsers: async () => 1,
     adminStats: async () => ({ registrationsByDay: [], totalUsers: 1 }),
   }
 }

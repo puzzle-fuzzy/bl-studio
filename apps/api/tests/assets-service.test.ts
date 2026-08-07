@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
-import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from '@bailian-studio/storage'
+import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from '@bailian-studio/storage'
 import { assetDownloadStorageKey, uploadAsset } from '../src/modules/assets/service'
 import { parseMediaDuration } from '../src/modules/assets/media-metadata'
 import type { AssetConfig } from '../src/lib/asset-config'
@@ -11,13 +11,31 @@ const testAssetConfig: AssetConfig = {
   ffprobePath: 'ffprobe',
 }
 
+/** P1-16：测试夹具用真实魔数头，sniff 校验才不会误杀。 */
+const PNG_MAGIC = [0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]
+const MP4_MAGIC = [0x00, 0x00, 0x00, 0x18, 0x66, 0x74, 0x79, 0x70, 0x6d, 0x70, 0x34, 0x32]
+
 class TestStorage implements StorageAdapter {
   readonly provider = 'local' as const
   readonly keyPrefix = ''
   deleteCalls: string[] = []
+  /** P1-16：统计是否走了流式写。 */
+  streamedKeys: string[] = []
 
   async writeObject(input: StorageWriteInput): Promise<StorageWriteResult> {
     return { provider: 'local', key: input.key, byteSize: input.body.byteLength, url: `/stored/${input.key}` }
+  }
+
+  async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
+    this.streamedKeys.push(input.key)
+    const reader = input.stream.getReader()
+    let byteSize = 0
+    for (;;) {
+      const { done, value } = await reader.read()
+      if (done) break
+      byteSize += value.byteLength
+    }
+    return { provider: 'local', key: input.key, byteSize, url: `/stored/${input.key}` }
   }
 
   async createReadUrl(input: StorageReadUrlInput): Promise<string> {
@@ -46,7 +64,7 @@ describe('asset media duration validation', () => {
     } as unknown as GenerationRepository
 
     const result = await uploadAsset({
-      file: new File([new Uint8Array([1, 2, 3])], 'clip.mp4', { type: 'video/mp4' }),
+      file: new File([new Uint8Array(MP4_MAGIC)], 'clip.mp4', { type: 'video/mp4' }),
       userId: 'user_1',
       kindParam: null,
       storage: new TestStorage(),
@@ -65,7 +83,7 @@ describe('asset media duration validation', () => {
   it('rejects media longer than the configured maximum before storage', async () => {
     const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
     await expect(uploadAsset({
-      file: new File([new Uint8Array([1])], 'clip.mp4', { type: 'video/mp4' }),
+      file: new File([new Uint8Array(MP4_MAGIC)], 'clip.mp4', { type: 'video/mp4' }),
       userId: 'user_1',
       kindParam: null,
       storage: new TestStorage(),
@@ -82,7 +100,7 @@ describe('asset media duration validation', () => {
     } as unknown as GenerationRepository
 
     await expect(uploadAsset({
-      file: new File([new Uint8Array([1])], 'image.png', { type: 'image/png' }),
+      file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
       userId: 'user_1',
       kindParam: null,
       storage,
@@ -92,6 +110,55 @@ describe('asset media duration validation', () => {
 
     expect(storage.deleteCalls).toHaveLength(1)
     expect(storage.deleteCalls[0]).toMatch(/^user_uploads\/user_1\//)
+  })
+})
+
+describe('asset upload streaming and magic-number validation', () => {
+  it('streams to writeObjectStream when the adapter supports it', async () => {
+    const storage = new TestStorage()
+    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+
+    await uploadAsset({
+      file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
+      userId: 'user_1',
+      kindParam: null,
+      storage,
+      repository,
+      config: testAssetConfig,
+    })
+
+    expect(storage.streamedKeys).toHaveLength(1)
+    expect(storage.streamedKeys[0]).toMatch(/^user_uploads\/user_1\//)
+  })
+
+  it('rejects media whose magic number does not match the declared type', async () => {
+    const storage = new TestStorage()
+    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+
+    await expect(uploadAsset({
+      file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'fake.mp4', { type: 'video/mp4' }),
+      userId: 'user_1',
+      kindParam: null,
+      storage,
+      repository,
+      config: testAssetConfig,
+    })).rejects.toThrow('文件内容与声明的类型不符')
+    expect(storage.streamedKeys).toHaveLength(0)
+    expect(storage.deleteCalls).toHaveLength(0)
+  })
+
+  it('rejects an image/png declared file whose body is not PNG', async () => {
+    const storage = new TestStorage()
+    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+
+    await expect(uploadAsset({
+      file: new File(['just text'], 'image.png', { type: 'image/png' }),
+      userId: 'user_1',
+      kindParam: null,
+      storage,
+      repository,
+      config: testAssetConfig,
+    })).rejects.toThrow('文件内容与声明的类型不符')
   })
 })
 

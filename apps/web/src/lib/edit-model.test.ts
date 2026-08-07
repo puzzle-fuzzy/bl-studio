@@ -9,7 +9,6 @@ import {
 
 function model(overrides: Partial<ModelCatalogItem> & Pick<ModelCatalogItem, 'id'>): ModelCatalogItem {
   return {
-    id: overrides.id,
     provider: 'dashscope',
     providerModel: overrides.id,
     displayName: overrides.id,

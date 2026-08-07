@@ -1,6 +1,10 @@
+import { createWriteStream } from 'node:fs'
 import { mkdir, readFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { dirname, isAbsolute, posix, relative, resolve } from 'node:path'
-import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from './types'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
+import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
 
 export interface LocalStorageAdapterOptions {
   rootDir: string
@@ -44,6 +48,28 @@ export class LocalStorageAdapter implements StorageAdapter {
       key: safeKey,
       url: localUrl(this.options.publicBaseUrl, safeKey),
       byteSize: input.body.byteLength,
+    }
+  }
+
+  async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
+    // P1-16：流式落盘，大上传不整块载入内存。字节数用 TransformStream 边流边计，
+    // 不依赖调用方上报。大小护栏与 writeObject 一致由调用方保证。
+    const fullKey = this.resolveWriteKey(input.key)
+    const safeKey = sanitizeKey(fullKey)
+    const target = resolveLocalStoragePath(this.options.rootDir, safeKey)
+    await mkdir(dirname(target), { recursive: true })
+    // DOM lib 与 node:stream/web 的 ReadableStream 类型结构不兼容，运行时两者等价。
+    const source = Readable.fromWeb(input.stream as unknown as NodeReadableStream)
+    let byteSize = 0
+    source.on('data', (chunk: Uint8Array) => {
+      byteSize += chunk.byteLength
+    })
+    await pipeline(source, createWriteStream(target))
+    return {
+      provider: this.provider,
+      key: safeKey,
+      url: localUrl(this.options.publicBaseUrl, safeKey),
+      byteSize,
     }
   }
 

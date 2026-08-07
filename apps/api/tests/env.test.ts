@@ -9,7 +9,7 @@ describe('API environment boundary', () => {
     })).toMatchObject({
       databaseUrl: 'postgres://db/bailian-studio',
       authJwtSecret: 'dev-secret-change-me',
-      authPublicWebOrigin: 'http://localhost:5004',
+      authPublicWebOrigin: 'http://localhost:5002',
     })
   })
 

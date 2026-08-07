@@ -205,7 +205,8 @@ export function UserListPage() {
     setGrantBusy(true)
     setGrantError(null)
     try {
-      await apiClient.adminBatchGrantPoints({
+      // P1-19：以服务端实际成功数反馈，不再把请求数当成功数（单用户失败不整批回滚）。
+      const result = await apiClient.adminBatchGrantPoints({
         userIds: [...selected],
         amountCents,
         reason: grantForm.reason.trim(),
@@ -213,7 +214,11 @@ export function UserListPage() {
       })
       setGrantOpen(false)
       setGrantForm({ amountCents: '', reason: '' })
-      setError(`已赠送 ${selectedCount} 位用户各 ${amountCents} 积分`)
+      setError(
+        result.failed.length === 0
+          ? `已赠送 ${result.granted} 位用户各 ${amountCents} 积分`
+          : `已赠送 ${result.granted} 位用户，${result.failed.length} 位失败`,
+      )
       void load(page)
     } catch (err) {
       setGrantError(userErrorMessage(err))

@@ -9,6 +9,9 @@ import { createTestApp } from '../src/test-app'
 import { generateAvatarSvg } from '../src/lib/avatar'
 import { createFakeAuthService } from './fake-auth-service'
 
+/** P1-16：真实 PNG 魔数头，让「合法上传」用例通过 sniff 校验。 */
+const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
 /** 本地适配器（无 deleteObject）：记录写与读请求，便于断言。 */
 class TestStorage implements StorageAdapter {
   readonly provider = 'local' as const
@@ -63,7 +66,7 @@ function authed(url: string, init: RequestInit = {}): Request {
   return new Request(url, { ...init, headers })
 }
 
-async function makeAvatarForm(fileName: string, fileType: string, body: string): Promise<FormData> {
+async function makeAvatarForm(fileName: string, fileType: string, body: string | Uint8Array<ArrayBuffer>): Promise<FormData> {
   const form = new FormData()
   form.set('file', new File([body], fileName, { type: fileType }))
   return form
@@ -154,7 +157,7 @@ describe('POST /api/auth/avatar', () => {
     const { app, storage, auditInputs } = createTestContext(() => null)
     const response = await app.handle(authed('http://localhost/api/auth/avatar', {
       method: 'POST',
-      body: await makeAvatarForm('me.png', 'image/png', 'png-bytes'),
+      body: await makeAvatarForm('me.png', 'image/png', PNG_MAGIC),
     }))
     expect(response.status).toBe(200)
     const body = await response.json() as { success: boolean; data: { user: { hasAvatar: boolean } } }

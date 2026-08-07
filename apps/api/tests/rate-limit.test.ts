@@ -38,22 +38,25 @@ describe('API rate limiting', () => {
     expect(rateLimitRule(new Request('http://localhost/api/generations', { method: 'GET' }), config)).toBeUndefined()
   })
 
-  it('exempts community write endpoints from rate limiting (gallery / prompt-library / feedback)', () => {
-    const config = readApiRateLimitConfig({ API_RATE_LIMIT_AUTH_PER_MINUTE: '3' })
+  it('applies a low-frequency community bucket to gallery / prompt-library / feedback writes', () => {
+    const config = readApiRateLimitConfig({
+      API_RATE_LIMIT_AUTH_PER_MINUTE: '3',
+      API_RATE_LIMIT_COMMUNITY_PER_MINUTE: '6',
+    })
 
-    // 社区写端点豁免（有意偏离标准实践，见 rate-limit.ts 注释）。
-    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/like', { method: 'POST' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/like', { method: 'DELETE' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/favorite', { method: 'POST' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/visibility', { method: 'PATCH' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/prompt-library', { method: 'POST' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/prompt-library/item-id', { method: 'DELETE' }), config)).toBeUndefined()
-    expect(rateLimitRule(new Request('http://localhost/api/feedback', { method: 'POST' }), config)).toBeUndefined()
+    // P1-18：社区写端点配独立低频桶，不再豁免。
+    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/like', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/like', { method: 'DELETE' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/favorite', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/gallery/generations/id/visibility', { method: 'PATCH' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/prompt-library', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/prompt-library/item-id', { method: 'DELETE' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/feedback', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
 
-    // 非社区端点仍受限。
+    // 非社区端点仍走各自专用桶。
     expect(rateLimitRule(new Request('http://localhost/api/auth/login', { method: 'POST' }), config)).toEqual({ bucket: 'auth', limit: 3 })
-    expect(rateLimitRule(new Request('http://localhost/api/generations', { method: 'POST' }), config)).toBeDefined()
-    // admin 治理不受豁免（仍走通用 write 桶）。
+    expect(rateLimitRule(new Request('http://localhost/api/generations', { method: 'POST' }), config)).toEqual({ bucket: 'generation', limit: config.generationRequestsPerMinute })
+    // admin 治理不走 community 桶（仍由通用 write 兜底）。
     expect(rateLimitRule(new Request('http://localhost/api/admin/gallery/generations/id/hide', { method: 'POST' }), config)).toEqual({ bucket: 'write', limit: config.requestsPerMinute })
   })
 })

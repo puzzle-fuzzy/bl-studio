@@ -192,31 +192,37 @@
 ### 2.2 API 层
 
 ### P1-16 · 上传把整个文件读进内存 + MIME 只信客户端声明
+> ✅ 已处理（2026-08-08，本批）——StorageAdapter 新增可选 `writeObjectStream` 流式写（local/OSS 皆实现），assets 与头像上传走流式路径；新增 `apps/api/src/lib/file-sniff.ts` 魔数嗅探（PNG/JPEG/WebP/WAV/MP3/OGG/MP4/WebM 头，64 字节采样），类型不符抛 400；测试 fixtures 改用真实魔数字节并新增流式 + 拒检用例。
 - **位置**：[assets/service.ts:96-115](apps/api/src/modules/assets/service.ts#L96-L115)（`Buffer.from(await file.arrayBuffer())` + 只判 `file.type`）；[auth/routes.ts:332-342](apps/api/src/modules/auth/routes.ts#L332-L342)（头像 2MB 同理）
 - **问题**：`maxAssetSizeBytes` 默认 100MB、multipart 上限 120MB，但 `arrayBuffer()` 一次性载入进程内存；只信客户端 Content-Type，从不校验魔数。
 - **影响**：并发上传即可 OOM；「image/png」可实际装载任意内容。`nosniff` + OSS 独立域缓解了存储型 XSS，但滥用面仍在。
 - **修法**：改流式 `pipeTo` 存储适配器（不要 arrayBuffer）；对媒体做魔数二次校验（PNG/JPEG/WebP/MP4 头）。
 
 ### P1-17 · SSE 重连回放硬编码 limit=500 且不翻页
+> ✅ 已处理（2026-08-08，本批）——`replayGenerationEvents` 按 `afterId → afterCursor` 循环翻页（每页 500、上限 20 页）；`cursor-expired` 改从 410 换为 200 SSE 单事件后关闭，前端 `use-generation-events` 收到即 close + 重新连接（新 EventSource 无 Last-Event-ID 自然重头拉取）。新增翻页单测 3 条。
 - **位置**：[generations/routes.ts:158-172](apps/api/src/modules/generations/routes.ts#L158-L172)
 - **问题**：带 `Last-Event-ID` 只拉一次 500 条；断线期间 >500 事件即永久丢失，且 `.catch(() => {})` 静默吞掉。次级问题：`EVENT_CURSOR_EXPIRED`(410) 时浏览器 EventSource 读不到响应体，会带同一 Last-Event-ID 无限重试。
 - **修法**：回放循环翻页追平到最新游标；410 时返回终止重试的信号（close 连接让前端 refetch）。
 
 ### P1-18 · 社区写端点整体豁免限流 + trustProxy 信任 XFF 首跳
+> ✅ 已处理（2026-08-08，本批）——新增 `community` 低频桶（`API_RATE_LIMIT_COMMUNITY_PER_MINUTE`，prod 30/分、dev 120/分）覆盖 gallery/prompt-library/feedback 写端点，取消豁免；生产 nginx 已核实为 `$proxy_add_x_forwarded_for`（首跳可伪造），已改为 `proxy_set_header X-Forwarded-For $remote_addr;` 覆写使首跳恒为真实客户端 IP，并在生产校验强制 `API_TRUST_PROXY=true`。测试更新为断言 community 桶。
 - **位置**：[rate-limit.ts:106-113,125,139-146](apps/api/src/lib/rate-limit.ts#L106-L113)（gallery/prompt-library/feedback 写请求不参与限流，注释声明为有意）
 - **影响**：点赞/收藏/提示词入库/反馈提交无频率限制，可被脚本批量刷，且每条点赞/收藏还写社交通知并触发 SSE，形成通知洪泛面；XFF 首跳若未被 nginx 覆写即可伪造绕过其它桶（**需核实**生产 nginx 是否覆写）。
 - **修法**：社区写端点补低频 per-IP/per-user 桶（30~60 次/分）；`clientIdentity` 用 nginx 覆写后的 XFF 或按会话 userId 计数。
 
 ### P1-19 · 批量操作的结果与真实状态不符
+> ✅ 已处理（2026-08-08，本批）——`adminBatchBan/Unban/DeleteUsers` 签名改为 `Promise<number>` 返回实际生效行数，routes 返回 `{ affected, requested }`；`batch-grant-points` 改为逐用户 try/catch（单户失败不拖垮整批），响应返回 `{ granted, results, failed }`（failed 为失败 userId 列表），`BatchGrantPointsResponseSchema` 同步加 `failed`，admin 前端按 failed 长度给出精确提示；审计 metadata 的失败 id 列表以逗号拼接（`AuditEventMetadataValue` 只收标量）。
 - **位置**：[admin/routes.ts:271,288,306](apps/api/src/modules/admin/routes.ts#L271)（`affected: targets.length` 返回请求目标数而非实际翻牌行数）；[:323-341](apps/api/src/modules/admin/routes.ts#L323)（`batch-grant-points` 用 `Promise.all`，任一失败 → 整体 500 + 审计记 failed，但已成功用户已入账）
 - **修法**：repository 批量语句返回 `rowCount`；grant 逐用户 try/catch 返回 `{ granted, failed }`。
 
 ### P1-20 · 畸形会话 cookie 触发 URIError → 500 而非「未登录」
+> ✅ 已处理（2026-08-08，本批）——`readCookie` 的 `decodeURIComponent` 包 try/catch，畸形转义按「无此 cookie」回落（正常走 401），新增 `cookies.test.ts` 4 条用例覆盖。
 - **位置**：[cookies.ts:28](apps/api/src/modules/auth/cookies.ts#L28)（`decodeURIComponent` 无 try/catch）
 - **影响**：任何带 `%zz` 等非法转义的 cookie 在受保护路由上 500（本应 401），并顺带触发 P1-03 的 message 泄漏。
 - **修法**：捕获后按无 cookie 处理。
 
 ### P1-21 · `env.ts` 默认 `AUTH_PUBLIC_WEB_ORIGIN=5004`，web dev 实际在 5002
+> ✅ 已处理（2026-08-08，本批）——回退值改 `http://localhost:5002`，`env.test.ts` 断言同步更新。
 - **位置**：[env.ts:35-37](apps/api/src/lib/env.ts#L35-L37)；该值驱动 GitHub OAuth `callbackUrl`（index.ts:108）
 - **影响**：本地未设环境变量时 GitHub 登录回调指向不存在的 5004，OAuth 失效（开发期坑，不触生产）。
 - **修法**：回退值改 `http://localhost:5002`。

@@ -166,12 +166,12 @@ export interface AuthService {
   adminBanUser(id: string): Promise<void>
   /** 管理后台：解除封禁。 */
   adminUnbanUser(id: string): Promise<void>
-  /** 管理后台：批量封禁（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。 */
-  adminBatchBanUsers(ids: string[]): Promise<void>
-  /** 管理后台：批量解除封禁。 */
-  adminBatchUnbanUsers(ids: string[]): Promise<void>
-  /** 管理后台：批量软删除（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。 */
-  adminBatchDeleteUsers(ids: string[]): Promise<void>
+  /** 管理后台：批量封禁（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。返回实际生效行数。 */
+  adminBatchBanUsers(ids: string[]): Promise<number>
+  /** 管理后台：批量解除封禁。返回实际生效行数。 */
+  adminBatchUnbanUsers(ids: string[]): Promise<number>
+  /** 管理后台：批量软删除（逐个吊销会话）。调用方须在 API 层剔除当前 admin 自身。返回实际生效行数。 */
+  adminBatchDeleteUsers(ids: string[]): Promise<number>
 }
 
 const DEFAULT_SESSION_TTL_SECONDS = 7 * 24 * 60 * 60
@@ -795,26 +795,33 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
     },
 
     async adminBatchBanUsers(ids) {
-      if (ids.length === 0) return
+      if (ids.length === 0) return 0
       const bannedAt = now()
+      // P1-19：返回实际生效行数，而非请求目标数——已在封禁中/不存在的行不计入。
+      let affected = 0
       await options.db.transaction(async tx => {
-        await setUsersBanned(tx, { userIds: ids, bannedAt, bannedBy: 'admin.user.ban' })
+        affected = await setUsersBanned(tx, { userIds: ids, bannedAt, bannedBy: 'admin.user.ban' })
         for (const id of ids) await revokeAllSessions(tx, id, bannedAt)
       })
+      return affected
     },
 
     async adminBatchUnbanUsers(ids) {
-      if (ids.length === 0) return
-      await clearUsersBanned(options.db, ids, now())
+      if (ids.length === 0) return 0
+      // P1-19：同上，返回实际解除封禁的行数。
+      return clearUsersBanned(options.db, ids, now())
     },
 
     async adminBatchDeleteUsers(ids) {
-      if (ids.length === 0) return
+      if (ids.length === 0) return 0
       const deletedAt = now()
+      // P1-19：返回实际软删除的行数（已删除/不存在的行不计入）。
+      let affected = 0
       await options.db.transaction(async tx => {
-        await softDeleteUsersRecord(tx, ids, deletedAt)
+        affected = await softDeleteUsersRecord(tx, ids, deletedAt)
         for (const id of ids) await revokeAllSessions(tx, id, deletedAt)
       })
+      return affected
     },
   }
 }

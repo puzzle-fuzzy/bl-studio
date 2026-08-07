@@ -766,7 +766,10 @@ export const BatchAffectedResponseSchema = z.object({
 })
 
 export const BatchGrantPointsResponseSchema = z.object({
+  /** 实际成功入账的用户数（不再等于请求数）。 */
   granted: z.number(),
+  /** 失败的 userId 列表；空数组表示整批成功。 */
+  failed: z.array(z.string()),
   results: z.array(z.object({
     userId: z.string(),
     balance: CreditBalanceSchema,

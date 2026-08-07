@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 import { AuthError } from '@bailian-studio/auth'
+import type { CreditBalance } from '@bailian-studio/credit-ledger'
 import type { AdminGalleryItem, GenerationArtifact } from '@bailian-studio/generation-repository'
 import { createLogger, validateInput } from '@bailian-studio/shared'
 import { listModels } from '@bailian-studio/model-core'
@@ -258,7 +259,8 @@ export function createAdminRoutes(deps: ApiDependencies) {
       if (targets.length === 0) {
         throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
       }
-      await deps.authService.adminBatchBanUsers(targets)
+      // P1-19：affected 返回 repository 实际生效行数，而非请求目标数。
+      const affected = await deps.authService.adminBatchBanUsers(targets)
       // 封禁联动：批量隐藏其公开作品（hygiene）。
       for (const userId of targets) await hideUserPublicWorksBestEffort(userId, actor.id)
       await recordApiAuditEvent(deps.generationRepository, request, {
@@ -266,9 +268,9 @@ export function createAdminRoutes(deps: ApiDependencies) {
         action: 'admin.user.ban',
         outcome: 'succeeded',
         targetType: 'user',
-        metadata: { count: targets.length, excludedSelf: userIds.length - targets.length },
+        metadata: { count: affected, requested: targets.length, excludedSelf: userIds.length - targets.length },
       })
-      return { success: true, data: { affected: targets.length } }
+      return { success: true, data: { affected, requested: targets.length } }
     })
     .post('/api/admin/users/batch-unban', async ({ request, body }) => {
       const actor = await requireAdminUser(request, deps.authService)
@@ -277,15 +279,15 @@ export function createAdminRoutes(deps: ApiDependencies) {
       if (targets.length === 0) {
         throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
       }
-      await deps.authService.adminBatchUnbanUsers(targets)
+      const affected = await deps.authService.adminBatchUnbanUsers(targets)
       await recordApiAuditEvent(deps.generationRepository, request, {
         userId: actor.id,
         action: 'admin.user.unban',
         outcome: 'succeeded',
         targetType: 'user',
-        metadata: { count: targets.length },
+        metadata: { count: affected, requested: targets.length },
       })
-      return { success: true, data: { affected: targets.length } }
+      return { success: true, data: { affected, requested: targets.length } }
     })
     .post('/api/admin/users/batch-delete', async ({ request, body }) => {
       const actor = await requireAdminUser(request, deps.authService)
@@ -295,15 +297,15 @@ export function createAdminRoutes(deps: ApiDependencies) {
         throw new AuthError('AUTH_FORBIDDEN', '批量操作不能包含自己的账号')
       }
       try {
-        await deps.authService.adminBatchDeleteUsers(targets)
+        const affected = await deps.authService.adminBatchDeleteUsers(targets)
         await recordApiAuditEvent(deps.generationRepository, request, {
           userId: actor.id,
           action: 'admin.user.delete',
           outcome: 'succeeded',
           targetType: 'user',
-          metadata: { count: targets.length, excludedSelf: userIds.length - targets.length },
+          metadata: { count: affected, requested: targets.length, excludedSelf: userIds.length - targets.length },
         })
-        return { success: true, data: { affected: targets.length } }
+        return { success: true, data: { affected, requested: targets.length } }
       } catch (error) {
         await recordApiAuditEvent(deps.generationRepository, request, {
           userId: actor.id,
@@ -319,8 +321,12 @@ export function createAdminRoutes(deps: ApiDependencies) {
       const actor = await requireAdminUser(request, deps.authService)
       const input = validateInput(BatchGrantPointsSchema, body)
       const requestId = getRequestTrace(request)?.requestId
-      try {
-        const results = await Promise.all(input.userIds.map(async userId => {
+      // P1-19：逐用户 try/catch，单个用户失败不拖垮整批——成功用户照常入账并随
+      // 响应返回；响应同时带出失败用户 id，供前端精确提示。
+      const results: Array<{ userId: string; balance: CreditBalance }> = []
+      const failedUserIds: string[] = []
+      for (const userId of input.userIds) {
+        try {
           const result = await deps.creditLedger.grant({
             userId,
             amountCents: input.amountCents,
@@ -329,26 +335,26 @@ export function createAdminRoutes(deps: ApiDependencies) {
             actorUserId: actor.id,
             ...(requestId !== undefined ? { requestId } : {}),
           })
-          return { userId, balance: result.balance }
-        }))
-        await recordApiAuditEvent(deps.generationRepository, request, {
-          userId: actor.id,
-          action: 'points.grant',
-          outcome: 'succeeded',
-          targetType: 'user',
-          metadata: { count: input.userIds.length, amountCents: input.amountCents },
-        })
-        return { success: true, data: { granted: input.userIds.length, results } }
-      } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
-          userId: actor.id,
-          action: 'points.grant',
-          outcome: 'failed',
-          targetType: 'user',
-          metadata: { count: input.userIds.length, amountCents: input.amountCents, errorCode: auditErrorCode(error) },
-        })
-        throw error
+          results.push({ userId, balance: result.balance })
+        } catch {
+          failedUserIds.push(userId)
+        }
       }
+      const failedCount = failedUserIds.length
+      await recordApiAuditEvent(deps.generationRepository, request, {
+        userId: actor.id,
+        action: 'points.grant',
+        outcome: failedCount === 0 ? 'succeeded' : 'failed',
+        targetType: 'user',
+        metadata: {
+          granted: results.length,
+          failed: failedCount,
+          amountCents: input.amountCents,
+          // AuditEventMetadataValue 只接受标量，失败 id 列表以逗号拼接落审计。
+          ...(failedCount > 0 ? { failedUserIds: failedUserIds.join(',') } : {}),
+        },
+      })
+      return { success: true, data: { granted: results.length, failed: failedUserIds, results } }
     })
     .get('/api/admin/users/:userId/assets', async ({ request, params, query }) => {
       await requireAdminUser(request, deps.authService)

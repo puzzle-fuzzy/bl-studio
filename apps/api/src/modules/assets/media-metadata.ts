@@ -1,6 +1,10 @@
-import { mkdir, rm, writeFile } from 'node:fs/promises'
+import { createWriteStream } from 'node:fs'
+import { mkdir, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
 import { spawnProcess } from '@bailian-studio/shared'
 
 export interface ProbeMediaDurationOptions {
@@ -18,7 +22,8 @@ export async function probeMediaDuration(
   await mkdir(workDir, { recursive: true })
 
   try {
-    await writeFile(inputPath, new Uint8Array(await file.arrayBuffer()))
+    // P1-16：流式写临时文件，避免 ffprobe 前整块载入进程内存。
+    await pipeline(Readable.fromWeb(file.stream() as unknown as NodeReadableStream), createWriteStream(inputPath))
     const output = await (options.runProbe ?? runFfprobe)(
       options.ffprobePath ?? 'ffprobe',
       inputPath,

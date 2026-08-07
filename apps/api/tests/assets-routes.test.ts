@@ -17,6 +17,9 @@ import type {
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
+/** P1-16：测试夹具用真实 PNG 魔数头，避免被新加的 sniff 校验拒绝。 */
+const PNG_MAGIC = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+
 let isolated!: IsolatedGenerationRepository
 let currentUserId = 'asset_owner'
 let app: ReturnType<typeof createTestApp>['app']
@@ -349,7 +352,7 @@ describe('asset routes', () => {
 
   it('audits successful uploads and link imports without persisting URLs in metadata', async () => {
     const uploadForm = new FormData()
-    uploadForm.set('file', new File(['image'], 'reference.png', { type: 'image/png' }))
+    uploadForm.set('file', new File([PNG_MAGIC], 'reference.png', { type: 'image/png' }))
     const uploadResponse = await app.handle(authed('http://localhost/api/assets/upload', {
       method: 'POST',
       body: uploadForm,

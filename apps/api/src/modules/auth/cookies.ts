@@ -25,7 +25,14 @@ export function readCookie(cookieHeader: string | null, name: string): string | 
     const key = part.slice(0, eq).trim()
     if (key === name) {
       const value = part.slice(eq + 1).trim()
-      return value.length > 0 ? decodeURIComponent(value) : undefined
+      if (value.length === 0) return undefined
+      // P1-20：畸形转义（如 %zz）会抛 URIError；按「无此 cookie」处理，
+      // 让后续 auth 校验正常回落为 401，而不是 500。
+      try {
+        return decodeURIComponent(value)
+      } catch {
+        return undefined
+      }
     }
   }
   return undefined

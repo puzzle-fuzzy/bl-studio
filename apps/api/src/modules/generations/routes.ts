@@ -14,6 +14,7 @@ import {
   type DailyGenerationUsage,
   type GenerationEstimate,
   type GenerationEvent,
+  type GenerationRepository,
 } from '@bailian-studio/generation-repository'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
@@ -40,6 +41,16 @@ const RetryGenerationSchema = z.object({
 }).strict().optional()
 
 const SSE_HEARTBEAT_INTERVAL_MS = 15_000
+
+/** P1-17：回放每页大小与最大页数。逐页翻直到一页不满或达到上限，追平最新游标。 */
+const REPLAY_PAGE_SIZE = 500
+const REPLAY_MAX_PAGES = 20
+
+const SSE_RESPONSE_HEADERS = {
+  'content-type': 'text/event-stream; charset=utf-8',
+  'cache-control': 'no-cache, no-transform',
+  connection: 'keep-alive',
+} as const
 
 export function createGenerationRoutes(deps: ApiDependencies) {
   const repository = deps.generationRepository
@@ -118,10 +129,13 @@ export function createGenerationRoutes(deps: ApiDependencies) {
     if (lastEventId !== undefined && lastEventId.length > 0) {
       const cursor = await repository.getGenerationEvent(lastEventId, user.id)
       if (cursor === undefined) {
-        throw new GenerationRepositoryError(
-          'EVENT_CURSOR_EXPIRED',
-          'SSE event cursor is no longer available; refetch the generation record before reconnecting.',
-        )
+        // P1-17：浏览器 EventSource 读不到 410 响应体，会带同一个 Last-Event-ID
+        // 无限重试。改为在 200 SSE 流内发 `cursor-expired` 事件后立即关闭：
+        // 前端收到后重建 EventSource（无 Last-Event-ID）一次性重新追平。
+        return sseResponseWithSingleEvent(encodeSSE({
+          event: 'cursor-expired',
+          data: { serverTime: new Date().toISOString() },
+        }))
       }
     }
 
@@ -157,7 +171,8 @@ export function createGenerationRoutes(deps: ApiDependencies) {
         unsubscribe = subscription.unsubscribe
         for (const chunk of subscription.buffered) send(chunk)
         if (lastEventId !== undefined && lastEventId.length > 0) {
-          void repository.listGenerationEvents({ userId: user.id, afterId: lastEventId, limit: 500 })
+          // P1-17：分页追平，而不是只拉一页 500 条——断线期间超过 500 事件也逐页补齐。
+          void replayGenerationEvents(repository, { userId: user.id, afterId: lastEventId })
             .then(events => {
               for (const event of events) {
                 if (sentEventIds.has(event.id)) continue
@@ -178,11 +193,7 @@ export function createGenerationRoutes(deps: ApiDependencies) {
       },
       cancel: cleanup,
     }), {
-      headers: {
-        'content-type': 'text/event-stream; charset=utf-8',
-        'cache-control': 'no-cache, no-transform',
-        connection: 'keep-alive',
-      },
+      headers: SSE_RESPONSE_HEADERS,
     })
   })
   .get('/', async ({ request, query }) => {
@@ -480,6 +491,43 @@ function readSseEventId(chunk: string): string | undefined {
   const line = chunk.split('\n').find(value => value.startsWith('id:'))
   const id = line?.slice(3).trim()
   return id === undefined || id.length === 0 ? undefined : id
+}
+
+/**
+ * P1-17：分页回放 Last-Event-ID 之后的事件，追平到最新游标。
+ * 以最后一页的事件 (id, createdAt) 作下页 afterCursor，直到一页不满
+ * （已到最新）或达到页数上限（极端追不回时交给实时流 + 前端重建游标兜底）。
+ */
+export async function replayGenerationEvents(
+  repository: Pick<GenerationRepository, 'listGenerationEvents'>,
+  input: { userId: string; afterId: string },
+): Promise<GenerationEvent[]> {
+  const events: GenerationEvent[] = []
+  let cursor: { id: string; createdAt: string } | undefined
+  for (let page = 0; page < REPLAY_MAX_PAGES; page++) {
+    const pageEvents = await repository.listGenerationEvents({
+      userId: input.userId,
+      ...(cursor === undefined ? { afterId: input.afterId } : { afterCursor: cursor }),
+      limit: REPLAY_PAGE_SIZE,
+    })
+    events.push(...pageEvents)
+    if (pageEvents.length < REPLAY_PAGE_SIZE) return events
+    const last = pageEvents[pageEvents.length - 1]
+    if (last === undefined) return events
+    cursor = { id: last.id, createdAt: last.createdAt }
+  }
+  return events
+}
+
+/** P1-17：构造一个发送单个 SSE 事件后立即关闭的响应（cursor-expired 重试终止信号）。 */
+function sseResponseWithSingleEvent(chunk: string): Response {
+  const encoder = new TextEncoder()
+  return new Response(new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode(chunk))
+      controller.close()
+    },
+  }), { headers: SSE_RESPONSE_HEADERS })
 }
 
 function generationEventFromRepositoryEvent(event: GenerationEvent) {
