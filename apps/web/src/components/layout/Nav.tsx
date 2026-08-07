@@ -19,11 +19,11 @@ import { NotificationMenu } from '@/components/layout/NotificationMenu'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
 
-// 主导航：任务列表已并入创作页「最新任务」；作品库改名「资产」；模型目录改名「全部模型」。
+// 主导航：画廊即「首页」置顶；任务列表已并入创作页「最新任务」；作品库改名「资产」；模型目录改名「全部模型」。
 const NAV_ITEMS = [
+  { to: '/gallery', label: '首页', icon: Images },
   { to: '/create', label: '创作', icon: Brush },
   { to: '/catalog', label: '全部模型', icon: Sparkles },
-  { to: '/gallery', label: '社区', icon: Images },
   { to: '/prompts', label: '提示词', icon: Bookmark },
   { to: '/functions', label: '辅助工具', icon: Wrench },
   { to: '/library', label: '资产', icon: Library },

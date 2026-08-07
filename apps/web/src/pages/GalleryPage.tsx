@@ -266,7 +266,7 @@ export function GalleryPage() {
   return (
     <div className="mx-auto max-w-7xl space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-lg font-semibold">社区画廊</h1>
+        <h1 className="text-lg font-semibold">画廊</h1>
         <div className="flex flex-wrap items-center gap-2">
           <Select value={tab} onValueChange={value => changeTab(value as GalleryTab)}>
             <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>

@@ -64,13 +64,13 @@ export function MediaLightbox({
         {count > 1 && <span className="shrink-0 text-white/60">{index + 1} / {count}</span>}
       </div>
 
-      {/* 大图区域 */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center" onClick={stop}>
+      {/* 大图区域：媒体居中，下载按钮竖排在图片右侧（圆形纯图标）。 */}
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center gap-5" onClick={stop}>
         {current?.kind === 'image' && url !== undefined && (
-          <img src={url} alt="" className="max-h-full max-w-full object-contain" />
+          <img src={url} alt="" className="max-h-full max-w-[calc(100%-4rem)] object-contain" />
         )}
         {current?.kind === 'video' && url !== undefined && (
-          <video src={url} controls autoPlay className="max-h-full max-w-full" />
+          <video src={url} controls autoPlay className="max-h-full max-w-[calc(100%-4rem)]" />
         )}
         {current?.kind === 'audio' && url !== undefined && (
           <audio src={url} controls autoPlay className="w-full max-w-lg" />
@@ -79,6 +79,20 @@ export function MediaLightbox({
           <p className="max-h-full max-w-2xl overflow-y-auto whitespace-pre-wrap text-sm text-white/90">
             {current.text ?? '(空文本)'}
           </p>
+        )}
+        {downloadUrl !== undefined && (
+          <a
+            href={downloadUrl}
+            target="_blank"
+            rel="noreferrer"
+            download
+            onClick={stop}
+            aria-label="下载"
+            title="下载"
+            className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
+          >
+            <Download className="size-5" />
+          </a>
         )}
       </div>
 
@@ -108,21 +122,6 @@ export function MediaLightbox({
             <ChevronRight className="size-5" />
           </button>
         </>
-      )}
-
-      {/* 下载 */}
-      {downloadUrl !== undefined && (
-        <a
-          href={downloadUrl}
-          target="_blank"
-          rel="noreferrer"
-          download
-          onClick={stop}
-          className="mt-3 inline-flex items-center gap-2 rounded-md bg-white/10 px-4 py-2 text-sm text-white/90 hover:bg-white/20"
-        >
-          <Download className="size-4" />
-          下载
-        </a>
       )}
 
       {/* 缩略图行（多图时） */}

@@ -71,34 +71,54 @@ export function CreatePage() {
   }, [loadModels])
 
   // `?reuse=<id>` 深链：从历史生成记录还原模型与全部参数（含参考图）。
+  // 每个 reuse id 只在首次进入时还原一次：还原完成（或失败）后用 ref 记录，
+  // 之后用户切换模型不会再被记录里的模型弹回（此前 effect 依赖 modelId/model，
+  // 切换模型即重新还原并 setModelId 弹回，导致级联末级 select「选不中」）。
   const reuseId = searchParams.get('reuse')
+  const handledReuseRef = useRef<string | null>(null)
   useEffect(() => {
     if (reuseId === null) return
+    if (handledReuseRef.current === reuseId) return
     let cancelled = false
     setIsRestoring(true)
     apiClient
       .getGeneration(reuseId)
       .then(record => {
         if (cancelled) return
-        if (modelId !== record.modelId) {
-          setModelId(record.modelId)
-          return
-        }
-        if (model === undefined) return
-        void restoreRecordParams(record.inputParams, record.assetRefs, model).then(restored => {
-          if (!cancelled) {
-            setValues(restored.values)
-          }
+        const recordModel = selectModelById(models, record.modelId)
+        if (recordModel === undefined) return // 目录未就绪：本次作罢，models 就绪后由 effect 再次触发
+        setModelId(record.modelId)
+        void restoreRecordParams(record.inputParams, record.assetRefs, recordModel).then(restored => {
+          if (cancelled) return
+          handledReuseRef.current = reuseId
+          setValues(restored.values)
         })
       })
-      .catch(() => undefined)
+      .catch(() => {
+        handledReuseRef.current = reuseId
+      })
       .finally(() => {
         if (!cancelled) setIsRestoring(false)
       })
     return () => {
       cancelled = true
     }
-  }, [reuseId, modelId, model])
+  }, [reuseId, models])
+
+  // 从带深链参数（?reuse= / ?params= / ?edit= / ?ref=）进入 /create 后，再导航到
+  // 无参 /create（如点侧栏「创作」）时重置为空白表单。React Router 同路由仅 query
+  // 变化不会重挂组件，还原进本地 useState 的内容需显式清空。
+  const deepLinkKeys = ['reuse', 'params', 'edit', 'ref', 'select'] as const
+  useEffect(() => {
+    const hasIntent = deepLinkKeys.some(key => searchParams.get(key) !== null)
+    if (hasIntent) return
+    setModelId(undefined)
+    setValues({})
+    setFieldErrors(new Map())
+    setSubmitError(null)
+    setEstimate(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams])
 
   // 切换模型：重建默认值、清空预估与错误
   useEffect(() => {
