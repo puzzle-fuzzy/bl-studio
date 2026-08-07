@@ -36,10 +36,11 @@
 ## 3. Owner 包职责边界
 
 ### packages/model-core（唯一数据源 + 纯函数校验层）
-- **拥有**：45 份 model manifest（parameters / rules / transport / pricing / output / request bindings）与纯函数校验/定价/状态分类（`validateModelParams`、`estimateModelCost`、`classifyTaskStatus`、`assertResponseShape`、`ModelCoreError`）。
+- **拥有**：51 份 model manifest（39 启用 / 12 个 vidu 暂未开通；parameters / rules / transport / pricing / output / request bindings / availability）与纯函数校验/定价/状态分类（`validateModelParams`、`estimateModelCost`、`classifyTaskStatus`、`assertResponseShape`、`ModelCoreError`）。
 - **禁止**：import SDK / adapter / provider-dashscope；加 HTTP 客户端、环境访问、数据库代码、运行时编排、第二份契约/价格表。
-- 每个启用的 manifest 必须在 Bailian operation requirement map 中**恰好出现一次**；未知/退役产品参数必须校验失败，绝不静默丢弃。
-- 改模型知识 = 改 manifest（transport/rules/pricing 与参数同步更新），跑 `pnpm run check:manifests`。
+- **可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`；`listModelCatalogItems()` 投影全部（含禁用项，前端置灰展示）。`availability.notActivated`（如 vidu 全家「暂未开通」）标注「key 已授权但产品卡未开通」的模型，必须配 `enabled: false`（registry-check 断言）且不能为空串。
+- 每个注册的 manifest 必须在 Bailian operation requirement map 中**恰好出现一次**（含暂未开通的禁用模型——其能力仍投影进 catalog）；未知/退役产品参数必须校验失败，绝不静默丢弃。
+- 改模型知识 = 改 manifest（transport/rules/pricing/availability 与参数同步更新），跑 `pnpm run check:manifests`。
 
 ### packages/provider-dashscope（协议执行层，worker 专属）
 - **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、provider 响应解析与错误分类。

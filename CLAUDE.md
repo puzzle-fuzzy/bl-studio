@@ -48,7 +48,8 @@ pnpm run db:push / db:push:test
 
 包边界是**可执行的架构**（`infra/scripts/check-package-boundaries.ts`，进 `verify`）：
 
-- **`@bailian-studio/model-core` 是唯一数据源**：45 份 manifest（transport/rules/pricing/parameters 全在 manifest 里）+ 纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 manifest，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
+- **`@bailian-studio/model-core` 是唯一数据源**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 manifest，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
+- **模型可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`。`notActivated`（如 vidu 全家「暂未开通」——key 已授权但百炼产品卡未开通）必须配 `enabled: false`（registry-check 断言），模型仍投影进前端 catalog 置灰 + 打 tag，但提交/worker 解析经 `getModelById` 一律拒绝。
 - `@bailian-studio/provider-dashscope` 是唯一受边界约束的执行包：**只允许 `apps/worker` 消费**（协议 `workspace:*`）；它是 worker 专属的 DashScope 传输/执行层。
 - **`apps/web` 可以直接 import model-core** 做提交前实时校验（提交 payload 与 `apps/web/src/lib/generation-submit.ts` 的 `buildValidationParams` 保持一致）。
 - 运行时应用**禁止**直接 import `@bailian-studio/db`——持久化走 repository/auth 包的 URL 工厂。
@@ -62,7 +63,7 @@ pnpm run db:push / db:push:test
 | 包 | 职责 |
 |---|---|
 | shared | 叶子：logger（敏感 key 脱敏）、metrics、错误基类、进程原语（spawn/sleep） |
-| model-core | **唯一数据源**：45 个 manifest（深冻结）+ 纯函数校验/定价/状态分类（前后端共享） |
+| model-core | **唯一数据源**：51 个 manifest（39 启用 / 12 个 vidu 暂未开通；深冻结）+ 纯函数校验/定价/状态分类（前后端共享） |
 | event-bus | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |
 | generation-repository | 生成记录/任务/产物/事件的持久化接缝（`FOR UPDATE SKIP LOCKED`） |
@@ -78,7 +79,7 @@ pnpm run db:push / db:push:test
 
 ## 模型知识维护工作流
 
-模型知识（transport / rules / pricing / parameters）只存在 `packages/model-core/src/manifests/`。改模型的流程：
+模型知识（transport / rules / pricing / parameters / availability）只存在 `packages/model-core/src/manifests/`。改模型的流程：
 
 1. **官网变更** → 运行 `pnpm run sync:bailian-docs` 看漂移报告（兼容面有机器清单；媒体生成面与定价没有，需人工比对官网文档）；
 2. **AI 读官网原文** → 更新对应 manifest（参数约束 / 传输端点 / 定价 rates / rules），保证 `pnpm run check:manifests` 通过；
@@ -86,15 +87,20 @@ pnpm run db:push / db:push:test
 
 **git 即版本**：没有外部 SDK、npm 发布或 hash 对账，改了 manifest 就是新版本。
 
+> **暂未开通模型**（当前 = vidu 全家 12 个）：key 里授权了但百炼产品卡没开通时，**不要删 manifest**，而是置
+> `availability: { enabled: false, stage: 'beta', notActivated: '暂未开通' }`——仍进前端 catalog 置灰展示（带 tag），
+> 但 `listModels` / 提交 / worker 解析一律排除。产品卡开通后改回 `enabled: true` 即上线。
+
 ## 前端约定（apps/web）
 
 - **状态**：zustand store（`src/stores/`），登录态登出时统一 `resetPrivateData()`（注册表机制）。
 - **SSE 只做失效**：`use-generation-events` 收到事件只 `refreshRecord(id)` + 失效资产缓存，不写数据。
-- **纯函数层**（`src/lib/`）可单测：参数投影、提示词引用转换、幂等指纹、错误本地化。
+- **纯函数层**（`src/lib/`）可单测：参数投影（`parameter-form-schema` / `parameter-validation`）、级联子模式（`model-modes`，含「暂未开通」置灰）、提示词引用转换（`reference-format`）、幂等指纹（`idempotency`）、失败详情（`generation-failure`）、分块恢复（`chunk-recovery`）、错误本地化（`user-error`）。
 - **UI 组件**一律用 shadcn/ui（`src/components/ui/`，60+ 组件）；样式用 Tailwind v4。
 - **不要写 UI/样式测试**——页面样式后续还会调整。前端测试只覆盖纯函数层（vitest + happy-dom）。
 - 动态参数表单用「索引 token」承载非 string 枚举值（Radix Select 限制）。
 - 提示词参考图：编辑态 `@图N` 中性标记 ↔ 提交时按模型 `referenceFormat` 转 provider 语法。
+- **模型级联选择器**（`ModelSelector`）：子模式由选中模型 capabilities 派生（单一事实源），避免「选中即弹回」；browse 态用于「某子模式全部模型暂未开通」时停留展示置灰项（anchoredId 锚定，选中模型一变即回归派生值）——当前各子模式仍有 ≥1 个启用模型（r2v 由 happyhorse-reference-video 支撑），browse 是防御机制。
 
 ### apps/admin（管理后台，同源 /admin）
 

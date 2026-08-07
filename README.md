@@ -5,7 +5,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本），由 **ba
 **本仓库的定位**：
 - 合并原 Vue（web-vue）与 React（web）两个前端为**单个 React 前端**（zustand + react-router + shadcn/ui + Tailwind v4 + react-window 虚拟滚动）；
 - 后端保留已验证的强架构（任务队列 + outbox + SSE、manifest 驱动、包边界门禁），并迁移工具链到 **pnpm + turbo**；
-- **bailian-hub 已并入本仓库**：`packages/model-core` 的 45 份 manifest 是唯一数据源（transport/rules/pricing 全在 manifest 里），纯函数校验（`validateModelParams` 等）前后端共享，git 即版本——无外部 SDK、npm 发布或 hash 对账仪式。
+- **bailian-hub 已并入本仓库**：`packages/model-core` 的 51 份 manifest 是唯一数据源（39 启用 / 12 个 vidu「暂未开通」置灰；transport/rules/pricing 全在 manifest 里），纯函数校验（`validateModelParams` 等）前后端共享，git 即版本——无外部 SDK、npm 发布或 hash 对账仪式。
 
 ## 技术栈
 
@@ -86,9 +86,11 @@ Web (apps/web, React 19 + zustand + shadcn/ui)   Admin (apps/admin, 同源 /admi
 
 ```text
 src/
-├── lib/          纯函数（可单测）：parameter-form-schema / reference-format /
-│                 creation-presets / idempotency / deeplink-params / generation-submit /
-│                 user-error / labels / money
+├── lib/          纯函数（可单测）：parameter-form-schema / parameter-validation /
+│                 model-modes（级联子模式+暂未开通置灰）/ reference-format /
+│                 generation-submit / generation-failure / idempotency /
+│                 chunk-recovery / creation-presets / deeplink-params /
+│                 user-error / model-description / labels / money
 ├── stores/       zustand：auth（含 auth-dialog）/ model-catalog / generations /
 │                 generation-artifacts / assets / reference-assets / credits /
 │                 notifications（登出统一 resetPrivateData）
