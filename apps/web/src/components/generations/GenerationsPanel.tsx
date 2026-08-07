@@ -69,8 +69,8 @@ function EmbeddedVariant({
   const [kindFilter, setKindFilter] = useState<KindFilter>('all')
   const [progressFilter, setProgressFilter] = useState<ProgressFilter>('all')
 
-  const recent = records.slice(0, 8)
-  const filtered = recent.filter(record => {
+  // 展示 store 已加载的全部最近任务（初始 30 条），由外层 VirtualScrollArea 限高滚动。
+  const filtered = records.filter(record => {
     if (kindFilter !== 'all' && recordKind(record, models) !== kindFilter) return false
     if (progressFilter !== 'all' && !matchesProgress(record.status, progressFilter)) return false
     return true
@@ -109,7 +109,7 @@ function EmbeddedVariant({
       </div>
       {filtered.length === 0 ? (
         <p className="py-4 text-center text-sm text-muted-foreground">
-          {isLoading ? '加载中…' : recent.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
+          {isLoading ? '加载中…' : records.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
         </p>
       ) : (
         // 无卡片包裹：列表项之间用分割线划分。

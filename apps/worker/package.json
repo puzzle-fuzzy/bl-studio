@@ -13,7 +13,6 @@
     "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@bailian-studio/bailian-adapter": "workspace:*",
     "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/media-repository": "workspace:*",

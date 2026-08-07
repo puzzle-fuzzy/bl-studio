@@ -76,7 +76,34 @@ export const funMusicV1: ModelManifest = {
       description: '预估生成音频时长，仅用于费用预估（实际时长由模型按歌词决定）',
     },
   ],
-  request: {
+    rules: [
+    {
+      kind: 'required-one-of',
+      fields: ['lyrics', 'prompt'],
+      minimum: 1,
+      code: 'REQUIRED_PARAMETER',
+      message: { 'zh-CN': '歌词与提示词至少提供一项', 'en-US': 'Provide at least one of lyrics or prompt' },
+    },
+    {
+      kind: 'text-length',
+      field: 'lyrics',
+      cjk: { min: 5, max: 350 },
+      other: { min: 5, max: 2000 },
+      modes: ['sync'],
+      code: 'OUT_OF_RANGE',
+      message: { 'zh-CN': '非流式歌词需为 5~350 个中文字符或 5~2000 个非中文字符', 'en-US': 'Non-streaming lyrics must be 5-350 Chinese characters or 5-2000 other characters' },
+    },
+    {
+      kind: 'text-length',
+      field: 'prompt',
+      cjk: { min: 1, max: 2000 },
+      other: { min: 1, max: 2000 },
+      modes: ['sync'],
+      code: 'OUT_OF_RANGE',
+      message: { 'zh-CN': '非流式 prompt 需为 1~2000 个字符', 'en-US': 'Non-streaming prompt must be 1-2000 characters' },
+    },
+  ],
+request: {
     kind: 'dashscope-audio-task',
     endpoint: '/services/audio/music/generation',
     bindings: {
@@ -97,7 +124,30 @@ export const funMusicV1: ModelManifest = {
     unit: 'per_second',
     quantityKey: 'duration',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 0.2 }],
+    rates: [
+      {
+        id: 'cn-beijing-output-second',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'second',
+        unitSize: 1,
+        unitPrice: '0.002',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/music/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
   },
   availability: { enabled: true, stage: 'beta' },
 }

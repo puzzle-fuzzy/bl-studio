@@ -3,9 +3,6 @@ import {
   getModelCatalogItemById,
   listModelCatalogItems,
 } from '@bailian-studio/model-core'
-import {
-  getBailianContractSnapshot,
-} from '@bailian-studio/bailian-adapter'
 import { requestErrorResponseBody } from '../../lib/http-errors'
 
 export const modelRoutes = new Elysia({ prefix: '/api/models' })
@@ -14,10 +11,6 @@ export const modelRoutes = new Elysia({ prefix: '/api/models' })
     data: {
       items: listModelCatalogItems(),
     },
-  }))
-  .get('/bailian-contract', () => ({
-    success: true,
-    data: getBailianContractSnapshot(),
   }))
   .get('/:id', ({ request, params, set }) => {
     const model = getModelCatalogItemById(params.id)

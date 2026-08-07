@@ -61,6 +61,7 @@ export const zImage: ModelManifest = {
       label: '随机种子',
       type: 'number',
       required: false,
+      min: 0, max: 2147483647, step: 1,
       description: '随机数种子，取值范围[0,2147483647]',
     },
   ],
@@ -80,10 +81,40 @@ export const zImage: ModelManifest = {
     unit: 'per_image',
     quantityKey: 'n',
     currency: 'CNY',
-    tiers: [
-      { condition: {}, priceCents: 10 },
-      { condition: { promptExtend: true }, priceCents: 20 },
+    rates: [
+      {
+        id: 'cn-beijing-prompt-extend-off-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.1',
+        conditions: { promptExtend: false },
+      },
+      {
+        id: 'cn-beijing-prompt-extend-on-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.2',
+        conditions: { promptExtend: true },
+      },
     ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
   },
   availability: { enabled: true, stage: 'stable' },
 }

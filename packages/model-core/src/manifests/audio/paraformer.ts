@@ -81,7 +81,40 @@ export const paraformerV1: ModelManifest = {
     unit: 'per_second',
     quantityKey: 'duration',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 0.008 }],
+    rates: [
+      {
+        id: 'cn-beijing-input-second',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'input',
+        unit: 'second',
+        unitSize: 1,
+        unitPrice: '0.00008',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'provider_async',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/asr/transcription',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+        { name: 'X-DashScope-Async', value: 'enable' },
+      ],
+    },
+    polling: {
+      method: 'GET',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/tasks/{taskId}',
+      headers: [{ name: 'Authorization' }],
+      taskIdPath: '/output/task_id',
+      statusPath: '/output/task_status',
+      succeededValues: ['SUCCEEDED'],
+      failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
+    },
   },
   availability: { enabled: true, stage: 'beta' },
 }

@@ -1,36 +1,23 @@
-import {
-  getBailianContractSnapshot,
-} from '@bailian-studio/bailian-adapter'
+import { listModels } from '@bailian-studio/model-core'
 
 export interface BailianRuntimeSnapshot {
-  readonly sdkVersion: string
-  readonly catalogRevision: string
-  readonly catalogHash: string
-  readonly requirementsHash: string
-  readonly maintenance: 'manual' | 'official-sync'
-  readonly sourceImportedAt: string
-  readonly totalRequirements: number
-  readonly coveredRequirements: number
-  readonly legacyRequirements: number
-  readonly coveredConsumerIds: readonly string[]
+  readonly modelCount: number
+  readonly enabledModelCount: number
+  readonly provider: string
+  readonly maintenance: 'manual'
 }
 
 /**
- * Worker 启动门禁：目录版本或覆盖矩阵不一致时直接阻止启动，同时返回可记录的
- * 不可变版本快照，便于从日志确认生产环境实际加载了哪次官网同步。
+ * Worker 启动快照：model-core 是唯一数据源，注册表一致性由 model-core 模块加载时
+ * 的 assertModelManifestConsistent 保证，这里只返回可记录的只读统计（模型数/启用数），
+ * 便于从日志确认生产环境实际加载的目录规模。git 即版本，不再有 SDK 版本/catalog hash。
  */
 export function verifyBailianRuntime(): BailianRuntimeSnapshot {
-  const snapshot = getBailianContractSnapshot()
+  const models = listModels()
   return Object.freeze({
-    sdkVersion: snapshot.sdkVersion,
-    catalogRevision: snapshot.catalogRevision,
-    catalogHash: snapshot.catalogHash,
-    requirementsHash: snapshot.requirementsHash,
-    maintenance: snapshot.maintenance,
-    sourceImportedAt: snapshot.sourceImportedAt,
-    totalRequirements: snapshot.coverage.totalRequirements,
-    coveredRequirements: snapshot.coverage.coveredRequirements,
-    legacyRequirements: snapshot.coverage.legacyRequirements,
-    coveredConsumerIds: snapshot.coverage.coveredConsumerIds,
+    modelCount: models.length,
+    enabledModelCount: models.filter(model => model.availability.enabled).length,
+    provider: 'dashscope',
+    maintenance: 'manual',
   })
 }

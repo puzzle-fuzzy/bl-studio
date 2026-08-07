@@ -27,10 +27,6 @@
  */
 import { and, asc, desc, eq, gt, gte, ilike, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import {
-  BailianStudioBailianAdapterError,
-  estimateBailianModelCost,
-} from '@bailian-studio/bailian-adapter'
-import {
   CreditLedgerError,
   ensureCreditAccountInTransaction,
   refundCreditsInTransaction,
@@ -39,12 +35,15 @@ import {
 } from '@bailian-studio/credit-ledger'
 import { assetDerivatives, auditLogs, generationArtifacts, generationEvents, generationInputAssets, generationRecords, generationShares, providerRequestAudits, taskRecords, usageRecords, userAssets, workerHeartbeats, type BailianStudioDb } from '@bailian-studio/db'
 import {
+  estimateModelCost,
   getModelAuditMetadata,
   getModelById,
   validateModelParams,
   type FrozenModelManifest,
   type ModelCategory,
   type ModelManifest,
+  type ModelValidationRule,
+  type ProviderTransport,
 } from '@bailian-studio/model-core'
 import { transitionTask, type TaskRecord, type TaskError } from '@bailian-studio/task-engine'
 import {
@@ -869,21 +868,23 @@ function mutableManifest(manifest: DeepReadonly<ModelManifest> | FrozenModelMani
     parameters: manifest.parameters.map(parameter => ({
       ...parameter,
       options: parameter.options?.map(option => ({ ...option })),
+      ...(parameter.conditional !== undefined
+        ? { conditional: { ...parameter.conditional, when: { ...parameter.conditional.when } } }
+        : {}),
     })),
-    mediaGroups: manifest.mediaGroups?.map(group => ({
-      ...group,
-      parameters: [...group.parameters],
-      ...(group.when !== undefined ? { when: { ...group.when } } : {}),
-    })),
+    rules: manifest.rules === undefined
+      ? undefined
+      : structuredClone(manifest.rules) as ModelValidationRule[],
     request: structuredClone(manifest.request),
     output: { ...manifest.output },
     pricing: {
       ...manifest.pricing,
-      tiers: manifest.pricing.tiers.map(tier => ({
-        ...tier,
-        condition: { ...tier.condition },
+      rates: manifest.pricing.rates.map(rate => ({
+        ...rate,
+        conditions: { ...rate.conditions },
       })),
     },
+    transport: structuredClone(manifest.transport) as ProviderTransport,
     availability: { ...manifest.availability },
   }
 }
@@ -3771,21 +3772,10 @@ export function estimateGenerationRequest(
   return prepareGenerationRequest(input).estimate
 }
 
-/** 用官方 SDK 估算生成成本；校验失败统一转成 INVALID_GENERATION_PARAMS。 */
+/** 用 manifest 官方定价表估算生成成本；estimateModelCost 不抛错（保守回退）。 */
 function estimateGenerationCost(
   manifest: FrozenModelManifest,
   params: Readonly<Record<string, unknown>>,
 ): number {
-  try {
-    return estimateBailianModelCost(manifest, params).cents
-  } catch (error) {
-    if (error instanceof BailianStudioBailianAdapterError) {
-      throw new GenerationRepositoryError(
-        'INVALID_GENERATION_PARAMS',
-        error.message,
-        error.toJSON(),
-      )
-    }
-    throw error
-  }
+  return estimateModelCost(manifest, params).cents
 }

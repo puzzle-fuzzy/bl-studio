@@ -4,6 +4,12 @@ interface DeepSeekV4Options {
   id: 'deepseek-v4-pro' | 'deepseek-v4-flash'
   displayName: string
   description: string
+  /** 输入 token 单价：CNY 分 / 每百万 token。 */
+  inputPriceCentsPerMillion: number
+  /** 输出 token 单价：CNY 分 / 每百万 token。 */
+  outputPriceCentsPerMillion: number
+  /** 缓存读取单价：CNY 分 / 每百万 token；不支持缓存的模型省略。 */
+  cacheReadPriceCentsPerMillion?: number
 }
 
 /**
@@ -145,9 +151,52 @@ function deepSeekV4(options: DeepSeekV4Options): ModelManifest {
       unit: 'per_token',
       quantityKey: 'maxCompletionTokens',
       currency: 'CNY',
-      // Contract v3 覆盖的模型由 SDK 通过 bailian-adapter 定价。
-      // 这个非权威阶梯仅为满足遗留 manifest 形态。
-      tiers: [{ condition: {}, priceCents: 0 }],
+      rates: [
+        {
+          id: 'cn-beijing-input-token',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'input',
+          unit: 'token',
+          unitSize: 1000000,
+          unitPrice: (options.inputPriceCentsPerMillion / 100).toString(),
+          conditions: {},
+        },
+        {
+          id: 'cn-beijing-output-token',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'token',
+          unitSize: 1000000,
+          unitPrice: (options.outputPriceCentsPerMillion / 100).toString(),
+          conditions: {},
+        },
+        ...(options.cacheReadPriceCentsPerMillion !== undefined
+          ? [{
+              id: 'cn-beijing-cache-read-token' as const,
+              region: 'cn-beijing' as const,
+              serviceScope: 'china-mainland' as const,
+              chargeItem: 'cache-read' as const,
+              unit: 'token' as const,
+              unitSize: 1000000,
+              unitPrice: (options.cacheReadPriceCentsPerMillion / 100).toString(),
+              conditions: {},
+            }]
+          : []),
+      ],
+    },
+    transport: {
+      mode: 'sync',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+        modelFieldPath: '/model',
+        headers: [
+          { name: 'Authorization' },
+          { name: 'Content-Type', value: 'application/json' },
+        ],
+      },
     },
     availability: { enabled: true, stage: 'stable' },
   }
@@ -157,10 +206,15 @@ export const deepseekV4Pro = deepSeekV4({
   id: 'deepseek-v4-pro',
   displayName: 'DeepSeek V4 Pro',
   description: 'DeepSeek V4 高性能版本，适合复杂推理、代码与高质量通用文本任务',
+  inputPriceCentsPerMillion: 1200,
+  outputPriceCentsPerMillion: 2400,
 })
 
 export const deepseekV4Flash = deepSeekV4({
   id: 'deepseek-v4-flash',
   displayName: 'DeepSeek V4 Flash',
   description: 'DeepSeek V4 低延迟版本，适合高并发与成本敏感的通用文本任务',
+  inputPriceCentsPerMillion: 100,
+  outputPriceCentsPerMillion: 200,
+  cacheReadPriceCentsPerMillion: 20,
 })

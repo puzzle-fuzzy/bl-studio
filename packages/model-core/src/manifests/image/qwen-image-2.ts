@@ -79,6 +79,7 @@ export const qwenImage2Pro: ModelManifest = {
       label: '随机种子',
       type: 'number',
       required: false,
+      min: 0, max: 2147483647, step: 1,
       description: '随机数种子，取值范围[0,2147483647]',
     },
   ],
@@ -100,7 +101,30 @@ export const qwenImage2Pro: ModelManifest = {
     unit: 'per_image',
     quantityKey: 'n',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 20 }],
+    rates: [
+      {
+        id: 'cn-beijing-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.5',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
   },
   availability: { enabled: true, stage: 'stable' },
 }
@@ -174,6 +198,7 @@ export const qwenImageMax: ModelManifest = {
       label: '随机种子',
       type: 'number',
       required: false,
+      min: 0, max: 2147483647, step: 1,
       description: '随机数种子，取值范围[0,2147483647]',
     },
   ],
@@ -194,7 +219,30 @@ export const qwenImageMax: ModelManifest = {
     unit: 'per_image',
     quantityKey: 'n',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 25 }],
+    rates: [
+      {
+        id: 'cn-beijing-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.5',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
   },
   availability: { enabled: true, stage: 'stable' },
 }
@@ -267,6 +315,7 @@ export const qwenImage2: ModelManifest = {
       label: '随机种子',
       type: 'number',
       required: false,
+      min: 0, max: 2147483647, step: 1,
       description: '随机数种子，取值范围[0,2147483647]',
     },
   ],
@@ -288,7 +337,30 @@ export const qwenImage2: ModelManifest = {
     unit: 'per_image',
     quantityKey: 'n',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 15 }],
+    rates: [
+      {
+        id: 'cn-beijing-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.2',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
   },
   availability: { enabled: true, stage: 'stable' },
 }

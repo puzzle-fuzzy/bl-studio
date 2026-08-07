@@ -60,7 +60,40 @@ export const wanxTextToVideo: ModelManifest = {
     unit: 'per_second',
     quantityKey: 'duration',
     currency: 'CNY',
-    tiers: [{ condition: {}, priceCents: 24 }],
+    rates: [
+      {
+        id: 'cn-beijing-output-second',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'second',
+        unitSize: 1,
+        unitPrice: '0.24',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'provider_async',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+        { name: 'X-DashScope-Async', value: 'enable' },
+      ],
+    },
+    polling: {
+      method: 'GET',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/tasks/{taskId}',
+      headers: [{ name: 'Authorization' }],
+      taskIdPath: '/output/task_id',
+      statusPath: '/output/task_status',
+      succeededValues: ['SUCCEEDED'],
+      failedValues: ['FAILED', 'CANCELED', 'UNKNOWN'],
+    },
   },
   availability: { enabled: true, stage: 'beta' },
 }

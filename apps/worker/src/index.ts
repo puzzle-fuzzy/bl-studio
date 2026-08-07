@@ -70,7 +70,6 @@ async function main(): Promise<void> {
   const providerRegistry = createProviderRegistry({
     dashscope: {
       apiKey: env.dashscopeApiKey,
-      ...(env.dashscopeBaseUrl === undefined ? {} : { baseUrl: env.dashscopeBaseUrl }),
       ...(env.bailianWorkspaceId === undefined ? {} : { workspaceId: env.bailianWorkspaceId }),
       contractLocale: env.bailianContractLocale,
       ...(env.dashscopeRequestTimeoutMs === undefined ? {} : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
@@ -121,7 +120,7 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown)
 
   try {
-    console.log(`[${env.workerId}] Bailian SDK ${bailianRuntime.sdkVersion}, catalog ${bailianRuntime.catalogRevision}, coverage ${bailianRuntime.coveredRequirements}/${bailianRuntime.totalRequirements}`)
+    console.log(`[${env.workerId}] DashScope runtime: ${bailianRuntime.enabledModelCount}/${bailianRuntime.modelCount} models enabled`)
     console.log(`[${env.workerId}] starting`)
     await loop.run()
     console.log(`[${env.workerId}] stopped`)

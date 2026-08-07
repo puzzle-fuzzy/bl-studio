@@ -14,20 +14,22 @@ describe('model registry', () => {
     expect(getModelById('qwen-image')?.id).toBe('qwen-image')
   })
 
-  it('freezes nested manifest arrays and pricing tiers', () => {
+  it('freezes nested manifest arrays and pricing rates', () => {
     const [model] = listModels()
 
     expect(model).toBeDefined()
     expect(Object.isFrozen(model!.parameters)).toBe(true)
-    expect(Object.isFrozen(model!.pricing.tiers)).toBe(true)
-    expect(Object.isFrozen(model!.pricing.tiers[0])).toBe(true)
+    expect(Object.isFrozen(model!.pricing)).toBe(true)
+    expect(Object.isFrozen(model!.pricing.rates)).toBe(true)
+    expect(Object.isFrozen(model!.pricing.rates[0])).toBe(true)
+    expect(Object.isFrozen(model!.pricing.rates[0]?.conditions)).toBe(true)
     const mutableParameters = model!.parameters as unknown as Array<{ name: string; label: string; type: 'text' }>
-    const firstTier = model!.pricing.tiers[0] as unknown as { priceCents: number }
+    const firstRate = model!.pricing.rates[0] as unknown as { unitPrice: string }
     expect(() => {
       mutableParameters.push({ name: 'extra', label: 'Extra', type: 'text' })
     }).toThrow(TypeError)
     expect(() => {
-      Object.assign(firstTier, { priceCents: 0 })
+      Object.assign(firstRate, { unitPrice: '0' })
     }).toThrow(TypeError)
   })
 })

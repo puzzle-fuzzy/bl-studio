@@ -2,7 +2,6 @@
 
 These instructions apply to the API model routes. Read `../../../../../docs/bailian/PACKAGE_BOUNDARY.md` first.
 
-- The API may use `@bailian-studio/bailian-adapter` only to expose the immutable, read-only contract snapshot.
-- Never import the Bailian SDK or `@bailian-studio/provider-dashscope`, call DashScope, validate SDK payloads, calculate official prices, or read provider credentials here.
-- Model catalog responses come from `@bailian-studio/model-core`; do not rebuild model metadata in route code.
-- Keep response schemas strict in `@bailian-studio/api-client` and add route/client tests when the public snapshot changes.
+- Model catalog responses come from `@bailian-studio/model-core` (`listModelCatalogItems`); do not rebuild model metadata in route code.
+- Never import `@bailian-studio/provider-dashscope`, call DashScope, validate provider payloads, calculate official prices, or read provider credentials here.
+- Keep response schemas strict in `@bailian-studio/api-client` (including the `rules` projection used by the web form's real-time validation) and add route/client tests when the public snapshot changes.

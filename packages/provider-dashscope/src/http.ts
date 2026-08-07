@@ -1,4 +1,4 @@
-import type { ResolvedBailianHttpTarget } from '@bailian-studio/bailian-adapter'
+import type { ProviderTransportHeader } from '@bailian-studio/model-core'
 import { classifyDashScopeError, type ProviderErrorInfo } from './errors'
 
 /** 可注入的 fetch，供测试、代理与私有网络环境复用。 */
@@ -59,22 +59,14 @@ export async function requestJson(
   return raw
 }
 
-export function createLegacyHeaders(apiKey: string, asyncRequest = false): Headers {
-  const headers = new Headers({
-    Authorization: `Bearer ${apiKey}`,
-    'Content-Type': 'application/json',
-  })
-  if (asyncRequest) headers.set('X-DashScope-Async', 'enable')
-  return headers
-}
-
 /**
- * SDK 是 covered operation 的请求头事实来源。无固定值的 Authorization 由运行时
- * API Key 注入；任何新的无值请求头都会提前失败，避免升级后漏传安全相关字段。
+ * 请求头来自 manifest.transport 的声明（ProviderTransportHeader[]）。无固定值的
+ * Authorization 由运行时 API Key 注入；任何新的无值请求头都会提前失败，避免升级后
+ * 漏传安全相关字段。
  */
-export function createSdkHeaders(
+export function createManifestHeaders(
   apiKey: string,
-  declarations: ResolvedBailianHttpTarget['headers'],
+  declarations: readonly ProviderTransportHeader[],
 ): Headers {
   const headers = new Headers()
   for (const declaration of declarations) {
@@ -89,8 +81,8 @@ export function createSdkHeaders(
     throw new DashScopeHttpError({
       category: 'validation',
       retriable: false,
-      code: 'BAILIAN_REQUIRED_HEADER_UNRESOLVED',
-      message: `Bailian SDK requires unresolved header: ${declaration.name}`,
+      code: 'DASHSCOPE_REQUIRED_HEADER_UNRESOLVED',
+      message: `DashScope manifest requires unresolved header: ${declaration.name}`,
       details: { header: declaration.name },
     })
   }

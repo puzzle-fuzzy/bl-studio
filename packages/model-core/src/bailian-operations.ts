@@ -1,9 +1,9 @@
 /**
- * Bailian Studio 产品 manifest → Bailian SDK operation 的映射。
+ * Bailian Studio 产品 manifest → 能力的映射。
  *
  * 本文件刻意只包含"消费者持有的产品标识 → 能力"这一决策。provider 模型 ID
- * 与执行模式仍来自 ModelManifest；请求字段、传输、响应、生命周期与官方定价
- * 归属 @puzzle-fuzzy/bailian-sdk。
+ * 与执行模式来自 ModelManifest；请求字段、传输、响应、生命周期与官方定价
+ * 全部由 manifest 声明（本仓库即唯一数据源），不再有外部 SDK 归属。
  */
 
 import { MODEL_REGISTRY, listModels } from './registry'

@@ -17,7 +17,6 @@ function createFixtureFetch(fixture: ProviderFailureFixture): DashScopeFetch {
 async function executeFixture(fixture: ProviderFailureFixture): Promise<unknown> {
   const client = createDashScopeClient({
     apiKey: 'fixture-key',
-    baseUrl: 'https://fixture.invalid/api/v1',
     workspaceId: 'ws-fixture',
     fetch: createFixtureFetch(fixture),
   })

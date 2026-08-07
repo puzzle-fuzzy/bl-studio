@@ -1,9 +1,8 @@
-import { isValidBailianWorkspaceId } from '@bailian-studio/bailian-adapter'
+import { isValidDashScopeWorkspaceId } from '@bailian-studio/provider-dashscope'
 
 export interface WorkerEnv {
   readonly databaseUrl: string
   readonly dashscopeApiKey: string
-  readonly dashscopeBaseUrl?: string
   readonly bailianWorkspaceId?: string
   readonly bailianContractLocale: 'zh-CN' | 'en-US'
   readonly workerId: string
@@ -32,7 +31,6 @@ export function readWorkerEnv(
 ): WorkerEnv {
   const databaseUrl = requiredValue(source['DATABASE_URL'], 'DATABASE_URL')
   const dashscopeApiKey = requiredValue(source['DASHSCOPE_API_KEY'], 'DASHSCOPE_API_KEY')
-  const dashscopeBaseUrl = optionalUrl(source['DASHSCOPE_BASE_URL'], 'DASHSCOPE_BASE_URL')
   if (optionalValue(source['NODE_ENV'])?.toLowerCase() === 'production') {
     validateProductionStorage(source)
   }
@@ -60,7 +58,7 @@ export function readWorkerEnv(
       'BAILIAN_CONTRACT_LOCALE must be zh-CN or en-US',
     )
   }
-  if (bailianWorkspaceId !== undefined && !isValidBailianWorkspaceId(bailianWorkspaceId)) {
+  if (bailianWorkspaceId !== undefined && !isValidDashScopeWorkspaceId(bailianWorkspaceId)) {
     throw configError(
       'BAILIAN_WORKSPACE_ID 只能包含英文字母、数字、连字符和下划线',
       'BAILIAN_WORKSPACE_ID may contain only letters, digits, hyphens, and underscores',
@@ -70,7 +68,6 @@ export function readWorkerEnv(
   return Object.freeze({
     databaseUrl,
     dashscopeApiKey,
-    ...(dashscopeBaseUrl === undefined ? {} : { dashscopeBaseUrl }),
     ...(bailianWorkspaceId === undefined ? {} : { bailianWorkspaceId }),
     bailianContractLocale: localeValue,
     workerId,
@@ -146,22 +143,6 @@ function isValidHostname(hostname: string): boolean {
   const labels = hostname.split('.')
   if (labels.length < 2) return false
   return labels.every(label => /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/.test(label))
-}
-
-function optionalUrl(value: string | undefined, name: string): string | undefined {
-  const normalized = optionalValue(value)
-  if (normalized === undefined) return undefined
-  let parsed: URL
-  try {
-    parsed = new URL(normalized)
-  }
-  catch {
-    throw configError(`${name} 必须是合法 URL`, `${name} must be a valid URL`)
-  }
-  if (parsed.username || parsed.password || (parsed.protocol !== 'https:' && parsed.protocol !== 'http:')) {
-    throw configError(`${name} 不得包含凭据且必须使用 HTTP(S)`, `${name} must be an HTTP(S) URL without credentials`)
-  }
-  return normalized.replace(/\/+$/, '')
 }
 
 function configError(zh: string, en: string): Error {

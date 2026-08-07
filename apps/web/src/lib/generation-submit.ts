@@ -53,3 +53,22 @@ export function buildSubmitPayload(
 
   return { params, assetRefs, resolvedPrompt }
 }
+
+/**
+ * 构造 model-core validateModelParams 的入参（纯函数，可单测）。
+ *
+ * 与服务端 prepareGenerationParams 等价：媒体字段以 id 数组进入（AssetItem[] →
+ * string[]），提示词走 buildSubmitPayload 的引用解析（服务端校验的是解析后的
+ * prompt）。因此客户端校验结果与服务端一致，不会出现「前端通过、提交被拒」。
+ */
+export function buildValidationParams(
+  model: ModelCatalogItem,
+  values: Readonly<Record<string, unknown>>,
+): Record<string, unknown> {
+  const { params, assetRefs } = buildSubmitPayload(model, values)
+  const validationParams: Record<string, unknown> = { ...params }
+  for (const [name, ids] of Object.entries(assetRefs)) {
+    validationParams[name] = ids
+  }
+  return validationParams
+}

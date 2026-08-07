@@ -9,25 +9,24 @@
  * 注意：错误消息字符串是契约的一部分（部分测试断言其文本），不要修改。
  */
 
-import type { FrozenModelManifest } from './types'
+import type {
+  DeepReadonly,
+  FrozenModelManifest,
+  ModelRuleCondition,
+  ModelValidationRule,
+} from './types'
 import { isNumberStepAligned } from './number-step'
 import { modelValuesEqual } from './value-equality'
-
-/** 默认定价阶梯的判定：condition 为空对象即视为默认阶梯。 */
-function isDefaultPricingTier(condition: Record<string, unknown>): boolean {
-  return Object.keys(condition).length === 0
-}
 
 /**
  * 校验单个 manifest 的内部一致性，违反任一规则即抛错：
  *  - 必须有 id 与 providerModel（调用 DashScope 的真实模型名）
- *  - 至少一个定价阶梯
- *  - 有且仅有一个"默认阶梯"（condition 为空），且必须位于 tiers[0]
- *    —— estimatePriceCents 的 `?? tiers[0]` 回退依赖此不变量
+ *  - transport 与 taskMode 一致，async 必有 polling、stream 必有 stream 段
+ *  - 至少一条定价 rate；同一 (chargeItem, region) 至多一条默认价
  *  - pricing.quantityKey 必须引用某个已声明的参数
- *  - 每个 tier.priceCents 必须是有限非负数。它是「每单位费率」，可以为小数
- *    （如 per_second 0.5 分/秒）；estimatePriceCents 在返回前会取整为整数分，
- *    所以这里不强求整数——cost_estimate/cost_final 列的整数性由取整保证。
+ *  - 每条 rate 的 unitPrice 必须是有限非负小数（十进制元）、unitSize 正整数、
+ *    conditions 字段必须引用已声明参数
+ *  - 每条 rule 引用的字段必须是已声明参数；media-group 的字段必须是 media 参数
  *  - 每个 required 参数必须有对应的 request binding（否则用户必填的字段不会
  *    进入 provider 请求）
  *  - 每个 binding 必须引用某个已声明的参数（悬空 binding 是死配置）
@@ -40,12 +39,9 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
   if (new Set(manifest.capabilities).size !== manifest.capabilities.length) {
     throw new Error(`${manifest.id} must not define duplicate capabilities`)
   }
-  if (manifest.pricing.tiers.length === 0) throw new Error(`${manifest.id} must define at least one pricing tier`)
-  const defaultTierIndexes = manifest.pricing.tiers
-    .map((tier, index) => isDefaultPricingTier(tier.condition) ? index : -1)
-    .filter(index => index >= 0)
-  if (defaultTierIndexes.length !== 1) throw new Error(`${manifest.id} must define exactly one default pricing tier`)
-  if (defaultTierIndexes[0] !== 0) throw new Error(`${manifest.id} default pricing tier must be first`)
+
+  assertTransport(manifest)
+  assertPricing(manifest)
 
   const parameterNames = new Set<string>()
   for (const parameter of manifest.parameters) {
@@ -62,33 +58,13 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
     if (parameter.exclusiveMax && parameter.max === undefined) {
       throw new Error(`${manifest.id} parameter "${parameter.name}" exclusiveMax requires max`)
     }
+    if (parameter.conditional !== undefined) {
+      assertConditionalConstraint(manifest.id, parameter)
+    }
   }
-  assertMediaGroups(manifest, parameterNames)
+  assertRules(manifest, parameterNames)
   if (!parameterNames.has(manifest.pricing.quantityKey)) {
     throw new Error(`${manifest.id} pricing quantityKey "${manifest.pricing.quantityKey}" does not match a parameter`)
-  }
-
-  for (const tier of manifest.pricing.tiers) {
-    if (!Number.isFinite(tier.priceCents) || tier.priceCents < 0) {
-      throw new Error(`${manifest.id} pricing tier priceCents must be finite and non-negative`)
-    }
-    for (const conditionField of Object.keys(tier.condition)) {
-      if (!parameterNames.has(conditionField)) {
-        throw new Error(`${manifest.id} pricing tier condition field "${conditionField}" does not match a parameter`)
-      }
-    }
-  }
-
-  const actualUsage = manifest.pricing.actualUsage
-  if (actualUsage !== undefined) {
-    if (actualUsage.kind !== 'chat_tokens') {
-      throw new Error(`${manifest.id} pricing actualUsage kind is unsupported`)
-    }
-    for (const [name, price] of Object.entries(actualUsage).filter(([key]) => key !== 'kind')) {
-      if (typeof price !== 'number' || !Number.isFinite(price) || price < 0) {
-        throw new Error(`${manifest.id} pricing actualUsage ${name} must be finite and non-negative`)
-      }
-    }
   }
 
   const bindingNames = new Set(Object.keys(manifest.request.bindings))
@@ -114,43 +90,173 @@ export function assertModelManifestConsistent(manifest: FrozenModelManifest): vo
   }
 }
 
-function assertMediaGroups(
+function assertTransport(manifest: FrozenModelManifest): void {
+  const transport = manifest.transport
+  if (transport.mode !== manifest.taskMode) {
+    throw new Error(`${manifest.id} transport mode "${transport.mode}" must match taskMode "${manifest.taskMode}"`)
+  }
+  if (!transport.submit.endpointTemplate.trim()) {
+    throw new Error(`${manifest.id} transport submit endpointTemplate is missing`)
+  }
+  if (!transport.submit.endpointTemplate.includes('{WorkspaceId}')) {
+    throw new Error(`${manifest.id} transport submit endpointTemplate must contain {WorkspaceId}`)
+  }
+  if (transport.submit.modelFieldPath !== '/model') {
+    throw new Error(`${manifest.id} transport submit modelFieldPath must be /model`)
+  }
+  if (transport.mode === 'provider_async') {
+    const polling = transport.polling
+    if (!polling.taskIdPath || !polling.statusPath) {
+      throw new Error(`${manifest.id} async transport polling must declare taskIdPath and statusPath`)
+    }
+    if (polling.succeededValues.length === 0 || polling.failedValues.length === 0) {
+      throw new Error(`${manifest.id} async transport polling must declare succeededValues and failedValues`)
+    }
+    if (polling.succeededValues.some(value => polling.failedValues.includes(value))) {
+      throw new Error(`${manifest.id} async transport polling succeededValues and failedValues must not overlap`)
+    }
+  }
+  if (transport.mode === 'stream' && transport.stream === undefined) {
+    throw new Error(`${manifest.id} stream transport must declare the stream section`)
+  }
+}
+
+function assertPricing(manifest: FrozenModelManifest): void {
+  const rates = manifest.pricing.rates
+  if (rates.length === 0) throw new Error(`${manifest.id} must define at least one pricing rate`)
+  for (const rate of rates) {
+    const price = Number(rate.unitPrice)
+    if (!Number.isFinite(price) || price < 0) {
+      throw new Error(`${manifest.id} pricing rate "${rate.id}" unitPrice must be a finite non-negative decimal yuan`)
+    }
+    if (!Number.isInteger(rate.unitSize) || rate.unitSize <= 0) {
+      throw new Error(`${manifest.id} pricing rate "${rate.id}" unitSize must be a positive integer`)
+    }
+    if (!rate.region.trim()) {
+      throw new Error(`${manifest.id} pricing rate "${rate.id}" region is missing`)
+    }
+    for (const conditionField of Object.keys(rate.conditions)) {
+      const parameterNames = new Set(manifest.parameters.map(parameter => parameter.name))
+      if (!parameterNames.has(conditionField)) {
+        throw new Error(`${manifest.id} pricing rate "${rate.id}" condition field "${conditionField}" does not match a parameter`)
+      }
+    }
+  }
+  // 同一 (chargeItem, region) 至多一条默认价——selectRate 的默认回退依赖唯一性。
+  const defaultKeys = new Set<string>()
+  for (const rate of rates) {
+    if (Object.keys(rate.conditions).length !== 0) continue
+    const key = `${rate.chargeItem}:${rate.region}`
+    if (defaultKeys.has(key)) {
+      throw new Error(`${manifest.id} pricing rate "${rate.id}" duplicates the default rate for ${key}`)
+    }
+    defaultKeys.add(key)
+  }
+}
+
+function assertConditionalConstraint(
+  modelId: string,
+  parameter: FrozenModelManifest['parameters'][number],
+): void {
+  const conditional = parameter.conditional
+  if (conditional === undefined) return
+  const when = conditional.when
+  if (!when.field.trim()) throw new Error(`${modelId} parameter "${parameter.name}" conditional when.field is missing`)
+  if (when.field === parameter.name) throw new Error(`${modelId} parameter "${parameter.name}" conditional cannot depend on itself`)
+  if (conditional.min !== undefined && conditional.max !== undefined && conditional.min > conditional.max) {
+    throw new Error(`${modelId} parameter "${parameter.name}" conditional min must not exceed max`)
+  }
+  if (conditional.equals !== undefined && (conditional.min !== undefined || conditional.max !== undefined)) {
+    throw new Error(`${modelId} parameter "${parameter.name}" conditional must not combine equals with min/max`)
+  }
+  if (conditional.min === undefined && conditional.max === undefined && conditional.equals === undefined) {
+    throw new Error(`${modelId} parameter "${parameter.name}" conditional must declare min, max, or equals`)
+  }
+}
+
+/** 每个 rule 引用的字段必须存在；media-group 的字段必须是 media 参数。 */
+function assertRules(
   manifest: FrozenModelManifest,
   parameterNames: ReadonlySet<string>,
 ): void {
   const parameters = new Map(manifest.parameters.map(parameter => [parameter.name, parameter] as const))
-  for (const [groupIndex, group] of (manifest.mediaGroups ?? []).entries()) {
-    if (group.parameters.length < 2 || new Set(group.parameters).size !== group.parameters.length) {
-      throw new Error(`${manifest.id} media group ${groupIndex} must declare at least two unique parameters`)
+  const assertField = (rule: DeepReadonly<ModelValidationRule>, field: string): void => {
+    if (!parameterNames.has(field)) {
+      throw new Error(`${manifest.id} rule ${rule.kind} field "${field}" does not match a parameter`)
     }
-    for (const parameterName of group.parameters) {
-      if (!parameterNames.has(parameterName) || parameters.get(parameterName)?.type !== 'media') {
-        throw new Error(`${manifest.id} media group ${groupIndex} parameter "${parameterName}" does not match a media parameter`)
+  }
+  const assertCondition = (rule: DeepReadonly<ModelValidationRule>, condition: DeepReadonly<ModelRuleCondition>): void => {
+    if (!parameterNames.has(condition.field)) {
+      throw new Error(`${manifest.id} rule ${rule.kind} condition field "${condition.field}" does not match a parameter`)
+    }
+  }
+
+  for (const rule of manifest.rules ?? []) {
+    switch (rule.kind) {
+      case 'required-one-of': {
+        if (rule.fields.length === 0) {
+          throw new Error(`${manifest.id} rule required-one-of must declare fields`)
+        }
+        for (const field of rule.fields) assertField(rule, field)
+        if (rule.minimum !== undefined && (!Number.isInteger(rule.minimum) || rule.minimum < 1)) {
+          throw new Error(`${manifest.id} rule required-one-of minimum must be a positive integer`)
+        }
+        break
       }
-    }
-    if (
-      group.when !== undefined &&
-      !parameterNames.has(group.when.field)
-    ) {
-      throw new Error(`${manifest.id} media group ${groupIndex} condition field "${group.when.field}" does not match a parameter`)
-    }
-    if (group.minItems === undefined && group.maxItems === undefined) {
-      throw new Error(`${manifest.id} media group ${groupIndex} must declare minItems or maxItems`)
-    }
-    for (const [field, value] of [
-      ['minItems', group.minItems],
-      ['maxItems', group.maxItems],
-    ] as const) {
-      if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
-        throw new Error(`${manifest.id} media group ${groupIndex} ${field} must be a positive integer`)
+      case 'text-length': {
+        assertField(rule, rule.field)
+        if (rule.cjk.max <= 0 || rule.other.max <= 0) {
+          throw new Error(`${manifest.id} rule text-length must declare positive cjk/other max`)
+        }
+        break
       }
-    }
-    if (
-      group.minItems !== undefined &&
-      group.maxItems !== undefined &&
-      group.minItems > group.maxItems
-    ) {
-      throw new Error(`${manifest.id} media group ${groupIndex} minItems must not exceed maxItems`)
+      case 'field-required-when':
+      case 'field-allowed-when': {
+        assertField(rule, rule.field)
+        assertCondition(rule, rule.condition)
+        break
+      }
+      case 'media-group': {
+        if (rule.fields.length === 0) {
+          throw new Error(`${manifest.id} rule media-group must declare fields`)
+        }
+        if (new Set(rule.fields).size !== rule.fields.length) {
+          throw new Error(`${manifest.id} rule media-group must not declare duplicate fields`)
+        }
+        for (const field of rule.fields) {
+          if (!parameterNames.has(field) || parameters.get(field)?.type !== 'media') {
+            throw new Error(`${manifest.id} rule media-group field "${field}" does not match a media parameter`)
+          }
+        }
+        if (rule.condition !== undefined) assertCondition(rule, rule.condition)
+        if (rule.minItems === undefined && rule.maxItems === undefined) {
+          throw new Error(`${manifest.id} rule media-group must declare minItems or maxItems`)
+        }
+        for (const [field, value] of [
+          ['minItems', rule.minItems],
+          ['maxItems', rule.maxItems],
+        ] as const) {
+          if (value !== undefined && (!Number.isInteger(value) || value <= 0)) {
+            throw new Error(`${manifest.id} rule media-group ${field} must be a positive integer`)
+          }
+        }
+        if (
+          rule.minItems !== undefined &&
+          rule.maxItems !== undefined &&
+          rule.minItems > rule.maxItems
+        ) {
+          throw new Error(`${manifest.id} rule media-group minItems must not exceed maxItems`)
+        }
+        break
+      }
+      case 'array-item-field-max-path': {
+        assertField(rule, rule.field)
+        assertField(rule, rule.maximumField)
+        if (!Number.isFinite(rule.defaultMaximum)) {
+          throw new Error(`${manifest.id} rule array-item-field-max-path defaultMaximum must be finite`)
+        }
+        break
+      }
     }
   }
 }

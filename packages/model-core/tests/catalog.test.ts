@@ -70,7 +70,19 @@ describe('model catalog composition', () => {
         })
       expect(model?.parameters.find(parameter => parameter.name === 'resultFormat'))
         .toMatchObject({ defaultValue: 'message', required: true })
-      expect(model?.pricing.tiers).toEqual([{ condition: {}, priceCents: 0 }])
+      // pro 无缓存读取价；flash 额外声明 cache-read rate
+      expect(model?.pricing.rates.map(rate => ({ chargeItem: rate.chargeItem, unitPrice: rate.unitPrice }))).toEqual(
+        modelId === 'deepseek-v4-pro'
+          ? [
+              { chargeItem: 'input', unitPrice: '12' },
+              { chargeItem: 'output', unitPrice: '24' },
+            ]
+          : [
+              { chargeItem: 'input', unitPrice: '1' },
+              { chargeItem: 'output', unitPrice: '2' },
+              { chargeItem: 'cache-read', unitPrice: '0.2' },
+            ],
+      )
 
       const nonThinking = validateModelParams(model!, {
         prompt: '直接回答',
@@ -100,7 +112,12 @@ describe('model catalog composition', () => {
 
     const changed = getModelAuditMetadata({
       ...model!,
-      pricing: { ...model!.pricing, tiers: model!.pricing.tiers.map((tier, index) => index === 0 ? { ...tier, priceCents: tier.priceCents + 1 } : tier) },
+      pricing: {
+        ...model!.pricing,
+        rates: model!.pricing.rates.map((rate, index) => index === 0
+          ? { ...rate, unitPrice: (Number(rate.unitPrice) + 0.01).toString() }
+          : rate),
+      },
     })
     expect(changed.pricingVersion).not.toBe(first.pricingVersion)
     expect(changed.manifestHash).not.toBe(first.manifestHash)
@@ -166,24 +183,34 @@ describe('model catalog composition', () => {
     }
   })
 
-  it('declares the combined Wanxiang 2.7 reference media limit', () => {
+  it('declares the combined Wanxiang 2.7 reference media limit as a media-group rule', () => {
     const model = getModelById('wanx-2.7-reference-video')
-    expect(model?.mediaGroups).toEqual([
-      { parameters: ['references', 'referenceVideos'], minItems: 1, maxItems: 5 },
+    expect(model?.rules).toEqual([
+      expect.objectContaining({
+        kind: 'media-group',
+        fields: ['references', 'referenceVideos'],
+        minItems: 1,
+        maxItems: 5,
+      }),
     ])
   })
 
-  it('declares Keling reference media combinations without requiring images', () => {
+  it('declares Keling reference media requirements as media-group rules', () => {
     const model = getModelById('keling-reference-video')
     expect(model?.parameters.find(parameter => parameter.name === 'references')?.required).toBe(false)
     expect(model?.parameters.find(parameter => parameter.name === 'featureVideo')?.maxItems).toBe(1)
-    expect(model?.mediaGroups).toEqual([
-      { parameters: ['references', 'featureVideo'], minItems: 1 },
-      {
-        parameters: ['references', 'featureVideo'],
-        maxItems: 5,
-        when: { field: 'featureVideo', present: true },
-      },
+    expect(model?.rules).toEqual([
+      expect.objectContaining({
+        kind: 'media-group',
+        fields: ['references', 'featureVideo'],
+        minItems: 1,
+      }),
+      expect.objectContaining({
+        kind: 'media-group',
+        fields: ['references', 'featureVideo'],
+        maxItems: 4,
+        condition: { kind: 'media-count', field: 'featureVideo', minimum: 1 },
+      }),
     ])
   })
 

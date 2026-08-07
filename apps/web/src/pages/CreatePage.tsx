@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { ChevronDown, Info, Loader2, X } from 'lucide-react'
 import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
+import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -18,8 +19,12 @@ import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-st
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { buildParameterFormSchema, visibleFormFields, type FormField } from '@/lib/parameter-form-schema'
-import { readParameterValidationErrors, type FieldIssue } from '@/lib/parameter-validation'
-import { buildSubmitPayload } from '@/lib/generation-submit'
+import {
+  parameterIssuesToFieldErrors,
+  readParameterValidationErrors,
+  type FieldIssue,
+} from '@/lib/parameter-validation'
+import { buildSubmitPayload, buildValidationParams } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
 import { modelNameZh } from '@/lib/model-modes'
@@ -260,6 +265,16 @@ export function CreatePage() {
       setSubmitError('请先补全必填项')
       return
     }
+    // 提交前用 model-core 实时校验：范围/步长/条件上限/media 数量/文本长度等，与服务端
+    // 等价，关闭「前端能提交、提交才被拒」的 gap（如 vidu seed 区间、wan2.7 含参考
+    // 视频时长上限、素材数量上限）。
+    const validation = validateModelParams(model, buildValidationParams(model, values))
+    if (!validation.valid) {
+      setFieldErrors(parameterIssuesToFieldErrors(validation.errors))
+      setSubmitError('请修正参数后再提交')
+      return
+    }
+    setFieldErrors(new Map())
     setIsSubmitting(true)
     try {
       const { params, assetRefs } = buildSubmitPayload(model, values)
@@ -287,6 +302,16 @@ export function CreatePage() {
     const batchId = crypto.randomUUID()
     let submitted = 0
     for (const compareModel of compareModels) {
+      // 提交前实时校验：跳过不满足该模型约束的对比项（与服务端等价）。
+      const validation = validateModelParams(compareModel, buildValidationParams(compareModel, values))
+      if (!validation.valid) {
+        const first = validation.errors[0]
+        showMessage({
+          title: `${modelNameZh(compareModel)}：${first?.messages['zh-CN'] ?? '参数不合法'}`,
+          tone: 'warning',
+        })
+        continue
+      }
       const { params, assetRefs } = buildSubmitPayload(compareModel, values)
       const payload = { modelId: compareModel.id, params, assetRefs }
       const idempotencyKey = idempotencyKeyFor(payload)

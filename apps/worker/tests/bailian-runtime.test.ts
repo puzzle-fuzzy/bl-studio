@@ -1,21 +1,29 @@
 import { describe, expect, it } from 'vitest'
-import { BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE } from '@bailian-studio/bailian-adapter'
+import { listModels } from '@bailian-studio/model-core'
 import { verifyBailianRuntime } from '../src/bailian-runtime'
 
 describe('Bailian worker runtime gate', () => {
-  it('pins and exposes the loaded SDK catalog snapshot', () => {
+  it('exposes the model-core catalog stats as the startup snapshot', () => {
     const runtime = verifyBailianRuntime()
-    expect(runtime).toMatchObject({
-      sdkVersion: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.sdkVersion,
-      catalogRevision: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.catalogRevision,
-      catalogHash: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.catalogHash,
-      requirementsHash: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.requirementsHash,
-      maintenance: 'official-sync',
-      totalRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.totalRequirements,
-      coveredRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.coveredRequirements,
-      legacyRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.uncoveredRequirements,
-      coveredConsumerIds: [...BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.coveredConsumerIds],
-    })
-    expect(runtime.sourceImportedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
+    const models = listModels()
+    expect(runtime.modelCount).toBe(models.length)
+    expect(runtime.enabledModelCount).toBe(
+      models.filter(model => model.availability.enabled).length,
+    )
+    expect(runtime.enabledModelCount).toBeGreaterThan(0)
+    expect(runtime.enabledModelCount).toBeLessThanOrEqual(runtime.modelCount)
+    expect(runtime.provider).toBe('dashscope')
+    expect(runtime.maintenance).toBe('manual')
+  })
+
+  it('returns a frozen snapshot (git is the version — no SDK/catalog hash fields)', () => {
+    const runtime = verifyBailianRuntime()
+    expect(Object.isFrozen(runtime)).toBe(true)
+    expect(Object.keys(runtime).sort()).toEqual([
+      'enabledModelCount',
+      'maintenance',
+      'modelCount',
+      'provider',
+    ])
   })
 })

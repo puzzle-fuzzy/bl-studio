@@ -26,7 +26,6 @@ import {
   AssetItemSchema,
   AssetResponseSchema,
   ApiErrorSchema,
-  BailianContractStatusSchema,
   AuthResponseSchema,
   CancelGenerationResponseSchema,
   CreditBalanceResponseSchema,
@@ -110,7 +109,6 @@ import type {
   UpdatePromptLibraryInput,
   AssetCapabilities,
   AssetItem,
-  BailianContractStatus,
   CancelGenerationResult,
   CreditBalance,
   CreateGenerationResponse,
@@ -297,8 +295,6 @@ export interface BailianStudioApiClient {
   getModels(): Promise<ModelCatalogItem[]>
   /** `GET /api/models/:id` —— 获取单个模型的 manifest 摘要。 */
   getModel(id: string): Promise<ModelCatalogItem>
-  /** `GET /api/models/bailian-contract` —— 获取运行中 SDK 目录版本与覆盖基线。 */
-  getBailianContractStatus(): Promise<BailianContractStatus>
   /** `GET /api/usage` —— 当前用户本月的生成量和成本聚合。 */
   getUsage(): Promise<UsageSummary>
   /** `GET /api/account/points` — 获取当前用户的可用、冻结和总积分。 */
@@ -569,15 +565,6 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         { method: 'GET', credentials: 'include' },
         fetchImpl,
         ModelCatalogItemSchema,
-      )
-    },
-
-    async getBailianContractStatus() {
-      return unwrapData(
-        `${base}/api/models/bailian-contract`,
-        { method: 'GET', credentials: 'include' },
-        fetchImpl,
-        BailianContractStatusSchema,
       )
     },
 

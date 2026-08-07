@@ -41,9 +41,100 @@ export const ModelParameterSchema = z.object({
   minItems: z.number().int().positive().optional(),
   maxItems: z.number().int().positive().optional(),
   visibleWhen: z.object({ field: z.string(), equals: z.unknown() }).optional(),
+  // 条件区间约束（field-value-when 折叠而来）：when 触发时才生效的 min/max/equals。
+  conditional: z.object({
+    when: z.union([
+      z.object({ field: z.string(), present: z.boolean() }),
+      z.object({ field: z.string(), equals: z.unknown() }),
+    ]),
+    min: z.number().optional(),
+    max: z.number().optional(),
+    equals: z.unknown().optional(),
+  }).optional(),
   // 仅 media 类型参数携带：约束「作品库」选择器按媒体种类过滤候选成品。
   mediaKind: z.enum(['image', 'video', 'audio', 'text']).optional(),
 })
+
+const LocalizedModelMessageSchema = z.object({
+  'zh-CN': z.string(),
+  'en-US': z.string(),
+})
+
+/**
+ * 跨字段校验规则的触发条件（与 model-core ModelRuleCondition 同形）。
+ *  - field-equals：字段等于 equals（negate 取反时为其反面）
+ *  - media-count：media 参数的条目数满足范围
+ */
+const ModelRuleConditionSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('field-equals'),
+    field: z.string(),
+    equals: z.unknown(),
+    negate: z.boolean().optional(),
+  }),
+  z.object({
+    kind: z.literal('media-count'),
+    field: z.string(),
+    minimum: z.number().optional(),
+    maximum: z.number().optional(),
+  }),
+])
+
+/**
+ * 跨字段校验规则 —— 与 model-core ModelValidationRule 同形的六种判别联合。
+ * catalog 把 rules 原样透传，web 表单因此能直接用 model-core validateModelParams
+ * 做与服务端等价的提交前校验（media 数量上限 / 文本长度 / 条件必填等）。
+ */
+const ModelValidationRuleSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('required-one-of'),
+    fields: z.array(z.string()),
+    minimum: z.number().optional(),
+    code: z.string(),
+    message: LocalizedModelMessageSchema,
+  }),
+  z.object({
+    kind: z.literal('text-length'),
+    field: z.string(),
+    cjk: z.object({ min: z.number().optional(), max: z.number() }),
+    other: z.object({ min: z.number().optional(), max: z.number() }),
+    modes: z.array(z.enum(['sync', 'provider_async', 'stream'])).optional(),
+    code: z.string(),
+    message: LocalizedModelMessageSchema,
+  }),
+  z.object({
+    kind: z.literal('field-required-when'),
+    field: z.string(),
+    condition: ModelRuleConditionSchema,
+    code: z.string(),
+    message: LocalizedModelMessageSchema,
+  }),
+  z.object({
+    kind: z.literal('field-allowed-when'),
+    field: z.string(),
+    condition: ModelRuleConditionSchema,
+    code: z.string(),
+    message: LocalizedModelMessageSchema,
+  }),
+  z.object({
+    kind: z.literal('media-group'),
+    fields: z.array(z.string()),
+    minItems: z.number().optional(),
+    maxItems: z.number().optional(),
+    condition: ModelRuleConditionSchema.optional(),
+    code: z.string().optional(),
+    message: LocalizedModelMessageSchema.optional(),
+  }),
+  z.object({
+    kind: z.literal('array-item-field-max-path'),
+    field: z.string(),
+    itemProperty: z.string(),
+    maximumField: z.string(),
+    defaultMaximum: z.number(),
+    code: z.string(),
+    message: LocalizedModelMessageSchema,
+  }),
+])
 
 const ModelReferenceFormatSchema = z.enum([
   'angle-bracket',
@@ -81,15 +172,8 @@ const ModelCatalogItemContractSchema = z.object({
   taskMode: z.enum(['sync', 'provider_async', 'stream']),
   capabilities: z.array(z.string()),
   parameters: z.array(ModelParameterSchema),
-  mediaGroups: z.array(z.object({
-    parameters: z.array(z.string()).min(2),
-    minItems: z.number().int().positive().optional(),
-    maxItems: z.number().int().positive().optional(),
-    when: z.object({
-      field: z.string(),
-      present: z.boolean(),
-    }).optional(),
-  })).optional(),
+  // 跨字段校验规则：透传 manifest rules，web 表单据此做提交前实时校验。
+  rules: z.array(ModelValidationRuleSchema).optional(),
   availability: z
     .object({ enabled: z.boolean(), stage: z.enum(['stable', 'beta', 'hidden']) })
     .optional(),
@@ -103,41 +187,6 @@ export const ModelCatalogItemSchema = z.preprocess(
 
 export const ModelCatalogResponseSchema = z.object({
   items: z.array(ModelCatalogItemSchema),
-})
-
-const Sha256Schema = z.string().regex(/^sha256:[0-9a-f]{64}$/)
-
-const BailianCoverageStatusSchema = z.object({
-  totalRequirements: z.number().int().nonnegative(),
-  coveredRequirements: z.number().int().nonnegative(),
-  legacyRequirements: z.number().int().nonnegative(),
-  coveredConsumerIds: z.array(z.string()),
-  legacyConsumerIds: z.array(z.string()),
-}).superRefine((coverage, context) => {
-  if (coverage.totalRequirements !== coverage.coveredRequirements + coverage.legacyRequirements) {
-    context.addIssue({ code: 'custom', message: 'Bailian coverage counts are inconsistent' })
-  }
-  if (coverage.coveredConsumerIds.length !== coverage.coveredRequirements) {
-    context.addIssue({ code: 'custom', path: ['coveredConsumerIds'], message: 'Covered model count does not match the id list' })
-  }
-  if (coverage.legacyConsumerIds.length !== coverage.legacyRequirements) {
-    context.addIssue({ code: 'custom', path: ['legacyConsumerIds'], message: 'Legacy model count does not match the id list' })
-  }
-  const allIds = [...coverage.coveredConsumerIds, ...coverage.legacyConsumerIds]
-  if (new Set(allIds).size !== allIds.length) {
-    context.addIssue({ code: 'custom', message: 'Bailian coverage model ids must be unique' })
-  }
-})
-
-export const BailianContractStatusSchema = z.object({
-  sdkVersion: z.string(),
-  catalogRevision: z.string(),
-  catalogHash: Sha256Schema,
-  requirementsHash: Sha256Schema,
-  maintenance: z.enum(['manual', 'official-sync']),
-  sourceImportedAt: z.string(),
-  latestModelReviewAt: z.string(),
-  coverage: BailianCoverageStatusSchema,
 })
 
 export const NormalizedArtifactSchema = z.object({
@@ -498,8 +547,9 @@ export const MediaJobResponseSchema = z.object({
 
 export type ModelParameter = z.infer<typeof ModelParameterSchema>
 export type ModelOperation = z.infer<typeof ModelOperationSchema>
+export type ModelValidationRule = z.infer<typeof ModelValidationRuleSchema>
+export type ModelRuleCondition = z.infer<typeof ModelRuleConditionSchema>
 export type ModelCatalogItem = z.infer<typeof ModelCatalogItemSchema>
-export type BailianContractStatus = z.infer<typeof BailianContractStatusSchema>
 export type NormalizedArtifact = z.infer<typeof NormalizedArtifactSchema>
 export type OutputResult = z.infer<typeof OutputResultSchema>
 export type GenerationErrorJson = z.infer<typeof GenerationErrorJsonSchema>

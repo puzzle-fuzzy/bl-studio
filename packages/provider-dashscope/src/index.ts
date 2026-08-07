@@ -20,6 +20,14 @@ export type {
   ProviderSubmitInput,
   ProviderSubmitResult,
 } from './client'
+export type { BailianContractLocale } from './contract'
+export {
+  isValidDashScopeWorkspaceId,
+  resolveDashScopeCancelTarget,
+  resolveDashScopePollTarget,
+  resolveDashScopeSubmitTarget,
+} from './transport'
+export type { DashScopeHttpTarget, DashScopeTransportOptions } from './transport'
 export { classifyDashScopeError } from './errors'
 export type { ProviderErrorCategory, ProviderErrorInfo } from './errors'
 export { buildDashScopeRequest } from './request-builder'

@@ -2,36 +2,33 @@
  * DashScope（百炼）provider 的 HTTP 客户端：实现"提交 → 轮询 → 完成/失败"的核心
  * 状态机，是 @bailian-studio/worker 调用 DashScope 的入口。
  *
- * 两条主路径：
- *  - submit：按 manifest 构建请求体并 POST 到 endpoint。同步模式（taskMode 非
- *    provider_async）直接返回 completed + 归一化结果；异步模式则带上
- *    X-DashScope-Async 头提交，返回 polling + providerTaskId 交给 worker 后续轮询。
- *  - poll：GET /tasks/<id> 查询异步任务状态，按 output.task_status 映射到
- *    pending（继续轮询）/ completed（取结果）/ failed（分类错误）。
+ * 统一路径：所有模型的提交/轮询/取消端点、请求头、任务状态值都来自
+ * manifest.transport（见 transport.ts），不再区分 sdk/legacy 两条分支。请求发出前
+ * validateModelParams 做参数自检（漂移的 manifest 在 fetch 之前被拦截）；响应用
+ * assertResponseShape 做结构性校验——天然 lenient，接受一切未知字段，只在缺关键字段
+ * 或状态无法识别时报告问题。
  *
  * 所有 HTTP 层异常（网络错误、非 2xx）都被包装成 DashScopeHttpError，错误信息经
  * classifyDashScopeError 归一分类，供 worker 决定重试或判失败。
  */
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
-import {
-  classifyBailianTaskStatus,
-  getBailianIntegrationStatus,
-  resolveBailianCancelTarget,
-  resolveBailianPollTarget,
-  resolveBailianSubmitTarget,
-  validateBailianHttpRequest,
-  validateBailianResponse,
-} from '@bailian-studio/bailian-adapter'
+import { classifyTaskStatus } from '@bailian-studio/model-core'
 import { classifyDashScopeError, type ProviderErrorInfo } from './errors'
 import {
-  assertProviderContract,
   assertProviderResponseContract,
-  resolveAdapterTarget,
+  assertStreamEvent,
+  resolveTransportTarget,
+  validateRequestParams,
+  type BailianContractLocale,
 } from './contract'
 import {
+  resolveDashScopeCancelTarget,
+  resolveDashScopePollTarget,
+  resolveDashScopeSubmitTarget,
+} from './transport'
+import {
   DashScopeHttpError,
-  createLegacyHeaders,
-  createSdkHeaders,
+  createManifestHeaders,
   getStringPath,
   readResponseBody,
   requestJson,
@@ -43,25 +40,17 @@ import { parseDashScopeOutput, type NormalizedArtifact, type NormalizedOutput } 
 import { SseEventParseError, readSseStream, type SseResult } from './sse-reader'
 import { buildChatRequest } from './chat-builder'
 
-// base URL 内含 /api/v1 版本前缀，于是 manifest 里的 endpoint 可以保持相对路径
-// （如 '/services/audio/music/generation'）。这与 DashScope 官方文档及线上 uhyc
-// 客户端一致——因此下方轮询路径是 '/tasks/<id>'，而非 '/api/v1/tasks/<id>'。
-const DEFAULT_BASE_URL = 'https://dashscope.aliyuncs.com/api/v1'
-
 export type { DashScopeFetch } from './http'
 export { DashScopeHttpError } from './http'
 
-/** 创建 client 的选项：apiKey 必填，fetch 与 baseUrl 可注入便于测试与自定 host。 */
+/** 创建 client 的选项：apiKey 必填，fetch 可注入便于测试。 */
 export interface CreateDashScopeClientOptions {
   apiKey: string
   fetch?: DashScopeFetch
-  baseUrl?: string
-  /** 可选的 OpenAI 兼容 chat 根路径；默认取 baseUrl 推导出的 provider host。 */
-  chatBaseUrl?: string
   /** Keling、HappyHorse、Fun Music 等工作空间专属端点所需。 */
   workspaceId?: string
-  /** Contract v3 校验错误的输出语言。 */
-  contractLocale?: 'zh-CN' | 'en-US'
+  /** 契约校验错误的输出语言。 */
+  contractLocale?: BailianContractLocale
   /** 单次 provider HTTP 请求超过该时长后中止。 */
   requestTimeoutMs?: number
 }
@@ -130,64 +119,37 @@ export interface DashScopeClient {
 /**
  * 创建一个 DashScope 客户端实例。
  *
- * fetch 与 baseUrl 均可注入：测试时可传假 fetch；线上可改 baseUrl 走代理或私有端点。
- * 返回的 submit/poll 方法内部已封装错误分类与状态映射，调用方只需按 result.mode 分支。
+ * fetch 可注入：测试时可传假 fetch。返回的 submit/poll 方法内部已封装错误分类与
+ * 状态映射，调用方只需按 result.mode 分支。
  */
 export function createDashScopeClient(options: CreateDashScopeClientOptions): DashScopeClient {
   const fetchImpl = options.fetch ?? fetch
-  const baseUrl = normalizeBaseUrl(options.baseUrl ?? DEFAULT_BASE_URL)
-  const chatBaseUrl = normalizeBaseUrl(options.chatBaseUrl ?? deriveChatBaseUrl(baseUrl))
   const contractLocale = options.contractLocale ?? 'zh-CN'
   const requestTimeoutMs = options.requestTimeoutMs ?? 60_000
+  const transportOptions = { workspaceId: options.workspaceId }
 
   return {
     async submit(input) {
       const request = buildDashScopeRequest(input.manifest, input.params)
-      const integration = getBailianIntegrationStatus(input.manifest.id)
-      const target = integration.kind === 'sdk'
-        ? resolveAdapterTarget(() => resolveBailianSubmitTarget(
-            input.manifest.id,
-            options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId },
-            contractLocale,
-          ))
-        : { method: 'POST', url: `${baseUrl}${request.endpoint}` }
-      const headers = 'headers' in target
-        ? createSdkHeaders(options.apiKey, target.headers)
-        : createLegacyHeaders(options.apiKey, request.async)
+      validateRequestParams(input.manifest, input.params, contractLocale)
+      const target = resolveTransportTarget(() => resolveDashScopeSubmitTarget(input.manifest, transportOptions))
+      const headers = createManifestHeaders(options.apiKey, target.headers)
+      if (request.async) headers.set('X-DashScope-Async', 'enable')
       if (input.idempotencyKey !== undefined) {
         headers.set('X-DashScope-Idempotency-Key', input.idempotencyKey)
-      }
-
-      if (integration.kind === 'sdk') {
-        assertProviderContract(
-          validateBailianHttpRequest(input.manifest.id, {
-            method: target.method,
-            url: target.url,
-            headers,
-            body: request.body,
-          }, contractLocale),
-          contractLocale,
-          request.body,
-        )
       }
 
       const raw = await requestJson(fetchImpl, target.url, {
         method: target.method,
         headers,
         body: JSON.stringify(request.body),
-      }, integration.kind === 'sdk'
-        ? (responseBody, response) => assertProviderResponseContract(
-            validateBailianResponse(
-              input.manifest.id,
-              response.ok ? (request.async ? 'submit' : 'final') : 'error',
-              responseBody,
-              contractLocale,
-            ),
-            contractLocale,
-            responseBody,
-            response,
-          )
-        : undefined, requestTimeoutMs)
+      }, (responseBody, response) => assertProviderResponseContract(
+        input.manifest,
+        response.ok ? (request.async ? 'submit' : 'final') : 'error',
+        responseBody,
+        response,
+        contractLocale,
+      ), requestTimeoutMs)
 
       const requestId = getStringPath(raw, 'request_id')
       const providerStatus = getStringPath(raw, 'output.task_status')
@@ -228,64 +190,37 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
     },
 
     async poll(input) {
-      const integration = getBailianIntegrationStatus(input.manifest.id)
-      const target = integration.kind === 'sdk'
-        ? resolveAdapterTarget(() => resolveBailianPollTarget(
-            input.manifest.id,
-            input.providerTaskId,
-            options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId },
-            contractLocale,
-          ))
-        : {
-            method: 'GET',
-            url: `${baseUrl}/tasks/${encodeURIComponent(input.providerTaskId)}`,
-          }
+      const target = resolveTransportTarget(() => resolveDashScopePollTarget(input.manifest, input.providerTaskId, transportOptions))
+      const headers = createManifestHeaders(options.apiKey, target.headers)
 
       const raw = await requestJson(fetchImpl, target.url, {
         method: target.method,
-        headers: 'headers' in target
-          ? createSdkHeaders(options.apiKey, target.headers)
-          : createLegacyHeaders(options.apiKey),
-      }, integration.kind === 'sdk'
-        ? (responseBody, response) => {
-            const status = getStringPath(responseBody, 'output.task_status')?.toLowerCase()
-            const lifecycle = status === undefined
-              ? undefined
-              : classifyBailianTaskStatus(input.manifest.id, status, contractLocale)
-            const phase = !response.ok
-              ? 'error'
-              : lifecycle === 'succeeded'
-                ? 'final'
-                : 'poll'
-            const validation = response.ok && lifecycle === 'failed'
-              ? (() => {
-                  const taskError = validateBailianResponse(
-                    input.manifest.id,
-                    'error',
-                    responseBody,
-                    contractLocale,
-                  )
-                  return taskError.valid
-                    ? taskError
-                    : validateBailianResponse(input.manifest.id, 'poll', responseBody, contractLocale)
-                })()
-              : validateBailianResponse(input.manifest.id, phase, responseBody, contractLocale)
-            assertProviderResponseContract(
-              validation,
-              contractLocale,
-              responseBody,
-              response,
-            )
-          }
-        : undefined, requestTimeoutMs)
+        headers,
+      }, (responseBody, response) => {
+        if (!response.ok) {
+          assertProviderResponseContract(input.manifest, 'error', responseBody, response, contractLocale)
+          return
+        }
+        const providerStatus = getStringPath(responseBody, 'output.task_status')
+        const lifecycle = providerStatus === undefined
+          ? undefined
+          : classifyTaskStatus(input.manifest, providerStatus)
+        // 失败任务响应以宽容形状通过（'error' 阶段对 record 全宽容），交由错误分类；
+        // 成功终态才要求产物字段齐全。
+        const phase = lifecycle === 'failed'
+          ? 'error'
+          : lifecycle === 'succeeded'
+            ? 'final'
+            : 'poll'
+        assertProviderResponseContract(input.manifest, phase, responseBody, response, contractLocale)
+      }, requestTimeoutMs)
 
       const requestId = getStringPath(raw, 'request_id')
       const providerStatus = getStringPath(raw, 'output.task_status')
       // 归一为小写以兼容 DashScope 不同接口大小写不一的状态字符串。
-      const normalizedStatus = providerStatus?.toLowerCase()
-      const taskLifecycle = integration.kind === 'sdk' && providerStatus !== undefined
-        ? classifyBailianTaskStatus(input.manifest.id, providerStatus, contractLocale)
-        : classifyLegacyTaskStatus(normalizedStatus)
+      const taskLifecycle = providerStatus === undefined
+        ? 'unknown'
+        : classifyTaskStatus(input.manifest, providerStatus)
 
       if (taskLifecycle === 'pending') {
         return {
@@ -335,25 +270,13 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
     },
 
     async cancel(input) {
-      const integration = getBailianIntegrationStatus(input.manifest.id)
-      const target = integration.kind === 'sdk'
-        ? resolveAdapterTarget(() => resolveBailianCancelTarget(
-            input.manifest.id,
-            input.providerTaskId,
-            options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId },
-            contractLocale,
-          ))
-        : {
-            method: 'POST',
-            url: `${baseUrl}/tasks/${encodeURIComponent(input.providerTaskId)}/cancel`,
-          }
+      const target = resolveTransportTarget(() => resolveDashScopeCancelTarget(input.manifest, input.providerTaskId, transportOptions))
+      const headers = createManifestHeaders(options.apiKey, target.headers)
 
       try {
         const raw = await requestJson(fetchImpl, target.url, {
           method: target.method,
-          headers: 'headers' in target
-            ? createSdkHeaders(options.apiKey, target.headers)
-            : createLegacyHeaders(options.apiKey),
+          headers,
         }, undefined, requestTimeoutMs)
         return {
           mode: 'cancelled',
@@ -375,33 +298,12 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
 
     async chat(input) {
       const body = buildChatRequest(input.manifest, input.params)
-      const integration = getBailianIntegrationStatus(input.manifest.id)
-      const target = integration.kind === 'sdk'
-        ? resolveAdapterTarget(() => resolveBailianSubmitTarget(
-            input.manifest.id,
-            options.workspaceId === undefined ? {} : { workspaceId: options.workspaceId },
-            contractLocale,
-          ))
-        : { method: 'POST', url: `${chatBaseUrl}/chat/completions` }
-      const headers = 'headers' in target
-        ? createSdkHeaders(options.apiKey, target.headers)
-        : new Headers({
-            Authorization: `Bearer ${options.apiKey}`,
-            'Content-Type': 'application/json',
-          })
-
-      if (integration.kind === 'sdk') {
-        assertProviderContract(
-          validateBailianHttpRequest(input.manifest.id, {
-            method: target.method,
-            url: target.url,
-            headers,
-            body,
-          }, contractLocale),
-          contractLocale,
-          body,
-        )
-      }
+      validateRequestParams(input.manifest, input.params, contractLocale)
+      const target = resolveTransportTarget(() => resolveDashScopeSubmitTarget(input.manifest, transportOptions))
+      const streamHeaders = input.manifest.transport.mode === 'provider_async'
+        ? []
+        : (input.manifest.transport.stream?.headers ?? [])
+      const headers = createManifestHeaders(options.apiKey, [...target.headers, ...streamHeaders])
 
       let response: Response
       const controller = new AbortController()
@@ -435,14 +337,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
       if (!response.ok) {
         const raw = await readResponseBody(response)
         clearTimeout(timeout)
-        if (integration.kind === 'sdk') {
-          assertProviderResponseContract(
-            validateBailianResponse(input.manifest.id, 'error', raw, contractLocale),
-            contractLocale,
-            raw,
-            response,
-          )
-        }
+        assertProviderResponseContract(input.manifest, 'error', raw, response, contractLocale)
         throw new DashScopeHttpError(
           classifyDashScopeError(withHttpStatus(raw, response.status)),
           response.status,
@@ -455,13 +350,7 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
         stream = await readSseStream(
           response,
           controller.signal,
-          integration.kind === 'sdk'
-            ? (event) => assertProviderContract(
-                validateBailianResponse(input.manifest.id, 'stream-event', event, contractLocale),
-                contractLocale,
-                event,
-              )
-            : undefined,
+          (event) => assertStreamEvent(input.manifest, event, contractLocale),
         )
         if (controller.signal.aborted) {
           throw new DOMException('The operation was aborted.', 'AbortError')
@@ -513,26 +402,6 @@ export function createDashScopeClient(options: CreateDashScopeClientOptions): Da
       }
     },
   }
-}
-
-/** 去掉 baseUrl 结尾的多余斜杠，避免与 manifest 的相对 endpoint 拼出双斜杠。 */
-function normalizeBaseUrl(baseUrl: string): string {
-  return baseUrl.replace(/\/+$/, '')
-}
-
-function deriveChatBaseUrl(baseUrl: string): string {
-  if (baseUrl.endsWith('/api/v1')) return `${baseUrl.slice(0, -'/api/v1'.length)}/compatible-mode/v1`
-  if (baseUrl.endsWith('/compatible-mode/v1')) return baseUrl
-  return `${baseUrl}/compatible-mode/v1`
-}
-
-function classifyLegacyTaskStatus(
-  status: string | undefined,
-): 'pending' | 'succeeded' | 'failed' | 'unknown' {
-  if (status === 'pending' || status === 'running') return 'pending'
-  if (status === 'succeeded' || status === 'success' || status === 'completed') return 'succeeded'
-  if (status === 'failed' || status === 'canceled' || status === 'cancelled') return 'failed'
-  return 'unknown'
 }
 
 function classifyTerminalTaskError(raw: unknown, providerStatus: string | undefined): ProviderErrorInfo {

@@ -5,7 +5,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本），由 **ba
 **本仓库的定位**：
 - 合并原 Vue（web-vue）与 React（web）两个前端为**单个 React 前端**（zustand + react-router + shadcn/ui + Tailwind v4 + react-window 虚拟滚动）；
 - 后端保留已验证的强架构（任务队列 + outbox + SSE、manifest 驱动、包边界门禁），并迁移工具链到 **pnpm + turbo**；
-- bailian-hub 作为外部「模型书架」仓库保留，经 `@bailian-studio/bailian-adapter` 集成。
+- **bailian-hub 已并入本仓库**：`packages/model-core` 的 45 份 manifest 是唯一数据源（transport/rules/pricing 全在 manifest 里），纯函数校验（`validateModelParams` 等）前后端共享，git 即版本——无外部 SDK、npm 发布或 hash 对账仪式。
 
 ## 技术栈
 
@@ -53,7 +53,7 @@ pnpm run typecheck        # 全仓 typecheck（tsc --noEmit，无 ESLint）
 pnpm run typecheck:root   # 根 infra/scripts + tests 的 typecheck
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
 pnpm run test:coverage    # 覆盖率
-pnpm run verify           # baseline + boundaries + manifests + typecheck + test
+pnpm run verify           # boundaries + manifests + typecheck:root + typecheck + test
 pnpm run check:boundaries # 包边界（import 规则）
 pnpm run check:manifests  # 模型 manifest 一致性
 pnpm run db:studio        # drizzle-kit studio
@@ -73,12 +73,12 @@ Web (apps/web, React 19 + zustand + shadcn/ui)   Admin (apps/admin, 同源 /admi
               │
         packages/（shared / model-core / event-bus / db / generation-repository /
                   auth / storage / provider-dashscope / task-engine /
-                  bailian-adapter / credit-ledger / media-repository /
-                  provider-health / api-client / design-tokens）
+                  credit-ledger / media-repository / provider-health /
+                  api-client / design-tokens）
 ```
 
-- **包边界即架构**：`check:boundaries` 用正则强制执行「谁可以 import 谁」；`bailian-adapter` 是外部 `@puzzle-fuzzy/bailian-sdk` 的唯一所有者。
-- **manifest 驱动模型**：新增模型 = `packages/model-core/src/manifests/` 加一份 manifest + 注册表一行，provider/前端零代码扩展。
+- **包边界即架构**：`check:boundaries` 用正则强制执行「谁可以 import 谁」；`provider-dashscope` 是唯一受边界约束的执行包（只被 worker 消费），`model-core` 是前后端共享的纯数据 + 纯函数叶子。
+- **manifest 驱动模型**：`packages/model-core/src/manifests/` 是唯一数据源（含 transport/rules/pricing/parameters），新增模型 = 加一份 manifest + 注册表一行，provider/前端零代码扩展；web 表单用 `validateModelParams` 做提交前实时校验，与服务端等价。
 - **SSE 实时管线**：DB outbox 是事实来源，SSE 事件携带 recordId 作「失效提示」，前端只做 `refreshRecord(id)`，不直接写数据。
 - **前端状态**：zustand（auth / 模型目录 / 任务列表 / 资产 / 积分 / 通知）+ 纯函数业务层（参数投影、提示词引用转换、幂等指纹），页面不直接 fetch。
 

@@ -35,7 +35,7 @@ export const qwenImage: ModelManifest = {
     { name: 'n', label: '图片数量', type: 'number', defaultValue: 1, min: 1, max: 1, step: 1, description: '固定为1张' },
     { name: 'promptExtend', label: '智能改写', type: 'boolean', defaultValue: true, description: '开启prompt智能改写，对短prompt效果提升明显' },
     { name: 'watermark', label: '水印', type: 'boolean', defaultValue: false, description: '是否添加"Qwen-Image"水印' },
-    { name: 'seed', label: '随机种子', type: 'number', required: false, description: '随机数种子，取值范围[0,2147483647]' },
+    { name: 'seed', label: '随机种子', type: 'number', required: false, min: 0, max: 2147483647, step: 1, description: '随机数种子，取值范围[0,2147483647]' },
   ],
   request: {
     kind: 'dashscope-image-message',
@@ -51,6 +51,34 @@ export const qwenImage: ModelManifest = {
     },
   },
   output: { kind: 'images-from-message-content' },
-  pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: 20 }] },
+  pricing: {
+    unit: 'per_image',
+    quantityKey: 'n',
+    currency: 'CNY',
+    rates: [
+      {
+        id: 'cn-beijing-output-image',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.25',
+        conditions: {},
+      },
+    ],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      modelFieldPath: '/model',
+      headers: [
+        { name: 'Authorization' },
+        { name: 'Content-Type', value: 'application/json' },
+      ],
+    },
+  },
   availability: { enabled: true, stage: 'stable' },
 }

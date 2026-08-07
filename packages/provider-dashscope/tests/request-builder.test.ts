@@ -31,7 +31,30 @@ const asyncVideoManifest: ModelManifest = {
     },
   },
   output: { kind: 'video-url', path: 'output.video_url' },
-  pricing: { unit: 'per_second', quantityKey: 'duration', tiers: [{ condition: {}, priceCents: 100 }], currency: 'CNY' },
+  pricing: {
+    unit: 'per_second',
+    quantityKey: 'duration',
+    currency: 'CNY',
+    rates: [{ id: 'cn-beijing-output-second', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '1', conditions: {} }],
+  },
+  transport: {
+    mode: 'provider_async',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis/{WorkspaceId}',
+      modelFieldPath: '/model',
+      headers: [],
+    },
+    polling: {
+      method: 'GET',
+      endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/tasks/{WorkspaceId}/{taskId}',
+      taskIdPath: 'output.task_id',
+      statusPath: 'output.task_status',
+      succeededValues: ['SUCCEEDED'],
+      failedValues: ['FAILED', 'UNKNOWN'],
+      headers: [],
+    },
+  },
   availability: { enabled: true, stage: 'beta' },
 }
 
@@ -95,7 +118,30 @@ describe('buildDashScopeRequest', () => {
       },
     },
     output: { kind: 'video-url', path: 'output.video_url' },
-    pricing: { unit: 'per_second', quantityKey: 'duration', tiers: [{ condition: {}, priceCents: 60 }], currency: 'CNY' },
+    pricing: {
+      unit: 'per_second',
+      quantityKey: 'duration',
+      currency: 'CNY',
+      rates: [{ id: 'cn-beijing-output-second', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'second', unitSize: 1, unitPrice: '0.6', conditions: {} }],
+    },
+    transport: {
+      mode: 'provider_async',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis/{WorkspaceId}',
+        modelFieldPath: '/model',
+        headers: [],
+      },
+      polling: {
+        method: 'GET',
+        endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/tasks/{WorkspaceId}/{taskId}',
+        taskIdPath: 'output.task_id',
+        statusPath: 'output.task_status',
+        succeededValues: ['SUCCEEDED'],
+        failedValues: ['FAILED', 'UNKNOWN'],
+        headers: [],
+      },
+    },
     availability: { enabled: true, stage: 'beta' },
   }
 
@@ -170,7 +216,21 @@ describe('buildDashScopeRequest', () => {
       },
     },
     output: { kind: 'images-from-message-content' },
-    pricing: { unit: 'per_image', quantityKey: 'n', tiers: [{ condition: {}, priceCents: 25 }], currency: 'CNY' },
+    pricing: {
+      unit: 'per_image',
+      quantityKey: 'n',
+      currency: 'CNY',
+      rates: [{ id: 'cn-beijing-output-image', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'image', unitSize: 1, unitPrice: '0.25', conditions: {} }],
+    },
+    transport: {
+      mode: 'sync',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation/{WorkspaceId}',
+        modelFieldPath: '/model',
+        headers: [],
+      },
+    },
     availability: { enabled: true, stage: 'stable' },
   }
 

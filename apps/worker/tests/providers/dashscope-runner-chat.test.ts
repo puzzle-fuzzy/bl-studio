@@ -55,13 +55,21 @@ const streamManifest = {
     unit: 'per_second' as const,
     quantityKey: 'estimatedDuration',
     currency: 'CNY' as const,
-    tiers: [{ condition: {}, priceCents: 1 }],
-    actualUsage: {
-      kind: 'chat_tokens' as const,
-      inputTextPriceCentsPerMillion: 700,
-      inputAudioPriceCentsPerMillion: 5300,
-      outputTextPriceCentsPerMillion: 4000,
+    rates: [
+      { id: 'cn-beijing-visual-text-input-token', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'input', unit: 'token', unitSize: 1000000, unitPrice: '7', conditions: { mode: 'text-image-video-input' } },
+      { id: 'cn-beijing-audio-input-token', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'input', unit: 'token', unitSize: 1000000, unitPrice: '53', conditions: { mode: 'audio-input' } },
+      { id: 'cn-beijing-multimodal-text-output-token', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'token', unitSize: 1000000, unitPrice: '40', conditions: { mode: 'multimodal-input-text-output' } },
+    ],
+  },
+  transport: {
+    mode: 'stream' as const,
+    submit: {
+      method: 'POST' as const,
+      endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
+      modelFieldPath: '/model',
+      headers: [],
     },
+    stream: { contentTypes: ['text/event-stream'], framing: 'sse' as const, headers: [] },
   },
   availability: { enabled: true, stage: 'beta' as const },
 } as unknown as FrozenModelManifest

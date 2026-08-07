@@ -1,4 +1,5 @@
 import type { ApiClientError } from '@bailian-studio/api-client'
+import type { ParameterValidationIssue } from '@bailian-studio/model-core'
 
 /**
  * 服务端字段级校验错误的解析与本地化。
@@ -41,6 +42,25 @@ export function readParameterValidationErrors(error: unknown): Map<string, Field
       (typeof issue.message === 'string' ? issue.message : '') ??
       '参数不合法'
     map.set(issue.field, { field: issue.field, code, message })
+  }
+  return map
+}
+
+/**
+ * 把 model-core validateModelParams 的 issue 列表映射为按字段归组的 FieldIssue。
+ * 与服务端解析器共用同一个本地化出口：统一取 `messages['zh-CN']`。
+ */
+export function parameterIssuesToFieldErrors(
+  issues: readonly ParameterValidationIssue[],
+): Map<string, FieldIssue> {
+  const map = new Map<string, FieldIssue>()
+  for (const issue of issues) {
+    if (issue.field === '') continue
+    map.set(issue.field, {
+      field: issue.field,
+      code: issue.code,
+      message: issue.messages['zh-CN'] ?? issue.message,
+    })
   }
   return map
 }

@@ -7,7 +7,6 @@ import {
   type ModelCatalogItem,
   type RegistrationResult,
 } from '../src'
-import { BailianContractStatusSchema } from '../src/schemas'
 
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
@@ -133,21 +132,18 @@ describe('createApiClient', () => {
     expect(model).not.toHaveProperty('request')
   })
 
-  it('preserves declarative conditional media group constraints', async () => {
+  it('preserves conditional parameter constraints through the catalog projection', async () => {
     const conditionalManifest = {
       ...fullManifest,
       id: 'conditional-media',
       capabilities: ['text_prompt', 'image_input', 'video_input'],
       parameters: [
-        { name: 'images', label: 'Images', type: 'media', mediaKind: 'image', maxItems: 7 },
         { name: 'featureVideo', label: 'Feature video', type: 'media', mediaKind: 'video' },
-      ],
-      mediaGroups: [
-        { parameters: ['images', 'featureVideo'], minItems: 1 },
         {
-          parameters: ['images', 'featureVideo'],
-          maxItems: 5,
-          when: { field: 'featureVideo', present: true },
+          name: 'duration',
+          label: 'Duration',
+          type: 'number',
+          conditional: { when: { field: 'featureVideo', present: true }, max: 10 },
         },
       ],
     }
@@ -158,63 +154,8 @@ describe('createApiClient', () => {
 
     const [model] = await client.getModels()
 
-    expect(model?.mediaGroups).toEqual(conditionalManifest.mediaGroups)
-  })
-
-  it('reads a structurally valid Bailian SDK contract snapshot', async () => {
-    const status = {
-      sdkVersion: 'test-sdk',
-      catalogRevision: 'test-revision',
-      catalogHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      requirementsHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      maintenance: 'official-sync' as const,
-      sourceImportedAt: '2026-07-30',
-      latestModelReviewAt: '2026-07-15',
-      coverage: {
-        totalRequirements: 2,
-        coveredRequirements: 1,
-        legacyRequirements: 1,
-        coveredConsumerIds: ['happyhorse-video-edit'],
-        legacyConsumerIds: ['qwen-image'],
-      },
-    }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: status })])
-    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
-
-    await expect(client.getBailianContractStatus()).resolves.toEqual(status)
-    expect(calls[0]?.url).toBe('http://api.test/api/models/bailian-contract')
-    expect(calls[0]?.credentials).toBe('include')
-  })
-
-  it('rejects an inconsistent Bailian coverage snapshot from the server', async () => {
-    const invalidStatus = {
-      sdkVersion: 'test-sdk',
-      catalogRevision: 'test-revision',
-      catalogHash: 'sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-      requirementsHash: 'sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-      maintenance: 'official-sync',
-      sourceImportedAt: '2026-07-30',
-      latestModelReviewAt: '2026-07-15',
-      coverage: {
-        totalRequirements: 43,
-        coveredRequirements: 10,
-        legacyRequirements: 33,
-        coveredConsumerIds: ['happyhorse-video-edit'],
-        legacyConsumerIds: ['qwen-image'],
-      },
-    }
-    const { fetch } = queuedFetch([jsonResponse({ success: true, data: invalidStatus })])
-    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
-
-    const parsed = BailianContractStatusSchema.safeParse(invalidStatus)
-    expect(parsed.success).toBe(false)
-    if (parsed.success) throw new Error('invalid coverage unexpectedly parsed')
-    expect(parsed.error.issues.map(({ message }) => message)).toContain(
-      'Covered model count does not match the id list',
-    )
-    await expect(client.getBailianContractStatus()).rejects.toThrow(
-      'Response did not match the expected success envelope',
-    )
+    expect(model?.parameters.find(parameter => parameter.name === 'duration')?.conditional)
+      .toEqual({ when: { field: 'featureVideo', present: true }, max: 10 })
   })
 
   it('creates a generation share using the cookie session', async () => {

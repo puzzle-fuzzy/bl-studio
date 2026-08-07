@@ -21,7 +21,7 @@ pnpm run dev              # turbo 并行：api(bun,5003) / worker(tsx) / web(vit
 pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行；这就是 lint，无 ESLint）
 pnpm run typecheck:root   # 根作用域 tsc --noEmit：infra/scripts/ + 根 tests/（per-package typecheck 不含这两处）
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
-pnpm run verify           # baseline + boundaries + manifests + typecheck + test
+pnpm run verify           # boundaries + manifests + typecheck:root + typecheck + test
 pnpm run check:boundaries # 包边界
 pnpm run check:manifests  # manifest 一致性
 pnpm run db:push / db:push:test
@@ -48,10 +48,11 @@ pnpm run db:push / db:push:test
 
 包边界是**可执行的架构**（`infra/scripts/check-package-boundaries.ts`，进 `verify`）：
 
+- **`@bailian-studio/model-core` 是唯一数据源**：45 份 manifest（transport/rules/pricing/parameters 全在 manifest 里）+ 纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 manifest，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
+- `@bailian-studio/provider-dashscope` 是唯一受边界约束的执行包：**只允许 `apps/worker` 消费**（协议 `workspace:*`）；它是 worker 专属的 DashScope 传输/执行层。
+- **`apps/web` 可以直接 import model-core** 做提交前实时校验（提交 payload 与 `apps/web/src/lib/generation-submit.ts` 的 `buildValidationParams` 保持一致）。
 - 运行时应用**禁止**直接 import `@bailian-studio/db`——持久化走 repository/auth 包的 URL 工厂。
 - `apps/api` 与 `apps/worker` **禁止互相 import**。
-- `@bailian-studio/bailian-adapter` 是 `@puzzle-fuzzy/bailian-sdk` 的**唯一所有者**；provider/repository/apps 只能消费 adapter。
-- SDK 版本在 `pnpm-workspace.yaml` 的 `catalog:` 钉死精确版本（coverage 基线绑定）。
 - `@bailian-studio/shared` 是叶子包，不得 import 其它 `@bailian-studio/*`。
 
 改跨包 import 后必须 `pnpm run check:boundaries`。
@@ -61,7 +62,7 @@ pnpm run db:push / db:push:test
 | 包 | 职责 |
 |---|---|
 | shared | 叶子：logger（敏感 key 脱敏）、metrics、错误基类、进程原语（spawn/sleep） |
-| model-core | manifest 驱动模型注册表（45 个模型，深冻结） |
+| model-core | **唯一数据源**：45 个 manifest（深冻结）+ 纯函数校验/定价/状态分类（前后端共享） |
 | event-bus | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |
 | generation-repository | 生成记录/任务/产物/事件的持久化接缝（`FOR UPDATE SKIP LOCKED`） |
@@ -71,10 +72,19 @@ pnpm run db:push / db:push:test
 | provider-dashscope | DashScope 协议执行（仅 worker 消费） |
 | provider-health | provider 健康探测（worker 心跳/就绪检查） |
 | task-engine | 纯任务状态机 + 退避 |
-| bailian-adapter | 外部 SDK 唯一入口（coverage 基线） |
 | credit-ledger | 积分账本（冻结/结算/释放） |
 | api-client | 前端共享的 zod 契约层（零 `as`） |
 | design-tokens | CSS 设计令牌 |
+
+## 模型知识维护工作流
+
+模型知识（transport / rules / pricing / parameters）只存在 `packages/model-core/src/manifests/`。改模型的流程：
+
+1. **官网变更** → 运行 `pnpm run sync:bailian-docs` 看漂移报告（兼容面有机器清单；媒体生成面与定价没有，需人工比对官网文档）；
+2. **AI 读官网原文** → 更新对应 manifest（参数约束 / 传输端点 / 定价 rates / rules），保证 `pnpm run check:manifests` 通过；
+3. `pnpm run verify` 全绿 → `pnpm run deploy:prod` 部署。
+
+**git 即版本**：没有外部 SDK、npm 发布或 hash 对账，改了 manifest 就是新版本。
 
 ## 前端约定（apps/web）
 

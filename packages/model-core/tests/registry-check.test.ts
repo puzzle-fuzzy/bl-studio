@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertModelManifestConsistent, assertUniqueModelIds, type ModelManifest } from '../src'
+import { assertModelManifestConsistent, assertUniqueModelIds, type ModelManifest, type ModelValidationRule } from '../src'
 
 function manifest(overrides: Partial<ModelManifest> = {}): ModelManifest {
   return {
@@ -16,7 +16,30 @@ function manifest(overrides: Partial<ModelManifest> = {}): ModelManifest {
     ],
     request: { kind: 'dashscope-image-message', endpoint: '/images', bindings: { prompt: { target: 'input.prompt' }, n: { target: 'parameters.field' } } },
     output: { kind: 'images-from-message-content' },
-    pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: 10 }] },
+    pricing: {
+      unit: 'per_image',
+      quantityKey: 'n',
+      currency: 'CNY',
+      rates: [{
+        id: 'output-default',
+        region: 'cn-beijing',
+        serviceScope: 'china-mainland',
+        chargeItem: 'output',
+        unit: 'image',
+        unitSize: 1,
+        unitPrice: '0.1',
+        conditions: {},
+      }],
+    },
+    transport: {
+      mode: 'sync',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+        modelFieldPath: '/model',
+        headers: [],
+      },
+    },
     availability: { enabled: true, stage: 'stable' },
     ...overrides,
   }
@@ -33,97 +56,292 @@ describe('registry checks', () => {
     }))).toThrow(/prompt/)
   })
 
-  it('rejects manifests with no unconditional default tier', () => {
+  it('rejects a transport mode that does not match taskMode', () => {
     expect(() => assertModelManifestConsistent(manifest({
-      pricing: {
-        unit: 'per_image',
-        quantityKey: 'n',
-        currency: 'CNY',
-        tiers: [{ condition: { size: '2048*2048' }, priceCents: 25 }],
+      transport: {
+        mode: 'provider_async',
+        submit: {
+          method: 'POST',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+          modelFieldPath: '/model',
+          headers: [],
+        },
+        polling: {
+          method: 'GET',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/tasks/{taskId}',
+          headers: [],
+          taskIdPath: '/output/task_id',
+          statusPath: '/output/task_status',
+          succeededValues: ['SUCCEEDED'],
+          failedValues: ['FAILED'],
+        },
       },
-    }))).toThrow(/default pricing tier/)
+    }))).toThrow(/transport mode "provider_async" must match taskMode "sync"/)
   })
 
-  it('rejects manifests with default tier not first', () => {
+  it('rejects an async transport that omits polling', () => {
     expect(() => assertModelManifestConsistent(manifest({
-      pricing: {
-        unit: 'per_image',
-        quantityKey: 'n',
-        currency: 'CNY',
-        tiers: [
-          { condition: { size: '2048*2048' }, priceCents: 25 },
-          { condition: {}, priceCents: 10 },
-        ],
+      taskMode: 'provider_async',
+      transport: {
+        mode: 'provider_async',
+        submit: {
+          method: 'POST',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+          modelFieldPath: '/model',
+          headers: [],
+        },
+        polling: {
+          method: 'GET',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/tasks/{taskId}',
+          headers: [],
+          taskIdPath: '/output/task_id',
+          statusPath: '',
+          succeededValues: ['SUCCEEDED'],
+          failedValues: ['FAILED'],
+        },
       },
-    }))).toThrow(/default pricing tier/)
+    }))).toThrow(/async transport polling must declare taskIdPath and statusPath/)
   })
 
-  it('rejects manifests with multiple unconditional default tiers', () => {
+  it('rejects overlapping async polling status values', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      taskMode: 'provider_async',
+      transport: {
+        mode: 'provider_async',
+        submit: {
+          method: 'POST',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/video-generation/video-synthesis',
+          modelFieldPath: '/model',
+          headers: [],
+        },
+        polling: {
+          method: 'GET',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/tasks/{taskId}',
+          headers: [],
+          taskIdPath: '/output/task_id',
+          statusPath: '/output/task_status',
+          succeededValues: ['SUCCEEDED', 'FAILED'],
+          failedValues: ['FAILED'],
+        },
+      },
+    }))).toThrow(/succeededValues and failedValues must not overlap/)
+  })
+
+  it('rejects an endpoint template without a {WorkspaceId} placeholder', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      transport: {
+        mode: 'sync',
+        submit: {
+          method: 'POST',
+          endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+          modelFieldPath: '/model',
+          headers: [],
+        },
+      },
+    }))).toThrow(/endpointTemplate must contain \{WorkspaceId\}/)
+  })
+
+  it('rejects a model field path that is not /model', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      transport: {
+        mode: 'sync',
+        submit: {
+          method: 'POST',
+          endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+          modelFieldPath: '/parameters/model',
+          headers: [],
+        },
+      },
+    }))).toThrow(/modelFieldPath must be \/model/)
+  })
+
+  it('rejects a stream transport without the stream section', () => {
+    // 该形态在类型层就不合法，用 cast 构造一个"错误实现"来验证运行时断言。
+    const malformedStream = {
+      mode: 'stream',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/compatible-mode/v1/chat/completions',
+        modelFieldPath: '/model',
+        headers: [],
+      },
+    } as unknown as ModelManifest['transport']
+    expect(() => assertModelManifestConsistent(manifest({
+      taskMode: 'stream',
+      transport: malformedStream,
+    }))).toThrow(/stream transport must declare the stream section/)
+  })
+
+  it('accepts a manifest whose only pricing rate is conditional (unconditional defaults are optional)', () => {
     expect(() => assertModelManifestConsistent(manifest({
       pricing: {
         unit: 'per_image',
         quantityKey: 'n',
         currency: 'CNY',
-        tiers: [
-          { condition: {}, priceCents: 10 },
-          { condition: {}, priceCents: 12 },
+        rates: [{
+          id: 'output-large',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: '0.25',
+          conditions: { n: 2 },
+        }],
+      },
+    }))).not.toThrow()
+  })
+
+  it('rejects manifests with multiple unconditional default rates for the same chargeItem and region', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      pricing: {
+        unit: 'per_image',
+        quantityKey: 'n',
+        currency: 'CNY',
+        rates: [
+          {
+            id: 'output-default-a',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'image',
+            unitSize: 1,
+            unitPrice: '0.1',
+            conditions: {},
+          },
+          {
+            id: 'output-default-b',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'image',
+            unitSize: 1,
+            unitPrice: '0.12',
+            conditions: {},
+          },
         ],
       },
-    }))).toThrow(/default pricing tier/)
+    }))).toThrow(/duplicates the default rate for output:cn-beijing/)
   })
 
   it('rejects pricing quantity keys that do not match a parameter', () => {
     expect(() => assertModelManifestConsistent(manifest({
-      pricing: { unit: 'per_image', quantityKey: 'count', currency: 'CNY', tiers: [{ condition: {}, priceCents: 10 }] },
+      pricing: {
+        unit: 'per_image',
+        quantityKey: 'count',
+        currency: 'CNY',
+        rates: [{
+          id: 'output-default',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: '0.1',
+          conditions: {},
+        }],
+      },
     }))).toThrow(/quantityKey/)
   })
 
-  it('rejects negative price cents', () => {
-    expect(() => assertModelManifestConsistent(manifest({
-      pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: -1 }] },
-    }))).toThrow(/priceCents/)
-  })
-
-  it('rejects non-finite price cents', () => {
-    expect(() => assertModelManifestConsistent(manifest({
-      pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: Infinity }] },
-    }))).toThrow(/priceCents/)
-
-    expect(() => assertModelManifestConsistent(manifest({
-      pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: Number.NaN }] },
-    }))).toThrow(/priceCents/)
-  })
-
-  it('rejects invalid actual usage pricing rates', () => {
+  it('rejects negative unitPrice', () => {
     expect(() => assertModelManifestConsistent(manifest({
       pricing: {
         unit: 'per_image',
         quantityKey: 'n',
         currency: 'CNY',
-        tiers: [{ condition: {}, priceCents: 10 }],
-        actualUsage: {
-          kind: 'chat_tokens',
-          inputTextPriceCentsPerMillion: -1,
-          inputAudioPriceCentsPerMillion: 0,
-          outputTextPriceCentsPerMillion: 0,
-        },
+        rates: [{
+          id: 'output-default',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: '-1',
+          conditions: {},
+        }],
       },
-    }))).toThrow(/actualUsage inputTextPriceCentsPerMillion/)
+    }))).toThrow(/unitPrice must be a finite non-negative decimal yuan/)
+  })
+
+  it('rejects non-finite unitPrice', () => {
+    for (const unitPrice of ['Infinity', 'NaN']) {
+      expect(() => assertModelManifestConsistent(manifest({
+        pricing: {
+          unit: 'per_image',
+          quantityKey: 'n',
+          currency: 'CNY',
+          rates: [{
+            id: 'output-default',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'image',
+            unitSize: 1,
+            unitPrice,
+            conditions: {},
+          }],
+        },
+      }))).toThrow(/unitPrice must be a finite non-negative decimal yuan/)
+    }
+  })
+
+  it('rejects rate conditions that reference undeclared parameters', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      pricing: {
+        unit: 'per_image',
+        quantityKey: 'n',
+        currency: 'CNY',
+        rates: [{
+          id: 'output-conditional',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: '0.25',
+          conditions: { size: '2048*2048' },
+        }],
+      },
+    }))).toThrow(/condition field "size" does not match a parameter/)
+  })
+
+  it('rejects non-positive or non-integer unitSize and missing region', () => {
+    expect(() => assertModelManifestConsistent(manifest({
+      pricing: {
+        unit: 'per_image',
+        quantityKey: 'n',
+        currency: 'CNY',
+        rates: [{
+          id: 'output-default',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 0,
+          unitPrice: '0.1',
+          conditions: {},
+        }],
+      },
+    }))).toThrow(/unitSize must be a positive integer/)
 
     expect(() => assertModelManifestConsistent(manifest({
       pricing: {
         unit: 'per_image',
         quantityKey: 'n',
         currency: 'CNY',
-        tiers: [{ condition: {}, priceCents: 10 }],
-        actualUsage: {
-          kind: 'chat_tokens',
-          inputTextPriceCentsPerMillion: Number.NaN,
-          inputAudioPriceCentsPerMillion: 0,
-          outputTextPriceCentsPerMillion: 0,
-        },
+        rates: [{
+          id: 'output-default',
+          region: '',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: '0.1',
+          conditions: {},
+        }],
       },
-    }))).toThrow(/actualUsage inputTextPriceCentsPerMillion/)
+    }))).toThrow(/region is missing/)
   })
 
   it('rejects duplicate model ids', () => {
@@ -153,12 +371,30 @@ describe('registry checks', () => {
         unit: 'per_image',
         quantityKey: 'n',
         currency: 'CNY',
-        tiers: [
-          { condition: {}, priceCents: 10 },
-          { condition: { missing: true }, priceCents: 12 },
+        rates: [
+          {
+            id: 'output-default',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'image',
+            unitSize: 1,
+            unitPrice: '0.1',
+            conditions: {},
+          },
+          {
+            id: 'output-conditional',
+            region: 'cn-beijing',
+            serviceScope: 'china-mainland',
+            chargeItem: 'output',
+            unit: 'image',
+            unitSize: 1,
+            unitPrice: '0.12',
+            conditions: { missing: true },
+          },
         ],
       },
-    }))).toThrow(/condition field/)
+    }))).toThrow(/condition field "missing" does not match a parameter/)
 
     expect(() => assertModelManifestConsistent(manifest({
       parameters: [
@@ -244,15 +480,15 @@ describe('registry checks', () => {
     }))).toThrow(/minItems must not exceed maxItems/)
   })
 
-  it('rejects invalid combined media group declarations', () => {
-    const grouped = (mediaGroups: NonNullable<ModelManifest['mediaGroups']>): ModelManifest => manifest({
+  it('rejects invalid combined media group rule declarations', () => {
+    const grouped = (rules: NonNullable<ModelManifest['rules']>): ModelManifest => manifest({
       parameters: [
         { name: 'prompt', label: 'Prompt', type: 'text', required: true },
         { name: 'n', label: 'Count', type: 'number', defaultValue: 1, min: 1, max: 4 },
         { name: 'images', label: 'Images', type: 'media', mediaKind: 'image' },
         { name: 'videos', label: 'Videos', type: 'media', mediaKind: 'video' },
       ],
-      mediaGroups,
+      rules,
       request: {
         kind: 'dashscope-image-message',
         endpoint: '/images',
@@ -266,18 +502,168 @@ describe('registry checks', () => {
     })
 
     expect(() => assertModelManifestConsistent(grouped([
-      { parameters: ['images', 'missing'], maxItems: 5 },
+      { kind: 'media-group', fields: ['images', 'missing'], maxItems: 5 },
     ]))).toThrow(/does not match a media parameter/)
     expect(() => assertModelManifestConsistent(grouped([
-      { parameters: ['images', 'videos'], minItems: 6, maxItems: 5 },
+      { kind: 'media-group', fields: ['images', 'videos'], minItems: 6, maxItems: 5 },
     ]))).toThrow(/minItems must not exceed maxItems/)
     expect(() => assertModelManifestConsistent(grouped([
       {
-        parameters: ['images', 'videos'],
+        kind: 'media-group',
+        fields: ['images', 'videos'],
         maxItems: 4,
-        when: { field: 'missing', present: true },
+        condition: { kind: 'media-count', field: 'missing' },
       },
     ]))).toThrow(/condition field "missing" does not match a parameter/)
+    expect(() => assertModelManifestConsistent(grouped([
+      { kind: 'media-group', fields: ['images', 'videos'] },
+    ]))).toThrow(/must declare minItems or maxItems/)
+    expect(() => assertModelManifestConsistent(grouped([
+      { kind: 'media-group', fields: ['images', 'images'], minItems: 1 },
+    ]))).toThrow(/must not declare duplicate fields/)
+  })
+
+  it('validates every cross-field rule kind', () => {
+    const message = { 'zh-CN': '规则文案', 'en-US': 'Rule message' }
+    const withParams = (
+      extraParameters: ModelManifest['parameters'],
+      rule: ModelValidationRule,
+    ): ModelManifest => manifest({
+      parameters: [
+        { name: 'prompt', label: 'Prompt', type: 'text', required: true },
+        { name: 'n', label: 'Count', type: 'number', defaultValue: 1, min: 1, max: 4 },
+        { name: 'references', label: 'References', type: 'media', mediaKind: 'image' },
+        ...extraParameters,
+      ],
+      rules: [rule],
+      request: {
+        kind: 'dashscope-image-message',
+        endpoint: '/images',
+        bindings: {
+          prompt: { target: 'input.prompt' },
+          n: { target: 'parameters.field' },
+          references: { target: 'input.media', mediaType: 'image' },
+        },
+      },
+    })
+
+    // required-one-of
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'required-one-of',
+      fields: ['prompt', 'n'],
+      code: 'REQUIRED_PARAMETER',
+      message,
+    }))).not.toThrow()
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'required-one-of',
+      fields: [],
+      code: 'REQUIRED_PARAMETER',
+      message,
+    }))).toThrow(/required-one-of must declare fields/)
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'required-one-of',
+      fields: ['prompt'],
+      minimum: 0,
+      code: 'REQUIRED_PARAMETER',
+      message,
+    }))).toThrow(/minimum must be a positive integer/)
+
+    // text-length
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'text-length',
+      field: 'prompt',
+      cjk: { max: 350 },
+      other: { max: 2000 },
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).not.toThrow()
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'text-length',
+      field: 'missing',
+      cjk: { max: 10 },
+      other: { max: 10 },
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).toThrow(/text-length field "missing" does not match a parameter/)
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'text-length',
+      field: 'prompt',
+      cjk: { max: 0 },
+      other: { max: 10 },
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).toThrow(/text-length must declare positive cjk\/other max/)
+
+    // field-required-when
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'field-required-when',
+      field: 'n',
+      condition: { kind: 'field-equals', field: 'prompt', equals: 'x' },
+      code: 'REQUIRED_PARAMETER',
+      message,
+    }))).not.toThrow()
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'field-required-when',
+      field: 'n',
+      condition: { kind: 'field-equals', field: 'missing', equals: 'x' },
+      code: 'REQUIRED_PARAMETER',
+      message,
+    }))).toThrow(/field-required-when condition field "missing" does not match a parameter/)
+
+    // field-allowed-when
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'field-allowed-when',
+      field: 'n',
+      condition: { kind: 'field-equals', field: 'prompt', equals: 'x' },
+      code: 'INVALID_VALUE',
+      message,
+    }))).not.toThrow()
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'field-allowed-when',
+      field: 'missing',
+      condition: { kind: 'field-equals', field: 'prompt', equals: 'x' },
+      code: 'INVALID_VALUE',
+      message,
+    }))).toThrow(/field-allowed-when field "missing" does not match a parameter/)
+
+    // media-group with condition (cross-field binding must reference a declared media param)
+    expect(() => assertModelManifestConsistent(withParams([
+      { name: 'featureVideo', label: 'Feature', type: 'media', mediaKind: 'video' },
+    ], {
+      kind: 'media-group',
+      fields: ['references', 'featureVideo'],
+      maxItems: 5,
+      condition: { kind: 'media-count', field: 'featureVideo', minimum: 1 },
+    }))).not.toThrow()
+
+    // array-item-field-max-path
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'array-item-field-max-path',
+      field: 'n',
+      itemProperty: 'weight',
+      maximumField: 'prompt',
+      defaultMaximum: 100,
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).not.toThrow()
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'array-item-field-max-path',
+      field: 'missing',
+      itemProperty: 'weight',
+      maximumField: 'prompt',
+      defaultMaximum: 100,
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).toThrow(/array-item-field-max-path field "missing" does not match a parameter/)
+    expect(() => assertModelManifestConsistent(withParams([], {
+      kind: 'array-item-field-max-path',
+      field: 'n',
+      itemProperty: 'weight',
+      maximumField: 'missing',
+      defaultMaximum: 100,
+      code: 'OUT_OF_RANGE',
+      message,
+    }))).toThrow(/array-item-field-max-path field "missing" does not match a parameter/)
   })
 
   it('accepts structured select defaults and option values', () => {

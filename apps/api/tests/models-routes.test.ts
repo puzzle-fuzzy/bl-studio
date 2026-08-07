@@ -1,5 +1,4 @@
 import { describe, expect, it } from 'vitest'
-import { BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE } from '@bailian-studio/bailian-adapter'
 import { createTestApp } from '../src/test-app'
 
 const { app } = createTestApp()
@@ -43,40 +42,6 @@ describe('model routes', () => {
     expect(response.status).toBe(200)
     expect(body.data.id).toBe('qwen-image')
     expect(body.data.operation).toBe('image.text-to-image')
-  })
-
-  it('exposes the exact Bailian SDK catalog and coverage snapshot', async () => {
-    const response = await app.handle(new Request('http://localhost/api/models/bailian-contract'))
-    const body = await response.json() as {
-      success: true
-      data: {
-        sdkVersion: string
-        catalogRevision: string
-        catalogHash: string
-        requirementsHash: string
-        coverage: {
-          totalRequirements: number
-          coveredRequirements: number
-          legacyRequirements: number
-          coveredConsumerIds: string[]
-        }
-      }
-    }
-
-    expect(response.status).toBe(200)
-    expect(body.data).toMatchObject({
-      sdkVersion: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.sdkVersion,
-      catalogRevision: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.catalogRevision,
-      catalogHash: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.catalogHash,
-      requirementsHash: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.requirementsHash,
-      coverage: {
-        totalRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.totalRequirements,
-        coveredRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.coveredRequirements,
-        legacyRequirements: BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.uncoveredRequirements,
-        coveredConsumerIds: [...BAILIAN_STUDIO_BAILIAN_COVERAGE_BASELINE.coveredConsumerIds],
-      },
-    })
-    expect(body.data.coverage.coveredConsumerIds).toContain('happyhorse-video-edit')
   })
 
   it('returns 404 for an unknown model', async () => {

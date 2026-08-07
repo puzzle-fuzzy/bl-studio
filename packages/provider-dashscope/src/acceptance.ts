@@ -5,6 +5,7 @@ import {
   type DeepReadonly,
   type FrozenModelManifest,
   type ModelParameter,
+  type ModelRuleCondition,
 } from '@bailian-studio/model-core'
 import { buildDashScopeRequest } from './request-builder'
 import { parseDashScopeOutput } from './response-parser'
@@ -57,19 +58,18 @@ export function buildOfflineFixtureParams(manifest: FrozenModelManifest): Record
     }
   }
 
-  for (const group of manifest.mediaGroups ?? []) {
-    const conditionMatches = group.when === undefined
-      || (mediaItemCount(params[group.when.field]) > 0) === group.when.present
-    if (!conditionMatches || group.minItems === undefined) continue
+  for (const rule of manifest.rules ?? []) {
+    if (rule.kind !== 'media-group' || rule.minItems === undefined) continue
+    if (!fixtureRuleConditionMatches(rule.condition, params)) continue
 
-    const currentCount = group.parameters.reduce(
+    const currentCount = rule.fields.reduce(
       (total, name) => total + mediaItemCount(params[name]),
       0,
     )
-    if (currentCount >= group.minItems) continue
+    if (currentCount >= rule.minItems) continue
 
     const parameter = manifest.parameters.find(candidate =>
-      group.parameters.includes(candidate.name)
+      rule.fields.includes(candidate.name)
       && candidate.type === 'media'
       && isModelParameterVisible(candidate, params),
     )
@@ -77,7 +77,7 @@ export function buildOfflineFixtureParams(manifest: FrozenModelManifest): Record
 
     const requiredCount = Math.max(
       parameter.minItems ?? 1,
-      group.minItems - currentCount,
+      rule.minItems - currentCount,
     )
     const count = Math.min(requiredCount, parameter.maxItems ?? 1)
     const values = Array.from(
@@ -226,4 +226,20 @@ function fixtureValue(parameter: DeepReadonly<ModelParameter>): unknown {
 function mediaItemCount(value: unknown): number {
   if (value === undefined || value === null || value === '') return 0
   return Array.isArray(value) ? value.length : 1
+}
+
+/** 评估 media-group 规则的 condition（无 condition = 恒满足）。 */
+function fixtureRuleConditionMatches(
+  condition: ModelRuleCondition | undefined,
+  params: Record<string, unknown>,
+): boolean {
+  if (condition === undefined) return true
+  if (condition.kind === 'field-equals') {
+    const matched = params[condition.field] === condition.equals
+    return condition.negate === true ? !matched : matched
+  }
+  const count = mediaItemCount(params[condition.field])
+  if (condition.minimum !== undefined && count < condition.minimum) return false
+  if (condition.maximum !== undefined && count > condition.maximum) return false
+  return true
 }

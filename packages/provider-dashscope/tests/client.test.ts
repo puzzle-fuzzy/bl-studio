@@ -110,7 +110,6 @@ describe('createDashScopeClient', () => {
       apiKey: 'test-key',
       fetch,
       workspaceId: 'ws-test',
-      chatBaseUrl: 'https://proxy.example.test/openai/v1',
     })
 
     await client.chat({ manifest: qwenOmniScreenplay, params: { videoUrl: 'https://fixture.invalid/video.mp4' } })
@@ -146,7 +145,6 @@ describe('createDashScopeClient', () => {
     const client = createDashScopeClient({
       apiKey: 'test-key',
       fetch,
-      baseUrl: 'https://legacy.test',
       workspaceId: 'ws-test',
     })
 
@@ -297,7 +295,7 @@ describe('createDashScopeClient', () => {
     expect((error as DashScopeHttpError).info).toMatchObject({
       category: 'validation',
       retriable: false,
-      code: 'BAILIAN_ADAPTER_WORKSPACE_ID_REQUIRED',
+      code: 'DASHSCOPE_WORKSPACE_ID_REQUIRED',
     })
   })
 
@@ -515,7 +513,7 @@ describe('createDashScopeClient', () => {
       request_id: 'request-image',
     }
     const { fetch, calls } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.submit({ manifest: qwenImage, params: { prompt: 'draw a lighthouse', n: 1 } })
 
@@ -554,7 +552,7 @@ describe('createDashScopeClient', () => {
       request_id: 'request-idempotency',
     }
     const { fetch, calls } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     await client.submit({
       manifest: qwenImage,
@@ -575,7 +573,7 @@ describe('createDashScopeClient', () => {
       request_id: 'request-submit',
     }
     const { fetch, calls } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.submit({
       manifest: wanxTextToVideo,
@@ -624,7 +622,7 @@ describe('createDashScopeClient', () => {
       request_id: 'request-failed',
     }
     const { fetch, calls } = createFetch([jsonResponse(running), jsonResponse(succeeded), jsonResponse(failed)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     await expect(client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-running' })).resolves.toEqual({
       mode: 'pending',
@@ -677,7 +675,7 @@ describe('createDashScopeClient', () => {
       request_id: 'request-missing',
     }
     const { fetch } = createFetch([jsonResponse(unknown), jsonResponse(missing)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     await expect(client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-unknown' })).rejects.toMatchObject({
       info: {
@@ -696,7 +694,7 @@ describe('createDashScopeClient', () => {
   it('throws DashScopeHttpError for non-2xx HTTP responses', async () => {
     const raw = { code: 'Throttling', message: 'rate limit exceeded', request_id: 'request-error' }
     const { fetch } = createFetch([jsonResponse(raw, 429)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     let error: unknown
     try {
@@ -719,7 +717,7 @@ describe('createDashScopeClient', () => {
   it('wraps transport failures in DashScopeHttpError', async () => {
     const transportError = new Error('socket disconnected')
     const { fetch, calls } = createThrowingFetch(transportError)
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     let error: unknown
     try {
@@ -749,7 +747,7 @@ describe('DashScopeClient request_id extraction', () => {
       request_id: 'req-submit-123',
     }
     const { fetch } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.submit({ manifest: wanxTextToVideo, params: { prompt: 'test' } })
 
@@ -769,7 +767,7 @@ describe('DashScopeClient request_id extraction', () => {
       request_id: 'req-sync-456',
     }
     const { fetch } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.submit({ manifest: qwenImage, params: { prompt: 'draw a lighthouse' } })
 
@@ -792,7 +790,7 @@ describe('DashScopeClient request_id extraction', () => {
       request_id: 'req-poll-789',
     }
     const { fetch } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-123' })
 
@@ -811,7 +809,7 @@ describe('DashScopeClient request_id extraction', () => {
       request_id: 'req-poll-fail',
     }
     const { fetch } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     const result = await client.poll({ manifest: wanxTextToVideo, providerTaskId: 'task-123' })
 
@@ -828,7 +826,7 @@ describe('DashScopeClient request_id extraction', () => {
       // 无 request_id
     }
     const { fetch } = createFetch([jsonResponse(raw)])
-    const client = createDashScopeClient({ apiKey: 'test-key', fetch, baseUrl: 'https://dashscope.test' })
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch })
 
     await expect(client.submit({ manifest: wanxTextToVideo, params: { prompt: 'test' } })).rejects.toMatchObject({
       info: {

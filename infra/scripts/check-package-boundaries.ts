@@ -18,9 +18,6 @@ const importsElysia = importSpecifier(String.raw`elysia`)
 const importsProviderDashScopePackage = importSpecifier(String.raw`(?:\.\.\/)*packages\/provider-dashscope`)
 const importsApiSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:api|apps\/api|services\/api)`)
 const importsWorkerSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:worker|apps\/worker|services\/worker)`)
-export const importsBailianSdk = importSpecifier(String.raw`@puzzle-fuzzy\/bailian-sdk`)
-export const bailianSdkOwnerScope = 'packages/bailian-adapter'
-export const importsBailianAdapter = importSpecifier(String.raw`@bailian-studio\/bailian-adapter`)
 export const importsProviderDashScope = importSpecifier(String.raw`@bailian-studio\/provider-dashscope`)
 
 export interface BailianPackageBoundary {
@@ -31,29 +28,12 @@ export interface BailianPackageBoundary {
 }
 
 /**
- * 百炼依赖的唯一所有者和消费者白名单。
+ * 执行层包的所有者和消费者白名单。
  *
  * 这不是文档提示，而是 `check:boundaries` 的可执行架构。新增消费者必须先经过
  * 架构评审并同时更新 docs/bailian/PACKAGE_BOUNDARY.md 与对应测试。
  */
 export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
-  {
-    packageName: '@puzzle-fuzzy/bailian-sdk',
-    ownerScope: bailianSdkOwnerScope,
-    allowedConsumerScopes: [],
-    dependencyProtocol: 'catalog:',
-  },
-  {
-    packageName: '@bailian-studio/bailian-adapter',
-    ownerScope: bailianSdkOwnerScope,
-    allowedConsumerScopes: [
-      'packages/provider-dashscope',
-      'packages/generation-repository',
-       'apps/api',
-       'apps/worker',
-    ],
-    dependencyProtocol: 'workspace:*',
-  },
   {
     packageName: '@bailian-studio/provider-dashscope',
     ownerScope: 'packages/provider-dashscope',
@@ -139,17 +119,7 @@ export const rules: Array<{
   },
   {
     scope: 'packages/model-core',
-    banned: [/@bailian-studio\/(db|storage|provider-dashscope|bailian-adapter)\b/, importsApps, importsServices],
-  },
-  {
-    scope: 'packages/bailian-adapter',
-    banned: [
-      importSpecifier(String.raw`@bailian-studio\/(?!model-core(?:\/|['"]))[a-z-]+`),
-      importsApps,
-      importsServices,
-      importsElysia,
-      importsReact,
-    ],
+    banned: [/@bailian-studio\/(db|storage|provider-dashscope)\b/, importsApps, importsServices],
   },
   {
     scope: 'packages/provider-dashscope',
@@ -277,10 +247,6 @@ function walkPackageManifests(dir: string): string[] {
   return files
 }
 
-export function declaresBailianSdkDependency(manifest: unknown): boolean {
-  return declaresPackageDependency(manifest, '@puzzle-fuzzy/bailian-sdk')
-}
-
 export function declaresPackageDependency(manifest: unknown, packageName: string): boolean {
   if (typeof manifest !== 'object' || manifest === null) return false
   const record = manifest as Record<string, unknown>
@@ -330,40 +296,6 @@ export function checkBailianPackageManifestBoundary(
   return violations
 }
 
-export function checkBailianSdkVersionPolicy(
-  adapterManifest: unknown,
-  pnpmWorkspaceYaml: string,
-): string[] {
-  const violations: string[] = []
-  const exactSemver = /^\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?(?:\+[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?$/
-  const catalogVersion = extractCatalogVersion(pnpmWorkspaceYaml, '@puzzle-fuzzy/bailian-sdk')
-
-  if (typeof catalogVersion !== 'string' || !exactSemver.test(catalogVersion)) {
-    violations.push(
-      'pnpm-workspace.yaml must pin @puzzle-fuzzy/bailian-sdk to one exact semver in its catalog',
-    )
-  }
-
-  if (declaredPackageVersion(adapterManifest, '@puzzle-fuzzy/bailian-sdk') !== 'catalog:') {
-    violations.push(
-      'packages/bailian-adapter/package.json must consume @puzzle-fuzzy/bailian-sdk through catalog:',
-    )
-  }
-
-  return violations
-}
-
-/** 从 pnpm-workspace.yaml 的 catalog 段提取指定包名对应的版本值。 */
-export function extractCatalogVersion(yaml: string, packageName: string): string | undefined {
-  const escaped = packageName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-  const pattern = new RegExp(
-    `^\\s*["']?${escaped}["']?\\s*:\\s*["']?([^"'\\s#]+)["']?\\s*$`,
-    'm',
-  )
-  const match = pattern.exec(yaml)
-  return match?.[1]
-}
-
 export function checkPackageBoundaries(): string[] {
   const violations: string[] = []
 
@@ -407,12 +339,6 @@ export function checkPackageBoundaries(): string[] {
       violations.push(...checkBailianPackageManifestBoundary(relativeFile, manifest))
     }
   }
-
-  const adapterManifest = JSON.parse(
-    readFileSync(join(root, bailianSdkOwnerScope, 'package.json'), 'utf8'),
-  ) as unknown
-  const pnpmWorkspaceYaml = readFileSync(join(root, 'pnpm-workspace.yaml'), 'utf8')
-  violations.push(...checkBailianSdkVersionPolicy(adapterManifest, pnpmWorkspaceYaml))
 
   return violations
 }

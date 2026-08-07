@@ -28,6 +28,7 @@ import type {
   GetOwnedStorageObjectInput,
   GetGenerationShareForRecordInput,
   ListAdminGalleryResult,
+  ListAdminTasksResult,
   ListFeedbackResult,
   ListGalleryResult,
   ListGenerationArtifactsOptions,
@@ -543,11 +544,25 @@ export class FakeRepository implements GenerationRepository {
   getAdminGalleryArtifact(): Promise<GenerationArtifact | undefined> {
     return Promise.resolve(undefined)
   }
+  listAdminGalleryRecordArtifacts(input: { recordId: string }): Promise<GenerationArtifact[]> {
+    return Promise.resolve(
+      [...this.artifacts.values()].filter(artifact => artifact.recordId === input.recordId),
+    )
+  }
   setGalleryRecordHidden(): Promise<void> {
     return Promise.resolve()
   }
+  setGalleryRecordsHidden(): Promise<string[]> {
+    return Promise.resolve([])
+  }
+  softDeleteGalleryRecords(): Promise<string[]> {
+    return Promise.resolve([])
+  }
   hideUserPublicWorks(): Promise<number> {
     return Promise.resolve(0)
+  }
+  listAdminTasks(): Promise<ListAdminTasksResult> {
+    return Promise.resolve({ items: [] })
   }
   getGenerationOwner(): Promise<string | undefined> {
     return Promise.resolve(undefined)

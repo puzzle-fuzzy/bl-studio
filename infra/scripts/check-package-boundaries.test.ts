@@ -2,14 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import {
   bailianPackageBoundaries,
-  bailianSdkOwnerScope,
   checkBailianPackageManifestBoundary,
   checkBailianPackageSourceBoundary,
-  checkBailianSdkVersionPolicy,
-  declaresBailianSdkDependency,
   declaresPackageDependency,
-  importsBailianAdapter,
-  importsBailianSdk,
   importsProviderDashScope,
   isBailianPackageConsumerAllowed,
   rules,
@@ -24,7 +19,7 @@ function matchesRule(scope: string, source: string): boolean {
 }
 
 describe('package boundary rules', () => {
-  it('allows only the worker runtime to import provider execution adapters in M5', () => {
+  it('allows only the worker runtime to import provider execution adapters', () => {
     expect(matchesRule('apps/worker', "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'")).toBe(false)
     expect(matchesRule('apps/api', "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'")).toBe(true)
     expect(matchesRule('packages/generation-repository', "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'")).toBe(true)
@@ -82,93 +77,43 @@ describe('package boundary rules', () => {
     }
   })
 
-  it('keeps the Bailian SDK behind a near-leaf adapter boundary', () => {
-    expect(matchesRule('packages/model-core', "import { bailian } from '@bailian-studio/bailian-adapter'")).toBe(true)
-    expect(matchesRule('packages/bailian-adapter', "import { listModels } from '@bailian-studio/model-core'")).toBe(false)
-    expect(matchesRule('packages/bailian-adapter', "import { createDb } from '@bailian-studio/db'")).toBe(true)
-    expect(matchesRule('packages/bailian-adapter', "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'")).toBe(true)
-    expect(matchesRule('packages/bailian-adapter', "import { Elysia } from 'elysia'")).toBe(true)
-    expect(bailianSdkOwnerScope).toBe('packages/bailian-adapter')
-    expect(importsBailianSdk.test(
-      "import { getCatalogMeta } from '@puzzle-fuzzy/bailian-sdk'",
-    )).toBe(true)
-    expect(importsBailianSdk.test(
-      "const sdk = await import('@puzzle-fuzzy/bailian-sdk/catalog')",
-    )).toBe(true)
-    expect(importsBailianSdk.test(
-      "const sdk = require('@puzzle-fuzzy/bailian-sdk')",
-    )).toBe(true)
-    expect(declaresBailianSdkDependency({
-      dependencies: { '@puzzle-fuzzy/bailian-sdk': '2.0.0' },
-    })).toBe(true)
-    expect(declaresBailianSdkDependency({
-      devDependencies: { '@puzzle-fuzzy/bailian-sdk': '2.0.0' },
-    })).toBe(true)
-    expect(declaresBailianSdkDependency({
-      dependencies: { '@bailian-studio/bailian-adapter': 'workspace:*' },
-    })).toBe(false)
+  it('keeps model-core a pure leaf: no provider execution, persistence, or app imports', () => {
+    expect(matchesRule('packages/model-core', "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'")).toBe(true)
+    expect(matchesRule('packages/model-core', "import { createDb } from '@bailian-studio/db'")).toBe(true)
+    expect(matchesRule('packages/model-core', "import { app } from '../../apps/api'")).toBe(true)
+    expect(matchesRule('packages/model-core', "import { runWorkerOnce } from '../../apps/worker'")).toBe(true)
+    expect(matchesRule('packages/model-core', "import { listModels } from './registry'")).toBe(false)
   })
 
-  it('defines an executable Bailian owner and consumer allowlist', () => {
+  it('defines an executable provider-dashscope owner and consumer allowlist', () => {
     expect(bailianPackageBoundaries).toEqual([
-      {
-        packageName: '@puzzle-fuzzy/bailian-sdk',
-        ownerScope: 'packages/bailian-adapter',
-        allowedConsumerScopes: [],
-        dependencyProtocol: 'catalog:',
-      },
-      {
-        packageName: '@bailian-studio/bailian-adapter',
-        ownerScope: 'packages/bailian-adapter',
-        allowedConsumerScopes: [
-          'packages/provider-dashscope',
-          'packages/generation-repository',
-          'apps/api',
-          'apps/worker',
-        ],
-        dependencyProtocol: 'workspace:*',
-      },
       {
         packageName: '@bailian-studio/provider-dashscope',
         ownerScope: 'packages/provider-dashscope',
-          allowedConsumerScopes: ['apps/worker'],
+        allowedConsumerScopes: ['apps/worker'],
         dependencyProtocol: 'workspace:*',
       },
     ])
 
-    const adapterBoundary = bailianPackageBoundaries[1]
-    const providerBoundary = bailianPackageBoundaries[2]
-    expect(adapterBoundary).toBeDefined()
+    const providerBoundary = bailianPackageBoundaries[0]
     expect(providerBoundary).toBeDefined()
-    expect(isBailianPackageConsumerAllowed(adapterBoundary!, 'apps/api/src/index.ts')).toBe(true)
-    expect(isBailianPackageConsumerAllowed(adapterBoundary!, 'apps/web/src/App.tsx')).toBe(false)
     expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/worker/src/index.ts')).toBe(true)
     expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/api/src/index.ts')).toBe(false)
+    expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/web/src/App.tsx')).toBe(false)
   })
 
   it('rejects unapproved consumers, package subpaths, and source deep imports', () => {
-    expect(importsBailianAdapter.test(
-      "import { getBailianContractSnapshot } from '@bailian-studio/bailian-adapter'",
-    )).toBe(true)
     expect(importsProviderDashScope.test(
       "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
     )).toBe(true)
 
-    expect(checkBailianPackageSourceBoundary(
-      'apps/web/src/bailian.ts',
-      "import { getBailianContractSnapshot } from '@bailian-studio/bailian-adapter'",
-    )).toHaveLength(1)
     expect(checkBailianPackageSourceBoundary(
       'apps/api/src/bailian.ts',
       "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
     )).toHaveLength(1)
     expect(checkBailianPackageSourceBoundary(
       'apps/worker/src/bailian.ts',
-      "import { getBailianSdkMeta } from '@bailian-studio/bailian-adapter/coverage'",
-    )).toHaveLength(1)
-    expect(checkBailianPackageSourceBoundary(
-      'apps/worker/src/bailian.ts',
-      "import { getBailianSdkMeta } from '../../../packages/bailian-adapter/src/coverage'",
+      "import { buildDashScopeRequest } from '../../../packages/provider-dashscope/src/request-builder'",
     )).toHaveLength(1)
     expect(checkBailianPackageSourceBoundary(
       'apps/worker/src/providers/dashscope.ts',
@@ -176,13 +121,13 @@ describe('package boundary rules', () => {
     )).toEqual([])
   })
 
-  it('rejects package declaration drift and non-exact SDK versions', () => {
+  it('rejects package declaration drift', () => {
     expect(declaresPackageDependency({
       dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
     }, '@bailian-studio/provider-dashscope')).toBe(true)
 
     expect(checkBailianPackageManifestBoundary('apps/web/package.json', {
-      dependencies: { '@bailian-studio/bailian-adapter': 'workspace:*' },
+      dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
     })).toHaveLength(1)
     expect(checkBailianPackageManifestBoundary('apps/worker/package.json', {
       dependencies: { '@bailian-studio/provider-dashscope': '^0.0.0' },
@@ -190,16 +135,6 @@ describe('package boundary rules', () => {
     expect(checkBailianPackageManifestBoundary('apps/worker/package.json', {
       dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
     })).toEqual([])
-
-    expect(checkBailianSdkVersionPolicy({
-      dependencies: { '@puzzle-fuzzy/bailian-sdk': 'catalog:' },
-    }, 'catalog:\n  "@puzzle-fuzzy/bailian-sdk": "^2.0.0"\n')).toHaveLength(1)
-    expect(checkBailianSdkVersionPolicy({
-      dependencies: { '@puzzle-fuzzy/bailian-sdk': '2.0.0-beta.3' },
-    }, 'catalog:\n  "@puzzle-fuzzy/bailian-sdk": "2.0.0-beta.3"\n')).toHaveLength(1)
-    expect(checkBailianSdkVersionPolicy({
-      dependencies: { '@puzzle-fuzzy/bailian-sdk': 'catalog:' },
-    }, 'catalog:\n  "@puzzle-fuzzy/bailian-sdk": "2.0.0-beta.3"\n')).toEqual([])
   })
 
   it('guards API and worker from direct persistence/provider coupling', () => {

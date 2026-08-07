@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
-import { buildSubmitPayload } from './generation-submit'
+import { validateModelParams } from '@bailian-studio/model-core'
+import { buildSubmitPayload, buildValidationParams } from './generation-submit'
 
 /** 参考生视频模型的最小 manifest（referenceFormat: image-bracket）。 */
 const referenceModel: ModelCatalogItem = {
@@ -66,5 +67,41 @@ describe('buildSubmitPayload', () => {
 
     expect(payload.params).toEqual({ prompt: '一段提示词', duration: 5 })
     expect(payload.assetRefs.references).toEqual(['a1'])
+  })
+})
+
+describe('buildValidationParams', () => {
+  it('镜像服务端校验入参：media 转 id 数组、prompt 解析引用、剥离 UI 元数据', () => {
+    const params = buildValidationParams(referenceModel, {
+      references: [asset('a1'), asset('a2')],
+      prompt: '@图2 主角在 @图1 的场景中',
+      duration: 5,
+      _uiOnly: true,
+    })
+
+    expect(params).toEqual({
+      references: ['a1', 'a2'],
+      prompt: '[Image 2] 主角在 [Image 1] 的场景中',
+      duration: 5,
+    })
+  })
+
+  it('validateModelParams 可直接消费其输出：提交前拦截超上限素材（media 数量上限拦截）', () => {
+    const ok = validateModelParams(referenceModel, buildValidationParams(referenceModel, {
+      references: [asset('a1'), asset('a2'), asset('a3'), asset('a4'), asset('a5')],
+      prompt: '一段提示词',
+    }))
+    expect(ok.valid).toBe(true)
+
+    // references maxItems: 7，第 8 张素材在提交前就被拦下
+    const tooMany = validateModelParams(referenceModel, buildValidationParams(referenceModel, {
+      references: Array.from({ length: 8 }, (_, index) => asset(`a${index + 1}`)),
+      prompt: '一段提示词',
+    }))
+    expect(tooMany.valid).toBe(false)
+    expect(tooMany.errors).toContainEqual(expect.objectContaining({
+      field: 'references',
+      code: 'OUT_OF_RANGE',
+    }))
   })
 })

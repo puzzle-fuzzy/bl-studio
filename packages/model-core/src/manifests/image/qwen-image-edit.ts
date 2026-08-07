@@ -105,6 +105,7 @@ function makeQwenImageEdit(options: QwenImageEditOptions): ModelManifest {
         label: '随机种子',
         type: 'number',
         required: false,
+        min: 0, max: 2147483647, step: 1,
         description: '随机数种子，取值范围[0,2147483647]',
       },
     ],
@@ -129,7 +130,30 @@ function makeQwenImageEdit(options: QwenImageEditOptions): ModelManifest {
       unit: 'per_image',
       quantityKey: 'n',
       currency: 'CNY',
-      tiers: [{ condition: {}, priceCents: options.priceCentsPerImage }],
+      rates: [
+        {
+          id: 'cn-beijing-output-image',
+          region: 'cn-beijing',
+          serviceScope: 'china-mainland',
+          chargeItem: 'output',
+          unit: 'image',
+          unitSize: 1,
+          unitPrice: (options.priceCentsPerImage / 100).toString(),
+          conditions: {},
+        },
+      ],
+    },
+    transport: {
+      mode: 'sync',
+      submit: {
+        method: 'POST',
+        endpointTemplate: 'https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+        modelFieldPath: '/model',
+        headers: [
+          { name: 'Authorization' },
+          { name: 'Content-Type', value: 'application/json' },
+        ],
+      },
     },
     availability: { enabled: true, stage: 'stable' },
   }

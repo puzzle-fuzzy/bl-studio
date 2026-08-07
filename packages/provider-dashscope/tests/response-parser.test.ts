@@ -17,7 +17,21 @@ const baseManifest: ModelManifest = {
     bindings: { prompt: { target: 'input.prompt' } },
   },
   output: { kind: 'images-from-message-content' },
-  pricing: { unit: 'per_image', quantityKey: 'n', tiers: [{ condition: {}, priceCents: 1 }], currency: 'CNY' },
+  pricing: {
+    unit: 'per_image',
+    quantityKey: 'n',
+    currency: 'CNY',
+    rates: [{ id: 'cn-beijing-output-image', region: 'cn-beijing', serviceScope: 'china-mainland', chargeItem: 'output', unit: 'image', unitSize: 1, unitPrice: '0.01', conditions: {} }],
+  },
+  transport: {
+    mode: 'sync',
+    submit: {
+      method: 'POST',
+      endpointTemplate: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation/{WorkspaceId}',
+      modelFieldPath: '/model',
+      headers: [],
+    },
+  },
   availability: { enabled: true, stage: 'stable' },
 }
 

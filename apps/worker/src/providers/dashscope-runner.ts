@@ -7,11 +7,12 @@
  */
 
 import {
-  BailianStudioBailianAdapterError,
-  calculateOfficialBailianUsageCost,
-  getBailianIntegrationStatus,
-} from '@bailian-studio/bailian-adapter'
-import { calculateUsagePriceCents, validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
+  ModelCoreError,
+  calculateUsageCostCents,
+  calculateUsagePriceCents,
+  validateModelParams,
+  type FrozenModelManifest,
+} from '@bailian-studio/model-core'
 import {
   createDashScopeClient,
   DashScopeHttpError,
@@ -27,8 +28,6 @@ import type {
 
 export interface CreateDashScopeRunnerOptions {
   apiKey: string
-  baseUrl?: string
-  chatBaseUrl?: string
   workspaceId?: string
   contractLocale?: 'zh-CN' | 'en-US'
   fetch?: CreateDashScopeClientOptions['fetch']
@@ -42,8 +41,6 @@ export class DashScopeProviderRunner implements ProviderRunner {
   constructor(options: CreateDashScopeRunnerOptions) {
     this.client = createDashScopeClient({
       apiKey: options.apiKey,
-      baseUrl: options.baseUrl,
-      ...(options.chatBaseUrl !== undefined ? { chatBaseUrl: options.chatBaseUrl } : {}),
       ...(options.workspaceId !== undefined ? { workspaceId: options.workspaceId } : {}),
       ...(options.contractLocale !== undefined ? { contractLocale: options.contractLocale } : {}),
       ...(options.fetch !== undefined ? { fetch: options.fetch } : {}),
@@ -289,7 +286,7 @@ export class DashScopeProviderRunner implements ProviderRunner {
       }
     }
 
-    if (error instanceof BailianStudioBailianAdapterError) {
+    if (error instanceof ModelCoreError) {
       return {
         success: false,
         costCents: 0,
@@ -299,7 +296,7 @@ export class DashScopeProviderRunner implements ProviderRunner {
           message: error.message,
           retryable: false,
           category: 'validation',
-          details: error.toJSON(),
+          ...(isRecordDetails(error.details) ? { details: error.details } : {}),
         },
       }
     }
@@ -319,16 +316,20 @@ export class DashScopeProviderRunner implements ProviderRunner {
   }
 }
 
+/** 结算实际成本：能用 usage 精确结算（时长类模型）就用官方定价结算，否则保留提交前估价。 */
 function completedProviderCost(
   manifest: FrozenModelManifest,
   params: Readonly<Record<string, unknown>>,
   usage: unknown,
   estimatedCents: number,
 ): number {
-  if (getBailianIntegrationStatus(manifest.id).kind === 'legacy') return estimatedCents
-  return calculateOfficialBailianUsageCost(manifest.id, params, usage)?.cents ?? estimatedCents
+  return calculateUsageCostCents(manifest, params, usage)?.cents ?? estimatedCents
 }
 
 function providerHttpCode(status: number | undefined): string {
   return status === undefined ? 'PROVIDER_HTTP_ERROR' : `PROVIDER_HTTP_${status}`
+}
+
+function isRecordDetails(value: unknown): value is Readonly<Record<string, unknown>> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

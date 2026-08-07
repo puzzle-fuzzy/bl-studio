@@ -3,7 +3,6 @@ import {
   AssetCapabilitiesSchema,
   AssetResponseSchema,
   AuthResponseSchema,
-  BailianContractStatusSchema,
   CreateGenerationResponseSchema,
   CreateMediaJobResponseSchema,
   GenerationEstimateResponseSchema,
@@ -292,16 +291,6 @@ describe('API success response contracts', () => {
     expect(data.id).toBe('qwen-image')
     expect(data.operation).toBe('image.text-to-image')
     expect(data.parameters.length).toBeGreaterThan(0)
-  })
-
-  it('keeps the covered Bailian contract response aligned with api-client', async () => {
-    const response = await app.handle(new Request('http://localhost/api/models/bailian-contract'))
-    const data = await readSuccessData(response, BailianContractStatusSchema)
-
-    expect(response.status).toBe(200)
-    expect(data.coverage.coveredRequirements).toBe(data.coverage.totalRequirements)
-    expect(data.coverage.coveredConsumerIds).toHaveLength(data.coverage.totalRequirements)
-    expect(data.coverage.legacyRequirements).toBe(0)
   })
 
   it('keeps the generation estimate response aligned with api-client', async () => {
