@@ -665,7 +665,9 @@ export const taskRecords = pgTable('task_records', {
   /** 任务域：generation | artifact，用于按域分组/过滤。 */
   domain: text('domain').notNull(),
   /**
-   * 任务状态：queued | running | succeeded | failed | cancelled | retry。
+   * 任务状态：queued | running | succeeded | failed | cancelled。
+   * 注意：重试不落 'retry' 状态——状态机失败重试时任务回到 queued（由 attempts/
+   * maxAttempts + nextRunAt 控制退避），'retry' 仅存在于注释里（P2-11，已统一）。
    * 状态机见 task engine 包；repository 是唯一合法的变更入口。
    */
   status: text('status').notNull(),

@@ -351,7 +351,7 @@
 - **P2-08 · 无 title/size 排序索引** —— ✅ 已处理（2026-08-08）：`user_assets` 新增 `user_assets_user_title_idx`（`(user_id, lower(coalesce(file_name, model_id, id)))`）与 `user_assets_user_size_idx`（`(user_id, byte_size DESC NULLS LAST)`），迁移 0039。用 2000 行种子数据 EXPLAIN 验证：标题/大小排序均走索引预排序，不再全表全排。
 - **P2-09 · keyset 决胜列缺 id** —— ✅ 已处理（2026-08-08）：`generation_records_user_created_idx` 由 `(user_id, created_at)` 改为 `(user_id, created_at, id)`（迁移 0039 DROP+CREATE），keyset 平局比较走索引。`generation_records_user_library_idx` 为同一模式的辅助索引，同样受益于 id 决胜列，本次未动（主路径已覆盖）。
 - **P2-10 · 上传大小仅在读侧校验** —— ✅ 已核实并加固（2026-08-08）：writeObject 是哑适配器（策略在调用方）。逐调用方核实——asset 上传在 service 层按 `config.maxAssetSizeBytes` 校验（assets/service.ts:99）、avatar 按 `AVATAR_MAX_BYTES`、worker 产物持久化按 `fetchProviderArtifact` 的 `maxBytes` 上限下载后再写、media/thumbnail 从有界源派生。写路径均先定界，无未校验入口。两个适配器补 P2-10 契约注释，防止未来新写路径忘记定界。
-- **P2-11 · task_records 注释与 CHECK 不一致（含 'retry'）** —— [schema.ts:657](packages/db/src/schema.ts#L657) 注释声明含 'retry'，[:696](packages/db/src/schema.ts#L696) CHECK 只有 queued/running/succeeded/failed/cancelled。已验证状态机从不持久化 'retry'（落到 queued）—— 约束对、注释过时，统一即可。
+- **P2-11 · task_records 注释与 CHECK 不一致（含 'retry'）** —— ✅ 已处理（2026-08-08）：status 注释去掉 'retry' 并注明「重试不落 retry 状态、回 queued」，与 `task_records_status_check` 对齐（纯注释改动，无迁移）。
 
 ### 模型知识
 - **P2-12 · rule.code 是死配置** —— ✅ 已处理（2026-08-08）：新增 `ParameterIssueCode` 白名单联合（含 `REQUIRED_MEDIA`/`TOO_MANY_MEDIA`），`validation.ts` 的 `fromRuleIssue` 改为取 `rule.code ?? 兜底码` 接线；`registry-check.ts` 加运行时白名单断言（tsx 不经 typecheck 也能挡漂移）。两个剧本 manifest 的 `conditions.mode` 交叉引用保持有效。
