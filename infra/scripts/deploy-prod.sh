@@ -170,7 +170,11 @@ ssh_cmd "mkdir -p $REMOTE_INFRA/docker $REMOTE_INFRA/env $REMOTE_INFRA/loki $REM
 
 rsync -az "images-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
 rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docker/"
-rsync -az infra/loki/ infra/alloy/ infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/"
+# 三个目录分别同步到自己的目标目录；多源 rsync 指向同一目标会在服务器
+# 已存在错误路径时把应为单文件的 config.alloy/loki.yaml 留成目录，破坏单文件挂载。
+rsync -az infra/loki/ "$DEPLOY_HOST:$REMOTE_INFRA/loki/"
+rsync -az infra/alloy/ "$DEPLOY_HOST:$REMOTE_INFRA/alloy/"
+rsync -az infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/grafana/"
 # 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
 rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
 rsync -az infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh infra/scripts/production-monitor.sh infra/scripts/restore-rehearsal.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
