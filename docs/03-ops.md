@@ -228,7 +228,7 @@ pnpm run deploy:prod               # 一键发布（核心栈 + 宿主机 nginx 
 pnpm run deploy:prod:web           # web-only 快速发版（约 20MB，不动 api/worker）
 pnpm run db:seed:model-costs       # 播种 model_costs 默认成本（新库首次部署后执行）
 pnpm run prod:up|down|ps|logs      # 生产核心栈运维
-pnpm run prod:observability:up|down  # 启用/停用日志观测栈（loki/alloy/grafana/monitor）
+pnpm run prod:observability:up|down  # SSH 到服务器启用/停用观测栈（loki/alloy/grafana/monitor）
 pnpm run logs:api|worker           # 生产单服务日志
 pnpm run logs:prune                # 清理旧日志（观测栈启用时）
 pnpm run prod:mem                  # 服务器内存 + 容器占用
