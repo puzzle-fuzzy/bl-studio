@@ -14,15 +14,19 @@
   │  https://logs.yxswy.com  (basic_auth)
   ▼
 Grafana (127.0.0.1:5300) ◄── Loki ◄── Alloy ◄── docker.sock 采集 api/worker/web 日志
+                                      ▲
+                         monitor（容器/ready/备份/磁盘 watchdog）
 ```
 
 - **HTTPS 边缘 = 宿主机 nginx**（与 dev/lunar/p2p 等子域名同一套运维 + certbot）。容器只
   绑定 `127.0.0.1`，由宿主机 nginx 反代；应用容器不打公网端口。
 - **日志链**：应用输出 JSON-lines 到 stdout → Alloy 过滤推 Loki → Grafana 查询
   （观测栈在 `observability` profile，核心上线后再启用）。
-- **数据**：postgres 命名卷持久化；每日 pg_dump 备份；Loki/Grafana 各自命名卷。
+- **运行护栏**：`monitor` 每 60 秒检查 postgres/api/worker/backup、ready、备份新鲜度与宿主机磁盘；
+  状态变化写结构化日志，并在配置 webhook 时发送恢复/故障告警。
+- **数据**：postgres 命名卷持久化；每日 pg_dump 备份；Loki/Grafana/monitor 状态各自命名卷。
 - 关键配置来源：
-  - `infra/docker/docker-compose.prod.yml` 生产编排（核心 = postgres/migrate/api/worker/web/backup；观测 = loki/alloy/grafana）
+  - `infra/docker/docker-compose.prod.yml` 生产编排（核心 = postgres/migrate/api/worker/web/backup；观测 = loki/alloy/grafana/monitor）
   - `infra/nginx/create.yxswy.com.conf`、`infra/nginx/logs.yxswy.com.conf` 宿主机 nginx 站点模板
   - `infra/scripts/setup-host-edge.sh` 宿主机边缘接入（证书 + conf.d，幂等）
   - `infra/loki/loki.yaml`、`infra/alloy/config.alloy`、`infra/grafana/provisioning/` 日志栈
@@ -70,7 +74,7 @@ pnpm run deploy:prod
   DNS 指向服务器）；该脚本幂等，已存在证书会跳过。
 - **观测栈默认不启动**（`observability` profile）。核心上线稳定后再：
   ```bash
-  pnpm run prod:observability:up   # 启用 loki/alloy/grafana
+  pnpm run prod:observability:up   # 启用 loki/alloy/grafana/monitor
   ```
 - 之后增量部署每次都是「重新 load 新 SHA 镜像 → 迁移 → 滚动 up → 边缘幂等刷新」。
 
@@ -85,9 +89,12 @@ pnpm run prod:down     # 停止（数据保留在命名卷）
 
 ## 4. 回滚
 
-镜像按 SHA 不可变保存，滚动部署为「先停旧后起新」（非零停机，个人部署可接受）。
+镜像按 SHA 不可变保存，滚动部署为「先停旧后起新」（非零停机，个人部署可接受）。回滚前先做只读检查：
 
 ```bash
+# 只读检查：确认旧镜像与远程 Compose 配置存在，不修改 env、不启动服务
+pnpm run deploy:rollback -- --dry-run <旧SHA>
+
 # 一键回滚到服务器上已有的旧镜像（P0-08）：确认镜像存在 → 把
 # BAILIAN_STUDIO_RELEASE_TAG 写回旧 SHA → 同步 env → 服务器 up -d --no-build。
 # 不重传镜像、不重跑迁移。
@@ -175,6 +182,11 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
   gunzip -c <backup.sql.gz> | psql "$DATABASE_URL"
   # 然后 pnpm run prod:up
   ```
+- **恢复演练**（推荐每次迁移后执行；只启动临时 PostgreSQL，不连接生产库、不写生产卷）：
+  ```bash
+  pnpm run prod:restore:rehearsal -- /path/to/bailian-studio-<timestamp>.sql.gz
+  ```
+  演练会校验 gzip、完整导入和 `users` / `generation_records` / `generation_artifacts` 核心表。
 
 ## 7. 本地开发与生产并存
 
@@ -203,6 +215,8 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 - 宿主机 nginx 是唯一 TLS 入口，X-Forwarded-For 用 `$proxy_add_x_forwarded_for` 逐层追加，API 取首项（真实客户端 IP）做限流身份——客户端无法伪造。
 - Grafana：关闭匿名访问与自助注册、挂 basic_auth 子域名、日志保留 31 天。
 - 应用日志脱敏：`logger` 对 prompt/body/authorization/token 等 key 一律输出 `[Redacted]`。
+- 公网发布闸门：`PUBLIC_WEB_LAUNCH=true` 时必须填写真实主体、联系方式和生效日期；当前法律页
+  明确标注为草案，未完成法务最终文本前保持 `false`。
 
 ## 10. 相关命令速查
 
@@ -214,10 +228,11 @@ pnpm run deploy:prod               # 一键发布（核心栈 + 宿主机 nginx 
 pnpm run deploy:prod:web           # web-only 快速发版（约 20MB，不动 api/worker）
 pnpm run db:seed:model-costs       # 播种 model_costs 默认成本（新库首次部署后执行）
 pnpm run prod:up|down|ps|logs      # 生产核心栈运维
-pnpm run prod:observability:up|down  # 启用/停用日志观测栈（loki/alloy/grafana）
+pnpm run prod:observability:up|down  # 启用/停用日志观测栈（loki/alloy/grafana/monitor）
 pnpm run logs:api|worker           # 生产单服务日志
 pnpm run logs:prune                # 清理旧日志（观测栈启用时）
 pnpm run prod:mem                  # 服务器内存 + 容器占用
 pnpm run db:backup:production      # 手动备份
+pnpm run prod:restore:rehearsal    # 临时库恢复演练（不连接生产库）
 pnpm run deploy:rehearsal:up|smoke # 本地生产形态演练
 ```

@@ -17,9 +17,15 @@ cd "$REPO_ROOT"
 ENV_APP="$REPO_ROOT/infra/env/.env.production"
 ENV_INFRA="$REPO_ROOT/infra/env/.env.prod-infra"
 
+DRY_RUN=false
+if [[ "${1:-}" == "--dry-run" ]]; then
+  DRY_RUN=true
+  shift
+fi
+
 SHA="${1:-}"
 if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "用法：pnpm run deploy:rollback <40位完整 Git SHA>（如 pnpm run deploy:rollback \$(git rev-parse HEAD~1)）" >&2
+  echo "用法：pnpm run deploy:rollback [--dry-run] <40位完整 Git SHA>（如 pnpm run deploy:rollback \$(git rev-parse HEAD~1)）" >&2
   exit 1
 fi
 
@@ -53,6 +59,15 @@ if ! ssh_cmd "docker image inspect bailian-studio-runtime:$SHA >/dev/null 2>&1 &
   fail "服务器缺少 bailian-studio-{runtime,web}:$SHA（可能从未全量部署过）。请改用 pnpm run deploy:prod 重新部署。"
 fi
 
+REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
+COMPOSE="docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml"
+if [[ "$DRY_RUN" == true ]]; then
+  echo "==> dry-run：仅检查旧镜像与远程 Compose 配置，不修改 env、不 rsync、不启动服务"
+  ssh_cmd "$COMPOSE config --services >/dev/null"
+  echo "==> dry-run 通过：$SHA 可用于真实回滚（真实回滚仍可能遇到前向迁移后的 schema 不兼容）"
+  exit 0
+fi
+
 # 把 tag 幂等写回本地两个 env 文件（与 deploy-prod.sh 的注入方式一致）。
 inject_tag() {
   local file="$1"
@@ -67,12 +82,10 @@ inject_tag "$ENV_APP"
 inject_tag "$ENV_INFRA"
 
 # 把更新后的 env 同步到服务器（本地 docker context 默认 Desktop，必须走 SSH 在服务器上 up）。
-REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 ssh_cmd "mkdir -p $REMOTE_INFRA/env"
 rsync -az "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production $REMOTE_INFRA/env/.env.prod-infra"
 
-COMPOSE="docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml"
 echo "==> 服务器上复用旧镜像滚动 up（--no-build --pull never）"
 ssh_cmd "$COMPOSE up -d --no-build --pull never"
 

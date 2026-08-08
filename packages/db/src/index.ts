@@ -15,6 +15,7 @@ export {
   authActionTokens,
   creditAccounts,
   creditLedgerEntries,
+  contentReports,
   generationArtifacts,
   generationEvents,
   generationFavorites,

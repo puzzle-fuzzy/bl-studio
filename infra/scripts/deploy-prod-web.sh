@@ -11,13 +11,18 @@ cd "$REPO_ROOT"
 trap 'rm -f "$REPO_ROOT"/web-*.tar' EXIT
 
 ENV_INFRA="$REPO_ROOT/infra/env/.env.prod-infra"
+ENV_APP="$REPO_ROOT/infra/env/.env.production"
 [[ -f "$ENV_INFRA" ]] || { echo "缺少 $ENV_INFRA" >&2; exit 1; }
+[[ -f "$ENV_APP" ]] || { echo "缺少 $ENV_APP" >&2; exit 1; }
 
-env_value() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_INFRA" | tail -n 1; }
+env_value() { local file="${2:-$ENV_INFRA}"; awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$file" | tail -n 1; }
 DEPLOY_HOST="$(env_value DEPLOY_HOST)"
 DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY)"
 DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR)"
 SITE_DOMAIN="$(env_value SITE_DOMAIN)"
+LEGAL_ENTITY="$(env_value VITE_LEGAL_ENTITY "$ENV_APP")"
+LEGAL_CONTACT_EMAIL="$(env_value VITE_LEGAL_CONTACT_EMAIL "$ENV_APP")"
+LEGAL_EFFECTIVE_DATE="$(env_value VITE_LEGAL_EFFECTIVE_DATE "$ENV_APP")"
 DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM)"
 [[ -n "$DEPLOY_HOST" ]] || { echo "缺少 DEPLOY_HOST" >&2; exit 1; }
 [[ -n "$SITE_DOMAIN" ]] || { echo "缺少 SITE_DOMAIN" >&2; exit 1; }
@@ -38,6 +43,9 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   --build-arg VITE_API_ORIGIN= \
   --build-arg VITE_WEB_ORIGIN="https://${SITE_DOMAIN}" \
+  --build-arg VITE_LEGAL_ENTITY="$LEGAL_ENTITY" \
+  --build-arg VITE_LEGAL_CONTACT_EMAIL="$LEGAL_CONTACT_EMAIL" \
+  --build-arg VITE_LEGAL_EFFECTIVE_DATE="$LEGAL_EFFECTIVE_DATE" \
   -t "bailian-studio-web:$SHA" .
 
 echo "==> 传输 web 镜像（约 20MB）"

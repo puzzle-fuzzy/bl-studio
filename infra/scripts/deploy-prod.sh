@@ -89,6 +89,9 @@ DEPLOY_HOST="$(env_value DEPLOY_HOST "$ENV_INFRA")"
 DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR "$ENV_INFRA")"
 DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY "$ENV_INFRA")"
 SITE_DOMAIN="$(env_value SITE_DOMAIN "$ENV_INFRA")"
+LEGAL_ENTITY="$(env_value VITE_LEGAL_ENTITY "$ENV_APP")"
+LEGAL_CONTACT_EMAIL="$(env_value VITE_LEGAL_CONTACT_EMAIL "$ENV_APP")"
+LEGAL_EFFECTIVE_DATE="$(env_value VITE_LEGAL_EFFECTIVE_DATE "$ENV_APP")"
 # 目标服务器 CPU 架构。本机（Apple Silicon）与服务器（x86_64）架构不同时，
 # 必须显式指定服务器架构跨平台构建，否则产出的 arm64 镜像无法在 x64 上运行。
 # 若本机与服务器同为 x86_64，可在 .env.prod-infra 置空走默认 linux/amd64。
@@ -149,6 +152,9 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   --build-arg VITE_API_ORIGIN= \
   --build-arg VITE_WEB_ORIGIN="https://$SITE_DOMAIN" \
+  --build-arg VITE_LEGAL_ENTITY="$LEGAL_ENTITY" \
+  --build-arg VITE_LEGAL_CONTACT_EMAIL="$LEGAL_CONTACT_EMAIL" \
+  --build-arg VITE_LEGAL_EFFECTIVE_DATE="$LEGAL_EFFECTIVE_DATE" \
   -t "bailian-studio-web:$SHA" .
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile.backup \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
@@ -167,7 +173,7 @@ rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docke
 rsync -az infra/loki/ infra/alloy/ infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/"
 # 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
 rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
-rsync -az infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
+rsync -az infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh infra/scripts/production-monitor.sh infra/scripts/restore-rehearsal.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
 rsync -az "$ENV_APP" "$ENV_INFRA" "$ENV_BACKUP" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 
 # 服务器侧收紧 env 文件权限（含真实凭据）。

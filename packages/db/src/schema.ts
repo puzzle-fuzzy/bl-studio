@@ -155,7 +155,7 @@ export const auditLogs = pgTable('audit_logs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'auth.profile.update', 'auth.avatar.update', 'auth.avatar.remove', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'gallery.visibility-change', 'admin.gallery.hide', 'admin.gallery.unhide', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete')`),
+  check('audit_logs_action_check', sql`${table.action} in ('auth.register', 'auth.verify-email', 'auth.resend-verification', 'auth.login', 'auth.github', 'auth.forgot-password', 'auth.reset-password', 'auth.change-password', 'auth.logout', 'auth.logout-all', 'auth.profile.update', 'auth.avatar.update', 'auth.avatar.remove', 'generation.create', 'generation.cancel', 'generation.retry', 'generation.hide', 'generation.delete', 'generation.restore', 'artifact.read', 'asset.upload', 'asset.import', 'asset.delete', 'share.create', 'share.revoke', 'points.grant', 'points.adjustment', 'admin.user.create', 'admin.user.update', 'admin.user.delete', 'admin.user.ban', 'admin.user.unban', 'gallery.like', 'gallery.favorite', 'gallery.visibility-change', 'admin.gallery.hide', 'admin.gallery.unhide', 'feedback.submit', 'feedback.update', 'prompt-library.create', 'prompt-library.delete', 'content.report.submit', 'admin.content-report.update')`),
   check('audit_logs_outcome_check', sql`${table.outcome} in ('succeeded', 'failed')`),
   index('audit_logs_user_occurred_idx').on(table.userId, table.occurredAt),
   index('audit_logs_action_occurred_idx').on(table.action, table.occurredAt),
@@ -579,6 +579,37 @@ export const userFeedback = pgTable('user_feedback', {
   check('user_feedback_kind_check', sql`${table.kind} in ('feedback', 'bug', 'suggestion', 'complaint')`),
   check('user_feedback_status_check', sql`${table.status} in ('open', 'reviewing', 'resolved', 'closed')`),
   index('user_feedback_status_created_idx').on(table.status, table.createdAt),
+])
+
+/**
+ * 内容举报 —— 与普通用户反馈分离，支持对公开作品的人工审核队列。
+ * 当前只支持 generation 目标；删除用户/作品时级联清理，避免保留无法解释的孤立内容事件。
+ */
+export const contentReports = pgTable('content_reports', {
+  id: text('id').primaryKey(),
+  generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  reporterId: text('reporter_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  reason: text('reason').notNull(),
+  details: text('details'),
+  /** open | reviewing | resolved | dismissed */
+  status: text('status').notNull().default('open'),
+  resolvedBy: text('resolved_by').references(() => users.id, { onDelete: 'set null' }),
+  resolutionNote: text('resolution_note'),
+  resolvedAt: timestamp('resolved_at', { withTimezone: true }),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('content_reports_reason_check', sql`${table.reason} in ('unsafe', 'copyright', 'privacy', 'spam', 'other')`),
+  check('content_reports_status_check', sql`${table.status} in ('open', 'reviewing', 'resolved', 'dismissed')`),
+  uniqueIndex('content_reports_reporter_generation_idx')
+    .on(table.reporterId, table.generationId)
+    .where(sql`${table.deletedAt} is null`),
+  index('content_reports_status_created_idx').on(table.status, table.createdAt),
+  index('content_reports_generation_created_idx').on(table.generationId, table.createdAt),
 ])
 
 /**

@@ -41,6 +41,7 @@ volumes:
   alloy_positions:
   grafana_data:
   backups:
+  monitor_state:
 
 services:
   # ── 数据库（容器化，命名卷持久化；如需外部托管库可把应用 DATABASE_URL 指向外部）──
@@ -244,6 +245,36 @@ services:
       loki:
         condition: service_started
     networks: [logging]
+    labels:
+      bailian-studio.log-format: "text"
+    logging: *json-logging
+    profiles: ["observability"]
+
+  # ── 生产 watchdog：容器/ready/备份/磁盘检查 + 可选 webhook 告警 ──
+  monitor:
+    image: docker:27.5.1-cli
+    restart: unless-stopped
+    mem_limit: 64m
+    env_file:
+      - ../env/.env.prod-infra
+    environment:
+      MONITOR_PROJECT: bailian-studio-prod
+      MONITOR_WEB_URL: http://web:5002
+      MONITOR_STATE_FILE: /var/lib/bailian-monitor/last-state
+    command: ["/usr/local/bin/production-monitor.sh", "loop"]
+    volumes:
+      # watchdog 只调用 docker ps/inspect/exec；socket 本身仍是高权限能力，不能暴露到公网。
+      - /var/run/docker.sock:/var/run/docker.sock
+      # 只读宿主机挂载仅用于 df /host，脚本不读取宿主机文件内容。
+      - /:/host:ro
+      - monitor_state:/var/lib/bailian-monitor
+      - ../scripts/production-monitor.sh:/usr/local/bin/production-monitor.sh:ro
+    depends_on:
+      api:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+    networks: [backend]
     labels:
       bailian-studio.log-format: "text"
     logging: *json-logging

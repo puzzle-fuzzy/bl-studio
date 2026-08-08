@@ -50,6 +50,8 @@ export const AUDIT_ACTIONS = [
   'feedback.update',
   'prompt-library.create',
   'prompt-library.delete',
+  'content.report.submit',
+  'admin.content-report.update',
 ] as const
 
 export type AuditAction = (typeof AUDIT_ACTIONS)[number]

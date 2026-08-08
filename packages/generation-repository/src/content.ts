@@ -17,6 +17,7 @@ import { randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, gte, ilike, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import {
   generationArtifacts,
+  contentReports,
   generationFavorites,
   generationLikes,
   generationRecords,
@@ -36,6 +37,9 @@ import type {
   AdminGalleryItem,
   AdminTaskItem,
   CostMarginRow,
+  ContentReport,
+  ContentReportReason,
+  ContentReportStatus,
   FeedbackKind,
   FeedbackStatus,
   GalleryDetail,
@@ -46,6 +50,7 @@ import type {
   ListAdminGalleryResult,
   ListAdminTasksResult,
   ListFeedbackResult,
+  ListContentReportsResult,
   ListGalleryResult,
   ListNotificationsResult,
   ListPromptLibraryResult,
@@ -178,6 +183,23 @@ export interface ContentRepository {
   listFeedback(input: { cursor?: string; limit?: number; status?: FeedbackStatus }): Promise<ListFeedbackResult>
   listMyFeedback(input: { userId: string; cursor?: string; limit?: number }): Promise<ListFeedbackResult>
   updateFeedbackStatus(input: { itemId: string; status: FeedbackStatus; resolvedBy: string }): Promise<UserFeedback>
+  submitContentReport(input: {
+    reporterId: string
+    generationId: string
+    reason: ContentReportReason
+    details?: string
+  }): Promise<ContentReport>
+  listContentReports(input: {
+    cursor?: string
+    limit?: number
+    status?: ContentReportStatus
+  }): Promise<ListContentReportsResult>
+  updateContentReport(input: {
+    reportId: string
+    status: ContentReportStatus
+    resolvedBy: string
+    resolutionNote?: string
+  }): Promise<ContentReport>
 }
 
 function nowIso(): string {
@@ -1044,6 +1066,9 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
     listFeedback: input => listFeedback(db, input),
     listMyFeedback: input => listMyFeedback(db, input),
     updateFeedbackStatus: input => updateFeedbackStatus(db, input),
+    submitContentReport: input => submitContentReport(db, input),
+    listContentReports: input => listContentReports(db, input),
+    updateContentReport: input => updateContentReport(db, input),
   }
 }
 
@@ -1139,6 +1164,101 @@ async function updateFeedbackStatus(db: BailianStudioDb, input: { itemId: string
   return toFeedback(row)
 }
 
+async function submitContentReport(
+  db: BailianStudioDb,
+  input: { reporterId: string; generationId: string; reason: ContentReportReason; details?: string },
+): Promise<ContentReport> {
+  const [target] = await db
+    .select({ id: generationRecords.id })
+    .from(generationRecords)
+    .where(and(
+      eq(generationRecords.id, input.generationId),
+      eq(generationRecords.visibility, 'public'),
+      eq(generationRecords.status, 'succeeded'),
+      isNull(generationRecords.deletedAt),
+      isNull(generationRecords.hiddenAt),
+    ))
+    .limit(1)
+  if (target === undefined) {
+    throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Generation not found: ${input.generationId}`)
+  }
+
+  const now = new Date()
+  try {
+    const [row] = await db
+      .insert(contentReports)
+      .values({
+        id: randomUUID(),
+        generationId: input.generationId,
+        reporterId: input.reporterId,
+        reason: input.reason,
+        ...(input.details !== undefined ? { details: input.details } : {}),
+        status: 'open',
+        createdAt: now,
+        updatedAt: now,
+      })
+      .returning()
+    if (row === undefined) throw new GenerationRepositoryError('DATABASE_ERROR', 'Failed to submit content report')
+    return toContentReport(row)
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      throw new GenerationRepositoryError('CONTENT_REPORT_DUPLICATE', 'You have already reported this content')
+    }
+    throw error
+  }
+}
+
+async function listContentReports(
+  db: BailianStudioDb,
+  input: { cursor?: string; limit?: number; status?: ContentReportStatus },
+): Promise<ListContentReportsResult> {
+  const limit = clampLimit(input.limit)
+  const cursor = input.cursor !== undefined ? decodeCursor(input.cursor) : undefined
+  const conditions: SQL[] = [isNull(contentReports.deletedAt)]
+  if (input.status !== undefined) conditions.push(eq(contentReports.status, input.status))
+  if (cursor !== undefined) {
+    conditions.push(sql`(${contentReports.createdAt} < ${cursor.createdAt} OR (${contentReports.createdAt} = ${cursor.createdAt} AND ${contentReports.id} < ${cursor.id}))`)
+  }
+  const rows = await db
+    .select()
+    .from(contentReports)
+    .where(and(...conditions))
+    .orderBy(desc(contentReports.createdAt), desc(contentReports.id))
+    .limit(limit + 1)
+  const hasMore = rows.length > limit
+  const page = hasMore ? rows.slice(0, limit) : rows
+  const last = page[page.length - 1]
+  return {
+    items: page.map(toContentReport),
+    ...(hasMore && last !== undefined
+      ? { nextCursor: encodeCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
+      : {}),
+  }
+}
+
+async function updateContentReport(
+  db: BailianStudioDb,
+  input: { reportId: string; status: ContentReportStatus; resolvedBy: string; resolutionNote?: string },
+): Promise<ContentReport> {
+  const now = new Date()
+  const terminal = input.status === 'resolved' || input.status === 'dismissed'
+  const [row] = await db
+    .update(contentReports)
+    .set({
+      status: input.status,
+      resolutionNote: input.resolutionNote ?? null,
+      ...(terminal ? { resolvedBy: input.resolvedBy, resolvedAt: now } : { resolvedBy: null, resolvedAt: null }),
+      updatedAt: now,
+      updatedBy: input.resolvedBy,
+    })
+    .where(and(eq(contentReports.id, input.reportId), isNull(contentReports.deletedAt)))
+    .returning()
+  if (row === undefined) {
+    throw new GenerationRepositoryError('GENERATION_NOT_FOUND', `Content report not found: ${input.reportId}`)
+  }
+  return toContentReport(row)
+}
+
 /** notifications 行 → 领域类型。 */
 function toNotificationItem(row: typeof notifications.$inferSelect): NotificationItem {
   return {
@@ -1166,6 +1286,29 @@ function toFeedback(row: typeof userFeedback.$inferSelect): UserFeedback {
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
+}
+
+function toContentReport(row: typeof contentReports.$inferSelect): ContentReport {
+  return {
+    id: row.id,
+    generationId: row.generationId,
+    reporterId: row.reporterId,
+    reason: row.reason as ContentReportReason,
+    ...(row.details !== null ? { details: row.details } : {}),
+    status: row.status as ContentReportStatus,
+    ...(row.resolvedBy !== null ? { resolvedBy: row.resolvedBy } : {}),
+    ...(row.resolutionNote !== null ? { resolutionNote: row.resolutionNote } : {}),
+    ...(row.resolvedAt !== null ? { resolvedAt: row.resolvedAt.toISOString() } : {}),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) return false
+  const candidate = error as { code?: unknown; cause?: unknown }
+  if (candidate.code === '23505') return true
+  return isUniqueViolation(candidate.cause)
 }
 
 /** 统计窗口内发起过生成（status 过滤可选）的不同用户数。 */

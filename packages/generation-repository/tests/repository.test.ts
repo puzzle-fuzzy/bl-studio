@@ -1823,6 +1823,42 @@ describe('generation repository', () => {
     for (const id of ids) expect(seen.has(id)).toBe(true)
   })
 
+  it('内容举报：只接受公开成功作品、同一用户不可重复举报、管理员可流转状态', async () => {
+    const generationId = await createPublicGeneration('user_1', 'reportable work', '2026-07-04T00:00:00.000Z')
+
+    const submitted = await repository.submitContentReport({
+      reporterId: 'user_page',
+      generationId,
+      reason: 'unsafe',
+      details: '请人工核查',
+    })
+    expect(submitted).toMatchObject({ generationId, reporterId: 'user_page', reason: 'unsafe', status: 'open' })
+
+    await expect(repository.submitContentReport({
+      reporterId: 'user_page',
+      generationId,
+      reason: 'other',
+    })).rejects.toMatchObject({ code: 'CONTENT_REPORT_DUPLICATE' })
+
+    const page = await repository.listContentReports({ status: 'open' })
+    expect(page.items.map(item => item.id)).toEqual([submitted.id])
+
+    const resolved = await repository.updateContentReport({
+      reportId: submitted.id,
+      status: 'resolved',
+      resolvedBy: 'user_1',
+      resolutionNote: '已下架处理',
+    })
+    expect(resolved).toMatchObject({ status: 'resolved', resolvedBy: 'user_1', resolutionNote: '已下架处理' })
+    expect(resolved.resolvedAt).toBeDefined()
+
+    await expect(repository.submitContentReport({
+      reporterId: 'user_page',
+      generationId,
+      reason: 'other',
+    })).rejects.toMatchObject({ code: 'CONTENT_REPORT_DUPLICATE' })
+  })
+
   it('收藏列表与详情可见性一致：作者隐藏后从收藏列表消失', async () => {
     const id = await createPublicGeneration('user_1', 'hidden from favorites', '2026-07-05T00:00:00.000Z')
     await repository.setGenerationFavorite({ userId: 'user_page', recordId: id, favorited: true })

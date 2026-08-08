@@ -25,6 +25,7 @@ export type GenerationRepositoryErrorCode =
   | 'ASSET_DERIVATIVE_NOT_FOUND'
   | 'TASK_NOT_FOUND'
   | 'IDEMPOTENCY_CONFLICT'
+  | 'CONTENT_REPORT_DUPLICATE'
   | 'DATABASE_ERROR'
 
 /**

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import {
   Dialog,
   DialogContent,
@@ -178,6 +178,12 @@ export function AuthDialog() {
               >
                 {mode === 'login' ? '去注册' : '去登录'}
               </button>
+            </p>
+            <p className="text-center text-xs leading-5 text-muted-foreground">
+              注册即表示你同意
+              <Link to="/terms" className="mx-1 underline underline-offset-2" onClick={close}>服务条款</Link>
+              和
+              <Link to="/privacy" className="ml-1 underline underline-offset-2" onClick={close}>隐私政策</Link>。
             </p>
           </form>
         )}

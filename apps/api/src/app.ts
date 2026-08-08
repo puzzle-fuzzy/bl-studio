@@ -24,6 +24,7 @@ import { createGenerationRoutes } from './modules/generations/routes'
 import { createGalleryRoutes } from './modules/gallery/routes'
 import { createPromptLibraryRoutes } from './modules/prompt-library/routes'
 import { createFeedbackRoutes } from './modules/feedback/routes'
+import { createContentReportRoutes } from './modules/reports/routes'
 import { createNotificationsRoutes } from './modules/notifications/routes'
 import { modelRoutes } from './modules/models/routes'
 import { createArtifactRoutes } from './modules/artifacts/routes'
@@ -150,6 +151,7 @@ export function createApp(options: ApiAppOptions) {
   .use(createGalleryRoutes(dependencies))
   .use(createPromptLibraryRoutes(dependencies))
   .use(createFeedbackRoutes(dependencies))
+  .use(createContentReportRoutes(dependencies))
   .use(createNotificationsRoutes(dependencies))
   .use(createShareRoutes(dependencies))
   .use(createArtifactRoutes(dependencies))

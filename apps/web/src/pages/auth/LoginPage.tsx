@@ -177,6 +177,12 @@ export function LoginPage() {
                 {mode === 'login' ? '去注册' : '去登录'}
               </button>
             </p>
+            <p className="text-center text-xs leading-5 text-muted-foreground">
+              注册即表示你同意
+              <Link to="/terms" className="mx-1 underline underline-offset-2">服务条款</Link>
+              和
+              <Link to="/privacy" className="ml-1 underline underline-offset-2">隐私政策</Link>。
+            </p>
           </form>
         </CardContent>
       </Card>

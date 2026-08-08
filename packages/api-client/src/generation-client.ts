@@ -43,6 +43,8 @@ import {
   AdminModelCostsUpdateResponseSchema,
   AdminGalleryHideResultSchema,
   FeedbackItemResponseSchema,
+  ContentReportItemResponseSchema,
+  ListContentReportsResponseSchema,
   AdminGalleryArtifactsResponseSchema,
   ListAdminGalleryResponseSchema,
   ListAdminTasksResponseSchema,
@@ -92,6 +94,8 @@ import type {
   BatchGalleryRequest,
   BatchUsersRequest,
   AdminAnalytics,
+  ContentReport,
+  ListContentReportsResult,
   AdminGalleryHideResult,
   AdminGalleryArtifactsResult,
   AdminModelCostsResult,
@@ -102,6 +106,8 @@ import type {
   NotificationUnreadCount,
   SubmitFeedbackInput,
   UpdateFeedbackStatusInput,
+  SubmitContentReportInput,
+  UpdateContentReportInput,
   UserFeedback,
   CreatePromptLibraryInput,
   ListPromptLibraryResult,
@@ -526,6 +532,16 @@ export interface BailianStudioApiClient {
   adminListFeedback(params?: { limit?: number; cursor?: string; status?: 'open' | 'reviewing' | 'resolved' | 'closed' }): Promise<ListFeedbackResult>
   /** `PATCH /api/admin/feedback/:id` —— admin 更新反馈状态。 */
   adminUpdateFeedbackStatus(itemId: string, status: UpdateFeedbackStatusInput['status']): Promise<UserFeedback>
+  /** `POST /api/reports` —— 对公开作品提交一次内容举报。 */
+  submitContentReport(input: SubmitContentReportInput): Promise<ContentReport>
+  /** `GET /api/admin/reports` —— 管理员查看内容举报队列。 */
+  adminListContentReports(params?: {
+    limit?: number
+    cursor?: string
+    status?: 'open' | 'reviewing' | 'resolved' | 'dismissed'
+  }): Promise<ListContentReportsResult>
+  /** `PATCH /api/admin/reports/:id` —— 更新审核状态，可联动下架作品。 */
+  adminUpdateContentReport(reportId: string, input: UpdateContentReportInput): Promise<ContentReport>
 
   // 社交通知（需登录；只作用于本人）
   // ---------------------------------------------------------------------------
@@ -1414,6 +1430,40 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         FeedbackItemResponseSchema,
       )
       return data.item
+    },
+
+    async submitContentReport(input) {
+      const data = await unwrapData(
+        `${base}/api/reports`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        ContentReportItemResponseSchema,
+      )
+      return data.report
+    },
+
+    async adminListContentReports(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      if (params.status !== undefined) search.set('status', params.status)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/admin/reports${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListContentReportsResponseSchema,
+      )
+    },
+
+    async adminUpdateContentReport(reportId, input) {
+      const data = await unwrapData(
+        `${base}/api/admin/reports/${encodeURIComponent(reportId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        ContentReportItemResponseSchema,
+      )
+      return data.report
     },
 
     async adminListTasks(params = {}) {

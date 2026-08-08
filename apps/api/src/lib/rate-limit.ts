@@ -62,7 +62,7 @@ export interface ApiRateLimitConfig {
   authRequestsPerMinute: number
   generationRequestsPerMinute: number
   uploadRequestsPerMinute: number
-  /** 社区写端点（画廊互动 / 提示词库 / 反馈）低频桶，防通知洪泛。 */
+  /** 社区写端点（画廊互动 / 提示词库 / 反馈 / 举报）低频桶，防通知与治理队列洪泛。 */
   communityRequestsPerMinute: number
 }
 
@@ -134,7 +134,7 @@ export function rateLimitRule(
     return { bucket: 'upload', limit: config.uploadRequestsPerMinute }
   }
   // P1-18：社区写端点不再豁免——点赞/收藏/提示词入库/反馈各配低频 per-IP 桶，
-  // 防止脚本批量刷写触发社交通知 + SSE 的洪泛。admin 治理（/api/admin/*）不走此桶，
+  // 防止脚本批量刷写触发社交通知 + SSE 或举报队列的洪泛。admin 治理（/api/admin/*）不走此桶，
   // 仍由通用 write 兜底。
   if (isCommunityPath(pathname)) {
     return { bucket: 'community', limit: config.communityRequestsPerMinute }
@@ -143,7 +143,7 @@ export function rateLimitRule(
 }
 
 /**
- * 社区用户写端点（画廊互动 / 提示词库 / 反馈通道）。限流身份取
+ * 社区用户写端点（画廊互动 / 提示词库 / 反馈 / 举报通道）。限流身份取
  * `clientIdentity(request, trustProxy)` —— 生产 API_TRUST_PROXY=true 且宿主机
  * nginx 用 `$remote_addr` 覆写 X-Forwarded-For，首项即真实客户端 IP。
  */
@@ -154,6 +154,8 @@ function isCommunityPath(pathname: string): boolean {
     || pathname.startsWith('/api/prompt-library/')
     || pathname === '/api/feedback'
     || pathname.startsWith('/api/feedback/')
+    || pathname === '/api/reports'
+    || pathname.startsWith('/api/reports/')
 }
 
 export function isUnsafeMethod(method: string): boolean {

@@ -27,6 +27,12 @@ export {
   type RenewTaskLockInput,
   type SaveTaskOptions,
 } from './repository'
+export type {
+  ContentReport,
+  ContentReportReason,
+  ContentReportStatus,
+  ListContentReportsResult,
+} from './types'
 export {
   createGenerationRepositoryFromUrl,
   type CreateGenerationRepositoryFromUrlOptions,

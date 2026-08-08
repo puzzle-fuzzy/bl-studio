@@ -10,6 +10,7 @@ import type {
   CompleteGenerationResult,
   CompleteAssetThumbnailInput,
   CostMarginRow,
+  ContentReport,
   CreateGenerationInput,
   CreateGenerationResult,
   CreateGenerationShareInput,
@@ -30,6 +31,7 @@ import type {
   ListAdminGalleryResult,
   ListAdminTasksResult,
   ListFeedbackResult,
+  ListContentReportsResult,
   ListGalleryResult,
   ListGenerationArtifactsOptions,
   ListGenerationArtifactsResult,
@@ -548,6 +550,15 @@ export class FakeRepository implements GenerationRepository {
   }
   listMyFeedback(): Promise<ListFeedbackResult> {
     return Promise.resolve({ items: [] })
+  }
+  submitContentReport(): Promise<ContentReport> {
+    throw new Error('FakeRepository.submitContentReport is not used')
+  }
+  listContentReports(): Promise<ListContentReportsResult> {
+    return Promise.resolve({ items: [] })
+  }
+  updateContentReport(): Promise<ContentReport> {
+    throw new Error('FakeRepository.updateContentReport is not used')
   }
   // ---- 社区治理（admin）+ 社交通知方法：worker 不使用，按需返回占位值以满足接口。 ----
   listAdminGalleryGenerations(): Promise<ListAdminGalleryResult> {

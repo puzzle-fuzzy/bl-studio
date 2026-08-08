@@ -128,6 +128,21 @@ export function checkProductionEnvironment(
   const apiOrigin = value('VITE_API_ORIGIN')
   if (apiOrigin !== undefined) checkOrigin(apiOrigin, 'VITE_API_ORIGIN', false, false, addIssue, warnings)
 
+  const publicLaunch = value('PUBLIC_WEB_LAUNCH')?.toLowerCase()
+  if (publicLaunch !== undefined && !['true', 'false'].includes(publicLaunch)) {
+    addIssue('PUBLIC_WEB_LAUNCH', '只能是 true 或 false')
+  }
+  if (publicLaunch === 'true') {
+    for (const key of ['VITE_LEGAL_ENTITY', 'VITE_LEGAL_EFFECTIVE_DATE'] as const) {
+      const current = value(key)
+      if (current === undefined || looksLikePlaceholder(current)) addIssue(key, 'PUBLIC_WEB_LAUNCH=true 时必须填写真实值')
+    }
+    const legalEmail = value('VITE_LEGAL_CONTACT_EMAIL')
+    if (legalEmail === undefined || looksLikePlaceholder(legalEmail) || !isEmail(legalEmail)) {
+      addIssue('VITE_LEGAL_CONTACT_EMAIL', 'PUBLIC_WEB_LAUNCH=true 时必须填写真实联系邮箱')
+    }
+  }
+
   for (const key of POSITIVE_INTEGER_KEYS) checkInteger(value(key), key, false, addIssue)
   checkInteger(value('SMTP_PORT'), 'SMTP_PORT', false, addIssue)
   for (const key of NON_NEGATIVE_INTEGER_KEYS) checkInteger(value(key), key, true, addIssue)
@@ -204,6 +219,27 @@ export function checkProductionInfrastructure(
   }
   for (const key of ['BACKUP_RETENTION_DAYS', 'LOKI_RETENTION_DAYS'] as const) {
     checkInteger(value(key), key, false, addIssue)
+  }
+
+  for (const key of ['MONITOR_INTERVAL_SECONDS', 'MONITOR_BACKUP_MAX_AGE_HOURS'] as const) {
+    checkInteger(value(key), key, false, addIssue)
+  }
+  const diskThreshold = value('MONITOR_DISK_USED_PERCENT')
+  checkInteger(diskThreshold, 'MONITOR_DISK_USED_PERCENT', false, addIssue)
+  if (diskThreshold !== undefined && /^\d+$/.test(diskThreshold)) {
+    const parsed = Number(diskThreshold)
+    if (parsed > 100) addIssue('MONITOR_DISK_USED_PERCENT', '必须不大于 100')
+  }
+  const monitorAlertRequired = value('MONITOR_ALERT_REQUIRED')?.toLowerCase()
+  if (monitorAlertRequired !== undefined && !['true', 'false'].includes(monitorAlertRequired)) {
+    addIssue('MONITOR_ALERT_REQUIRED', '只能是 true 或 false')
+  }
+  const monitorAlertUrl = value('MONITOR_ALERT_WEBHOOK_URL')
+  if (monitorAlertRequired === 'true' && monitorAlertUrl === undefined) {
+    addIssue('MONITOR_ALERT_WEBHOOK_URL', 'MONITOR_ALERT_REQUIRED=true 时必须配置 HTTPS webhook')
+  }
+  if (monitorAlertUrl !== undefined && !monitorAlertUrl.startsWith('https://')) {
+    addIssue('MONITOR_ALERT_WEBHOOK_URL', '生产告警 webhook 必须使用 HTTPS')
   }
 
   // P0-07：灾备必须显式选择，不能默默用默认值关掉 —— 默认 false 时备份与 DB 同宿主，
@@ -354,6 +390,9 @@ function looksLikePlaceholder(value: string): boolean {
     'example.com',
     'example.internal',
     'dev-secret-change-me',
+    '待填写',
+    '待定',
+    'draft',
   ].some(marker => normalized.includes(marker))
 }
 

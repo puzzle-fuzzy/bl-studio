@@ -29,6 +29,7 @@ const CODE_MESSAGES: Record<string, string> = {
   GENERATION_DAILY_LIMIT_EXCEEDED: '已达今日生成限额，请明天再试',
   INVALID_GENERATION_PARAMS: '生成参数不合法，请检查输入',
   IDEMPOTENCY_CONFLICT: '检测到重复提交，请刷新后重试',
+  CONTENT_REPORT_DUPLICATE: '你已经举报过这个作品',
   INVALID_CURSOR: '列表游标已失效，请刷新',
   EVENT_CURSOR_EXPIRED: '实时连接已过期，正在重新同步',
   // 资产业物

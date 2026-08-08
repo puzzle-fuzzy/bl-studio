@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Bookmark, BookmarkCheck, Check, Copy, Heart, Loader2, Search, Sparkles, X } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Check, Copy, Flag, Heart, Loader2, Search, Sparkles, X } from 'lucide-react'
 import type { GalleryDetail, GalleryItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { useAuthStore } from '@/stores/auth-store'
@@ -55,6 +56,7 @@ export function GalleryPage() {
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detail, setDetail] = useState<GalleryDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
+  const [reportTarget, setReportTarget] = useState<string | null>(null)
 
   /** 点赞/收藏防抖：请求在途的 recordId，防止连点重复请求。 */
   const mutating = useRef(new Set<string>())
@@ -414,10 +416,17 @@ export function GalleryPage() {
                 favoritedByViewer: detail.favoritedByViewer,
                 createdAt: detail.record.createdAt,
               })}
+              onReport={() => setReportTarget(detail.record.id)}
             />
           )}
         </DialogContent>
       </Dialog>
+      <ReportDialog
+        generationId={reportTarget ?? ''}
+        open={reportTarget !== null}
+        onOpenChange={open => { if (!open) setReportTarget(null) }}
+        onSubmitted={() => showMessage({ title: '举报已提交，管理员会人工审核', tone: 'success' })}
+      />
     </div>
   )
 }
@@ -541,12 +550,14 @@ function GalleryDetailView({
   onLike,
   onFavorite,
   onReuse,
+  onReport,
 }: {
   detail: GalleryDetail
   isAuthor: boolean
   onLike: () => void
   onFavorite: () => void
   onReuse: () => void
+  onReport: () => void
 }) {
   const [copied, setCopied] = useState(false)
   const prompt = typeof detail.record.inputParams.prompt === 'string' ? detail.record.inputParams.prompt : ''
@@ -591,6 +602,14 @@ function GalleryDetailView({
               <Heart data-icon className={detail.likedByViewer ? 'size-3.5 fill-current text-destructive' : 'size-3.5'} />
               {detail.likeCount}
             </button>
+            <button
+              type="button"
+              onClick={onReport}
+              className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+            >
+              <Flag data-icon className="size-3.5" />
+              举报
+            </button>
           </div>
         </DialogTitle>
         {prompt.length > 0 && (
@@ -625,6 +644,72 @@ function GalleryDetailView({
         })}
       </div>
     </>
+  )
+}
+
+function ReportDialog({
+  generationId,
+  open,
+  onOpenChange,
+  onSubmitted,
+}: {
+  generationId: string
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onSubmitted: () => void
+}) {
+  const [reason, setReason] = useState<'unsafe' | 'copyright' | 'privacy' | 'spam' | 'other'>('unsafe')
+  const [details, setDetails] = useState('')
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  const submit = async (event: React.FormEvent) => {
+    event.preventDefault()
+    setBusy(true)
+    setError(null)
+    try {
+      await apiClient.submitContentReport({
+        generationId,
+        reason,
+        ...(details.trim().length > 0 ? { details: details.trim() } : {}),
+      })
+      setDetails('')
+      onOpenChange(false)
+      onSubmitted()
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+        <DialogHeader>
+          <DialogTitle>举报公开作品</DialogTitle>
+          <DialogDescription>请提供事实信息；举报会进入管理员人工审核队列。</DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-4">
+          <Select value={reason} onValueChange={value => setReason(value as typeof reason)}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="unsafe">不安全或违法内容</SelectItem>
+              <SelectItem value="copyright">疑似侵犯版权</SelectItem>
+              <SelectItem value="privacy">隐私或个人信息</SelectItem>
+              <SelectItem value="spam">垃圾内容或滥用</SelectItem>
+              <SelectItem value="other">其他</SelectItem>
+            </SelectContent>
+          </Select>
+          <Textarea value={details} onChange={event => setDetails(event.target.value)} maxLength={2000} placeholder="补充说明（可选）" />
+          {error !== null && <p className="text-sm text-destructive">{error}</p>}
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
+            <Button type="submit" disabled={busy || generationId.length === 0}>{busy ? '提交中…' : '提交举报'}</Button>
+          </div>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }
 

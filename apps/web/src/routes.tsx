@@ -9,6 +9,7 @@ import { CreatePage } from '@/pages/CreatePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { GenerationsPage } from '@/pages/GenerationsPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
+import { LegalPage } from '@/pages/LegalPage'
 
 /**
  * 路由表。
@@ -80,6 +81,8 @@ export const router = createBrowserRouter([
           </RedirectIfAuthed>
         ),
       },
+      { path: '/privacy', element: <LegalPage kind="privacy" /> },
+      { path: '/terms', element: <LegalPage kind="terms" /> },
       { path: '/auth/verify-email', element: lazyPage('VerifyEmailPage', () => import('@/pages/auth/VerifyEmailPage')) },
       { path: '/auth/check-email', element: lazyPage('CheckEmailPage', () => import('@/pages/auth/CheckEmailPage')) },
       { path: '/auth/forgot-password', element: lazyPage('ForgotPasswordPage', () => import('@/pages/auth/ForgotPasswordPage')) },

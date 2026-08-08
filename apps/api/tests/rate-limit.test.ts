@@ -38,7 +38,7 @@ describe('API rate limiting', () => {
     expect(rateLimitRule(new Request('http://localhost/api/generations', { method: 'GET' }), config)).toBeUndefined()
   })
 
-  it('applies a low-frequency community bucket to gallery / prompt-library / feedback writes', () => {
+  it('applies a low-frequency community bucket to gallery / prompt-library / feedback / report writes', () => {
     const config = readApiRateLimitConfig({
       API_RATE_LIMIT_AUTH_PER_MINUTE: '3',
       API_RATE_LIMIT_COMMUNITY_PER_MINUTE: '6',
@@ -52,6 +52,7 @@ describe('API rate limiting', () => {
     expect(rateLimitRule(new Request('http://localhost/api/prompt-library', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
     expect(rateLimitRule(new Request('http://localhost/api/prompt-library/item-id', { method: 'DELETE' }), config)).toEqual({ bucket: 'community', limit: 6 })
     expect(rateLimitRule(new Request('http://localhost/api/feedback', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
+    expect(rateLimitRule(new Request('http://localhost/api/reports', { method: 'POST' }), config)).toEqual({ bucket: 'community', limit: 6 })
 
     // 非社区端点仍走各自专用桶。
     expect(rateLimitRule(new Request('http://localhost/api/auth/login', { method: 'POST' }), config)).toEqual({ bucket: 'auth', limit: 3 })

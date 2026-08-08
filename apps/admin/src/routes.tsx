@@ -26,6 +26,7 @@ function adminLazy<T extends Record<string, unknown>>(loader: () => Promise<T>, 
 const StatsPage = adminLazy(() => import('@/pages/StatsPage'), 'StatsPage')
 const AnalyticsPage = adminLazy(() => import('@/pages/AnalyticsPage'), 'AnalyticsPage')
 const FeedbackPage = adminLazy(() => import('@/pages/FeedbackPage'), 'FeedbackPage')
+const ReportsPage = adminLazy(() => import('@/pages/ReportsPage'), 'ReportsPage')
 const GalleryManagePage = adminLazy(() => import('@/pages/GalleryManagePage'), 'GalleryManagePage')
 const TasksPage = adminLazy(() => import('@/pages/TasksPage'), 'TasksPage')
 
@@ -80,6 +81,14 @@ export const router = createBrowserRouter(
                   element: (
                     <Suspense fallback={null}>
                       <FeedbackPage />
+                    </Suspense>
+                  ),
+                },
+                {
+                  path: 'reports',
+                  element: (
+                    <Suspense fallback={null}>
+                      <ReportsPage />
                     </Suspense>
                   ),
                 },

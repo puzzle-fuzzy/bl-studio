@@ -667,6 +667,32 @@ export interface ListFeedbackResult {
 }
 
 // ---------------------------------------------------------------------------
+// 内容举报。
+// ---------------------------------------------------------------------------
+
+export type ContentReportReason = 'unsafe' | 'copyright' | 'privacy' | 'spam' | 'other'
+export type ContentReportStatus = 'open' | 'reviewing' | 'resolved' | 'dismissed'
+
+export interface ContentReport {
+  id: string
+  generationId: string
+  reporterId: string
+  reason: ContentReportReason
+  details?: string
+  status: ContentReportStatus
+  resolvedBy?: string
+  resolutionNote?: string
+  resolvedAt?: string
+  createdAt: string
+  updatedAt: string
+}
+
+export interface ListContentReportsResult {
+  items: ContentReport[]
+  nextCursor?: string
+}
+
+// ---------------------------------------------------------------------------
 // 社交通知（作品被点赞/收藏 → 通知作者）。
 // ---------------------------------------------------------------------------
 

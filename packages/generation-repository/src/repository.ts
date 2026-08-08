@@ -73,6 +73,9 @@ import {
 import type {
   AdminGalleryItem,
   CostMarginRow,
+  ContentReport,
+  ContentReportReason,
+  ContentReportStatus,
   FeedbackKind,
   FeedbackStatus,
   GalleryDetail,
@@ -83,6 +86,7 @@ import type {
   ListAdminGalleryResult,
   ListAdminTasksResult,
   ListFeedbackResult,
+  ListContentReportsResult,
   ListGalleryResult,
   ListNotificationsResult,
   ListPromptLibraryResult,
@@ -853,6 +857,23 @@ export interface GenerationRepository {
   listFeedback(input: { cursor?: string; limit?: number; status?: FeedbackStatus }): Promise<ListFeedbackResult>
   listMyFeedback(input: { userId: string; cursor?: string; limit?: number }): Promise<ListFeedbackResult>
   updateFeedbackStatus(input: { itemId: string; status: FeedbackStatus; resolvedBy: string }): Promise<UserFeedback>
+  submitContentReport(input: {
+    reporterId: string
+    generationId: string
+    reason: ContentReportReason
+    details?: string
+  }): Promise<ContentReport>
+  listContentReports(input: {
+    cursor?: string
+    limit?: number
+    status?: ContentReportStatus
+  }): Promise<ListContentReportsResult>
+  updateContentReport(input: {
+    reportId: string
+    status: ContentReportStatus
+    resolvedBy: string
+    resolutionNote?: string
+  }): Promise<ContentReport>
 }
 
 type BailianStudioTx = Parameters<Parameters<BailianStudioDb['transaction']>[0]>[0]

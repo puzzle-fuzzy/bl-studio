@@ -1048,6 +1048,39 @@ export const UpdateFeedbackStatusInputSchema = z.object({
   status: z.enum(['open', 'reviewing', 'resolved', 'closed']),
 }).strict()
 
+export const ContentReportSchema = z.object({
+  id: z.string(),
+  generationId: z.string(),
+  reporterId: z.string(),
+  reason: z.enum(['unsafe', 'copyright', 'privacy', 'spam', 'other']),
+  details: z.string().optional(),
+  status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
+  resolvedBy: z.string().optional(),
+  resolutionNote: z.string().optional(),
+  resolvedAt: z.string().optional(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const ListContentReportsResponseSchema = z.object({
+  items: z.array(ContentReportSchema),
+  nextCursor: z.string().optional(),
+})
+
+export const ContentReportItemResponseSchema = z.object({ report: ContentReportSchema })
+
+export const SubmitContentReportInputSchema = z.object({
+  generationId: z.string().trim().min(1).max(256),
+  reason: z.enum(['unsafe', 'copyright', 'privacy', 'spam', 'other']),
+  details: z.string().trim().max(2000).optional(),
+}).strict()
+
+export const UpdateContentReportInputSchema = z.object({
+  status: z.enum(['open', 'reviewing', 'resolved', 'dismissed']),
+  resolutionNote: z.string().trim().max(2000).optional(),
+  hideTarget: z.boolean().optional(),
+}).strict()
+
 export const AdminAnalyticsSchema = z.object({
   window: z.object({ from: z.string(), to: z.string() }),
   costMargin: z.array(z.object({
@@ -1125,6 +1158,10 @@ export type UserFeedback = z.infer<typeof UserFeedbackSchema>
 export type ListFeedbackResult = z.infer<typeof ListFeedbackResponseSchema>
 export type SubmitFeedbackInput = z.infer<typeof SubmitFeedbackInputSchema>
 export type UpdateFeedbackStatusInput = z.infer<typeof UpdateFeedbackStatusInputSchema>
+export type ContentReport = z.infer<typeof ContentReportSchema>
+export type ListContentReportsResult = z.infer<typeof ListContentReportsResponseSchema>
+export type SubmitContentReportInput = z.infer<typeof SubmitContentReportInputSchema>
+export type UpdateContentReportInput = z.infer<typeof UpdateContentReportInputSchema>
 export type NotificationItem = z.infer<typeof NotificationItemSchema>
 export type ListNotificationsResult = z.infer<typeof ListNotificationsResponseSchema>
 export type NotificationUnreadCount = z.infer<typeof NotificationUnreadCountSchema>

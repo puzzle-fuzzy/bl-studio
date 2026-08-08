@@ -180,6 +180,36 @@ describe('production environment preflight', () => {
     })
     expect(consoleInProduction.issues.map(issue => issue.key)).toContain('LOG_FORMAT')
   })
+
+  it('keeps public launch disabled until legal identity and contact fields are complete', () => {
+    const draft = checkProductionEnvironment({
+      ...validEnvironment(),
+      PUBLIC_WEB_LAUNCH: 'false',
+    })
+    expect(draft.issues).toEqual([])
+
+    const incomplete = checkProductionEnvironment({
+      ...validEnvironment(),
+      PUBLIC_WEB_LAUNCH: 'true',
+      VITE_LEGAL_ENTITY: '',
+      VITE_LEGAL_CONTACT_EMAIL: 'not-an-email',
+      VITE_LEGAL_EFFECTIVE_DATE: '待填写',
+    })
+    expect(incomplete.issues.map(issue => issue.key)).toEqual([
+      'VITE_LEGAL_ENTITY',
+      'VITE_LEGAL_EFFECTIVE_DATE',
+      'VITE_LEGAL_CONTACT_EMAIL',
+    ])
+
+    const complete = checkProductionEnvironment({
+      ...validEnvironment(),
+      PUBLIC_WEB_LAUNCH: 'true',
+      VITE_LEGAL_ENTITY: '某某科技有限公司',
+      VITE_LEGAL_CONTACT_EMAIL: 'legal@yxswy.com',
+      VITE_LEGAL_EFFECTIVE_DATE: '2026-08-08',
+    })
+    expect(complete.issues).toEqual([])
+  })
 })
 
 function validInfrastructure(): Record<string, string> {
@@ -254,5 +284,32 @@ describe('production infrastructure preflight', () => {
       BACKUP_OSS_UPLOAD: 'maybe',
     })
     expect(invalidValue.issues.map(issue => issue.key)).toEqual(['BACKUP_OSS_UPLOAD'])
+  })
+
+  it('validates monitor thresholds and required HTTPS alert webhook', () => {
+    const invalid = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      MONITOR_INTERVAL_SECONDS: '0',
+      MONITOR_BACKUP_MAX_AGE_HOURS: 'abc',
+      MONITOR_DISK_USED_PERCENT: '101',
+      MONITOR_ALERT_REQUIRED: 'true',
+      MONITOR_ALERT_WEBHOOK_URL: 'http://hooks.example.com',
+    })
+    expect(invalid.issues.map(issue => issue.key)).toEqual([
+      'MONITOR_INTERVAL_SECONDS',
+      'MONITOR_BACKUP_MAX_AGE_HOURS',
+      'MONITOR_DISK_USED_PERCENT',
+      'MONITOR_ALERT_WEBHOOK_URL',
+    ])
+
+    const valid = checkProductionInfrastructure({
+      ...validInfrastructure(),
+      MONITOR_INTERVAL_SECONDS: '60',
+      MONITOR_BACKUP_MAX_AGE_HOURS: '30',
+      MONITOR_DISK_USED_PERCENT: '85',
+      MONITOR_ALERT_REQUIRED: 'true',
+      MONITOR_ALERT_WEBHOOK_URL: 'https://hooks.example.com/notify',
+    })
+    expect(valid.issues).toEqual([])
   })
 })
