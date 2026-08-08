@@ -198,6 +198,7 @@ services:
     command: ["-config.file=/etc/loki/loki.yaml"]
     volumes:
       - ../loki/loki.yaml:/etc/loki/loki.yaml:ro
+      - ../loki/runtime-config.yaml:/etc/loki/runtime-config.yaml:ro
       - loki_data:/loki
     networks: [logging]
     logging: *json-logging

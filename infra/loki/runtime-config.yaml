@@ -1,0 +1,5 @@
+# Loki 3.x runtime overrides。
+# auth_enabled=false 使用内置 fake 单租户；只允许本机 Grafana/prune 访问 Loki。
+overrides:
+  fake:
+    deletion_mode: filter-and-delete

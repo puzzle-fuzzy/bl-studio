@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # 清理 Loki 旧日志（2C2G 服务器内存/磁盘吃紧时的安全阀）。
 #
-# 通过 Loki delete API 队列化删除早于 CUTOFF_HOURS 的日志；删除由 compactor
-# 在下一次压缩周期真正应用（loki.yaml 已开启 deletion_mode: filter-and-delete）。
+# 通过 Loki delete API 队列化删除早于 CUTOFF_HOURS 的日志；Loki 默认保留 24h
+# 取消窗口，之后由 compactor 在下一次压缩周期真正应用。
 # 用法（在服务器上执行）：pnpm run logs:prune  或  CUTOFF_HOURS=48 pnpm run logs:prune
 set -euo pipefail
 
@@ -29,14 +29,14 @@ curl -fsS -X POST \
 response="$(curl -fsS "${LOKI_URL}/loki/api/v1/delete")"
 if command -v python3 >/dev/null 2>&1; then
   if printf '%s' "$response" | python3 -c 'import json,sys; sys.exit(0 if len(json.load(sys.stdin)) > 0 else 1)' 2>/dev/null; then
-    echo "==> 删除请求已入队，compactor 将于下次压缩时应用（约 10 分钟内）"
+    echo "==> 删除请求已入队，取消窗口结束后由 compactor 应用"
   else
     echo "==> 未看到待处理删除请求（可能已应用）"
   fi
 else
   compact="$(printf '%s' "$response" | tr -d '[:space:]')"
   if [[ -n "$compact" && "$compact" != "[]" && "$compact" != "null" ]]; then
-    echo "==> 删除请求已入队，compactor 将于下次压缩时应用（约 10 分钟内）"
+    echo "==> 删除请求已入队，取消窗口结束后由 compactor 应用"
   else
     echo "==> 未看到待处理删除请求（可能已应用）"
   fi

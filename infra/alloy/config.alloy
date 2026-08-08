@@ -60,7 +60,7 @@ loki.process "app_logs" {
   // API 容器健康检查每 10s 打一次 /api/health/(live|ready)，按 JSON 行内的 path 字段丢弃。
   stage.drop {
     source     = "message"
-    expression = '"path":"/api/health/(live|ready)"'
+    expression = "\"path\":\"/api/health/(live|ready)\""
   }
 
   forward_to = [loki.write.local.receiver]

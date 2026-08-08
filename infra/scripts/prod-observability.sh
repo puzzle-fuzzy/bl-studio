@@ -18,6 +18,7 @@ REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 [[ -n "$DEPLOY_HOST" ]] || { echo "缺少 DEPLOY_HOST" >&2; exit 1; }
 
 COMPOSE="docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra --profile observability -f $REMOTE_INFRA/docker/docker-compose.prod.yml"
+OBSERVABILITY_SERVICES="loki alloy grafana monitor"
 
 ssh_cmd() {
   if [[ -n "$DEPLOY_SSH_KEY" ]]; then ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
@@ -26,7 +27,9 @@ ssh_cmd() {
 
 case "${1:-up}" in
   up)
-    ssh_cmd "$COMPOSE pull loki alloy grafana monitor && $COMPOSE up -d --no-build --pull never"
+    # 配置文件通过 bind mount 同步；强制重建观测服务可确保文件/目录类型变更
+    # （尤其是 loki.yaml、config.alloy）不会被旧容器挂载缓存掩盖。
+    ssh_cmd "$COMPOSE pull $OBSERVABILITY_SERVICES && $COMPOSE up -d --no-build --pull never --force-recreate $OBSERVABILITY_SERVICES"
     ;;
   down)
     ssh_cmd "$COMPOSE stop"

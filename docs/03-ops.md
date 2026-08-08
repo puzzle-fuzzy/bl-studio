@@ -160,9 +160,9 @@ pnpm run logs:prune          # 队列化删除 24h 前的日志（安全阀）
 CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 ```
 
-删除由 Loki compactor 在下次压缩（约 10 分钟内）真正应用；`loki.yaml` 已开启
-`deletion_mode: filter-and-delete`。日志默认保留 31 天，磁盘吃紧时用 `logs:prune`
-主动缩短。
+删除请求默认有 Loki 的 24h 取消窗口，之后由 compactor 在下一次压缩时真正应用；
+`loki/runtime-config.yaml` 为单租户启用 `filter-and-delete`，`loki.yaml` 配置了
+filesystem delete request store。日志默认保留 31 天，磁盘吃紧时用 `logs:prune` 主动缩短。
 
 ## 6. 备份与恢复
 
