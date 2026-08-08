@@ -1,0 +1,9 @@
+{
+  "name": "bailian-studio-backup",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ali-oss": "6.23.0",
+    "tsx": "4.23.5"
+  }
+}

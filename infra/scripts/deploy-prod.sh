@@ -23,6 +23,7 @@ trap 'rm -f "$REPO_ROOT"/images-*.tar' EXIT
 
 ENV_APP="$REPO_ROOT/infra/env/.env.production"
 ENV_INFRA="$REPO_ROOT/infra/env/.env.prod-infra"
+ENV_BACKUP="$REPO_ROOT/infra/env/.env.prod-backup"
 
 fail() { echo "部署失败：$*" >&2; exit 1; }
 
@@ -53,6 +54,12 @@ inject_release_tag() {
 }
 inject_release_tag "$ENV_APP"
 inject_release_tag "$ENV_INFRA"
+
+# 只把 OSS 灾备所需的五项变量投影给 backup 容器，避免把 API/Worker/SMTP 等
+# 应用机密通过 env_file 扩散到备份服务。
+pnpm exec tsx "$REPO_ROOT/infra/scripts/prepare-backup-env.ts" \
+  || fail "prepare-backup-env 未通过"
+[[ -f "$ENV_BACKUP" ]] || fail "缺少 ${ENV_BACKUP}"
 
 # ── 预检 2.5：verify 硬门禁（P0-08）─────────────────────────────
 # CI 只覆盖「推送 main 的 commit」；本地未推送/分支 commit 直接 deploy 会绕过 CI。
@@ -129,7 +136,7 @@ if ! ssh_cmd "test -x ${FFMPEG_HOST_DIR}/ffmpeg && test -x ${FFMPEG_HOST_DIR}/ff
 fi
 
 # ── 本机构镜像（SHA tag，不可变）─────────────────────────────────
-echo "==> 构建 runtime / web 镜像（平台 ${DEPLOY_PLATFORM}）"
+echo "==> 构建 runtime / web / backup 镜像（平台 ${DEPLOY_PLATFORM}）"
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target runtime \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   -t "bailian-studio-runtime:$SHA" .
@@ -138,10 +145,14 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg VITE_API_ORIGIN= \
   --build-arg VITE_WEB_ORIGIN="https://$SITE_DOMAIN" \
   -t "bailian-studio-web:$SHA" .
+docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile.backup \
+  --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
+  -t "bailian-studio-backup:$SHA" .
 
 # ── docker save → rsync 到服务器 ─────────────────────────────────
 echo "==> 导出并传输镜像与配置"
-docker save -o "images-$SHA.tar" "bailian-studio-runtime:$SHA" "bailian-studio-web:$SHA"
+docker save -o "images-$SHA.tar" \
+  "bailian-studio-runtime:$SHA" "bailian-studio-web:$SHA" "bailian-studio-backup:$SHA"
 
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 ssh_cmd "mkdir -p $REMOTE_INFRA/docker $REMOTE_INFRA/env $REMOTE_INFRA/loki $REMOTE_INFRA/alloy $REMOTE_INFRA/grafana $REMOTE_INFRA/nginx $REMOTE_INFRA/scripts"
@@ -151,11 +162,11 @@ rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docke
 rsync -az infra/loki/ infra/alloy/ infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/"
 # 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
 rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
-rsync -az infra/scripts/backup-postgres.sh infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
-rsync -az "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
+rsync -az infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
+rsync -az "$ENV_APP" "$ENV_INFRA" "$ENV_BACKUP" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 
 # 服务器侧收紧 env 文件权限（含真实凭据）。
-ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production $REMOTE_INFRA/env/.env.prod-infra && chmod +x $REMOTE_INFRA/scripts/backup-postgres.sh"
+ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production $REMOTE_INFRA/env/.env.prod-infra $REMOTE_INFRA/env/.env.prod-backup"
 
 # ── 服务器：docker load + 拉基础镜像 + 迁移 + 滚动 up ────────────
 echo "==> 服务器 docker load"
@@ -177,6 +188,9 @@ ssh_cmd "$COMPOSE up -d --no-build --pull never --scale migrate=0"
 
 echo "==> 接入宿主机 nginx 边缘（证书 + conf.d，幂等）"
 ssh_cmd "bash $REMOTE_INFRA/scripts/setup-host-edge.sh $REMOTE_INFRA"
+
+echo "==> OSS 灾备冒烟（真实 pg_dump + OSS 上传）"
+ssh_cmd "$COMPOSE run --rm --no-deps --entrypoint /usr/local/bin/backup-postgres.sh backup"
 
 # ── 冒烟 ─────────────────────────────────────────────────────────
 echo "==> 等待 api 容器健康（最多 ~2.5 分钟）"

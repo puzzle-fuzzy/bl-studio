@@ -1,8 +1,8 @@
 #!/usr/bin/env sh
-# 每日 Postgres 备份：pg_dump | gzip → 原子写入 → 保留期轮转（可选 OSS 上传）。
+# 每日 Postgres 备份：pg_dump | gzip → 原子写入 → 保留期轮转 → OSS 上传。
 #
-# 运行环境：compose 的 backup 容器（postgres:16-alpine，含 pg_dump）每 24h 调用一次；
-# 也可在服务器上手动触发 `pnpm run db:backup:production`。
+# 运行环境：专用 backup 镜像每 24h 调用一次；也可在服务器上手动触发
+# `pnpm run db:backup:production`。OSS 上传使用镜像内的 ali-oss SDK，不依赖宿主机 CLI。
 set -eu
 
 DATABASE_URL="${DATABASE_URL:?缺少 DATABASE_URL}"
@@ -35,34 +35,8 @@ echo "[backup] 完成: $OUT"
 # 保留期轮转：删除早于保留天数的备份文件。
 find "$BACKUP_DIR" -name 'bailian-studio-*.sql.gz' -mtime +"$BACKUP_RETENTION_DAYS" -delete
 
-# 可选 OSS 上传：仅当显式开启且服务器存在 ossutil/aliyun CLI 时执行。
-# OSS ACCESS_KEY 等凭据不进脚本，由目标环境配置（如 ossutil config 或环境变量）。
-# P0-07：上传失败必须返回非零退出码（标红），不能只 echo 吞掉 ——
-# compose 入口循环据此记录失败并在 5 分钟后重试，运维日志能立即看到。
-oss_upload() {
-  local src="$1" dst="oss://${OSS_BUCKET:-bailian-studio-backups}/"
-  if command -v ossutil >/dev/null 2>&1; then
-    if ossutil cp "$src" "$dst" >/dev/null 2>&1; then
-      echo "[backup] 已上传 OSS"
-      return 0
-    fi
-  elif command -v aliyun >/dev/null 2>&1; then
-    if aliyun oss cp "$src" "$dst" >/dev/null 2>&1; then
-      echo "[backup] 已上传 OSS"
-      return 0
-    fi
-  else
-    echo "[backup] OSS 上传跳过：BACKUP_OSS_UPLOAD=true 但未找到 ossutil/aliyun CLI（检查服务器安装）" >&2
-    return 1
-  fi
-  echo "[backup] OSS 上传失败（检查 CLI 配置 / ACCESS_KEY 权限 / bucket 名）" >&2
-  return 1
-}
-
-exit_code=0
+# P0-07：上传失败必须返回非零退出码（标红），不能只 echo 吞掉 —— compose 入口循环
+# 据此记录失败并在 5 分钟后重试，运维日志能立即看到。
 if [ "$BACKUP_OSS_UPLOAD" = "true" ]; then
-  if ! oss_upload "$OUT"; then
-    exit_code=1
-  fi
+  /opt/bailian-studio/node_modules/.bin/tsx /opt/bailian-studio/upload-backup-to-oss.ts "$OUT"
 fi
-exit "$exit_code"

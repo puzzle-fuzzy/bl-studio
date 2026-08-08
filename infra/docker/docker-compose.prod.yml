@@ -157,16 +157,16 @@ services:
 
   # ── 每日备份：pg_dump | gzip 轮转（可选 OSS 上传）──
   backup:
-    image: postgres:16-alpine
+    image: bailian-studio-backup:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     restart: unless-stopped
-    mem_limit: 64m
+    mem_limit: 128m
+    env_file:
+      - ../env/.env.prod-backup
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
-      BACKUP_OSS_UPLOAD: ${BACKUP_OSS_UPLOAD:-false}
     volumes:
-      - ../scripts/backup-postgres.sh:/usr/local/bin/backup-postgres.sh:ro
       - backups:/backups
     entrypoint:
       - /bin/sh

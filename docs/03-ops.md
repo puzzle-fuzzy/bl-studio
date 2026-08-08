@@ -159,13 +159,17 @@ CUTOFF_HOURS=48 pnpm run logs:prune   # 自定义保留窗口
 
 ## 6. 备份与恢复
 
-- **自动备份**：`backup` 容器每 24h 执行 `infra/scripts/backup-postgres.sh`，`pg_dump | gzip` 写入 `backups` 命名卷（保留 `BACKUP_RETENTION_DAYS` 天）。备份文件带 UTC 时间戳。
+- **自动备份**：专用 `bailian-studio-backup:<full-sha>` 容器每 24h 执行备份，内置
+  `postgresql-client`、`gzip` 和固定版本 `ali-oss` SDK；`pg_dump | gzip` 写入
+  `backups` 命名卷（保留 `BACKUP_RETENTION_DAYS` 天），备份文件带 UTC 时间戳。
 - **手动触发**：`pnpm run db:backup:production`。
 - **查看备份**：`docker compose ... exec backup ls -lh /backups`。
 - **OSS 灾备（强制二选一，P0-07）**：deploy 预检（`check-production-env infra`）要求显式选择——
-  - `BACKUP_OSS_UPLOAD=true`：服务器装有 `ossutil`/`aliyun` CLI 时自动上传；ACCESS_KEY 由服务器环境配置，不进脚本。**上传失败会让备份任务以非零退出**（compose 循环 5 分钟后重试），日志里 `[backup] OSS 上传失败` 即为标红信号。
+  - `BACKUP_OSS_UPLOAD=true`：deploy 从 `.env.production` 只投影 `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`、可选 `OSS_ENDPOINT` 到 gitignored 的 `.env.prod-backup`，并设置 `BACKUP_OSS_PREFIX`。**上传失败会让备份任务以非零退出**（compose 循环 5 分钟后重试），日志里 `[backup] OSS 上传失败` 即为标红信号。
+    手动使用 `prod:up` 前先运行 `pnpm exec tsx infra/scripts/prepare-backup-env.ts`。
   - `BACKUP_OSS_UPLOAD=false` + `BACKUP_OSS_DISABLED_ACK=confirmed`：显式接受「备份与 DB 同宿主，整机故障即丢数据」的风险。
   - 缺省/非法值会让 `deploy:prod` 预检直接失败。
+- **部署验证**：`deploy:prod` 启动核心栈后会执行一次真实的 `pg_dump + gzip + OSS 上传` 冒烟；该步骤失败时不会报告部署成功。
 - **恢复**（先停止写入方，一般停 api/worker）：
   ```bash
   gunzip -c <backup.sql.gz> | psql "$DATABASE_URL"

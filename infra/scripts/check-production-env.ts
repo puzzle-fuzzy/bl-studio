@@ -218,7 +218,7 @@ export function checkProductionInfrastructure(
     addIssue(
       'BACKUP_OSS_UPLOAD',
       'OSS 灾备已关闭：备份与 DB 在同一台宿主机磁盘，整机故障/误删卷时无恢复路径。' +
-        '开启灾备（BACKUP_OSS_UPLOAD=true 且服务器装 ossutil/aliyun）或显式接受该风险' +
+        '开启灾备（BACKUP_OSS_UPLOAD=true 且 .env.production 具备完整 OSS 配置）或显式接受该风险' +
         '（BACKUP_OSS_DISABLED_ACK=confirmed）',
     )
   }
