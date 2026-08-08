@@ -4,9 +4,9 @@
 
 **Goal:** Make production PostgreSQL backups upload to Alibaba Cloud OSS from a self-contained backup container, then deploy and verify the enabled disaster-recovery path.
 
-**Architecture:** Replace the `postgres:16-alpine` backup service with a dedicated Node/PostgreSQL-client image. The image contains the existing pinned `ali-oss` SDK and an isolated uploader; only the selected OSS variables are generated into `.env.prod-backup` and injected into the backup service. The deployment script builds/transfers the immutable backup image, transfers the generated backup env file, and runs an explicit backup upload smoke test after startup.
+**Architecture:** Use a dedicated `postgres:16-alpine` backup image with Node/tsx added alongside the PostgreSQL 16 client. The image contains the existing pinned `ali-oss` SDK and an isolated uploader; only the selected OSS variables are generated into `.env.prod-backup` and injected into the backup service. The deployment script builds/transfers the immutable backup image, transfers the generated backup env file, and runs an explicit backup upload smoke test after startup.
 
-**Tech Stack:** Docker Compose, Node 24, `postgresql-client`, POSIX shell, TypeScript/tsx, Vitest, `ali-oss@6.23.0`, pnpm.
+**Tech Stack:** Docker Compose, PostgreSQL 16 Alpine, Node 24, `gzip`, POSIX shell, TypeScript/tsx, Vitest, `ali-oss@6.23.0`, pnpm.
 
 ## Global Constraints
 
@@ -43,7 +43,7 @@ Use `ali-oss@6.23.0` with `authorizationV4: true`; read only `OSS_REGION`, `OSS_
 
 - [x] **Step 3: Build the dedicated image**
 
-Base `infra/docker/Dockerfile.backup` on `node:24-bookworm-slim`, install `postgresql-client`, `gzip`, and CA certificates, install the exact package versions in `backup-package.json`, and copy the shell/uploader scripts into `/usr/local/bin`.
+Base `infra/docker/Dockerfile.backup` on `postgres:16-alpine`, add Node/npm, `gzip`, and CA certificates, install the exact package versions in `backup-package.json`, and copy the shell/uploader scripts into the backup image.
 
 - [x] **Step 4: Wire Compose to the image and isolated env file**
 
@@ -113,14 +113,14 @@ Document `BACKUP_OSS_PREFIX` and that the actual OSS credentials remain in `.env
 
 Run `git diff --check`, focused tests, `pnpm run verify`, and a Compose config/build check for the backup service.
 
-- [ ] **Step 2: Commit and push**
+- [x] **Step 2: Commit and push**
 
 Commit the implementation and documentation, confirm the worktree is clean, and push the full commit to `origin/main`.
 
-- [ ] **Step 3: Run production deployment**
+- [x] **Step 3: Run production deployment**
 
 Run `pnpm run deploy:prod`; the script must pass verify, build/load all three images, run migrations, start the stack, execute the backup upload smoke, and pass the public readiness check.
 
-- [ ] **Step 4: Verify remote state**
+- [x] **Step 4: Verify remote state**
 
 Run production status and inspect the backup service's latest successful log marker without printing credentials; confirm the deployed SHA matches `origin/main`.
