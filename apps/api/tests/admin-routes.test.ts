@@ -109,6 +109,7 @@ describe('admin routes', () => {
       ['GET', '/api/admin/stats/overview'],
       ['GET', '/api/admin/model-costs'],
       ['GET', '/api/admin/stats/analytics'],
+      ['GET', '/api/metrics'],
       ['GET', '/api/admin/gallery'],
       ['POST', '/api/admin/gallery/g1/hide'],
       ['POST', '/api/admin/gallery/g1/unhide'],
@@ -118,6 +119,19 @@ describe('admin routes', () => {
       const response = await app.handle(adminRequest(path, { method }))
       expect(response.status, `${method} ${path}`).toBe(403)
     }
+  })
+
+  it('exposes process metrics only to administrators', async () => {
+    const adminResponse = await app.handle(adminRequest('/api/metrics'))
+    expect(adminResponse.status).toBe(200)
+    expect(await adminResponse.json()).toEqual(expect.objectContaining({
+      success: true,
+      data: expect.objectContaining({ counters: expect.any(Object), timers: expect.any(Object) }),
+    }))
+
+    currentUser = { id: 'user-1', role: 'user' }
+    const userResponse = await app.handle(adminRequest('/api/metrics'))
+    expect(userResponse.status).toBe(403)
   })
 
   it('lists users with pagination and search passthrough', async () => {

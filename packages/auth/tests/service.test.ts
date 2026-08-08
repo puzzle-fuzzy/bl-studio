@@ -305,6 +305,7 @@ describe('auth service', () => {
       })
       expect(first.user.email).toBe('octocat@example.com')
       expect(first.user.displayName).toBe('Mona Octocat')
+      expect(first.user.passwordAuthEnabled).toBe(false)
       expect(await handle.authService.verifyToken(first.token)).toMatchObject({
         user: { id: first.user.id, emailVerifiedAt: expect.any(String) },
       })
@@ -323,6 +324,21 @@ describe('auth service', () => {
       } finally {
         await db.close()
       }
+    })
+
+    it('coalesces concurrent bindings for one GitHub identity', async () => {
+      await handle.authService.register({ email: 'race-a@x.test', password: 'password1' })
+      await handle.authService.verifyEmail(tokenFrom(emailSender.verifications.at(-1)!.url))
+      await handle.authService.register({ email: 'race-b@x.test', password: 'password1' })
+      await handle.authService.verifyEmail(tokenFrom(emailSender.verifications.at(-1)!.url))
+
+      const [first, second] = await Promise.all([
+        handle.authService.loginWithGithub({ githubId: 'concurrent-link', email: 'race-a@x.test' }),
+        handle.authService.loginWithGithub({ githubId: 'concurrent-link', email: 'race-b@x.test' }),
+      ])
+
+      expect(first.user.id).toBe(second.user.id)
+      expect(first.user.githubLinked).toBe(true)
     })
 
     it('links an existing verified email account to the GitHub identity', async () => {

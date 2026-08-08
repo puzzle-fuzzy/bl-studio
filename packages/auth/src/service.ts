@@ -341,6 +341,42 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
     return sessionResult(user, sessionId, issuedAt, expiresAt)
   }
 
+  /**
+   * 将已有邮箱账号绑定到 GitHub，并把唯一索引竞争收敛为正常登录。
+   *
+   * 两个 OAuth 回调可能同时按不同的邮箱投影进入这里，但最终竞争同一个
+   * github_id 唯一索引。事务失败后按 github_id 重读，避免把数据库唯一约束
+   * 错误暴露成登录失败。
+   */
+  async function linkEmailAccountToGithub(
+    existing: UserRepositoryRecord,
+    githubId: string,
+  ): Promise<UserRepositoryRecord> {
+    const linkedAt = now()
+    try {
+      await options.db.transaction(async tx => {
+        await linkGithubId(tx, existing.id, githubId, linkedAt)
+        // GitHub 已验证该邮箱，绑定后视为已完成邮箱验证（无需验证邮件）。
+        if (existing.emailVerifiedAt === null) {
+          await markUserEmailVerified(tx, existing.id, linkedAt)
+        }
+      })
+    } catch (error) {
+      if (!isUniqueViolation(error)) throw error
+      const racedGithub = await findActiveUserByGithubId(options.db, githubId)
+      if (racedGithub === undefined) throw error
+      ensureNotBanned(racedGithub)
+      return racedGithub
+    }
+
+    return (await findActiveUserById(options.db, existing.id)) ?? {
+      ...existing,
+      githubId,
+      emailVerifiedAt: existing.emailVerifiedAt ?? linkedAt,
+      updatedAt: linkedAt,
+    }
+  }
+
   async function replaceActionToken(input: {
     user: UserRepositoryRecord
     purpose: AuthActionTokenPurpose
@@ -537,15 +573,7 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
             action: 'login',
           })
         }
-        const linkedAt = now()
-        await options.db.transaction(async tx => {
-          await linkGithubId(tx, byEmail.id, input.githubId, linkedAt)
-          // GitHub 已验证该邮箱，绑定后视为已完成邮箱验证（无需验证邮件）。
-          if (byEmail.emailVerifiedAt === null) {
-            await markUserEmailVerified(tx, byEmail.id, linkedAt)
-          }
-        })
-        const user = (await findActiveUserById(options.db, byEmail.id)) ?? byEmail
+        const user = await linkEmailAccountToGithub(byEmail, input.githubId)
         return issueSession(user)
       }
 
@@ -582,12 +610,7 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
               action: 'login',
             })
           }
-          const linkedAt = now()
-          await options.db.transaction(async tx => {
-            await linkGithubId(tx, racedEmail.id, input.githubId, linkedAt)
-            if (racedEmail.emailVerifiedAt === null) await markUserEmailVerified(tx, racedEmail.id, linkedAt)
-          })
-          return issueSession((await findActiveUserById(options.db, racedEmail.id)) ?? racedEmail)
+          return issueSession(await linkEmailAccountToGithub(racedEmail, input.githubId))
         }
         throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已注册，请使用其他账号登录。', { action: 'login' })
       }

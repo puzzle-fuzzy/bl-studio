@@ -309,6 +309,13 @@
       "when": 1786163925836,
       "tag": "0043_fuzzy_metal_master",
       "breakpoints": true
+    },
+    {
+      "idx": 44,
+      "version": "7",
+      "when": 1786165441076,
+      "tag": "0044_legacy_password_auth_compat",
+      "breakpoints": true
     }
   ]
 }

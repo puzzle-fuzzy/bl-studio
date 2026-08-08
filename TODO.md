@@ -438,14 +438,12 @@
 <a name="r2-p0-01"></a>
 **R2-P0-01 · 重发验证邮件被「掩码邮箱」打断 —— 按钮显示成功但什么都没发（已验证）**
 > ✅ 已处理（commit `026ea75` fix(auth)，2026-08-08）
-- **位置**：[service.ts:440](packages/auth/src/service.ts#L440)（register 返回 `maskEmail(email)`）→ [auth-store.ts:91](apps/web/src/stores/auth-store.ts#L91)（`pendingVerificationEmail` 存的就是掩码）→ [CheckEmailPage.tsx:18](apps/web/src/pages/auth/CheckEmailPage.tsx#L18)（`resend(掩码)`）→ [service.ts:468-485](packages/auth/src/service.ts#L468-L485)（`findActiveUserByEmail(掩码)` 查无此人 → 按防枚举语义静默返回 `accepted:true`）
-- **影响**：验证邮件丢失/过期的用户永远无法完成验证、无法登录，账号成死号；且是**假成功**（前端提示「已重新发送」）。
-- **修法**：register 响应里掩码仅供展示（单独 `displayEmail` 字段），前端在注册提交时把**原始邮箱**存入 store；或重发端点改按 userId 维度。补 register→resend 端到端契约测试（现有 resend 测试都直接传全量邮箱，覆盖不到这个 bug）。
+- **现状**：[service.ts:454-460](packages/auth/src/service.ts#L454-L460) 返回原始规范化邮箱与独立 `displayEmail`；[auth-store.ts:90-98](apps/web/src/stores/auth-store.ts#L90-L98) 分离保存重发值与展示值；[service.test.ts:125-153](packages/auth/tests/service.test.ts#L125-L153) 覆盖真实邮箱可重发、掩码邮箱静默不发信。
+- **处理**：掩码只用于展示，原始邮箱用于重发；注册路由也断言两字段不泄漏 token。
 
-**R2-P0-02 · 登录回跳 `?cb=` 未过白名单，自带校验函数零引用（已复核：中等风险）**
-- **位置**：[LoginPage.tsx:42,57](apps/web/src/pages/auth/LoginPage.tsx#L42)、[AuthDialog.tsx:41-43](apps/web/src/components/auth/AuthDialog.tsx#L41)、[ProtectedRoute.tsx:28-29](apps/web/src/components/auth/ProtectedRoute.tsx#L28)；[auth-callback.ts:41-58](packages/api-client/src/auth-callback.ts#L41)（`isAllowedCallback`/`resolvePostLoginRedirect` 已导出、有测试，但 web 侧零引用）
-- **实际风险说明**：react-router `navigate('//evil.com')` 按 pathname 解析，pushState 对跨源 URL 会抛错而非跳转 —— 不是真开放重定向。但「校验函数存在却未在使用点应用」是防线下沉：一旦某处改用 `location.href` 即变真漏洞。按中等（P1）记录。
-- **修法**：`LoginPage`/`AuthDialog` 跳转前统一走 `resolvePostLoginRedirect(callback, '/create', allowedOrigins)`；接线或删除 auth-callback.ts。
+**R2-P0-02 · 登录回跳 `?cb=` 未过白名单，自带校验函数零引用（已复核：中等风险）** — ✅ 已处理（2026-08-08）
+- **现状**：[LoginPage.tsx:57-58](apps/web/src/pages/auth/LoginPage.tsx#L57-L58) 与 [AuthDialog.tsx:56-57](apps/web/src/components/auth/AuthDialog.tsx#L56-L57) 均调用 `resolvePostLoginRedirect`，仅允许当前 `window.location.origin` 或站内单斜杠路径；非法值回退 `/create`。
+- **处理**：[auth-callback.ts](packages/api-client/src/auth-callback.ts) 保留为唯一校验契约并有单测，web 两个登录入口已接线；[ProtectedRoute.tsx:28-29](apps/web/src/components/auth/ProtectedRoute.tsx#L28-L29) 只生成站内相对回跳，不直接执行外部 URL。
 
 **R2-P1-01 · SMTP 故障时注册已落库，但用户没有可用重发路径** — ✅ 已处理（2026-08-08）
 - **位置**：[service.ts:370-387](packages/auth/src/service.ts#L370-L387)（发信失败抛 `EMAIL_DELIVERY_FAILED`、账号已保留）；[LoginPage.tsx:52-60](apps/web/src/pages/auth/LoginPage.tsx#L52)（catch 只显示错误、不跳 check-email）
@@ -508,9 +506,8 @@
 - **修法**：至少补 user-error + chunk-recovery（与 web 同名模块对齐）；`passWithNoTests` 改 false 让空跑变红。
 
 **R2-P1-11 · `test:coverage` 是死链，60% 阈值无人 enforce** — ✅ 已处理（2026-08-08）
-- **位置**：[package.json:22](package.json#L22)（`test:coverage` → `turbo run test:coverage`，全仓无包定义该 script）；[web/vitest.config.ts:18-22](apps/web/vitest.config.ts#L18)（v8 + 60% 阈值只能手动触达、不在 verify）；「重建 coverage 基线」3 次 commit 实为 bailian-adapter 产物（402a006 已删）
-- **影响（已消除）**：web 覆盖率命令已接入 root `verify`，不再是无任务死链；覆盖率阈值仍由 web 的 Vitest 配置执行。
-- **处理**：web 增加 `test:coverage` script，root `verify` 已接入；门禁范围先限定为已有纯函数回归覆盖的 `src/lib/**`，stores/hooks 待补组件测试后再纳入，避免低质量的全局假门禁。
+- **现状**：[apps/web/package.json:11](apps/web/package.json#L11) 已提供真实 `test:coverage` 脚本；root `verify` 会执行它，Vitest v8 阈值在 [apps/web/vitest.config.ts:16-25](apps/web/vitest.config.ts#L16-L25) 强制生效。
+- **处理**：当前门禁明确覆盖已有纯函数/协议适配层 `src/lib/**`，不是假装全局 60%；stores/hooks 在补齐组件级测试后再扩大范围，避免把未定义的覆盖基线伪装成完成。
 
 **R2-P1-12 · 登出数据清理注册表（`registerPrivateDataReset`）无测试**
 > ✅ 已处理（commit `e055d4f`）——auth-store.test.ts：导入 6 个注册 store 播种标志数据→resetAllPrivateData 后全部清空（注册表漏掉任一 store 即红）+ allSettled 容错（单个回调 reject 不拖垮整体）。
@@ -547,10 +544,9 @@
 - **修法**：二选一 —— (a) 真收敛：各层错误继承 `BailianStudioError`，统一 `code`/`retryable`/`metadata`；(b) 至少把 02-design:138 改写为现状，并给 http-errors 兜底分支加「不得透传 message」约束。
 - **处理**：取 (b)——02-design:138 改写为现状（集中映射契约 + 兜底 INTERNAL_ERROR 不泄漏）；「不得透传 message」约束已在 R2-P0-03 落地（[http-errors.ts:190-194](apps/api/src/lib/http-errors.ts#L190-L194)），文档如实记录。跨层统一继承留待后续。
 
-**R2-P1-15 · 指标「只写不读」—— 无任何观测出口** — ✅ 已处理（2026-08-08）：新增 admin 鉴权的 `GET /api/metrics`，并让 worker 周期记录 metrics snapshot。
-- **位置**：[metrics.ts:4-7](apps/api/src/lib/metrics.ts#L4)（注释「供未来的 /metrics 端点」）；[app.ts:125-126](apps/api/src/app.ts#L125)（api.request）；[generation-task-handler.ts:604-613](apps/worker/src/generation-task-handler.ts#L604)（worker.provider_request）；[worker-loop.ts:126-128](apps/worker/src/worker-loop.ts#L126)（`metricsSnapshot()` 无调用方）；全仓无 `/metrics` 端点
-- **影响**：api.request 状态码分布、provider 请求耗时/失败率在 Loki/Grafana 里不可见 —— 观测栈白装。
-- **修法**：最低成本 —— admin 鉴权的 `GET /api/metrics`，或按周期把 `snapshot()` 打一条 json 日志进 Loki。
+**R2-P1-15 · 指标「只写不读」—— 无任何观测出口** — ✅ 已处理（2026-08-08）
+- **现状**：[app.ts:161-164](apps/api/src/app.ts#L161-L164) 提供 admin 鉴权的 `GET /api/metrics`；请求与 worker provider 指标继续写入进程级 collector，worker 周期输出 snapshot。
+- **处理**：指标已有受保护读取出口；认证失败仍走统一 401/403，避免把运行指标公开给匿名请求。
 
 **R2-P1-16 · 未使用依赖声明（6 条，零 import）** — ✅ 已处理（2026-08-08）
 - **位置**：worker `package.json` 声明 `@bailian-studio/event-bus`；api 声明 `@bailian-studio/task-engine`；credit-ledger + media-repository 各声明 `@bailian-studio/shared` + `postgres`；web 声明 `date-fns` —— 各自 src+tests 0 处 import
