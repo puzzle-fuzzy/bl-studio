@@ -34,6 +34,9 @@ describe('Bailian SDK product operation map', () => {
       expect.objectContaining({ consumerId: 'happyhorse-image-to-video', capability: 'video.image-to-video', mode: 'async' }),
       expect.objectContaining({ consumerId: 'happyhorse-reference-video', capability: 'video.reference-to-video', mode: 'async' }),
       expect.objectContaining({ consumerId: 'happyhorse-video-edit', capability: 'video.edit', mode: 'async' }),
+      expect.objectContaining({ consumerId: 'wan3-text-to-video', capability: 'video.text-to-video', mode: 'async' }),
+      expect.objectContaining({ consumerId: 'wan3-image-to-video', capability: 'video.image-to-video', mode: 'async' }),
+      expect.objectContaining({ consumerId: 'wan3-reference-to-video', capability: 'video.reference-to-video', mode: 'async' }),
       expect.objectContaining({ consumerId: 'fun-music-v1', capability: 'music.generate', mode: 'sync' }),
     ]))
   })

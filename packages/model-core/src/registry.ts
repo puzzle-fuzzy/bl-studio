@@ -28,6 +28,7 @@ import { wanxTextToVideo } from './manifests/video/wanx-video'
 import { viduT2VPro, viduT2VTurbo, viduT2V, viduI2V, viduFirstLastFrame, viduR2V } from './manifests/video/vidu-video'
 import { viduR2VQ3, viduR2VQ3Turbo, viduR2VQ3Ad, viduR2VQ3Drama, viduR2VQ2, viduR2VQ2Pro } from './manifests/video/vidu-reference-video'
 import { wanx27T2V, wanx27I2V, wanx27R2V, wanx27VideoEdit } from './manifests/video/wanx-27-video'
+import { wan3T2V, wan3I2V, wan3R2V } from './manifests/video/wan3-video'
 import { kelingT2V, kelingI2V, kelingFirstLastFrame, kelingReferenceVideo, kelingVideoEdit } from './manifests/video/keling-video'
 import { aishiT2V, aishiI2V, aishiFirstLastFrame } from './manifests/video/aishi-video'
 import { happyhorseT2V, happyhorseI2V, happyhorseR2V, happyhorseVideoEdit } from './manifests/video/happyhorse-video'
@@ -91,6 +92,9 @@ const registry = [
   wanx27I2V,
   wanx27R2V,
   wanx27VideoEdit,
+  wan3T2V,
+  wan3I2V,
+  wan3R2V,
   kelingT2V,
   kelingI2V,
   kelingFirstLastFrame,

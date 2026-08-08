@@ -37,6 +37,9 @@ describe('model catalog composition', () => {
     expect(ids.has('happyhorse-video-edit')).toBe(true)
     expect(ids.has('vidu-reference-video')).toBe(true)
     expect(ids.has('wanx-2.7-video-edit')).toBe(true)
+    expect(ids.has('wan3-text-to-video')).toBe(true)
+    expect(ids.has('wan3-image-to-video')).toBe(true)
+    expect(ids.has('wan3-reference-to-video')).toBe(true)
   })
 
   it('resolves a model by id and surfaces its manifest fields', () => {
@@ -193,6 +196,23 @@ describe('model catalog composition', () => {
         fields: ['references', 'referenceVideos'],
         minItems: 1,
         maxItems: 5,
+      }),
+    ])
+  })
+
+  it('declares the Wanxiang 3.0 operation slices and reference limits', () => {
+    expect(getModelById('wan3-text-to-video')).toMatchObject({
+      providerModel: 'wan3.0-video',
+    })
+    expect(getModelById('wan3-text-to-video')?.pricing.rates.map(rate => rate.unitPrice)).toEqual(['0.3', '0.6', '1.2'])
+    expect(getModelById('wan3-image-to-video')?.rules).toEqual([
+      expect.objectContaining({ fields: ['firstFrame', 'lastFrame'], minItems: 1, maxItems: 2 }),
+    ])
+    expect(getModelById('wan3-reference-to-video')?.rules).toEqual([
+      expect.objectContaining({
+        fields: ['references', 'referenceVideos', 'referenceAudios'],
+        minItems: 1,
+        maxItems: 10,
       }),
     ])
   })

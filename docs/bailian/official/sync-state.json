@@ -1,0 +1,56 @@
+{
+  "schemaVersion": 1,
+  "source": "https://help.aliyun.com/zh/model-studio",
+  "syncedAt": "2026-08-07T03:02:35.000Z",
+  "documentCount": 4,
+  "sourceDocuments": [
+    {
+      "path": "错误码.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/error-code",
+      "nodeId": 2712216,
+      "title": "错误码",
+      "officialPath": "https://help.aliyun.com/zh/model-studio/error-code",
+      "officialVersion": 172,
+      "officialLastModifiedAt": "2026-08-06T23:55:42.000Z",
+      "contentHash": "sha256:406860c6a4e42ac873b0c6ff5851dc14667513bdcfef8c1e58257068a2584a08",
+      "importedAt": "2026-08-06T23:55:42.000Z",
+      "bytes": 113962
+    },
+    {
+      "path": "模型调用价格.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "nodeId": 2987148,
+      "title": "模型调用计费",
+      "officialPath": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "officialVersion": 261,
+      "officialLastModifiedAt": "2026-08-07T03:02:35.000Z",
+      "contentHash": "sha256:aa37048bc340e6730e3a200c4aba4ac61166eeb92b38a2c2055b9b5fb386aa46",
+      "importedAt": "2026-08-07T03:02:35.000Z",
+      "bytes": 231009
+    },
+    {
+      "path": "选择模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/models",
+      "nodeId": 2840914,
+      "title": "选择模型",
+      "officialPath": "https://help.aliyun.com/zh/model-studio/models",
+      "officialVersion": 729,
+      "officialLastModifiedAt": "2026-08-04T03:31:17.000Z",
+      "contentHash": "sha256:2454ee419c749b57c39cb40432fba5bb4382fefacd63fa5524fd152a1a4468fc",
+      "importedAt": "2026-08-04T03:31:17.000Z",
+      "bytes": 65724
+    },
+    {
+      "path": "视频生成/万相/3049634-万相3.0-视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
+      "nodeId": 3049634,
+      "title": "万相3.0-视频生成",
+      "officialPath": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
+      "officialVersion": 3,
+      "officialLastModifiedAt": "2026-08-07T01:47:54.000Z",
+      "contentHash": "sha256:6ca20c24132d911bada8d92661c3622289b9b082b0e5865bcdf886a7e0141ad1",
+      "importedAt": "2026-08-07T01:47:54.000Z",
+      "bytes": 22711
+    }
+  ]
+}

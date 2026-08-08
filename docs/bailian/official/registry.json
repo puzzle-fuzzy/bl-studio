@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "source": "https://help.aliyun.com/zh/model-studio",
+  "navigation": {
+    "endpoint": "https://bailian.console.aliyun.com/data/api.json",
+    "action": "MenuPath",
+    "product": "DocHelpService",
+    "region": "cn-hangzhou",
+    "nodeId": "2400256",
+    "website": "cn",
+    "language": "zh",
+    "rootAliases": [
+      "/model-studio/model-api-reference"
+    ],
+    "minimumDocumentCount": 100
+  },
+  "documents": [
+    {
+      "path": "错误码.md",
+      "nodeId": 2712216,
+      "url": "https://help.aliyun.com/zh/model-studio/error-code",
+      "navigationPath": [
+        "官方补充文档",
+        "错误码"
+      ],
+      "origin": "supplemental"
+    },
+    {
+      "path": "模型调用价格.md",
+      "nodeId": 2987148,
+      "url": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "navigationPath": [
+        "官方补充文档",
+        "模型调用价格"
+      ],
+      "origin": "supplemental"
+    },
+    {
+      "path": "选择模型.md",
+      "nodeId": 2840914,
+      "url": "https://help.aliyun.com/zh/model-studio/models",
+      "navigationPath": [
+        "官方补充文档",
+        "选择模型"
+      ],
+      "origin": "supplemental"
+    },
+    {
+      "path": "视频生成/万相/3049634-万相3.0-视频生成.md",
+      "nodeId": 3049634,
+      "url": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
+      "navigationPath": [
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相3.0-视频生成"
+      ],
+      "origin": "navigation"
+    }
+  ]
+}

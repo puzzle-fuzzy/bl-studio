@@ -1,0 +1,70 @@
+name: Sync official Bailian documents
+
+on:
+  schedule:
+    - cron: '0 */12 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: bailian-official-documents-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.9.0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Sync official Bailian document snapshot
+        run: pnpm run docs:bailian:sync
+
+      - name: Validate official Bailian snapshot
+        run: pnpm run docs:bailian:snapshot:check
+
+      - name: Validate generated files
+        run: |
+          git add docs/bailian/official
+          git diff --cached --check
+          test -z "$(git ls-files --others --exclude-standard)" || {
+            echo "Unexpected untracked files were generated:"
+            git ls-files --others --exclude-standard
+            exit 1
+          }
+
+      - name: Commit synchronized official documents
+        shell: bash
+        run: |
+          if git diff --cached --quiet; then
+            echo "Official Bailian documents are already current."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore(docs): sync official Bailian documents"
+          git fetch origin main
+          test "$(git rev-parse HEAD^)" = "$(git rev-parse origin/main)" || {
+            echo "main advanced during synchronization; refusing to overwrite it"
+            exit 1
+          }
+          git push origin HEAD:main
