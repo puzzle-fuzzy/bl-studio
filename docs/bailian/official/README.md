@@ -33,6 +33,10 @@ pnpm run docs:bailian:snapshot:check
   → 单独提交并部署
 ```
 
-同步失败时保留旧快照；官方导航数量低于安全下限或来源主机不可信时，任务直接失败，不覆盖已有文档。
+同步现在按文档逐个原子保存：某个页面成功后，其 Markdown、registry 和来源状态会立即 checkpoint。
+如果后续页面失败，已保存文档会保留，`sync-state.json` 会标记为 `status: partial`，并记录
+`documentCount/expectedDocumentCount`；这类快照不会被 `docs:bailian:snapshot:check` 当作完整快照。
+下一次同步会比较当前官网导航；导航未变化时会校验并跳过已保存文档，从上次断点继续，导航变化时重新抓取受影响文档，全部成功后才标记为 `status: complete`。
+验证码页、官方导航数量低于安全下限或来源主机不可信时，任务直接失败，并且不会把失败响应写入文档。
 
 `docs:bailian:check` 会联网检查官网漂移；`docs:bailian:snapshot:check` 只校验仓库内已有快照、文件路径、来源元数据和 SHA-256，不联网。
