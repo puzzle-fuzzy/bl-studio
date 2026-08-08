@@ -20,7 +20,7 @@ describe('official Bailian document synchronization primitives', () => {
             children: [{
               id: 3049634,
               title: '万相3.0-视频生成',
-              url: 'https://help.aliyun.com/zh/model-studio/wan3',
+              url: '/zh/model-studio/wan3',
               validDocument: true,
               children: [],
             }],
@@ -75,6 +75,35 @@ describe('official Bailian document synchronization primitives', () => {
       rootAliases: ['/model-studio/model-api-reference'],
       minimumDocumentCount: 1,
     }})).toThrow('trusted Aliyun Help URL')
+  })
+
+  it('rejects bare relative document URLs instead of silently rebasing them', () => {
+    const root = parseOfficialNavigationResponse({
+      code: 200,
+      data: { Data: JSON.stringify({ title: 'root', children: [{
+        title: 'API参考（模型）',
+        alias: '/model-studio/model-api-reference',
+        children: [{
+          id: 2,
+          title: 'bad',
+          url: 'wan3',
+          validDocument: true,
+          children: [],
+        }],
+      }] }) },
+    })
+
+    expect(() => discoverOfficialDocuments(root, { ...{
+      endpoint: 'https://bailian.console.aliyun.com/data/api.json',
+      action: 'MenuPath',
+      product: 'DocHelpService',
+      region: 'cn-hangzhou',
+      nodeId: '2400256',
+      website: 'cn',
+      language: 'zh',
+      rootAliases: ['/model-studio/model-api-reference'],
+      minimumDocumentCount: 1,
+    }})).toThrow()
   })
 
   it('parses SSR document payloads and converts tables/code to markdown', () => {

@@ -5,6 +5,7 @@ import TurndownService from 'turndown'
 import { gfm } from 'turndown-plugin-gfm'
 
 export const OFFICIAL_DOCUMENT_SOURCE = 'https://help.aliyun.com/zh/model-studio'
+const OFFICIAL_DOCUMENT_ORIGIN = new URL(OFFICIAL_DOCUMENT_SOURCE).origin
 
 export interface OfficialNavigationConfig {
   endpoint: string
@@ -118,7 +119,14 @@ function requiredInteger(record: Record<string, unknown>, key: string, label: st
 }
 
 function trustedHelpUrl(value: string): string {
-  const url = new URL(value)
+  // Aliyun's live navigation returns root-relative paths (for example
+  // `/zh/model-studio/wan3`), while supplemental entries use absolute URLs.
+  // Resolve only root-relative paths against the fixed trusted origin; a
+  // bare relative string must still fail instead of becoming an arbitrary
+  // path under help.aliyun.com.
+  const url = value.startsWith('/')
+    ? new URL(value, OFFICIAL_DOCUMENT_ORIGIN)
+    : new URL(value)
   if (url.protocol !== 'https:' || url.hostname !== 'help.aliyun.com') {
     throw new TypeError(`official document URL is not a trusted Aliyun Help URL: ${value}`)
   }
