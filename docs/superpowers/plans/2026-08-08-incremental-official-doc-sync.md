@@ -51,4 +51,4 @@
 - [x] **Step 1: Run the focused sync tests and root typecheck.**
 - [x] **Step 2: Run `pnpm run docs:bailian:sync` locally; confirm successful documents are present even if Aliyun rate limiting interrupts the batch.**
 - [x] **Step 3: Inspect `git diff` and confirm no runtime manifest files changed.**
-- [ ] **Step 4: Commit and push the implementation.**
+- [x] **Step 4: Commit and push the implementation.**
