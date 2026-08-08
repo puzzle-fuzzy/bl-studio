@@ -500,6 +500,8 @@ export const PublicUserSchema = z.object({
   displayName: z.string().nullable(),
   /** 已上传自定义头像；false 时用 avatarUrlFor(id) 指向的 identicon 默认头像。 */
   hasAvatar: z.boolean(),
+  passwordAuthEnabled: z.boolean(),
+  githubLinked: z.boolean(),
   role: z.enum(['user', 'admin']),
   emailVerifiedAt: z.string(),
   /** 非空即封禁（正常会话下恒为 null）。 */

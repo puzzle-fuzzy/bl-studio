@@ -67,7 +67,8 @@ export function redactCredentialSubstrings(value: string): string {
  *
  * 关键处理：
  *  - bigint 转为字符串（JSON 原生不支持 bigint，直接序列化会抛错）；
- *  - 用 WeakSet 记录已访问对象，遇到循环引用时输出 '[Circular]' 占位，避免抛 TypeError；
+ *  - 只在当前对象祖先链上记录引用，遇到循环引用时输出 '[Circular]' 占位，避免把
+ *    两个字段共享的普通对象误判为循环引用；
  *  - 命中 SENSITIVE_METADATA_KEY 的 key 输出 '[Redacted]'（键名级）；
  *  - 任何字符串值再做值级凭据模式扫描（R2-P0-04：message/error 等非名单 key 的
  *    错误文本里的凭据也会被模糊化）；
@@ -76,10 +77,12 @@ export function redactCredentialSubstrings(value: string): string {
  * 上述多重防护共同保证「日志调用本身永远不会抛出」——日志绝不能成为新的故障源。
  */
 export function safeJsonStringify(value: unknown): string {
-  const seen = new WeakSet<object>()
+  // 只追踪当前递归祖先链，而不是所有已经访问过的对象。后者会把同一个普通
+  // 对象被两个字段复用的情况误判成循环引用，造成日志数据丢失。
+  const ancestors: object[] = []
 
   try {
-    return JSON.stringify(value, (key, raw) => {
+    return JSON.stringify(value, function replacer(key, raw) {
       if (key.length > 0 && SENSITIVE_METADATA_KEY.test(key)) return '[Redacted]'
 
       if (typeof raw === 'string') return redactCredentialSubstrings(raw)
@@ -87,8 +90,11 @@ export function safeJsonStringify(value: unknown): string {
       if (typeof raw === 'bigint') return raw.toString()
 
       if (typeof raw === 'object' && raw !== null) {
-        if (seen.has(raw)) return '[Circular]'
-        seen.add(raw)
+        while (ancestors.length > 0 && ancestors[ancestors.length - 1] !== this) {
+          ancestors.pop()
+        }
+        if (ancestors.includes(raw)) return '[Circular]'
+        ancestors.push(raw)
       }
 
       return raw

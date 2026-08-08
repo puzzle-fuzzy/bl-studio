@@ -88,6 +88,8 @@ const user = {
   email: 'a@b.test',
   displayName: null,
   hasAvatar: false,
+  passwordAuthEnabled: true,
+  githubLinked: false,
   role: 'user' as const,
   emailVerifiedAt: '2026-07-25T00:00:00.000Z',
   bannedAt: null,

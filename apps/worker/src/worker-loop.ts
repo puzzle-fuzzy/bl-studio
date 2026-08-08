@@ -59,6 +59,8 @@ export interface WorkerLoopConfig {
   logger?: Logger
   /** 可选的进程内指标收集器，用于任务/provider 计数器与计时。 */
   metrics?: MetricsCollector
+  /** 输出 worker 指标快照的间隔（毫秒），默认 60s。 */
+  metricsLogIntervalMs?: number
 }
 
 export class WorkerLoop {
@@ -77,6 +79,7 @@ export class WorkerLoop {
   private readonly concurrency: number
   private readonly creditLedger?: Pick<CreditLedger, 'releaseStaleReservations'>
   private readonly metrics: MetricsCollector
+  private readonly metricsLogIntervalMs: number
 
   constructor(private readonly config: WorkerLoopConfig) {
     const metrics = config.metrics ?? new MetricsCollector()
@@ -118,6 +121,7 @@ export class WorkerLoop {
     this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
     this.concurrency = config.concurrency ?? 3
     this.creditLedger = config.creditLedger
+    this.metricsLogIntervalMs = config.metricsLogIntervalMs ?? 60_000
   }
 
   /** 一直运行直到调用 stop()。优雅停止时 resolve（等待所有在途任务收尾）。 */
@@ -126,6 +130,7 @@ export class WorkerLoop {
     const stopHeartbeat = this.startWorkerHeartbeat()
     const stopSweeper = this.startStaleGenerationSweeper()
     const stopReserveSweeper = this.startStaleReserveSweeper()
+    const stopMetricsReporter = this.startMetricsReporter()
     try {
       while (this.running) {
         // P1-26：达到并发上限时不抢新任务，等一个槽位空出来。
@@ -171,6 +176,7 @@ export class WorkerLoop {
       await stopHeartbeat()
       stopSweeper()
       stopReserveSweeper()
+      stopMetricsReporter()
     }
   }
 
@@ -181,6 +187,19 @@ export class WorkerLoop {
   /** 供本地诊断与测试使用的只读快照；metrics 为进程内数据。 */
   metricsSnapshot(): MetricsSnapshot {
     return this.metrics.snapshot()
+  }
+
+  private startMetricsReporter(): () => void {
+    const report = () => {
+      const snapshot = this.metrics.snapshot()
+      this.logger.info('worker.metrics_snapshot', {
+        counters: snapshot.counters,
+        timers: snapshot.timers,
+      })
+    }
+    report()
+    const timer = setInterval(report, this.metricsLogIntervalMs)
+    return () => clearInterval(timer)
   }
 
   /**

@@ -6,15 +6,19 @@ export interface FakeAuthService extends AuthService {
 }
 
 export function createFakeAuthService(
-  currentUser: () => Omit<PublicUser, 'emailVerifiedAt' | 'bannedAt' | 'hasAvatar'> & {
+  currentUser: () => Omit<PublicUser, 'emailVerifiedAt' | 'bannedAt' | 'hasAvatar' | 'passwordAuthEnabled' | 'githubLinked'> & {
     emailVerifiedAt?: string
     hasAvatar?: boolean
+    passwordAuthEnabled?: boolean
+    githubLinked?: boolean
   },
 ): FakeAuthService {
   let banned = false
   const user = (): PublicUser => ({
     ...currentUser(),
     hasAvatar: currentUser().hasAvatar ?? false,
+    passwordAuthEnabled: currentUser().passwordAuthEnabled ?? true,
+    githubLinked: currentUser().githubLinked ?? false,
     emailVerifiedAt: currentUser().emailVerifiedAt ?? '2026-07-25T00:00:00.000Z',
     bannedAt: banned ? '2026-07-25T00:00:00.000Z' : null,
   })
@@ -66,11 +70,16 @@ export function createFakeAuthService(
       requireNotBanned()
       return authResult()
     },
+    unlinkGithub: async () => {
+      requireNotBanned()
+      return authResult().user
+    },
     verifyToken: async token => token.length > 0 && !banned
       ? { user: user(), sessionId: 'sess-1' }
       : undefined,
     revokeSessionByToken: async () => {},
     revokeAllSessionsByToken: async () => {},
+    pruneExpiredAuthState: async () => {},
     updateProfile: async (_id, input) => ({ ...user(), displayName: input.displayName }),
     updateAvatar: async _id => ({ ...user(), hasAvatar: true }),
     removeAvatar: async _id => ({ ...user(), hasAvatar: false }),

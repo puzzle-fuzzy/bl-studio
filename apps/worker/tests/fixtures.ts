@@ -422,7 +422,14 @@ export class FakeRepository implements GenerationRepository {
   retryGeneration(_input: RetryGenerationInput): Promise<CreateGenerationResult> {
     return Promise.reject(new Error('FakeRepository.retryGeneration is not used'))
   }
-  saveTask(task: TaskRecord, _options?: SaveTaskOptions): Promise<TaskRecord> {
+  saveTask(task: TaskRecord, options?: SaveTaskOptions): Promise<TaskRecord | undefined> {
+    // task-engine 的 succeed/fail transition 会清掉锁字段；此时只要原始锁校验
+    // 已由 WorkerLoop 传入即可保存。若 fixture 仍带有锁字段，则严格模拟 owner check。
+    if (options?.expectedWorkerId !== undefined
+      && task.lockedBy !== undefined
+      && task.lockedBy !== options.expectedWorkerId) {
+      return Promise.resolve(undefined)
+    }
     this.savedTasks.push(task)
     return Promise.resolve(task)
   }

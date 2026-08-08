@@ -129,7 +129,7 @@
 
 ## G. 前端导航与入口
 
-- web `Nav.tsx`：新增「社区」`/gallery`、「提示词」`/prompts`；UserMenu 加「意见反馈」。
+- web `Nav.tsx`：`/gallery` 作为「首页」画廊入口，另有「提示词」`/prompts`；UserMenu 加「意见反馈」。
 - admin `AdminShell.tsx`：用户管理 `/users` · 调用统计 `/stats` · 分析 `/analytics` · 反馈 `/feedback`。
 - 路由：web `/gallery`、`/prompts`（ProtectedRoute 内）；admin `/analytics`、`/feedback`。
 

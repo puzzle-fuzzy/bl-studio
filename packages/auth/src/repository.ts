@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { and, desc, eq, gte, gt, ilike, inArray, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
+import { and, desc, eq, gte, gt, ilike, inArray, isNotNull, isNull, lt, or, sql, type SQL } from 'drizzle-orm'
 import {
   authActionTokens,
   sessions,
@@ -19,6 +19,7 @@ export interface UserRepositoryRecord {
   id: string
   email: string
   passwordHash: string
+  passwordAuthEnabled: boolean
   displayName: string | null
   /** 自定义头像的存储 key（storage adapter 命名空间下）；为空使用 identicon 默认头像。 */
   avatarStorageKey: string | null
@@ -37,6 +38,7 @@ function toUserRecord(row: typeof users.$inferSelect): UserRepositoryRecord {
     id: row.id,
     email: row.email,
     passwordHash: row.passwordHash,
+    passwordAuthEnabled: row.passwordAuthEnabled,
     displayName: row.displayName,
     avatarStorageKey: row.avatarStorageKey,
     role: row.role as UserRepositoryRecord['role'],
@@ -89,6 +91,7 @@ async function findActiveUserBy(
 export interface CreateUserInput {
   email: string
   passwordHash: string
+  passwordAuthEnabled?: boolean
   displayName?: string
   githubId?: string
   role?: 'user' | 'admin'
@@ -108,6 +111,7 @@ export async function createUserInTransaction(
       id,
       email: input.email,
       passwordHash: input.passwordHash,
+      passwordAuthEnabled: input.passwordAuthEnabled ?? true,
       displayName: input.displayName ?? null,
       githubId: input.githubId ?? null,
       role: input.role ?? 'user',
@@ -133,6 +137,20 @@ export async function linkGithubId(
     .update(users)
     .set({ githubId, updatedAt: now, updatedBy: 'auth.github' })
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+}
+
+/** 解绑 GitHub；调用方负责在解绑前确认账号仍有可用邮箱密码登录方式。 */
+export async function unlinkGithubId(
+  db: AuthDatabase,
+  userId: string,
+  now: Date,
+): Promise<UserRepositoryRecord | undefined> {
+  const [row] = await db
+    .update(users)
+    .set({ githubId: null, updatedAt: now, updatedBy: 'auth.github-unlink' })
+    .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+    .returning()
+  return row === undefined ? undefined : toUserRecord(row)
 }
 
 // ---------------------------------------------------------------------------
@@ -707,6 +725,19 @@ export async function updateUserPassword(
 ): Promise<void> {
   await db
     .update(users)
-    .set({ passwordHash, updatedAt: now, updatedBy: 'auth.password-change' })
+    .set({ passwordHash, passwordAuthEnabled: true, updatedAt: now, updatedBy: 'auth.password-change' })
     .where(and(eq(users.id, userId), isNull(users.deletedAt)))
+}
+
+/** 清理已过期或已撤销的认证状态，避免软删除/消费记录无限累积。 */
+export async function pruneExpiredAuthState(
+  db: BailianStudioDb,
+  now: Date,
+): Promise<void> {
+  await db.delete(sessions).where(or(isNotNull(sessions.deletedAt), lt(sessions.expiresAt, now)))
+  await db.delete(authActionTokens).where(or(
+    isNotNull(authActionTokens.consumedAt),
+    isNotNull(authActionTokens.deletedAt),
+    lt(authActionTokens.expiresAt, now),
+  ))
 }

@@ -4,9 +4,14 @@ import type { ModelManifest } from '../../types'
  * 千问图像 2.x 系列 manifest（provider: dashscope，category: image）。
  *
  * 包含三个文生图变体，均走 multimodal-generation 端点（同步任务，按张计费）：
- *  - qwen-image-2.0-pro：2.0 Pro，支持 1~6 张多图输出，单张 0.20 元
- *  - qwen-image-max：质量档，n 固定为 1（不暴露给 UI），单张 0.25 元
- *  - qwen-image-2.0：2.0 标准版，支持 1~6 张多图输出，单张 0.15 元
+ *  - qwen-image-2.0-pro：2.0 Pro，支持 1~6 张多图输出，单张 0.50 元
+ *  - qwen-image-max：质量档，n 固定为 1（不暴露给 UI），单张 0.50 元
+ *  - qwen-image-2.0：2.0 标准版，支持 1~6 张多图输出，单张 0.20 元
+ *
+ * 价格已于 2026-08-08 按中国内地（北京）官方文档核验：
+ * https://help.aliyun.com/zh/model-studio/qwen-image-2-0-pro
+ * https://help.aliyun.com/zh/model-studio/qwen-image-max
+ * https://help.aliyun.com/zh/model-studio/qwen-image-2-0
  *
  * 与 qwen-image 一致：negativePrompt 走 parameters.negative_prompt（snake_case）。
  */

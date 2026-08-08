@@ -354,6 +354,8 @@ export interface BailianStudioApiClient {
   forgotPassword(input: { email: string }): Promise<EmailActionAccepted>
   resetPassword(input: { token: string; newPassword: string }): Promise<void>
   changePassword(input: { currentPassword: string; newPassword: string }): Promise<PublicUser>
+  /** `POST /api/auth/github/unlink` —— 解绑 GitHub（必须保留邮箱密码登录）。 */
+  unlinkGithub(): Promise<PublicUser>
   /** `PATCH /api/auth/profile` —— 更新当前用户昵称（displayName）。 */
   updateProfile(input: { displayName: string }): Promise<PublicUser>
   /** `POST /api/auth/avatar` —— 上传自定义头像（multipart 图片），返回更新后的用户。 */
@@ -936,6 +938,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       const data = await unwrapData(
         `${base}/api/auth/change-password`,
         { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        AuthResponseSchema,
+      )
+      return data.user
+    },
+
+    async unlinkGithub() {
+      const data = await unwrapData(
+        `${base}/api/auth/github/unlink`,
+        { method: 'POST', headers: JSON_HEADERS, credentials: 'include' },
         fetchImpl,
         AuthResponseSchema,
       )

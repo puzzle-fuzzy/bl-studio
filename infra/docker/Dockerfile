@@ -8,7 +8,7 @@
 # 镜像分层要点：
 # - `base`：oven/bun + Node 24 + pnpm（无 node_modules）；
 # - `workspace`：**全量依赖**（含 typescript/vite 等构建/测试期工具），仅供 web-build；
-# - `runtime`：**只装生产依赖**（pnpm install --prod），供 api/worker/migrate。
+# - `runtime`：**只装 api/worker/root 的生产依赖**（pnpm filtered install），供 api/worker/migrate。
 #   全量 devDeps 永远不进入 runtime 层链，runtime 镜像才真正变小
 #   （node_modules 全量 ~497M → 生产 ~288M，docker save 传输 ~440MB → ~350MB）。
 
@@ -90,10 +90,13 @@ COPY packages/shared/package.json ./packages/shared/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/task-engine/package.json ./packages/task-engine/
 
-# 生产依赖：tsx/drizzle-kit/postgres 在根 dependencies；各包自带 prod 依赖。
-# 因为 runtime 从 base 开始、从未装过全量依赖，node_modules 就是纯生产集，
-# 全量 devDeps（typescript/vite/vitest/playwright/turbo）不在本层链里。
-RUN pnpm install --prod --frozen-lockfile
+# 生产依赖：tsx/drizzle-kit/postgres 在根 dependencies；api/worker 的 workspace
+# 闭包由 filter 自动带入。web/admin 仅在 web-build 阶段需要，避免把 react/recharts
+# 等前端运行时依赖复制进 api/worker 镜像。
+RUN pnpm install --prod --frozen-lockfile \
+  --filter . \
+  --filter @bailian-studio/api... \
+  --filter @bailian-studio/worker...
 
 COPY apps ./apps
 COPY packages ./packages

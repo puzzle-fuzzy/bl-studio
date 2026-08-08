@@ -218,18 +218,18 @@ async function fetchGithubProfile(accessToken: string): Promise<GithubProfile | 
     const githubId = typeof user.id === 'number' ? String(user.id) : undefined
     if (githubId === undefined) return undefined
 
-    let email = typeof user.email === 'string' && user.email.length > 0 ? user.email : undefined
-    if (email === undefined) {
-      const emailsResponse = await fetch(`${GITHUB_API_BASE}/user/emails`, { headers })
-      const emails = (await emailsResponse.json().catch(() => [])) as Array<{
-        email?: unknown
-        primary?: unknown
-        verified?: unknown
-      }>
-      if (Array.isArray(emails)) {
-        const primary = emails.find(entry => entry.primary === true && entry.verified === true)
-        email = typeof primary?.email === 'string' ? primary.email : undefined
-      }
+    // `/user.email` may be present even when it is not a verified primary address.
+    // Always use `/user/emails` so account linking and email verification share one rule.
+    const emailsResponse = await fetch(`${GITHUB_API_BASE}/user/emails`, { headers })
+    const emails = (await emailsResponse.json().catch(() => [])) as Array<{
+      email?: unknown
+      primary?: unknown
+      verified?: unknown
+    }>
+    let email: string | undefined
+    if (Array.isArray(emails)) {
+      const primary = emails.find(entry => entry.primary === true && entry.verified === true)
+      email = typeof primary?.email === 'string' && primary.email.length > 0 ? primary.email : undefined
     }
     if (email === undefined) return undefined
 

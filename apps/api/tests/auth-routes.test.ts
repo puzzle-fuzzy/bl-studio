@@ -321,6 +321,11 @@ describe('github oauth routes', () => {
           email: 'octo@example.com',
         }), { status: 200, headers: { 'content-type': 'application/json' } })
       }
+      if (url === 'https://api.github.com/user/emails') {
+        return new Response(JSON.stringify([
+          { email: 'octo@example.com', primary: true, verified: true },
+        ]), { status: 200, headers: { 'content-type': 'application/json' } })
+      }
       return new Response(JSON.stringify({ message: 'unexpected url' }), { status: 500 })
     }))
   }

@@ -8,6 +8,7 @@
     "build": "tsc -p tsconfig.app.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "test:watch": "vitest",
     "preview": "vite preview --host"
   },

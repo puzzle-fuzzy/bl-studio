@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
 import { createIsolatedGenerationRepository, createTestUser, grantTestCredits, type IsolatedGenerationRepository } from '@bailian-studio/generation-repository'
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import { ProviderRegistry } from '../src/providers'
@@ -24,6 +24,11 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await iso?.close()
+})
+
+afterEach(async () => {
+  const queued = await iso.repository.listAdminTasks({ status: 'queued', limit: 100 })
+  expect(queued.items).toHaveLength(0)
 })
 
 /**
@@ -193,6 +198,9 @@ describe('worker e2e', () => {
       output: { artifacts: [{ kind: 'image', sourceUrl: IMAGE_DATA_URL }], raw: { recovered: true } },
     }], 'worker-recovery')
     await loop.runTask(recoveredTask!)
+    // runTask 只处理已认领的 generation.submit；继续运行同一 loop 以排空
+    // artifact.persist/thumbnail 等后续任务，保证用例不会给下一个用例遗留 queued 行。
+    await runUntilSucceeded(loop, created.record.id, 5000)
 
     const final = await iso.repository.getGenerationRecord(created.record.id)
     expect(final?.status).toBe('succeeded')

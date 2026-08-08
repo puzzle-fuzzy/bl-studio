@@ -20,7 +20,7 @@
     "test": "dotenv -e infra/env/.env.test -- sh -c 'pnpm run test:root && turbo run test --concurrency=1'",
     "test:root": "dotenv -e infra/env/.env.test -- vitest run tests infra/scripts",
     "test:coverage": "dotenv -e infra/env/.env.test -- sh -c 'turbo run test:coverage --concurrency=1'",
-    "verify": "dotenv -e infra/env/.env.test -- sh -c 'pnpm run check:db-migrations && pnpm run check:boundaries && pnpm run check:manifests && pnpm run typecheck:root && pnpm run typecheck && pnpm run test'",
+    "verify": "dotenv -e infra/env/.env.test -- sh -c 'pnpm run check:db-migrations && pnpm run check:boundaries && pnpm run check:manifests && pnpm run typecheck:root && pnpm run typecheck && pnpm run test && pnpm run test:coverage'",
     "check:boundaries": "tsx infra/scripts/check-package-boundaries.ts",
     "check:manifests": "tsx infra/scripts/check-model-manifests.ts",
     "check:db-migrations": "tsx infra/scripts/check-db-migrations.ts",

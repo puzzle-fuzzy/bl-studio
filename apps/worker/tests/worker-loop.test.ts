@@ -64,6 +64,17 @@ async function resolveWithin(p: Promise<unknown>, ms: number): Promise<void> {
 }
 
 describe('WorkerLoop', () => {
+  it('does not save a task after its ownership changed', async () => {
+    const repo = new FakeRepository()
+    const task = makeTask({ lockedBy: 'worker-a' })
+
+    await expect(repo.saveTask(task, { expectedWorkerId: 'worker-b' })).resolves.toBeUndefined()
+    expect(repo.savedTasks).toHaveLength(0)
+
+    await expect(repo.saveTask(task, { expectedWorkerId: 'worker-a' })).resolves.toBe(task)
+    expect(repo.savedTasks).toHaveLength(1)
+  })
+
   it('registers, refreshes, and stops its liveness heartbeat', async () => {
     const { loop, repo } = buildLoop({ workerHeartbeatIntervalMs: 1, idleSleepMs: 1 })
 

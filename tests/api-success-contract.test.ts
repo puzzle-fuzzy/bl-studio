@@ -57,6 +57,8 @@ const CONTRACT_USER = {
   email: 'api-contract@example.test',
   displayName: 'API Contract',
   hasAvatar: false,
+  passwordAuthEnabled: true,
+  githubLinked: false,
   role: 'user' as const,
   emailVerifiedAt: '2026-07-25T00:00:00.000Z',
   bannedAt: null,
@@ -90,6 +92,8 @@ const contractAuthService: AuthService = {
     : undefined,
   revokeSessionByToken: async () => {},
   revokeAllSessionsByToken: async () => {},
+  unlinkGithub: async () => CONTRACT_USER,
+  pruneExpiredAuthState: async () => {},
   adminCreateUser: async input => ({
     id: 'contract-admin-user',
     email: input.email,

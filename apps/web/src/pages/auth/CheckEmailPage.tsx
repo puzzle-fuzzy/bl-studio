@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { MailCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -11,14 +11,24 @@ export function CheckEmailPage() {
   // R2-P0-01：展示用掩码（displayEmail），重发用真实邮箱（pendingVerificationEmail），二者分离。
   const pendingEmail = useAuthStore(state => state.pendingVerificationEmail)
   const pendingDisplayEmail = useAuthStore(state => state.pendingVerificationDisplayEmail)
+  const resendAvailableAt = useAuthStore(state => state.pendingVerificationResendAvailableAt)
   const resend = useAuthStore(state => state.resendVerification)
   const navigate = useNavigate()
 
-  const [cooldown, setCooldown] = useState(0)
+  const [clock, setClock] = useState(() => Date.now())
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
   const email = pendingEmail ?? ''
   const displayEmail = pendingDisplayEmail ?? ''
+  const cooldown = resendAvailableAt === null
+    ? 0
+    : Math.max(0, Math.ceil((Date.parse(resendAvailableAt) - clock) / 1000))
+
+  useEffect(() => {
+    if (resendAvailableAt === null) return
+    const timer = window.setInterval(() => setClock(Date.now()), 1000)
+    return () => window.clearInterval(timer)
+  }, [resendAvailableAt])
 
   const handleResend = async () => {
     if (email === '' || cooldown > 0) return
@@ -26,16 +36,6 @@ export function CheckEmailPage() {
     try {
       await resend(email)
       setMessage('验证邮件已重新发送，请查收')
-      setCooldown(60)
-      const timer = setInterval(() => {
-        setCooldown(current => {
-          if (current <= 1) {
-            clearInterval(timer)
-            return 0
-          }
-          return current - 1
-        })
-      }, 1000)
     } catch (err) {
       setError(userErrorMessage(err))
     }

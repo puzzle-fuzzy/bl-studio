@@ -9,6 +9,7 @@ import { createCreditLedgerFromUrl } from '@bailian-studio/credit-ledger'
 import { createGenerationRepositoryFromUrl } from '@bailian-studio/generation-repository'
 import { createMediaRepositoryFromUrl } from '@bailian-studio/media-repository'
 import { createStorageFromEnv, resolveArtifactLocalRoot } from '@bailian-studio/storage'
+import { createLogger } from '@bailian-studio/shared'
 import { readApiEnvOrThrow } from './lib/env'
 import { cookieSecure } from './modules/auth/cookies'
 import { createSmtpEmailSender } from './modules/auth/smtp-email-sender'
@@ -59,6 +60,16 @@ async function main(): Promise<void> {
     artifactConfig: readArtifactConfig(process.env),
   }
   const app = createApp({ dependencies })
+  const maintenanceLogger = createLogger('api:maintenance')
+  const sweepAuthState = () => {
+    void authHandle.authService.pruneExpiredAuthState().catch(error => {
+      maintenanceLogger.error('auth_state_sweep_failed', {
+        errorName: error instanceof Error ? error.name : 'unknown',
+      })
+    })
+  }
+  sweepAuthState()
+  const authStateSweepTimer = setInterval(sweepAuthState, 60 * 60 * 1000)
 
   let listener: { close(): Promise<void> } | undefined
   try {
@@ -76,6 +87,7 @@ async function main(): Promise<void> {
       if (shuttingDown) return
       shuttingDown = true
       console.log(`received ${signal}, stopping...`)
+      clearInterval(authStateSweepTimer)
       await app.stop()
       if (listener !== undefined) await listener.close()
       await Promise.all([generationHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
@@ -86,6 +98,7 @@ async function main(): Promise<void> {
     process.on('SIGTERM', () => void shutdown('SIGTERM'))
   }
   catch (error) {
+    clearInterval(authStateSweepTimer)
     if (listener !== undefined) await listener.close()
     await Promise.all([generationHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
     throw error

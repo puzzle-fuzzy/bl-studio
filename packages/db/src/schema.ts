@@ -45,6 +45,8 @@ export const users = pgTable('users', {
   email: text('email').notNull(),
   /** argon2id 密码哈希（由 @node-rs/argon2 生成），永不存明文。GitHub OAuth 用户存随机不可用哈希。 */
   passwordHash: text('password_hash').notNull(),
+  /** 是否启用邮箱密码登录；GitHub-only 账号在通过重置密码设置前为 false。 */
+  passwordAuthEnabled: boolean('password_auth_enabled').notNull().default(true),
   /** 为空表示邮箱尚未验证；已有用户由迁移回填为创建时间。 */
   emailVerifiedAt: timestamp('email_verified_at', { withTimezone: true }),
   /** GitHub OAuth 用户 ID（数字），邮箱登录用户为 NULL。 */

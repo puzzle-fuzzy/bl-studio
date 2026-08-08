@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { PublicUser } from '@bailian-studio/api-client'
+import { ApiClientError, type EmailActionAccepted, type PublicUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { clearIdempotencyKeys } from '@/lib/idempotency'
 
@@ -35,6 +35,8 @@ interface AuthState {
   pendingVerificationEmail: string | null
   /** 注册后待验证邮箱的掩码展示值（如 j***@163.com），仅供渲染。 */
   pendingVerificationDisplayEmail: string | null
+  /** 服务端返回的下一次可重发时间，避免前端自行假设冷却长度。 */
+  pendingVerificationResendAvailableAt: string | null
   isPending: boolean
   lastError: string | null
 
@@ -42,10 +44,11 @@ interface AuthState {
   login(email: string, password: string): Promise<void>
   register(email: string, password: string, displayName?: string): Promise<boolean>
   verifyEmail(token: string): Promise<void>
-  resendVerification(email: string): Promise<void>
+  resendVerification(email: string): Promise<EmailActionAccepted>
   forgotPassword(email: string): Promise<void>
   resetPassword(token: string, newPassword: string): Promise<void>
   changePassword(currentPassword: string, newPassword: string): Promise<void>
+  unlinkGithub(): Promise<void>
   updateProfile(displayName: string): Promise<void>
   uploadAvatar(file: File): Promise<void>
   removeAvatar(): Promise<void>
@@ -62,6 +65,7 @@ export const useAuthStore = create<AuthState>((set, get) => ({
   user: null,
   pendingVerificationEmail: null,
   pendingVerificationDisplayEmail: null,
+  pendingVerificationResendAvailableAt: null,
   isPending: false,
   lastError: null,
 
@@ -101,11 +105,26 @@ export const useAuthStore = create<AuthState>((set, get) => ({
         set({
           pendingVerificationEmail: result.email,
           pendingVerificationDisplayEmail: result.displayEmail,
+          pendingVerificationResendAvailableAt: result.resendAvailableAt,
         })
         return true
       }
       return false
     } catch (error) {
+      if (error instanceof ApiClientError && (
+        error.code === 'EMAIL_DELIVERY_FAILED'
+        || (error.code === 'AUTH_EMAIL_TAKEN'
+          && typeof error.details === 'object'
+          && error.details !== null
+          && 'action' in error.details
+          && (error.details as { action?: unknown }).action === 'resend_verification')
+      )) {
+        set({
+          pendingVerificationEmail: normalizeEmail(email),
+          pendingVerificationDisplayEmail: normalizeEmail(email),
+          pendingVerificationResendAvailableAt: null,
+        })
+      }
       set({ lastError: error instanceof Error ? error.message : String(error) })
       throw error
     } finally {
@@ -120,11 +139,23 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       user,
       pendingVerificationEmail: null,
       pendingVerificationDisplayEmail: null,
+      pendingVerificationResendAvailableAt: null,
     })
   },
 
   async resendVerification(email) {
-    await apiClient.resendVerification({ email: normalizeEmail(email) })
+    const result = await apiClient.resendVerification({ email: normalizeEmail(email) })
+    const normalizedEmail = normalizeEmail(email)
+    set(state => ({
+      pendingVerificationEmail: state.pendingVerificationEmail === normalizedEmail
+        ? state.pendingVerificationEmail
+        : normalizedEmail,
+      pendingVerificationDisplayEmail: state.pendingVerificationEmail === normalizedEmail
+        ? state.pendingVerificationDisplayEmail
+        : normalizedEmail,
+      pendingVerificationResendAvailableAt: result.retryAt ?? null,
+    }))
+    return result
   },
 
   async forgotPassword(email) {
@@ -137,6 +168,11 @@ export const useAuthStore = create<AuthState>((set, get) => ({
 
   async changePassword(currentPassword, newPassword) {
     const user = await apiClient.changePassword({ currentPassword, newPassword })
+    set({ user })
+  },
+
+  async unlinkGithub() {
+    const user = await apiClient.unlinkGithub()
     set({ user })
   },
 

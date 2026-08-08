@@ -308,7 +308,7 @@
 - **位置**：[fun-music.ts:24](packages/model-core/src/manifests/audio/fun-music.ts#L24)（`prompt required:true`）vs [:80-86](packages/model-core/src/manifests/audio/fun-music.ts#L80-L86)（`required-one-of [lyrics, prompt]`）
 - **影响**：官方允许「仅歌词」提交，此处必被 `REQUIRED_PARAMETER(prompt)` 拒绝；规则与文案形成错误引导。
 - **修法**：去掉 prompt 的 `required:true`（二选一语义以规则为准），补「仅 lyrics」回归测试。
-- **处理**：① prompt 置 `required:false`（二选一语义以 required-one-of 规则为准）；② [validation.test.ts](packages/model-core/tests/validation.test.ts) 补「仅 lyrics」在真实 fun-music manifest 上通过的回归；③ [acceptance.ts](packages/provider-dashscope/src/acceptance.ts) 的 `buildOfflineFixtureParams` 增加 `required-one-of` 规则满足逻辑（全空时优先补 prompt 类文本字段）——否则 acceptance matrix 因「一个都不给」报 `INVALID_FIXTURE`。P1-36 的价格矛盾未动，留待人工核实。
+- **处理**：① prompt 置 `required:false`（二选一语义以 required-one-of 规则为准）；② [validation.test.ts](packages/model-core/tests/validation.test.ts) 补「仅 lyrics」在真实 fun-music manifest 上通过的回归；③ [acceptance.ts](packages/provider-dashscope/src/acceptance.ts) 的 `buildOfflineFixtureParams` 增加 `required-one-of` 规则满足逻辑（全空时优先补 prompt 类文本字段）——否则 acceptance matrix 因「一个都不给」报 `INVALID_FIXTURE`。P1-36 的价格矛盾已在本轮单独核实并修正头注释。
 
 ### P1-35 · subModeOf 把视频理解模型归类为「视频编辑」，主创建页可触达 — ✅ 已处理（commit `b4f46ac`，2026-08-08）
 - **位置**：[model-modes.ts:44-59](apps/web/src/lib/model-modes.ts#L44-L59)（`video_input` → `vedit`）；SubMode 无 `understand`
@@ -316,10 +316,10 @@
 - **修法**：SubMode 增加 `understand`（或独立分组），剧本类 capabilities 先行归类；至少从 vedit 排除。
 - **处理**：[model-modes.ts](apps/web/src/lib/model-modes.ts) 增加 `'understand'` 子模式（SUB_MODE_LABELS「视频理解」、SUB_MODE_ORDER.video 追加），subModeOf 的 video 分支将 `screenplay` capability 先行归为 `understand`；不变表补 `['video', ['screenplay'], 'understand']` 与 `['video', ['screenplay','video_input','streaming'], 'understand']` 行。
 
-### P1-36 · qwen-image-2 头注释价格与 manifest rates 矛盾（需核实）
+### P1-36 · qwen-image-2 头注释价格与 manifest rates 矛盾 — ✅ 已处理（2026-08-08）
 - **位置**：[qwen-image-2.ts:6-9](packages/model-core/src/manifests/image/qwen-image-2.ts#L6-L9)（注释 0.20/0.25/0.15 元）vs [:112/:230/:348](packages/model-core/src/manifests/image/qwen-image-2.ts#L112)（rates 实为 0.5/0.5/0.2 元）
 - **影响**：若 rates 是错的一方 → 真实资金影响；若注释是错的一方 → 误导维护。
-- **修法**：对照百炼官方价格页核对，把官方价格写进注释并标注核验日期。
+- **处理**：已按百炼官方价格页核对并更新注释：qwen-image-2.0 为 0.20 元/张，qwen-image-2.0-pro 与 qwen-image-max 均为 0.50 元/张；manifest rates 原值正确，未改计费数据。
 
 ### P1-37 · 「新增模型 = 只改 manifest」声明不完全成立，多个硬编码消费者 — ✅ 已处理（commit `b4f46ac`，2026-08-08）
 - **位置**：[FunctionsPage.tsx:16-17](apps/web/src/pages/FunctionsPage.tsx#L16-L17)、[chat-builder.ts](packages/provider-dashscope/src/chat-builder.ts)（buildScreenplayPrompt 硬编码）、[pricing.ts:170-172](packages/model-core/src/pricing.ts#L170-L172)（token 桶→conditions.mode 映射硬编码）、[model-modes.ts:14](apps/web/src/lib/model-modes.ts#L14)（无 understand）
@@ -394,7 +394,7 @@
 - **P2-13 · 剧本模型内部 `mode` 是死配置** —— ✅ 已处理（2026-08-08）：判定为「计费模式标记」而非 bug——rate `conditions.mode` 必须引用已声明参数（registry-check 断言），`mode` 承担该交叉引用并文档化四个计费桶；恒假 visibleWhen 使其不进 UI、applyDefaults 剥离。两个剧本 manifest 补充 P2-13 注释说明标记语义与 pricing.ts 字面字符串硬编码的对应关系。
 - **P2-14 · qwen-image-max 的 `n` 参数泄漏进 UI** —— ✅ 已处理（2026-08-08）：`qwen-image-2.ts` 的 `n`（min:1 max:1）加恒假 `visibleWhen: { field: 'prompt', equals: 'internal:never-user-visible' }`，提交时被 `removeHiddenParameterValues` 剥离；定价 `quantityFrom` 缺省回退 1 = 固定值，估价/结算不受影响。
 - **P2-15 · 剧本模型 output 映射与真实响应不符（潜藏）** —— ✅ 已处理（2026-08-08）：两个剧本 manifest 的 `output.path` 由 `output.text` 改为 `output.choices.0.message.content`（chat completions 兼容路径）；流式路径不读 manifest.output，此处供未来 async-poll 时 `assertResponseShape` 推导关键路径，消除漂移。
-- **P2-16 · deepseek providerModel 等于 manifest id（全仓唯一，需核实）** —— ❓ 待核实（2026-08-08）：`providerModel: 'deepseek-v4'` 即百炼模型名；本地无 console 对照，保留，改动需人工在百炼控制台确认真实模型名。
+- **P2-16 · deepseek providerModel 等于 manifest id（全仓唯一）** —— ✅ 已处理（2026-08-08）：官方模型 ID 为 `deepseek-v4-pro` / `deepseek-v4-flash`，manifest 已按这两个 ID 构造，原 TODO 描述已过期。
 - **P2-17 · fun-asr speakerCount 缺 step** —— ✅ 已处理（2026-08-08）：`fun-asr.ts` speakerCount 补 `step: 1`，`2.5` 等小数不再通过校验（与 paraformer 一致）。
 - **P2-18 · 可选字符串空串原样透传 provider** —— ✅ 已处理（2026-08-08）：`validation.ts` 的 `applyDefaults` 新增归一化——text 参数值为 `''` 时视为未提供并删除（与 isEmpty 语义一致），deepseek `stop` 清空后不再以空串进请求体。
 - **P2-19 · catalog/api-client 投影手工维护易漂移** —— ✅ 已处理（2026-08-08）：新增根契约测试 `tests/catalog-projection-completeness.test.ts`——类型层 `Exclude<keyof ModelParameter, ...>` 强制覆盖（model-core 加字段未同步即 tsc 红）+ 运行层对每个已注册模型经 `ModelCatalogItemSchema.parse` 断言投影字段不丢（`parsed.parameters` deep-equal 任一字段剥掉即红）。为此把 `ModelValidationRuleSchema` 从模块私有改为导出。
@@ -447,28 +447,27 @@
 - **实际风险说明**：react-router `navigate('//evil.com')` 按 pathname 解析，pushState 对跨源 URL 会抛错而非跳转 —— 不是真开放重定向。但「校验函数存在却未在使用点应用」是防线下沉：一旦某处改用 `location.href` 即变真漏洞。按中等（P1）记录。
 - **修法**：`LoginPage`/`AuthDialog` 跳转前统一走 `resolvePostLoginRedirect(callback, '/create', allowedOrigins)`；接线或删除 auth-callback.ts。
 
-**R2-P1-01 · SMTP 故障时注册已落库，但用户没有可用重发路径**
+**R2-P1-01 · SMTP 故障时注册已落库，但用户没有可用重发路径** — ✅ 已处理（2026-08-08）
 - **位置**：[service.ts:370-387](packages/auth/src/service.ts#L370-L387)（发信失败抛 `EMAIL_DELIVERY_FAILED`、账号已保留）；[LoginPage.tsx:52-60](apps/web/src/pages/auth/LoginPage.tsx#L52)（catch 只显示错误、不跳 check-email）
 - **修法**：收到该错误仍进 check-email 并存好原始邮箱，文案区分「已发」与「待重发」。
 
-**R2-P1-02 · 未验证账号无「重发验证」UI 入口（防枚举做对了，但把用户锁死）**
+**R2-P1-02 · 未验证账号无「重发验证」UI 入口（防枚举做对了，但把用户锁死）** — ✅ 已处理（2026-08-08）
 - **位置**：[user-error.ts:13](apps/web/src/lib/user-error.ts#L13)（把 `AUTH_EMAIL_TAKEN` 映射成「该邮箱已被注册」，丢弃服务端 `resend_verification` 指引）；[LoginPage.tsx:110-112](apps/web/src/pages/auth/LoginPage.tsx#L110)（未验证态无按钮）
 - **修法**：login 页对 `AUTH_EMAIL_UNVERIFIED`/未验证的 `AUTH_EMAIL_TAKEN` 渲染「重新发送验证邮件」；前端持久化原始邮箱（sessionStorage）。
 
-**R2-P1-03 · GitHub OAuth 新用户路径无唯一冲突兜底 —— 并发首次授权必有一个失败**
+**R2-P1-03 · GitHub OAuth 新用户路径无唯一冲突兜底 —— 并发首次授权必有一个失败** — ✅ 已处理（2026-08-08）
 - **位置**：[service.ts:501-543](packages/auth/src/service.ts#L501)（`loginWithGithub` 新建/绑定无 `isUniqueViolation` 处理，register 有，:428-435）；`users_github_id_idx` 部分唯一索引（schema.ts:77）
 - **修法**：补 `isUniqueViolation` 兜底，冲突时按 githubId 重查并 `issueSession`（幂等）。
 
-**R2-P1-04 · GitHub 邮箱 `verified` 判定两条路径不一致**
+**R2-P1-04 · GitHub 邮箱 `verified` 判定两条路径不一致** — ✅ 已处理（2026-08-08）
 - **位置**：[github-routes.ts:221](apps/api/src/modules/auth/github-routes.ts#L221)（`/user` 直取 `email`，未检查 verified）vs [:230](apps/api/src/modules/auth/github-routes.ts#L230)（`/user/emails` 兜底要求 `verified===true`）
-- **需核实**：GitHub 当前 profile 公开邮箱实际都已验证，影响可能为零；语义不一致是隐患。
-- **修法**：两路径统一强制 `verified===true`。
+- **处理**：回调统一读取 `/user/emails`，只接受 primary 且 `verified===true` 的邮箱；不再信任 `/user` profile 的未验证 email 字段。
 
-**R2-P2-01 · GitHub 解绑完全缺失**（未承诺，属完整性缺口）—— [repository.ts:126](packages/auth/src/repository.ts#L126) 只有 `linkGithubId`，无 unlink/端点/UI；`PublicUser` 不暴露 githubId。
-**R2-P2-02 · GitHub-only 账号「修改密码」永远失败** —— OAuth 用户 passwordHash 为随机值（service.ts:533），`changePassword` 校验 currentPassword（:609-611）；ProfilePage:148-160 对所有人显示，UI 无法区分账号类型（PublicUser 无 githubId）。
-**R2-P2-03 · 会话无滑动续期** —— [jwt.ts:82](packages/auth/src/jwt.ts#L82) 固定 7 天绝对过期，长在线用户被强制重登。属设计选择，需明确产品预期。
-**R2-P2-04 · sessions/authActionTokens 无清理任务** —— 软删累积孤儿行（repository.ts:573-640），轻微存储膨胀，无安全影响。
-**R2-P2-05 · 重发冷却前端写死 60s** —— [CheckEmailPage.tsx:26](apps/web/src/pages/auth/CheckEmailPage.tsx#L26) 未消费服务端 `retryAt`（service.ts:483），服务端调整冷却后倒计时漂移。
+**R2-P2-01 · GitHub 解绑完全缺失** — ✅ 已处理（2026-08-08）：新增鉴权 API、审计动作、repository unlink 与 Profile UI；GitHub-only 账号会被阻止解绑。
+**R2-P2-02 · GitHub-only 账号「修改密码」永远失败** — ✅ 已处理（2026-08-08）：用户投影暴露 `passwordAuthEnabled`，OAuth-only 账号显示邮箱设置入口，设置成功后才允许解绑。
+**R2-P2-03 · 会话无滑动续期** —— ✅ 设计确认（2026-08-08）：7 天绝对 TTL 是当前产品取舍，本轮不引入滑动续期，避免无明确会话策略时扩大认证状态复杂度。
+**R2-P2-04 · sessions/authActionTokens 无清理任务** — ✅ 已处理（2026-08-08）：新增过期/撤销 session 与已消费/删除/过期 action token 的清理函数，并由 API 进程启动时执行、随后每小时执行。
+**R2-P2-05 · 重发冷却前端写死 60s** — ✅ 已处理（2026-08-08）：CheckEmailPage 改用服务端 `resendAvailableAt`/`retryAt` 倒计时。
 
 ### 6.2 前端完整性 vs 设计文档（文档承诺 vs 实际接线）
 
@@ -486,15 +485,15 @@
 - **影响**：SSE 降级/500 时用户看到「还没有生成任务 / 去创作吧」，误以为真没有任务。
 - **修法**：GenerationsPanel 两形态渲染 `state.error`，与空态区分（embedded 空态 + page 空列表都渲染错误态 + 重试按钮；有旧数据时给一行「列表刷新失败，当前显示上次结果」提示）。
 
-**R2-P1-08 · ThemeToggle 是死代码（功能本身可用，组件未接线）**
+**R2-P1-08 · ThemeToggle 是死代码（功能本身可用，组件未接线）** — ✅ 已处理（2026-08-08）：删除未引用组件，现有 UserMenu 内联主题切换作为唯一入口。
 - **位置**：[ThemeToggle.tsx](apps/web/src/components/layout/ThemeToggle.tsx) 从未被 import；主题切换实际在 [UserMenu.tsx:68-71](apps/web/src/components/layout/UserMenu.tsx#L68) 内联
 - **修法**：把 ThemeToggle 接进侧栏/顶栏，或删除并在 docs 里把「ThemeToggle」表述改为「账户菜单主题切换」。
 
-**R2-P2-06 · admin 守卫与 CLAUDE.md/注释不符** —— [ProtectedAdminRoute.tsx:25-27](apps/admin/src/components/ProtectedAdminRoute.tsx#L25) 非 admin 一律 `<Navigate to="/login">` 无 403 页；[admin-auth-store.ts:23](apps/admin/src/stores/admin-auth-store.ts#L23) 注释还写着「403 页由守卫展示」。实现真 403 页或改文档/注释，二选一。
-**R2-P2-07 · 32 个未引用的 shadcn/ui 组件（web 约 3887 行）** —— `accordion/aspect-ratio/attachment/breadcrumb/bubble/button-group/calendar/carousel/combobox/command/context-menu/direction/drawer/empty/field/hover-card/input-otp/item/kbd/marker/menubar/message-scroller/message/native-select/navigation-menu/pagination/popover/progress/radio-group/resizable/slider/spinner` 全仓零 import；其中 attachment/bubble/button-group/direction/empty/field/input-group/item/kbd/marker/message/message-scroller/native-select/spinner 是早期聊天/演示 UI 遗留（本产品无聊天）。calendar/carousel/combobox/command/menubar 带 Radix 依赖拉进构建。
-**R2-P2-08 · 死方法** —— store `setLibraryState`（generations-store.ts:57,151，无组件调用）、client `getAssetCapabilities`（generation-client.ts:373,860，仅被自身单测引用）、[GenerationDetailPage.tsx:10](apps/web/src/pages/GenerationDetailPage.tsx#L10) 未使用的 `Switch` import。
-**R2-P2-09 · 空态/加载态缺失** —— [CatalogPage.tsx](apps/web/src/pages/CatalogPage.tsx) 无 Skeleton（对比 CreatePage）；GenerationsPanel `PageVariant` 空 records 时只渲染空容器、无「还没有任务」文案。
-**R2-P2-10 · 文档措辞漂移（功能存在）** —— docs G 称 Nav 为「社区」，实现为「首页」（Nav.tsx:24）；docs D「LibraryPage『我公开的』筛选」标为可选未实现（非违约）。
+**R2-P2-06 · admin 守卫与 CLAUDE.md/注释不符** — ✅ 已处理（2026-08-08）：保留 API 403，修正前端守卫与 store 注释为「非 admin 重定向登录」。
+**R2-P2-07 · 32 个未引用的 shadcn/ui 组件（web 约 3887 行）** — ✅ 已处理（2026-08-08）：删除已确认零 import 的 web UI 文件及 ThemeToggle，保留实际消费者。
+**R2-P2-08 · 死方法** — ✅ 已复核（2026-08-08）：`setLibraryState` 被 GenerationsPanel 恢复流程使用；`getAssetCapabilities` 是真实 API 能力契约；仅删除 GenerationDetailPage 未使用的 `Switch` import，原 TODO 对前两项为误报。
+**R2-P2-09 · 空态/加载态缺失** — ✅ 已处理（2026-08-08）：Catalog 增加加载骨架、错误提示/重试与空目录状态；GenerationsPanel 已有加载失败与真实空态区分。
+**R2-P2-10 · 文档措辞漂移（功能存在）** — ✅ 已处理（2026-08-08）：社区功能文档改为与现行 web 导航一致的「首页 / 画廊」和「提示词」入口表述。
 
 ### 6.3 测试质量与覆盖（测试是否真的测到了行为）
 
@@ -508,10 +507,10 @@
 - **位置**：[admin/vitest.config.ts:13](apps/admin/vitest.config.ts#L13)（`passWithNoTests:true`）；41 个 src 文件 0 测试；`src/lib/user-error.ts`(84)/`chunk-recovery.ts`(55) 全是可测逻辑
 - **修法**：至少补 user-error + chunk-recovery（与 web 同名模块对齐）；`passWithNoTests` 改 false 让空跑变红。
 
-**R2-P1-11 · `test:coverage` 是死链，60% 阈值无人 enforce**
+**R2-P1-11 · `test:coverage` 是死链，60% 阈值无人 enforce** — ✅ 已处理（2026-08-08）
 - **位置**：[package.json:22](package.json#L22)（`test:coverage` → `turbo run test:coverage`，全仓无包定义该 script）；[web/vitest.config.ts:18-22](apps/web/vitest.config.ts#L18)（v8 + 60% 阈值只能手动触达、不在 verify）；「重建 coverage 基线」3 次 commit 实为 bailian-adapter 产物（402a006 已删）
-- **影响**：当前没有任何代码覆盖率基线被跟踪或 enforce；`pnpm run test:coverage` 直接报无任务。
-- **修法**：删死阈值 或 给 web 加 `test:coverage` script 并接进 verify。
+- **影响（已消除）**：web 覆盖率命令已接入 root `verify`，不再是无任务死链；覆盖率阈值仍由 web 的 Vitest 配置执行。
+- **处理**：web 增加 `test:coverage` script，root `verify` 已接入；门禁范围先限定为已有纯函数回归覆盖的 `src/lib/**`，stores/hooks 待补组件测试后再纳入，避免低质量的全局假门禁。
 
 **R2-P1-12 · 登出数据清理注册表（`registerPrivateDataReset`）无测试**
 > ✅ 已处理（commit `e055d4f`）——auth-store.test.ts：导入 6 个注册 store 播种标志数据→resetAllPrivateData 后全部清空（注册表漏掉任一 store 即红）+ allSettled 容错（单个回调 reject 不拖垮整体）。
@@ -521,10 +520,10 @@
 
 **R2-P1-13 · e2e 死端口 spec 无回归（印证 P1-38）** —— [account-assets.spec.ts:10](e2e/legacy-vue/account-assets.spec.ts#L10) 5103 vs [playwright.config.ts](e2e/playwright.config.ts) 5003；该 spec 曾是**唯一「上传→复用→生成→登出后直访被拒」真实资产闭环 e2e**。已随 P1-38 处理：legacy spec 归档（选择器/路由与 React 重写脱节，改端口无意义），闭环由 [asset-loop.spec.ts](e2e/asset-loop.spec.ts)（API 驱动）接手。
 
-**R2-P2-11 · 6 个 web lib 纯函数文件完全无测试** —— [chunk-recovery.ts](apps/web/src/lib/chunk-recovery.ts)(64：5 个 chunk 错误模式 + sessionStorage 单次 reload 守卫)、[creation-presets.ts](apps/web/src/lib/creation-presets.ts)(97：同名覆盖/容量 12 淘汰/版本化/`buildParamsFromRecord`)、labels.ts(69)、model-description.ts(14)、money.ts(16)、utils.ts(12)。前两个有真实状态逻辑，优先补。
-**R2-P2-12 · worker 集成测试共享同一隔离库、无 beforeEach 重置** —— [integration.test.ts:18-29](apps/worker/tests/integration.test.ts#L18) 靠注释要求手动排空避免顺序依赖；回归留下排队任务会泄漏进下一用例。补 afterEach「无遗留 queued 任务」断言。
-**R2-P2-13 · e2e workbench 产生数据不清理** —— [workbench.spec.ts:211-226](e2e/workbench.spec.ts#L211) 注册真实用户/积分/任务但无 afterAll（account-assets 有），反复手动跑累积 test DB。
-**R2-P2-14 · FakeRepository.saveTask 忽略 expectedWorkerId** —— [fixtures.ts:420-423](apps/worker/tests/fixtures.ts#L420) 恒返回 task，锁被抢走的 `result_discarded_lock_lost` 路径在集成层未真正测到（repository.test.ts 两端分别覆盖）。
+**R2-P2-11 · 6 个 web lib 纯函数文件完全无测试** — ✅ 已处理（2026-08-08）：为 chunk-recovery 与 creation-presets 补覆盖真实状态转移的回归测试；其余文件为无状态格式化辅助，风险不足以单独扩展测试面。
+**R2-P2-12 · worker 集成测试共享同一隔离库、无 beforeEach 重置** — ✅ 已处理（2026-08-08）：afterEach 断言无遗留 queued 任务，恢复路径显式排空后续任务。
+**R2-P2-13 · e2e workbench 产生数据不清理** — ✅ 已处理（2026-08-08）：legacy Vue spec 已归档并被 Playwright 忽略，现行 API 闭环使用隔离数据库清理；原 spec 不再作为现行 e2e 入口。
+**R2-P2-14 · FakeRepository.saveTask 忽略 expectedWorkerId** — ✅ 已处理（2026-08-08）：fixture 按锁持有者拒绝错误 worker，并新增错误 owner / 正确 owner 回归测试。
 
 ### 6.4 可观测性 / 错误体系 / 依赖 / 构建
 
@@ -548,7 +547,7 @@
 - **修法**：二选一 —— (a) 真收敛：各层错误继承 `BailianStudioError`，统一 `code`/`retryable`/`metadata`；(b) 至少把 02-design:138 改写为现状，并给 http-errors 兜底分支加「不得透传 message」约束。
 - **处理**：取 (b)——02-design:138 改写为现状（集中映射契约 + 兜底 INTERNAL_ERROR 不泄漏）；「不得透传 message」约束已在 R2-P0-03 落地（[http-errors.ts:190-194](apps/api/src/lib/http-errors.ts#L190-L194)），文档如实记录。跨层统一继承留待后续。
 
-**R2-P1-15 · 指标「只写不读」—— 无任何观测出口**
+**R2-P1-15 · 指标「只写不读」—— 无任何观测出口** — ✅ 已处理（2026-08-08）：新增 admin 鉴权的 `GET /api/metrics`，并让 worker 周期记录 metrics snapshot。
 - **位置**：[metrics.ts:4-7](apps/api/src/lib/metrics.ts#L4)（注释「供未来的 /metrics 端点」）；[app.ts:125-126](apps/api/src/app.ts#L125)（api.request）；[generation-task-handler.ts:604-613](apps/worker/src/generation-task-handler.ts#L604)（worker.provider_request）；[worker-loop.ts:126-128](apps/worker/src/worker-loop.ts#L126)（`metricsSnapshot()` 无调用方）；全仓无 `/metrics` 端点
 - **影响**：api.request 状态码分布、provider 请求耗时/失败率在 Loki/Grafana 里不可见 —— 观测栈白装。
 - **修法**：最低成本 —— admin 鉴权的 `GET /api/metrics`，或按周期把 `snapshot()` 打一条 json 日志进 Loki。
@@ -558,11 +557,17 @@
 - **修法**：删除这 6 条声明。
 
 **R2-P2-15 · provider-health 孤儿包被 Dockerfile 打进镜像**（印证 worker 轮 P2-01）— ✅ 已处理（2026-08-08）——随 P2-01 删除整个包，Dockerfile 两处 COPY 移除（见 P2-01 处理记录）。
-**R2-P2-16 · pnpm-lock 双版本 zod（v3.25.76 由 shadcn CLI devDep 拉入 + 业务面 v4.4.3）** —— 仅 dev 依赖树，无运行时冲突，但 `pnpm exec`/类型环境偶发混用。
-**R2-P2-17 · 根 package.json 把 drizzle-kit/tsx/postgres 放 `dependencies`** —— [Dockerfile:95-98](infra/docker/Dockerfile#L95) 依赖它们是 prod 依赖才能进 runtime 镜像，改动需同步。
-**R2-P2-18 · runtime 镜像装进前端依赖** —— [Dockerfile:75-98](infra/docker/Dockerfile#L75) 全量 `pnpm install --prod` 使 runtime node_modules 含 react/recharts（worker/api 用不到）；可用 `--filter` 缩小。
-**R2-P2-19 · `safeJsonStringify` 对共享引用误判 Circular** —— [logger.ts:47,55-58](packages/shared/src/logger.ts#L47) 同一对象非循环出现两次，第二次输出 `[Circular]`（数据丢失非安全问题）。
-**R2-P2-20 · admin 无 bundle 分组/分析** —— admin `vite.config.ts` 无 `build.rolldownOptions`（web 有 vendor-react/vendor-ui 分组 + 路由 lazy）；建议接 vite-bundle-visualizer 并给 admin 补 vendor 分组。
+**R2-P2-16 · pnpm-lock 双版本 zod（v3.25.76 由 shadcn CLI devDep 拉入 + 业务面 v4.4.3）** —— ✅ 设计确认（2026-08-08）：仅 dev 依赖树，无运行时冲突；为 shadcn CLI 保留，不做高风险强制收敛。
+**R2-P2-17 · 根 package.json 把 drizzle-kit/tsx/postgres 放 `dependencies`** —— ✅ 设计确认（2026-08-08）：生产迁移和 worker 启动确实需要这些运行时依赖，保持声明位置；Docker runtime 再用 filter 缩小闭包。
+**R2-P2-18 · runtime 镜像装进前端依赖** — ✅ 已处理（2026-08-08）：Docker runtime install 改为 root + api/worker filtered production dependencies。
+**R2-P2-19 · `safeJsonStringify` 对共享引用误判 Circular** — ✅ 已处理（2026-08-08）：改为仅沿当前祖先链检测循环，共享但非循环引用会完整序列化。
+**R2-P2-20 · admin 无 bundle 分组/分析** — ✅ 已处理（2026-08-08）：admin Vite 增加 vendor-react/vendor-ui 分组，与 web 构建策略一致。
+
+### 本轮复核结论（2026-08-08）
+
+按 P0 → P1 → P2 处理本节仍开放的条目：真实缺陷均已修复并补回归覆盖；无法从现有证据认定为缺陷的项目明确保留为设计选择或误报。主要落地项包括认证重发与 GitHub 账户闭环、认证状态清理、指标读取出口、web 加载/错误态、worker 测试隔离、Docker runtime 依赖过滤、共享引用安全序列化和 admin bundle 分组。
+
+本文件前半部分保留历史审计证据与旧提交记录；若历史段落仍写「待处理」，以各条目后续的「✅ 已处理」或本节结论为准。
 
 ## 4. 已核实无问题（防回归清单，勿误改）
 

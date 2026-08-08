@@ -21,6 +21,7 @@ import {
   findLatestActiveAuthActionToken,
   findUserById,
   linkGithubId,
+  unlinkGithubId,
   listActiveUsers,
   lockAuthTokenScope,
   markUserEmailVerified,
@@ -36,6 +37,7 @@ import {
   updateUserAvatar as updateUserAvatarRecord,
   updateUserPassword,
   updateUserSelf as updateUserSelfRecord,
+  pruneExpiredAuthState,
   type AuthActionTokenPurpose,
   type UserRepositoryRecord,
 } from './repository'
@@ -46,6 +48,10 @@ export interface PublicUser {
   displayName: string | null
   /** 已上传自定义头像；false 时前端使用由 userId 生成的 identicon 默认头像。 */
   hasAvatar: boolean
+  /** 是否已经设置可用的邮箱密码；GitHub-only 账号初始为 false。 */
+  passwordAuthEnabled: boolean
+  /** 是否已绑定 GitHub；仅返回布尔值，不暴露 provider user id。 */
+  githubLinked: boolean
   role: 'user' | 'admin'
   emailVerifiedAt: string
   /** 非空即封禁（正常会话下恒为 null —— 封禁用户会被 verifyToken 拒绝）。 */
@@ -122,6 +128,8 @@ export interface AuthService {
     currentPassword: string
     newPassword: string
   }): Promise<AuthResult>
+  /** 用户自助解绑 GitHub；没有邮箱密码时拒绝，避免账号失去唯一登录方式。 */
+  unlinkGithub(userId: string): Promise<PublicUser>
 
   /** 用户自助更新昵称（displayName）；用户不存在或已删除时抛 AUTH_UNAUTHORIZED。 */
   updateProfile(userId: string, input: { displayName: string }): Promise<PublicUser>
@@ -135,6 +143,8 @@ export interface AuthService {
   verifyToken(token: string): Promise<VerifiedSession | undefined>
   revokeSessionByToken(token: string): Promise<void>
   revokeAllSessionsByToken(token: string): Promise<void>
+  /** 清理过期、已消费和已撤销的认证状态。 */
+  pruneExpiredAuthState(): Promise<void>
 
   /** 管理后台：创建账户（跳过邮箱验证，直接视为已验证）。 */
   adminCreateUser(input: {
@@ -257,6 +267,8 @@ function toPublicUser(user: UserRepositoryRecord): PublicUser {
     email: user.email,
     displayName: user.displayName,
     hasAvatar: user.avatarStorageKey !== null,
+    passwordAuthEnabled: user.passwordAuthEnabled,
+    githubLinked: user.githubId !== null,
     role: user.role,
     emailVerifiedAt: user.emailVerifiedAt.toISOString(),
     bannedAt: user.bannedAt === null ? null : user.bannedAt.toISOString(),
@@ -541,15 +553,44 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       //（该用户只能通过 GitHub 登录，忘记密码后可用邮箱重设）。
       const passwordHash = await hashPassword(randomBytes(32).toString('base64url'))
       const displayName = input.displayName?.trim()
-      const user = await options.db.transaction(tx => createUserInTransaction(tx, {
-        email,
-        passwordHash,
-        githubId: input.githubId,
-        displayName: displayName !== undefined && displayName.length > 0 ? displayName : undefined,
-        emailVerifiedAt: issuedAt,
-        now: issuedAt,
-      }))
-      return issueSession(user)
+      try {
+        const user = await options.db.transaction(tx => createUserInTransaction(tx, {
+          email,
+          passwordHash,
+          passwordAuthEnabled: false,
+          githubId: input.githubId,
+          displayName: displayName !== undefined && displayName.length > 0 ? displayName : undefined,
+          emailVerifiedAt: issuedAt,
+          now: issuedAt,
+        }))
+        return issueSession(user)
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+
+        // 两个首次 OAuth 请求可能同时通过前置查询。唯一约束失败后重新读取，
+        // 把竞争者创建的账号当作正常登录/链接，而不是把数据库错误暴露给用户。
+        const racedGithub = await findActiveUserByGithubId(options.db, input.githubId)
+        if (racedGithub !== undefined) {
+          ensureNotBanned(racedGithub)
+          return issueSession(racedGithub)
+        }
+        const racedEmail = await findActiveUserByEmail(options.db, email)
+        if (racedEmail !== undefined) {
+          ensureNotBanned(racedEmail)
+          if (racedEmail.githubId !== null && racedEmail.githubId !== input.githubId) {
+            throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已绑定其他 GitHub 账号，请使用对应账号登录。', {
+              action: 'login',
+            })
+          }
+          const linkedAt = now()
+          await options.db.transaction(async tx => {
+            await linkGithubId(tx, racedEmail.id, input.githubId, linkedAt)
+            if (racedEmail.emailVerifiedAt === null) await markUserEmailVerified(tx, racedEmail.id, linkedAt)
+          })
+          return issueSession((await findActiveUserById(options.db, racedEmail.id)) ?? racedEmail)
+        }
+        throw new AuthError('AUTH_EMAIL_TAKEN', '该邮箱已注册，请使用其他账号登录。', { action: 'login' })
+      }
     },
 
     async forgotPassword(emailInput) {
@@ -615,6 +656,9 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (session === undefined || session.userId !== payload.sub || user === undefined) {
         throw new AuthError('AUTH_UNAUTHORIZED', '登录状态已失效，请重新登录。')
       }
+      if (!user.passwordAuthEnabled) {
+        throw new AuthError('AUTH_PASSWORD_NOT_SET', '该账号尚未设置邮箱密码，请先使用“忘记密码”设置。')
+      }
       if (!(await verifyPassword(input.currentPassword, user.passwordHash))) {
         throw new AuthError('AUTH_INVALID_CREDENTIALS', '当前密码不正确，请重新输入。')
       }
@@ -676,6 +720,18 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       return toPublicUser(updated)
     },
 
+    async unlinkGithub(userId) {
+      const user = await findActiveUserById(options.db, userId)
+      if (user === undefined) throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。')
+      if (user.githubId === null) throw new AuthError('AUTH_GITHUB_NOT_LINKED', '当前账号未绑定 GitHub。')
+      if (!user.passwordAuthEnabled) {
+        throw new AuthError('AUTH_GITHUB_UNLINK_BLOCKED', '请先通过邮箱重置密码，再解绑 GitHub。')
+      }
+      const updated = await unlinkGithubId(options.db, userId, now())
+      if (updated === undefined) throw new AuthError('AUTH_UNAUTHORIZED', '用户不存在或已删除。')
+      return toPublicUser(updated)
+    },
+
     async getUserAvatarStorageKey(userId) {
       const user = await findActiveUserById(options.db, userId)
       return user === undefined ? undefined : user.avatarStorageKey
@@ -695,6 +751,10 @@ export function createAuthService(options: AuthServiceOptions): AuthService {
       if (session !== undefined && session.userId === payload.sub) {
         await revokeAllSessions(options.db, payload.sub, revokedAt)
       }
+    },
+
+    async pruneExpiredAuthState() {
+      await pruneExpiredAuthState(options.db, now())
     },
 
     async adminCreateUser(input) {

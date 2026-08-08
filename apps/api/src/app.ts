@@ -36,6 +36,7 @@ import { createUsageRoutes } from './modules/usage'
 import { createPointsRoutes } from './modules/points'
 import { createAdminRoutes } from './modules/admin'
 import { appMetrics } from './lib/metrics'
+import { requireAdminUser } from './modules/auth/session'
 
 const accessLogger = createLogger('api')
 
@@ -157,6 +158,10 @@ export function createApp(options: ApiAppOptions) {
   .use(createUsageRoutes(dependencies))
   .use(createPointsRoutes(dependencies))
   .use(createAdminRoutes(dependencies))
+  .get('/api/metrics', async ({ request }) => {
+    await requireAdminUser(request, dependencies.authService)
+    return { success: true, data: appMetrics.snapshot() }
+  })
   .get('/api/health/live', () => ({ success: true, data: { status: 'ok' } }))
   .get('/api/health/ready', async ({ set }) => {
     const checks: {

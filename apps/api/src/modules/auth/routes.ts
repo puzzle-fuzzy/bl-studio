@@ -147,7 +147,14 @@ export function createAuthRoutes(deps: ApiDependencies) {
             outcome: 'succeeded',
             metadata: { rateLimited: true },
           })
-          return { success: true, data: { accepted: true as const } }
+          const retryAt = error.details?.retryAt
+          return {
+            success: true,
+            data: {
+              accepted: true as const,
+              ...(typeof retryAt === 'string' ? { retryAt } : {}),
+            },
+          }
         }
         await recordApiAuditEvent(deps.generationRepository, request, {
           action: 'auth.resend-verification',
@@ -250,6 +257,28 @@ export function createAuthRoutes(deps: ApiDependencies) {
           action: 'auth.change-password',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
+        })
+        throw error
+      }
+    })
+    .post('/github/unlink', async ({ request }) => {
+      try {
+        const user = await requireAuthUser(request, deps.authService)
+        const updated = await deps.authService.unlinkGithub(user.id)
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          userId: user.id,
+          action: 'auth.github',
+          outcome: 'succeeded',
+          targetType: 'user',
+          targetId: user.id,
+          metadata: { operation: 'unlink' },
+        })
+        return { success: true, data: { user: updated } }
+      } catch (error) {
+        await recordApiAuditEvent(deps.generationRepository, request, {
+          action: 'auth.github',
+          outcome: 'failed',
+          metadata: { operation: 'unlink', errorCode: auditErrorCode(error) },
         })
         throw error
       }

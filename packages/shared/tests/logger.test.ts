@@ -25,8 +25,16 @@ function withEnv(env: Record<string, string | undefined>): () => void {
 }
 
 describe('createLogger (console 模式)', () => {
+  let restore: () => void
+
+  beforeEach(() => {
+    // 测试文件并行执行时，其他文件可能设置 LOG_FORMAT；console 分支必须显式隔离。
+    restore = withEnv({ LOG_FORMAT: 'console', NODE_ENV: 'test' })
+  })
+
   afterEach(() => {
     console.info = originalInfo
+    restore()
   })
 
   it('writes scoped info messages with metadata', () => {
@@ -66,6 +74,13 @@ describe('createLogger (console 模式)', () => {
     expect(output).not.toContain('private-token')
     expect(output).toContain('"prompt":"[Redacted]"')
     expect(output).toContain('"authorization":"[Redacted]"')
+  })
+
+  it('keeps a shared non-cyclic object in both fields', () => {
+    const shared = { provider: 'dashscope' }
+    const output = safeJsonStringify({ first: shared, second: shared })
+
+    expect(output).toBe('{"first":{"provider":"dashscope"},"second":{"provider":"dashscope"}}')
   })
 })
 

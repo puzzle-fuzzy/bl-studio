@@ -3,8 +3,8 @@ import { Navigate, Outlet } from 'react-router'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 
 /**
- * 管理后台路由守卫：恢复会话后要求 admin 角色，否则重定向到登录页。
- * 非 admin 登录者在 store 里已被归为 anonymous，因此这里无需额外分支。
+ * 管理后台路由守卫：恢复会话后要求 admin 角色，否则按未认证处理并重定向到登录页。
+ * 当前产品没有单独的 403 页面，API 层仍会对受保护请求返回 403。
  */
 export function ProtectedAdminRoute() {
   const status = useAdminAuthStore(state => state.status)

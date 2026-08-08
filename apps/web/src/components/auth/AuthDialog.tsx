@@ -13,7 +13,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth-store'
 import { useAuthDialogStore } from '@/stores/auth-dialog-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { canResendVerification, userErrorMessage } from '@/lib/user-error'
 
 /** 全局登录/注册弹窗（模式可切换，登录后安全回跳）。 */
 export function AuthDialog() {
@@ -24,6 +24,7 @@ export function AuthDialog() {
   const switchMode = useAuthDialogStore(state => state.switchMode)
   const login = useAuthStore(state => state.login)
   const register = useAuthStore(state => state.register)
+  const resendVerification = useAuthStore(state => state.resendVerification)
   const isPending = useAuthStore(state => state.isPending)
   const navigate = useNavigate()
 
@@ -31,11 +32,14 @@ export function AuthDialog() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [verificationResendAvailable, setVerificationResendAvailable] = useState(false)
   const [verificationRequired, setVerificationRequired] = useState(false)
+  const [isResending, setIsResending] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    setVerificationResendAvailable(false)
     try {
       if (mode === 'login') {
         await login(email, password)
@@ -57,8 +61,26 @@ export function AuthDialog() {
       setDisplayName('')
     } catch (err) {
       setError(userErrorMessage(err))
+      setVerificationResendAvailable(mode === 'login' || canResendVerification(err))
     }
   }
+
+  const handleResend = async () => {
+    if (email.trim() === '') return
+    setIsResending(true)
+    setError(null)
+    try {
+      await resendVerification(email)
+      close()
+      navigate('/auth/check-email')
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setIsResending(false)
+    }
+  }
+
+  const showResend = error !== null && email.trim() !== '' && verificationResendAvailable
 
   const handleOpenChange = (open: boolean) => {
     if (!open) close()
@@ -130,6 +152,11 @@ export function AuthDialog() {
               />
             </div>
             {error !== null && <p className="text-sm text-destructive">{error}</p>}
+            {showResend && (
+              <Button type="button" variant="outline" className="w-full" disabled={isResending} onClick={() => void handleResend()}>
+                {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
+              </Button>
+            )}
             <Button type="submit" className="w-full" disabled={isPending}>
               {isPending ? '请稍候…' : mode === 'login' ? '登录' : '注册'}
             </Button>

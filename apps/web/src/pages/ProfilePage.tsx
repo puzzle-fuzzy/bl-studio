@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Link } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -23,6 +24,7 @@ export function ProfilePage() {
   const updateProfile = useAuthStore(state => state.updateProfile)
   const uploadAvatar = useAuthStore(state => state.uploadAvatar)
   const removeAvatar = useAuthStore(state => state.removeAvatar)
+  const unlinkGithub = useAuthStore(state => state.unlinkGithub)
   const showMessage = useNotificationsStore(state => state.showMessage)
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? '')
@@ -32,6 +34,7 @@ export function ProfilePage() {
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const [passwordDialogOpen, setPasswordDialogOpen] = useState(false)
+  const [unlinkingGithub, setUnlinkingGithub] = useState(false)
 
   // 头像/昵称更新后 store 的 user 会刷新，这里同步输入框初值。
   useEffect(() => {
@@ -149,13 +152,45 @@ export function ProfilePage() {
         <CardContent className="flex items-center justify-between gap-4 py-6">
           <div className="space-y-0.5">
             <p className="text-sm font-medium">密码</p>
-            <p className="text-sm text-muted-foreground">{PASSWORD_RULES}</p>
+            <p className="text-sm text-muted-foreground">
+              {user.passwordAuthEnabled ? PASSWORD_RULES : '当前账号尚未设置邮箱密码。'}
+            </p>
           </div>
-          <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
-            修改密码
-          </Button>
+          {user.passwordAuthEnabled ? (
+            <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
+              修改密码
+            </Button>
+          ) : (
+            <Button asChild variant="outline">
+              <Link to="/auth/forgot-password">通过邮箱设置</Link>
+            </Button>
+          )}
         </CardContent>
       </Card>
+
+      {user.githubLinked && (
+        <Card>
+          <CardContent className="flex items-center justify-between gap-4 py-6">
+            <div className="space-y-0.5">
+              <p className="text-sm font-medium">GitHub</p>
+              <p className="text-sm text-muted-foreground">已绑定 GitHub 登录。</p>
+            </div>
+            <Button
+              variant="outline"
+              disabled={unlinkingGithub || !user.passwordAuthEnabled}
+              onClick={() => {
+                setUnlinkingGithub(true)
+                void unlinkGithub()
+                  .then(() => showMessage({ title: 'GitHub 已解绑', tone: 'success' }))
+                  .catch(err => showMessage({ title: userErrorMessage(err), tone: 'warning' }))
+                  .finally(() => setUnlinkingGithub(false))
+              }}
+            >
+              {unlinkingGithub ? <Loader2 className="size-4 animate-spin" /> : '解绑 GitHub'}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       <ChangePasswordDialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen} />
     </div>

@@ -30,4 +30,24 @@ export default defineConfig({
       '@': path.resolve(adminRoot, 'src'),
     },
   },
+  build: {
+    rolldownOptions: {
+      output: {
+        codeSplitting: {
+          groups: [
+            {
+              name: 'vendor-react',
+              test: /node_modules[\\/](react|react-dom|react-router|zustand|scheduler)[\\/]/,
+              priority: 20,
+            },
+            {
+              name: 'vendor-ui',
+              test: /node_modules[\\/](radix-ui|@radix-ui|sonner|cmdk|@base-ui|@shadcn|class-variance-authority|tailwind-merge)[\\/]/,
+              priority: 10,
+            },
+          ],
+        },
+      },
+    },
+  },
 })

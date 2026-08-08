@@ -83,3 +83,11 @@ export function userErrorMessage(error: unknown): string {
   }
   return '操作失败，请稍后重试'
 }
+
+/** 注册邮件投递失败或命中未验证账号时，允许用户进入真实重发路径。 */
+export function canResendVerification(error: unknown): boolean {
+  if (!(error instanceof ApiClientError)) return false
+  if (error.code === 'EMAIL_DELIVERY_FAILED') return true
+  if (error.code !== 'AUTH_EMAIL_TAKEN' || typeof error.details !== 'object' || error.details === null) return false
+  return 'action' in error.details && (error.details as { action?: unknown }).action === 'resend_verification'
+}

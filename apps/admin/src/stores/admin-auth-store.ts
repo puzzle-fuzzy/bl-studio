@@ -33,7 +33,7 @@ export const useAdminAuthStore = create<AdminAuthState>(set => ({
     if (get().status === 'authenticated') return
     try {
       const user = await apiClient.getCurrentUser()
-      // 非 admin 一律按未登录处理（403 页由守卫展示）。
+      // 非 admin 一律按未认证处理，守卫会重定向到登录页。
       const authorized = user !== null && user.role === 'admin'
       set(authorized
         ? { status: 'authenticated', user }

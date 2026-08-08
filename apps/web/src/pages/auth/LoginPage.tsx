@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { BrandMark } from '@/components/shared/BrandMark'
 import { useAuthStore } from '@/stores/auth-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { canResendVerification, userErrorMessage } from '@/lib/user-error'
 
 /** GitHub Octocat 图标（lucide 已移除品牌图标，内联 SVG）。 */
 function GithubMark(props: React.SVGProps<SVGSVGElement>) {
@@ -32,6 +32,7 @@ export function LoginPage() {
   const navigate = useNavigate()
   const login = useAuthStore(state => state.login)
   const register = useAuthStore(state => state.register)
+  const resendVerification = useAuthStore(state => state.resendVerification)
   const isPending = useAuthStore(state => state.isPending)
 
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -39,6 +40,8 @@ export function LoginPage() {
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const [verificationResendAvailable, setVerificationResendAvailable] = useState(false)
+  const [isResending, setIsResending] = useState(false)
 
   const callback = searchParams.get('cb')
   const oauthErrorCode = searchParams.get('oauth_error')
@@ -47,6 +50,7 @@ export function LoginPage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setError(null)
+    setVerificationResendAvailable(false)
     try {
       if (mode === 'login') {
         await login(email, password)
@@ -59,8 +63,25 @@ export function LoginPage() {
       navigate(resolvePostLoginRedirect(callback, '/create', [window.location.origin]))
     } catch (err) {
       setError(userErrorMessage(err))
+      setVerificationResendAvailable(mode === 'login' || canResendVerification(err))
     }
   }
+
+  const handleResend = async () => {
+    if (email.trim() === '') return
+    setIsResending(true)
+    setError(null)
+    try {
+      await resendVerification(email)
+      navigate('/auth/check-email')
+    } catch (err) {
+      setError(userErrorMessage(err))
+    } finally {
+      setIsResending(false)
+    }
+  }
+
+  const showResend = error !== null && email.trim() !== '' && verificationResendAvailable
 
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/20 p-4">
@@ -111,6 +132,11 @@ export function LoginPage() {
             </div>
             {(error !== null || oauthError !== null) && (
               <p className="text-sm text-destructive">{error ?? oauthError}</p>
+            )}
+            {showResend && (
+              <Button type="button" variant="outline" className="w-full" disabled={isResending} onClick={() => void handleResend()}>
+                {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
+              </Button>
             )}
             <Button type="submit" className="w-full" disabled={isPending}>
               {isPending ? '请稍候…' : mode === 'login' ? '登录' : '注册'}
