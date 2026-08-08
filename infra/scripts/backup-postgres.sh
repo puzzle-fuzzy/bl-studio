@@ -4,6 +4,8 @@
 # 运行环境：专用 backup 镜像每 24h 调用一次；也可在服务器上手动触发
 # `pnpm run db:backup:production`。OSS 上传使用镜像内的 ali-oss SDK，不依赖宿主机 CLI。
 set -eu
+# pg_dump 在管道前端运行；没有 pipefail 时，gzip 成功会掩盖 pg_dump 失败。
+set -o pipefail
 
 DATABASE_URL="${DATABASE_URL:?缺少 DATABASE_URL}"
 BACKUP_DIR="${BACKUP_DIR:-/backups}"

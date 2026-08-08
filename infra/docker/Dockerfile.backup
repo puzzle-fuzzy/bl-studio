@@ -1,15 +1,13 @@
 # 生产 PostgreSQL 备份镜像。
 #
-# 与业务 runtime 镜像隔离：只包含 pg_dump/gzip、Node/tsx 和 ali-oss 上传器，
+# 与业务 runtime 镜像隔离：只包含 PostgreSQL 16 pg_dump/gzip、Node/tsx 和 ali-oss 上传器，
 # 不把 API/Worker/SMTP/provider 凭据或前端依赖带进备份容器。
-FROM node:24-bookworm-slim
+FROM postgres:16-alpine
 
 ENV NODE_ENV=production
 WORKDIR /opt/bailian-studio
 
-RUN apt-get update \
-  && apt-get install -y --no-install-recommends postgresql-client gzip ca-certificates \
-  && rm -rf /var/lib/apt/lists/*
+RUN apk add --no-cache nodejs npm gzip ca-certificates
 
 COPY infra/docker/backup-package.json ./package.json
 RUN npm install --omit=dev --no-audit --no-fund

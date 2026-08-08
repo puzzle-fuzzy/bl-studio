@@ -103,6 +103,11 @@ DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 # 仍保留 SNI 与证书校验，功能等价于走域名），避免被 fake-ip 解析到 127.0.0.1。
 SERVER_HOST="${DEPLOY_HOST##*@}"
 SERVER_HOST="${SERVER_HOST%%:*}"
+# DEPLOY_HOST 通常是 SSH config 别名（例如 yxswy-server），而 curl --resolve
+# 只能接受真实 IP/可解析主机名。优先使用 OpenSSH 展开的 HostName，避免本机
+# fake-ip/DNS 代理把公网冒烟导向错误地址。
+SSH_RESOLVED_HOST="$(ssh -G "$DEPLOY_HOST" 2>/dev/null | awk '$1=="hostname" {print $2; exit}' || true)"
+SERVER_HOST="${SSH_RESOLVED_HOST:-$SERVER_HOST}"
 
 # 不用数组（macOS bash 3.2 下 set -u + 空数组展开会误报 unbound variable）。
 ssh_cmd() {
