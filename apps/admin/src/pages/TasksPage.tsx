@@ -5,7 +5,7 @@ import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog,
   DialogContent,
@@ -56,9 +56,11 @@ function shortId(id: string | undefined, len = 8): string {
 
 function DetailField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
-    <div className="space-y-1 rounded-lg border bg-muted/20 px-3 py-2">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className={mono ? 'break-all font-mono text-xs' : 'break-words text-sm'}>{value}</dd>
+    <div className="flex flex-col gap-1 py-1 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+      <dd className={mono
+        ? 'min-w-0 flex-1 break-all text-left font-mono text-xs sm:text-right'
+        : 'min-w-0 flex-1 break-words text-left text-sm sm:text-right'}>{value}</dd>
     </div>
   )
 }
@@ -66,7 +68,7 @@ function DetailField({ label, value, mono = false }: { label: string; value: str
 function TaskDetailDialog({ task, onOpenChange }: { task: AdminTaskItem | null; onOpenChange: (open: boolean) => void }) {
   return (
     <Dialog open={task !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[min(760px,calc(100vh-2rem))] max-w-3xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
         {task !== null && (
           <>
             <DialogHeader>
@@ -76,44 +78,52 @@ function TaskDetailDialog({ task, onOpenChange }: { task: AdminTaskItem | null; 
               </DialogDescription>
             </DialogHeader>
 
-            <dl className="grid gap-3 sm:grid-cols-2">
-              <DetailField label="任务 ID" value={task.id} mono />
-              <DetailField label="任务域" value={DOMAIN_LABELS[task.domain] ?? task.domain} />
-              <DetailField label="作者" value={task.author?.displayName ?? (task.userId !== undefined ? task.userId : '—')} />
-              <DetailField label="关联记录" value={task.recordId ?? '—'} mono />
-              <DetailField label="尝试次数" value={`${task.attempts} / ${task.maxAttempts}`} />
-              <DetailField label="优先级" value={String(task.priority)} />
-              <DetailField label="开始时间" value={task.startedAt !== undefined ? formatTime(task.startedAt) : '—'} />
-              <DetailField label="结束时间" value={task.completedAt !== undefined ? formatTime(task.completedAt) : '—'} />
-              <DetailField label="创建时间" value={formatTime(task.createdAt)} />
-              <DetailField label="更新时间" value={formatTime(task.updatedAt)} />
-              <DetailField label="下次调度" value={formatTime(task.nextRunAt)} />
-              <DetailField label="耗时" value={task.durationMs !== undefined ? `${(task.durationMs / 1000).toFixed(1)} 秒` : '—'} />
-            </dl>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">任务属性</CardTitle>
+                <CardDescription>完整展示任务标识、执行状态和调度信息。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="flex flex-col gap-4">
+                  <DetailField label="任务 ID" value={task.id} mono />
+                  <DetailField label="任务域" value={DOMAIN_LABELS[task.domain] ?? task.domain} />
+                  <DetailField label="作者" value={task.author?.displayName ?? (task.userId !== undefined ? task.userId : '—')} />
+                  <DetailField label="关联记录" value={task.recordId ?? '—'} mono />
+                  <DetailField label="尝试次数" value={`${task.attempts} / ${task.maxAttempts}`} />
+                  <DetailField label="优先级" value={String(task.priority)} />
+                  <DetailField label="开始时间" value={task.startedAt !== undefined ? formatTime(task.startedAt) : '—'} />
+                  <DetailField label="结束时间" value={task.completedAt !== undefined ? formatTime(task.completedAt) : '—'} />
+                  <DetailField label="创建时间" value={formatTime(task.createdAt)} />
+                  <DetailField label="更新时间" value={formatTime(task.updatedAt)} />
+                  <DetailField label="下次调度" value={formatTime(task.nextRunAt)} />
+                  <DetailField label="耗时" value={task.durationMs !== undefined ? `${(task.durationMs / 1000).toFixed(1)} 秒` : '—'} />
+                </dl>
 
-            {task.error !== undefined && (
-              <section className="space-y-2 rounded-lg border border-destructive/30 bg-destructive/5 p-3">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h3 className="text-sm font-medium text-destructive">错误信息</h3>
-                  <Badge variant="destructive">{task.error.code ?? task.error.category}</Badge>
-                  {task.error.retriable && <Badge variant="outline">可重试</Badge>}
-                </div>
-                <p className="break-words text-sm text-muted-foreground">{task.error.message}</p>
-              </section>
-            )}
+                {task.error !== undefined && (
+                  <section className="mt-6 rounded-lg bg-destructive/5 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-medium text-destructive">错误信息</h3>
+                      <Badge variant="destructive">{task.error.code ?? task.error.category}</Badge>
+                      {task.error.retriable && <Badge variant="outline">可重试</Badge>}
+                    </div>
+                    <p className="mt-2 break-words text-sm text-muted-foreground">{task.error.message}</p>
+                  </section>
+                )}
 
-            <section className="space-y-2">
-              <h3 className="text-sm font-medium">诊断上下文</h3>
-              <pre className="max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs leading-5">
-                {JSON.stringify({
-                  traceId: task.traceId,
-                  recordContext: task.recordContext,
-                  type: task.type,
-                  domain: task.domain,
-                  status: task.status,
-                }, null, 2)}
-              </pre>
-            </section>
+                <section className="mt-6">
+                  <h3 className="text-sm font-medium">诊断上下文</h3>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs leading-5">
+                    {JSON.stringify({
+                      traceId: task.traceId,
+                      recordContext: task.recordContext,
+                      type: task.type,
+                      domain: task.domain,
+                      status: task.status,
+                    }, null, 2)}
+                  </pre>
+                </section>
+              </CardContent>
+            </Card>
           </>
         )}
       </DialogContent>
@@ -224,10 +234,10 @@ export function TasksPage() {
             <p className="p-6 text-center text-sm text-muted-foreground">暂无任务</p>
           ) : (
             <div className="overflow-x-auto">
-              <Table className="min-w-[1320px] table-fixed">
+              <Table className="min-w-[1480px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-28">任务 ID</TableHead>
+                    <TableHead className="w-80">任务 ID</TableHead>
                     <TableHead className="w-44">类型 / 域</TableHead>
                     <TableHead className="w-24">状态</TableHead>
                     <TableHead className="w-20">重试</TableHead>
@@ -247,11 +257,11 @@ export function TasksPage() {
                       className="cursor-pointer focus-visible:bg-muted/60"
                       tabIndex={0}
                       role="button"
-                      aria-label={`查看任务 ${shortId(item.id)}`}
+                      aria-label={`查看任务 ${item.id}`}
                       onClick={() => openTask(item)}
                       onKeyDown={event => handleRowKeyDown(event, item)}
                     >
-                      <TableCell className="font-mono text-xs">{shortId(item.id)}</TableCell>
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{item.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
                           <span className="truncate text-xs">{item.type}</span>

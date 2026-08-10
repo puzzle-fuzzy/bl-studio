@@ -17,7 +17,7 @@ export interface OssClientLike {
   putStream?(
     key: string,
     stream: Readable,
-    options?: { headers?: Record<string, string>; contentLength?: number },
+    options?: { headers?: Record<string, string>; contentLength?: number; timeout?: number },
   ): Promise<{ url?: string }>
   delete?(key: string): Promise<unknown>
   head?(key: string): Promise<unknown>
@@ -51,6 +51,8 @@ export interface CreateOssClientOptions {
   accessKeyId: string
   accessKeySecret: string
   endpoint?: string
+  /** ali-oss operation timeout in milliseconds; the SDK default is 60 seconds. */
+  timeoutMs?: number
 }
 
 /**
@@ -194,6 +196,7 @@ export function createOssClient(options: CreateOssClientOptions): OssClientLike 
     accessKeySecret: options.accessKeySecret,
     authorizationV4: true,
     ...(options.endpoint !== undefined ? { endpoint: options.endpoint } : {}),
+    ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
   }) as OssClientLike
 }
 

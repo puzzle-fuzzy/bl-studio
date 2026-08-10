@@ -2291,6 +2291,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             eq(taskRecords.recordId, updatedRecord.id),
             eq(taskRecords.type, 'generation.poll'),
             inArray(taskRecords.status, ['queued', 'running']),
+            ...(input.excludeTaskId === undefined ? [] : [sql`${taskRecords.id} <> ${input.excludeTaskId}`]),
           ))
           .limit(1)
 

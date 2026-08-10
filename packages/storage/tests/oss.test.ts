@@ -295,4 +295,16 @@ describe('OssStorageAdapter', () => {
       `attachment; filename="2026.png"; filename*=UTF-8''%E6%8A%A5%E5%91%8A%202026.png`,
     )
   })
+
+  it('configures the ali-oss operation timeout instead of using the 60 second SDK default', () => {
+    const client = createOssClient({
+      region: 'oss-cn-hangzhou',
+      bucket: 'bailian-studio-test',
+      accessKeyId: 'test-access-key',
+      accessKeySecret: 'test-secret',
+      timeoutMs: 180_000,
+    }) as unknown as { options?: { timeout?: number } }
+
+    expect(client.options?.timeout).toBe(180_000)
+  })
 })

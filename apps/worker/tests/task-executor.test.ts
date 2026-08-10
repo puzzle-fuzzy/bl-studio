@@ -417,6 +417,26 @@ describe('TaskExecutor.processTask', () => {
     expect(logger.entries.some(e => e.message === 'task.polling')).toBe(true)
   })
 
+  it('excludes the current running poll task when scheduling its continuation', async () => {
+    const { repo, runner, processTask } = setup({
+      record: makeRecord({ providerTaskId: 'provider-task-1' }),
+    })
+    runner.outputs.push({
+      success: true,
+      costCents: 0,
+      requiresPoll: true,
+      providerTaskId: 'provider-task-1',
+      nextPollAt: '2026-06-28T00:00:10.000Z',
+    })
+
+    await expect(processTask(makeTask({ type: 'generation.poll' }))).resolves.toMatchObject({ status: 'polling' })
+
+    expect(repo.mutations[0]).toMatchObject({
+      kind: 'schedulePoll',
+      input: { excludeTaskId: 'task_1' },
+    })
+  })
+
   it('fails when the provider requests polling without a providerTaskId', async () => {
     const { repo, runner, processTask } = setup({ record: makeRecord({ providerTaskId: undefined }) })
     // 模拟一个绕过 TypeScript 边界的第三方 runner，验证运行时仍会防御非法状态。

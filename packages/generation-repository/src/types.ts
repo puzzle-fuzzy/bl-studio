@@ -298,6 +298,11 @@ export interface MarkGenerationProcessingInput {
 export interface ScheduleGenerationPollInput extends MarkGenerationProcessingInput {
   providerTaskId: string
   /**
+   * 当前轮询任务在执行过程中再次安排下一次轮询时，排除自身，避免把
+   * running 的当前任务误认为已经存在的轮询任务。
+   */
+  excludeTaskId?: string
+  /**
    * 轮询任务的 nextRunAt。P1-22 的续跑路径（submit 重跑且记录已持有
    * providerTaskId）不关心调度时机——已有非终态 poll 任务会被直接复用，
    * 缺省时按「立即可认领」处理。

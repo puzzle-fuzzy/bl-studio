@@ -307,6 +307,7 @@ async function applyProviderResult(
     await deps.repository.scheduleGenerationPoll({
       recordId: record.id,
       providerTaskId,
+      ...(task.type === 'generation.poll' ? { excludeTaskId: task.id } : {}),
       nextRunAt,
       ...(result.providerStatus !== undefined ? { providerStatus: result.providerStatus } : {}),
       ...(result.requestId !== undefined ? { requestId: result.requestId } : {}),
