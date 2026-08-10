@@ -28,16 +28,30 @@ if (workflow === undefined || !(workflow in commands)) {
   process.exit(2)
 }
 
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+// Windows package managers commonly expose pnpm through a `.cmd` shim. Invoke
+// it through cmd.exe explicitly so the child process can remain shell:false;
+// the workflow arguments below are fixed tokens, not user input.
+const isWindows = process.platform === 'win32'
+const pnpmCommand = isWindows ? (process.env.ComSpec ?? 'cmd.exe') : 'pnpm'
 
-for (const args of commands[workflow]) {
-  const exitCode = await run(pnpmCommand, args)
-  if (exitCode !== 0) process.exit(exitCode)
+try {
+  for (const args of commands[workflow]) {
+    const exitCode = await run(pnpmCommand, args)
+    if (exitCode !== 0) process.exit(exitCode)
+  }
+}
+catch (error) {
+  const message = error instanceof Error ? error.message : String(error)
+  console.error(`Failed to start ${pnpmCommand}: ${message}`)
+  process.exit(1)
 }
 
 function run(command: string, args: string[]): Promise<number> {
   return new Promise((resolve, reject) => {
-    const child = spawn(command, args, {
+    const spawnArgs = isWindows
+      ? ['/d', '/s', '/c', ['pnpm', ...args].join(' ')]
+      : args
+    const child = spawn(command, spawnArgs, {
       env: process.env,
       shell: false,
       stdio: 'inherit',

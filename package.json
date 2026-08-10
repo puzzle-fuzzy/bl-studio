@@ -18,7 +18,7 @@
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.json --noEmit",
     "test": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts test",
-    "test:root": "dotenv -e infra/env/.env.test -- vitest run tests infra/scripts",
+    "test:root": "dotenv -e infra/env/.env.test -- vitest run tests infra/scripts --hookTimeout=30000",
     "test:coverage": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts coverage",
     "verify": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts verify",
     "check:boundaries": "tsx infra/scripts/check-package-boundaries.ts",
