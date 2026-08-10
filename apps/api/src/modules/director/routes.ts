@@ -134,6 +134,9 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      if (phase === 'assemble') {
+        throw new ValidationError('合成阶段尚未接入真实媒体执行器，请先完成合成预检')
+      }
       if (phase === 'videos') {
         const model = requireDirectorVideoModel(input.modelId)
         const project = await repository.getProject({ userId: user.id, projectId: params.id })

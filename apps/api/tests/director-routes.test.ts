@@ -345,6 +345,26 @@ describe('director routes', () => {
     expect(readBody.data.run.id).toBe(runBody.data.run.id)
   })
 
+  it('does not queue the assemble phase before a real media executor is available', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '合成边界', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+
+    const runResponse = await app.handle(authed(`/api/director/projects/${created.data.project.id}/phases/assemble/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'qwen-plus' }),
+    }))
+    const body = await runResponse.json() as { error: { code: string } }
+
+    expect(runResponse.status).toBe(400)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(runs).toHaveLength(0)
+  })
+
   it('rejects a non-reference video model before queueing the video phase', async () => {
     const createResponse = await app.handle(authed('/api/director/projects', {
       method: 'POST',
