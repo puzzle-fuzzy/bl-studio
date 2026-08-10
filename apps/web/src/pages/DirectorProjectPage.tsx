@@ -197,6 +197,11 @@ export function DirectorProjectPage() {
             }
           }
         }
+        const activeState = next.phases.find(state => state.status === 'queued' || state.status === 'running')
+        if (activeState !== undefined) {
+          setActiveRunId(activeState.activeRunId ?? activeState.lastRunId ?? undefined)
+          setActivePhase(activeState.phase)
+        }
         if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
             .then(run => {
@@ -251,6 +256,9 @@ export function DirectorProjectPage() {
       try {
         const run = await apiClient.getDirectorPhaseRun(id, activePhase, activeRunId)
         if (cancelled) return
+        if (activePhase === 'videos') {
+          setProject(current => current === undefined ? current : applyDirectorVideoProgress(current, run.outputSummary))
+        }
         if (run.status === 'succeeded' || run.status === 'failed' || run.status === 'cancelled') {
           const next = await apiClient.getDirectorProject(id)
           if (cancelled) return
@@ -978,6 +986,28 @@ function shotStatusVariant(status: DirectorShot['status']): 'default' | 'seconda
   if (status === 'failed') return 'destructive'
   if (status === 'generating' || status === 'locked') return 'secondary'
   return 'outline'
+}
+
+function applyDirectorVideoProgress(project: DirectorProjectDetail, outputSummary: Record<string, unknown> | null): DirectorProjectDetail {
+  if (outputSummary === null || typeof outputSummary.shotGenerations !== 'object' || outputSummary.shotGenerations === null || Array.isArray(outputSummary.shotGenerations)) return project
+  const shotGenerations = outputSummary.shotGenerations as Record<string, unknown>
+  let changed = false
+  const shots = project.shots.map(shot => {
+    const progress = shotGenerations[shot.id]
+    if (typeof progress !== 'object' || progress === null || Array.isArray(progress)) return shot
+    const generationId = (progress as { generationId?: unknown }).generationId
+    const status = (progress as { status?: unknown }).status
+    if (typeof generationId !== 'string' || (status !== 'queued' && status !== 'processing')) return shot
+    if (shot.status === 'generating' && shot.videoGenerationId === generationId) return shot
+    changed = true
+    return {
+      ...shot,
+      status: 'generating' as const,
+      videoGenerationId: generationId,
+      error: null,
+    }
+  })
+  return changed ? { ...project, shots } : project
 }
 
 function ReferenceEntityGroup({
