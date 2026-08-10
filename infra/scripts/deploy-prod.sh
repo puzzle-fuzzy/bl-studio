@@ -233,6 +233,7 @@ done
 
 # ── 清理 ─────────────────────────────────────────────────────────
 bash "$REPO_ROOT/infra/scripts/verify-web-release.sh" "$EXPECTED_INDEX_ASSET" "$SITE_DOMAIN" "$SERVER_HOST"
+bash "$REPO_ROOT/infra/scripts/verify-api-release.sh" "$SHA" "$SITE_DOMAIN" "$SERVER_HOST"
 rm -f "images-$SHA.tar"
 ssh_cmd "rm -f $DEPLOY_REMOTE_DIR/images-$SHA.tar; docker image prune -f >/dev/null 2>&1 || true"
 

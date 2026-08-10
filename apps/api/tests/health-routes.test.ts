@@ -73,6 +73,21 @@ describe('health routes', () => {
     })
   })
 
+  it('exposes the immutable release tag when the runtime provides one', async () => {
+    const previous = process.env.BAILIAN_STUDIO_RELEASE_TAG
+    process.env.BAILIAN_STUDIO_RELEASE_TAG = 'release-test-sha'
+    try {
+      const live = await app.handle(new Request('http://localhost/api/health/live'))
+      expect(await live.json()).toEqual({ success: true, data: { status: 'ok', release: 'release-test-sha' } })
+
+      const ready = await app.handle(new Request('http://localhost/api/health/ready'))
+      expect(await ready.json()).toMatchObject({ success: true, data: { release: 'release-test-sha' } })
+    } finally {
+      if (previous === undefined) delete process.env.BAILIAN_STUDIO_RELEASE_TAG
+      else process.env.BAILIAN_STUDIO_RELEASE_TAG = previous
+    }
+  })
+
   it('returns 503 when storage cannot produce a read URL', async () => {
     app = createTestApp({ generationRepository: isolated.repository, storage: new BrokenStorage() }).app
 

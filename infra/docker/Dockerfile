@@ -124,6 +124,7 @@ USER bun
 EXPOSE 5003
 
 ARG BAILIAN_STUDIO_RELEASE_TAG=unknown
+ENV BAILIAN_STUDIO_RELEASE_TAG=${BAILIAN_STUDIO_RELEASE_TAG}
 LABEL org.opencontainers.image.revision="${BAILIAN_STUDIO_RELEASE_TAG}"
 
 # ── web-build：基于 workspace（有 typescript/vite）构建前端 ──────────────────
