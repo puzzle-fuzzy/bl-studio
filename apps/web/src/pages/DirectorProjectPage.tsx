@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
+import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
@@ -74,6 +74,7 @@ export function DirectorProjectPage() {
   const [charactersModelId, setCharactersModelId] = useState('')
   const [locationsModelId, setLocationsModelId] = useState('')
   const [storyboardModelId, setStoryboardModelId] = useState('')
+  const [videoModelId, setVideoModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [activePhase, setActivePhase] = useState<DirectorPhase>()
   const [analysisText, setAnalysisText] = useState<string>()
@@ -92,6 +93,11 @@ export function DirectorProjectPage() {
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
+  const videoModels = useMemo(() => models.filter(model => (
+    model.category === 'video'
+    && model.operation === 'video.reference-to-video'
+    && model.availability?.enabled !== false
+  )), [models])
   const boundReferenceAssetIds = useMemo(() => {
     if (project === undefined) return []
     return [...new Set(project.assets.map(asset => asset.assetId).filter((assetId): assetId is string => assetId !== null))]
@@ -128,6 +134,12 @@ export function DirectorProjectPage() {
     const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
     if (preferred !== undefined) setStoryboardModelId(preferred.id)
   }, [storyboardModelId, textModels])
+
+  useEffect(() => {
+    if (videoModelId.length > 0 && videoModels.some(model => model.id === videoModelId)) return
+    const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
+    if (preferred !== undefined) setVideoModelId(preferred.id)
+  }, [videoModelId, videoModels])
 
   useEffect(() => {
     if (id === undefined) return
@@ -170,6 +182,12 @@ export function DirectorProjectPage() {
           if (storyboardState?.status === 'queued' || storyboardState?.status === 'running') {
             setActiveRunId(storyboardState.activeRunId ?? undefined)
             setActivePhase('storyboard')
+          } else {
+            const videosState = next.phases.find(state => state.phase === 'videos')
+            if (videosState?.status === 'queued' || videosState?.status === 'running') {
+              setActiveRunId(videosState.activeRunId ?? undefined)
+              setActivePhase('videos')
+            }
           }
         }
         if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
@@ -256,7 +274,9 @@ export function DirectorProjectPage() {
               ? '角色阶段'
               : activePhase === 'locations'
                 ? '场景阶段'
-                : '分镜阶段'
+                : activePhase === 'storyboard'
+                  ? '分镜阶段'
+                  : '视频生成阶段'
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
             ? `${phaseLabel}已完成`
             : `${phaseLabel}未完成，请查看阶段状态`)
@@ -363,6 +383,27 @@ export function DirectorProjectPage() {
       toast.success('分镜阶段已加入执行队列')
     } catch {
       toast.error('无法启动分镜阶段，请确认分析、角色和场景都已完成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runVideos = async () => {
+    if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'videos', { modelId: videoModelId })
+      setActiveRunId(run.id)
+      setActivePhase('videos')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'videos'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('视频生成已加入执行队列')
+    } catch {
+      toast.error('无法启动视频生成，请确认所有分镜已锁定')
     } finally {
       setSaving(false)
     }
@@ -709,7 +750,33 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard').map(tab => (
+        <TabsContent value="videos" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">手动执行</span>
+                <h2 className="text-xl font-semibold">逐镜头生成视频</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                  只会提交当前版本中已经锁定的分镜。每个镜头独立计费、独立追踪，生成中的任务可以离开页面继续执行；重新生成也会保留旧视频并标记为过时。
+                </p>
+              </div>
+              <DirectorVideoShotList project={project} assetItems={referenceAssets} />
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['videos']}
+              modelId={videoModelId}
+              textModels={videoModels}
+              running={activePhase === 'videos' && activeRunId !== undefined}
+              onModelChange={setVideoModelId}
+              onRunPhase={() => void runVideos()}
+              runLabel="按锁定分镜生成视频"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'videos').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -738,6 +805,85 @@ export function DirectorProjectPage() {
       />
     </>
   )
+}
+
+function DirectorVideoShotList({ project, assetItems }: { project: DirectorProjectDetail; assetItems: Record<string, AssetItem> }) {
+  if (project.shots.length === 0) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
+        <Video className="size-8 text-muted-foreground" />
+        <p className="font-medium">还没有可执行的分镜</p>
+        <p className="max-w-md text-sm leading-6 text-muted-foreground">先完成分镜生成，逐镜检查并锁定后，再进入视频生成。</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col divide-y divide-border/70">
+      {project.shots.map(shot => {
+        const videoBinding = shot.activeVideoAssetId === null
+          ? undefined
+          : project.assets.find(asset => asset.id === shot.activeVideoAssetId && asset.kind === 'shot_video')
+        const videoAsset = videoBinding?.assetId === null || videoBinding?.assetId === undefined
+          ? undefined
+          : assetItems[videoBinding.assetId]
+        const videoUrl = videoAsset?.url ?? videoAsset?.downloadUrl
+        return (
+          <article key={shot.id} className="flex flex-col gap-4 py-5 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+            <div className="flex min-w-0 gap-3">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-sm font-semibold tabular-nums">
+                {shot.sequence}
+              </div>
+              <div className="min-w-0 space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h3 className="font-medium">{shot.slugline ?? `镜头 ${shot.sequence}`}</h3>
+                  <Badge variant={shotStatusVariant(shot.status)}>{shotStatusLabel(shot.status)}</Badge>
+                </div>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">{shot.narrative}</p>
+                {shot.error?.message !== undefined && <p className="text-sm text-destructive">{String(shot.error.message)}</p>}
+                {videoBinding?.staleAt !== null && videoBinding?.staleAt !== undefined && (
+                  <p className="text-xs text-muted-foreground">当前视频已过时，历史资产仍保留在资产库中。</p>
+                )}
+              </div>
+            </div>
+            {videoUrl !== undefined && (
+              <video
+                className="aspect-video w-full shrink-0 bg-muted object-cover sm:w-56"
+                controls
+                preload="metadata"
+                poster={videoAsset?.thumbnailUrl}
+                src={videoUrl}
+              >
+                <track kind="captions" label="暂无字幕" srcLang="zh-CN" src="data:text/vtt,WEBVTT%0A%0A" />
+              </video>
+            )}
+            {videoBinding !== undefined && videoUrl === undefined && (
+              <span className="shrink-0 text-xs text-muted-foreground">视频资产已生成，预览地址准备中</span>
+            )}
+          </article>
+        )
+      })}
+    </div>
+  )
+}
+
+function shotStatusLabel(status: DirectorShot['status']): string {
+  return {
+    not_started: '未开始',
+    needs_review: '待审核',
+    ready: '待锁定',
+    generating: '生成中',
+    succeeded: '已生成',
+    failed: '生成失败',
+    locked: '已锁定',
+  }[status]
+}
+
+function shotStatusVariant(status: DirectorShot['status']): 'default' | 'secondary' | 'outline' | 'destructive' {
+  if (status === 'succeeded') return 'default'
+  if (status === 'failed') return 'destructive'
+  if (status === 'generating' || status === 'locked') return 'secondary'
+  return 'outline'
 }
 
 function ReferenceEntityGroup({

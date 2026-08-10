@@ -71,6 +71,7 @@ export class TaskExecutor {
       return processDirectorPhaseTask(task, {
         repository: this.deps.repository,
         ...(this.deps.directorRepository === undefined ? {} : { directorRepository: this.deps.directorRepository }),
+        modelRegistry: this.deps.modelRegistry,
         logger: this.logger,
       })
     }

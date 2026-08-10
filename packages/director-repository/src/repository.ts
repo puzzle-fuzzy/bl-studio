@@ -40,6 +40,9 @@ import type {
 	AttachDirectorAssetRepositoryInput,
 	DetachDirectorAssetRepositoryInput,
 	UpdateDirectorShotRepositoryInput,
+	StartDirectorShotVideoRepositoryInput,
+	MarkDirectorShotVideoFailedRepositoryInput,
+	FinalizeDirectorShotVideoRepositoryInput,
 } from "./types";
 
 interface ProjectCursor {
@@ -200,6 +203,7 @@ function toShot(row: typeof directorShots.$inferSelect): DirectorShot {
 		referenceAssetIds: row.referenceAssetIdsJson,
 		continuity: row.continuityJson,
 		status: row.status as DirectorShot["status"],
+		videoGenerationId: row.videoGenerationId,
 		activeVideoAssetId: row.activeVideoAssetId,
 		version: row.version,
 		staleAt: row.staleAt?.toISOString() ?? null,
@@ -1204,6 +1208,7 @@ export function createDirectorRepository({
 						...(patch.dialogue !== undefined ? { dialogueJson: patch.dialogue } : {}),
 						...(patch.continuity !== undefined ? { continuityJson: patch.continuity } : {}),
 						status: nextStatus,
+						version: current.version + 1,
 						updatedBy: input.userId,
 						updatedAt: now,
 					})
@@ -1218,6 +1223,210 @@ export function createDirectorRepository({
 				);
 			}
 			return toShot(updated);
+		},
+
+		async startShotVideo(input: StartDirectorShotVideoRepositoryInput) {
+			const now = new Date(input.now ?? new Date().toISOString());
+			const updated = await db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (project === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PROJECT_NOT_FOUND",
+						`Director project not found: ${input.projectId}`,
+					);
+				}
+				const [current] = await tx
+					.select()
+					.from(directorShots)
+					.where(
+						and(
+							eq(directorShots.id, input.shotId),
+							eq(directorShots.projectId, input.projectId),
+							isNull(directorShots.deletedAt),
+						),
+					)
+					.for("update")
+					.limit(1);
+				if (current === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_NOT_FOUND",
+						`Director shot not found: ${input.shotId}`,
+					);
+				}
+				if (current.videoGenerationId !== null || current.status === "generating") {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_GENERATING",
+						"This storyboard shot already has a video generation in progress",
+					);
+				}
+				if ((current.status !== "locked" && current.status !== "failed") || current.staleAt !== null) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_REFERENCE_INVALID",
+						"Only a current locked or failed storyboard shot can start video generation",
+					);
+				}
+
+				const referenceAssetIds = [...new Set(current.referenceAssetIdsJson)];
+				const referenceRows = referenceAssetIds.length === 0
+					? []
+					: await tx
+						.select({ id: directorAssets.id, kind: directorAssets.kind, staleAt: directorAssets.staleAt })
+						.from(directorAssets)
+						.where(
+							and(
+								eq(directorAssets.projectId, input.projectId),
+								inArray(directorAssets.id, referenceAssetIds),
+								isNull(directorAssets.deletedAt),
+							),
+						);
+				const referenceKeys = stringArrayField(objectField(current.continuityJson).referenceKeys);
+				if (
+					referenceRows.length !== referenceAssetIds.length
+					|| referenceRows.some((row) => row.staleAt !== null || !["uploaded_reference", "character_reference", "location_reference"].includes(row.kind))
+					|| (referenceKeys.length > 0 && referenceAssetIds.length === 0)
+				) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_REFERENCE_INVALID",
+						"The locked storyboard shot contains an unavailable reference asset",
+					);
+				}
+
+				const [next] = await tx
+					.update(directorShots)
+					.set({
+						status: "generating",
+						videoGenerationId: input.generationId,
+						errorJson: null,
+						version: current.version + 1,
+						updatedBy: input.userId,
+						updatedAt: now,
+					})
+					.where(eq(directorShots.id, current.id))
+					.returning();
+				return next;
+			});
+			if (updated === undefined) {
+				throw new DirectorRepositoryError(
+					"DIRECTOR_SHOT_NOT_FOUND",
+					`Director shot not found: ${input.shotId}`,
+				);
+			}
+			return toShot(updated);
+		},
+
+		async markShotVideoFailed(input: MarkDirectorShotVideoFailedRepositoryInput) {
+			const now = new Date(input.now ?? new Date().toISOString());
+			const [updated] = await db
+				.update(directorShots)
+				.set({
+					status: "failed",
+					videoGenerationId: null,
+					errorJson: {
+						code: input.error.code ?? "DIRECTOR_VIDEO_GENERATION_FAILED",
+						message: input.error.message,
+					},
+					version: sql`${directorShots.version} + 1`,
+					updatedBy: "worker",
+					updatedAt: now,
+				})
+				.where(
+					and(
+						eq(directorShots.videoGenerationId, input.generationId),
+						eq(directorShots.status, "generating"),
+					),
+				)
+				.returning({ id: directorShots.id });
+			return updated !== undefined;
+		},
+
+		async finalizeShotVideo(input: FinalizeDirectorShotVideoRepositoryInput) {
+			const now = new Date(input.now ?? new Date().toISOString());
+			return db.transaction(async (tx) => {
+				const [current] = await tx
+					.select()
+					.from(directorShots)
+					.where(
+						and(
+							eq(directorShots.videoGenerationId, input.generationId),
+							eq(directorShots.status, "generating"),
+							isNull(directorShots.deletedAt),
+						),
+					)
+					.for("update")
+					.limit(1);
+				if (current === undefined) return false;
+
+				const [userAsset] = await tx
+					.select({ id: userAssets.id })
+					.from(userAssets)
+					.where(
+						and(
+							eq(userAssets.recordId, input.generationId),
+							eq(userAssets.kind, "video"),
+							eq(userAssets.status, "ready"),
+							isNull(userAssets.deletedAt),
+						),
+					)
+					.orderBy(userAssets.createdAt)
+					.limit(1);
+				if (userAsset === undefined) return false;
+
+				if (current.activeVideoAssetId !== null) {
+					await tx
+						.update(directorAssets)
+						.set({ staleAt: now, staleReason: "superseded_by_shot_video", updatedBy: "worker", updatedAt: now })
+						.where(
+							and(
+								eq(directorAssets.id, current.activeVideoAssetId),
+								eq(directorAssets.projectId, current.projectId),
+								isNull(directorAssets.deletedAt),
+							),
+						);
+				}
+				const [created] = await tx
+					.insert(directorAssets)
+					.values({
+						id: crypto.randomUUID(),
+						projectId: current.projectId,
+						sourceRunId: null,
+						kind: "shot_video",
+						ownerType: null,
+						ownerId: null,
+						assetId: userAsset.id,
+						version: 1,
+						metadataJson: { generationId: input.generationId, shotId: current.id },
+						createdBy: "worker",
+						updatedBy: "worker",
+						createdAt: now,
+						updatedAt: now,
+					})
+					.returning({ id: directorAssets.id });
+				if (created === undefined) return false;
+
+				await tx
+					.update(directorShots)
+					.set({
+						status: "succeeded",
+						videoGenerationId: null,
+						activeVideoAssetId: created.id,
+						errorJson: null,
+						version: current.version + 1,
+						updatedBy: "worker",
+						updatedAt: now,
+					})
+					.where(eq(directorShots.id, current.id));
+				return true;
+			});
 		},
 
 		async requestPhaseRun(input) {
@@ -1400,6 +1609,7 @@ export function createDirectorRepository({
 							id: directorShots.id,
 							sequence: directorShots.sequence,
 							status: directorShots.status,
+							videoGenerationId: directorShots.videoGenerationId,
 							referenceAssetIds: directorShots.referenceAssetIdsJson,
 						})
 						.from(directorShots)
@@ -1411,10 +1621,14 @@ export function createDirectorRepository({
 							),
 						)
 						.orderBy(directorShots.sequence);
-					if (shotRows.length === 0 || shotRows.some((shot) => shot.status !== "locked")) {
+					if (
+						shotRows.length === 0
+						|| shotRows.some((shot) => !["locked", "failed", "generating", "succeeded"].includes(shot.status))
+						|| shotRows.some((shot) => shot.status === "generating" && shot.videoGenerationId === null)
+					) {
 						throw new DirectorRepositoryError(
 							"DIRECTOR_PHASE_INPUT_NOT_READY",
-							"Every current storyboard shot must be locked before starting video generation",
+							"Every current storyboard shot must be locked, resumable, or already generated before starting video generation",
 						);
 					}
 					inputSnapshot.shots = shotRows;
@@ -1459,7 +1673,7 @@ export function createDirectorRepository({
 						modelId: input.modelId,
 					},
 					attempts: 0,
-					maxAttempts: 3,
+					maxAttempts: input.phase === "videos" ? 360 : 60,
 					nextRunAt: now,
 					recordId: runId,
 					userId: input.userId,

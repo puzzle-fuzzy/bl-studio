@@ -75,6 +75,7 @@ function createShot(projectId: string, status: DirectorShot['status'] = 'needs_r
     referenceAssetIds: [],
     continuity: null,
     status,
+    videoGenerationId: null,
     activeVideoAssetId: null,
     version: 1,
     staleAt: null,
@@ -183,6 +184,19 @@ const fakeDirectorRepository: DirectorRepository = {
     }
     record.project = { ...record.project, shots: record.project.shots.map(shot => shot.id === next.id ? next : shot) }
     return next
+  },
+  async startShotVideo(input) {
+    const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
+    if (record === undefined) throw new Error('project not found')
+    const shot = record.project.shots.find(item => item.id === input.shotId)
+    if (shot === undefined) throw new Error('shot not found')
+    return { ...shot, status: 'generating', videoGenerationId: input.generationId }
+  },
+  async markShotVideoFailed() {
+    return false
+  },
+  async finalizeShotVideo() {
+    return false
   },
   async requestPhaseRun(input) {
     const run: DirectorPhaseRun = {

@@ -105,6 +105,25 @@ export interface UpdateDirectorShotRepositoryInput {
   patch: UpdateDirectorShotInput
 }
 
+export interface StartDirectorShotVideoRepositoryInput {
+  userId: string
+  projectId: string
+  shotId: string
+  generationId: string
+  now?: string
+}
+
+export interface MarkDirectorShotVideoFailedRepositoryInput {
+  generationId: string
+  error: { code?: string; message: string }
+  now?: string
+}
+
+export interface FinalizeDirectorShotVideoRepositoryInput {
+  generationId: string
+  now?: string
+}
+
 export interface ListDirectorProjectsResult {
   items: DirectorProjectRepositorySummary[]
   nextCursor?: string
@@ -118,6 +137,9 @@ export interface DirectorRepository {
   attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
   detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   updateShot(input: UpdateDirectorShotRepositoryInput): Promise<DirectorShot>
+  startShotVideo(input: StartDirectorShotVideoRepositoryInput): Promise<DirectorShot>
+  markShotVideoFailed(input: MarkDirectorShotVideoFailedRepositoryInput): Promise<boolean>
+  finalizeShotVideo(input: FinalizeDirectorShotVideoRepositoryInput): Promise<boolean>
   requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>

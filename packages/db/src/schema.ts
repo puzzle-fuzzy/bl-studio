@@ -1207,6 +1207,7 @@ export const directorShots = pgTable(
 			.default([]),
 		continuityJson: jsonb("continuity_json").$type<Record<string, unknown>>(),
 		status: text("status").notNull().default("not_started"),
+		videoGenerationId: text("video_generation_id"),
 		activeVideoAssetId: text("active_video_asset_id"),
 		version: integer("version").notNull().default(1),
 		staleAt: timestamp("stale_at", { withTimezone: true }),

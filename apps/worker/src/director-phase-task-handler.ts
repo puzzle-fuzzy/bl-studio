@@ -7,7 +7,8 @@ import { parseDirectorAnalysisOutput } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
-import type { TaskProcessOutcome } from './task-contracts'
+import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary, type DirectorVideoGenerationProgress, type DirectorVideoShotSnapshot } from './director-video'
+import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 9_000
 const PHASE_POLL_DELAY_MS = 5_000
@@ -15,6 +16,7 @@ const PHASE_POLL_DELAY_MS = 5_000
 export interface DirectorPhaseTaskHandlerDeps {
   readonly repository: GenerationRepository
   readonly directorRepository?: DirectorRepository
+  readonly modelRegistry: ModelRegistryLookup
   readonly logger: Logger
 }
 
@@ -60,9 +62,11 @@ export async function processDirectorPhaseTask(
   if (modelId === undefined) {
     return failPhase(run.id, {
       category: 'validation',
-      message: 'A text model is required to analyze the screenplay',
+      message: run.phase === 'videos'
+        ? 'A reference-to-video model is required to generate storyboard videos'
+        : 'A text model is required to execute this screenplay phase',
       retriable: false,
-      code: 'DIRECTOR_MODEL_ID_REQUIRED',
+      code: run.phase === 'videos' ? 'DIRECTOR_VIDEO_MODEL_ID_REQUIRED' : 'DIRECTOR_MODEL_ID_REQUIRED',
     }, deps)
   }
   if (task.userId === undefined) {
@@ -81,6 +85,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'storyboard') {
     return processStoryboardPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'videos') {
+    return processVideosPhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase !== 'analyze') {
     return failPhase(run.id, {
@@ -499,6 +506,257 @@ async function processStoryboardPhase(
   return retryUntilGenerationCompletes(task, `Storyboard generation is ${generation.status}`, 'DIRECTOR_STORYBOARD')
 }
 
+async function processVideosPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const manifest = deps.modelRegistry.getModelById(modelId)
+  if (manifest === undefined || manifest.availability.enabled === false) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Video model is unavailable: ${modelId}`,
+      retriable: false,
+      code: 'DIRECTOR_VIDEO_MODEL_UNAVAILABLE',
+    }, deps)
+  }
+
+  const shots = readVideoShotSnapshots(snapshot.shots)
+  if (shots.length === 0) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'No locked storyboard shots were captured for video generation',
+      retriable: false,
+      code: 'DIRECTOR_VIDEO_SHOTS_MISSING',
+    }, deps)
+  }
+
+  const project = await deps.directorRepository?.getProject({ userId, projectId: run.projectId })
+  if (project === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Director project not found: ${run.projectId}`,
+      retriable: false,
+      code: 'DIRECTOR_VIDEO_PROJECT_NOT_FOUND',
+    }, deps)
+  }
+
+  const existing = parseDirectorVideoRunSummary(run.outputSummary)
+  if (existing !== undefined && existing.modelId !== modelId) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'The video phase cannot switch models after a shot generation has started',
+      retriable: false,
+      code: 'DIRECTOR_VIDEO_MODEL_CHANGED',
+    }, deps)
+  }
+  const shotGenerations: Record<string, DirectorVideoGenerationProgress> = existing?.shotGenerations ?? {}
+  const preparedInputs = new Map<string, ReturnType<typeof buildDirectorVideoGenerationInput>>()
+  for (const snapshotShot of shots) {
+    const currentShot = project.shots.find(shot => shot.id === snapshotShot.id)
+    if (currentShot === undefined) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: `Storyboard shot no longer exists: ${snapshotShot.id}`,
+        retriable: false,
+        code: 'DIRECTOR_VIDEO_SHOT_NOT_FOUND',
+      }, deps)
+    }
+    const persistedVideoAsset = currentShot.activeVideoAssetId === null
+      ? undefined
+      : project.assets.find(asset => asset.id === currentShot.activeVideoAssetId && asset.kind === 'shot_video')
+    const hasPersistedVideo = currentShot.status === 'succeeded' && typeof persistedVideoAsset?.metadata.generationId === 'string'
+    const hasExistingGeneration = currentShot.videoGenerationId !== null || shotGenerations[snapshotShot.id] !== undefined
+    if (hasPersistedVideo || hasExistingGeneration) continue
+    try {
+      preparedInputs.set(snapshotShot.id, buildDirectorVideoGenerationInput(currentShot, project.assets, manifest))
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: error instanceof DirectorVideoInputError ? error.code : 'DIRECTOR_VIDEO_INPUT_INVALID',
+      }, deps)
+    }
+  }
+  let waitingForGeneration = false
+
+  for (const snapshotShot of shots) {
+    const currentShot = project.shots.find(shot => shot.id === snapshotShot.id)
+    if (currentShot === undefined) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: `Storyboard shot no longer exists: ${snapshotShot.id}`,
+        retriable: false,
+        code: 'DIRECTOR_VIDEO_SHOT_NOT_FOUND',
+      }, deps)
+    }
+
+    const persistedVideoAsset = currentShot.activeVideoAssetId === null
+      ? undefined
+      : project.assets.find(asset => asset.id === currentShot.activeVideoAssetId && asset.kind === 'shot_video')
+    const generationIdFromAsset = persistedVideoAsset?.metadata.generationId
+    if (currentShot.status === 'succeeded' && typeof generationIdFromAsset === 'string') {
+      shotGenerations[snapshotShot.id] = {
+        shotId: snapshotShot.id,
+        sequence: snapshotShot.sequence,
+        generationId: generationIdFromAsset,
+        status: 'succeeded',
+      }
+      continue
+    }
+
+    const currentGenerationId = currentShot.videoGenerationId ?? shotGenerations[snapshotShot.id]?.generationId
+    if (currentGenerationId === undefined) {
+      try {
+        const generationInput = preparedInputs.get(snapshotShot.id)
+        if (generationInput === undefined) {
+          throw new Error(`Video input was not prepared for storyboard shot: ${snapshotShot.id}`)
+        }
+        const generation = await deps.repository.createGeneration({
+          userId,
+          modelId,
+          params: generationInput.params,
+          ...(generationInput.assetRefs === undefined ? {} : { assetRefs: generationInput.assetRefs }),
+          idempotencyKey: `director:${run.id}:shot:${snapshotShot.id}`,
+          traceId: task.traceId,
+        })
+        await deps.directorRepository?.startShotVideo({
+          userId,
+          projectId: run.projectId,
+          shotId: snapshotShot.id,
+          generationId: generation.record.id,
+        })
+        shotGenerations[snapshotShot.id] = {
+          shotId: snapshotShot.id,
+          sequence: snapshotShot.sequence,
+          generationId: generation.record.id,
+          status: 'queued',
+        }
+        await persistVideoProgress(run.id, modelId, shotGenerations, deps)
+        waitingForGeneration = true
+        continue
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error)
+        if (error instanceof DirectorVideoInputError) {
+          return failPhase(run.id, {
+            category: 'validation',
+            message,
+            retriable: false,
+            code: error.code,
+          }, deps)
+        }
+        return failPhase(run.id, {
+          category: 'validation',
+          message,
+          retriable: false,
+          code: 'DIRECTOR_VIDEO_GENERATION_CREATE_FAILED',
+        }, deps)
+      }
+    }
+
+    const generationId = currentGenerationId
+    const generation = await deps.repository.getGenerationRecord(generationId)
+    if (generation === undefined) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: `Video generation record not found: ${generationId}`,
+        retriable: false,
+        code: 'DIRECTOR_VIDEO_GENERATION_NOT_FOUND',
+      }, deps)
+    }
+    if (generation.status === 'succeeded') {
+      const finalized = await deps.directorRepository?.finalizeShotVideo({ generationId })
+      if (finalized !== true) {
+        waitingForGeneration = true
+        shotGenerations[snapshotShot.id] = {
+          shotId: snapshotShot.id,
+          sequence: snapshotShot.sequence,
+          generationId,
+          status: 'processing',
+        }
+        continue
+      }
+      shotGenerations[snapshotShot.id] = {
+        shotId: snapshotShot.id,
+        sequence: snapshotShot.sequence,
+        generationId,
+        status: 'succeeded',
+      }
+      continue
+    }
+    if (generation.status === 'failed' || generation.status === 'cancelled') {
+      await deps.directorRepository?.markShotVideoFailed({
+        generationId,
+        error: {
+          code: 'DIRECTOR_VIDEO_GENERATION_FAILED',
+          message: generation.errorJson?.message === undefined
+            ? `Video generation ${generation.status}`
+            : String(generation.errorJson.message),
+        },
+      })
+      return failPhase(run.id, {
+        category: 'provider',
+        message: generation.errorJson?.message === undefined
+          ? `Video generation ${generation.status}`
+          : String(generation.errorJson.message),
+        retriable: false,
+        code: 'DIRECTOR_VIDEO_GENERATION_FAILED',
+      }, deps)
+    }
+    shotGenerations[snapshotShot.id] = {
+      shotId: snapshotShot.id,
+      sequence: snapshotShot.sequence,
+      generationId,
+      status: 'processing',
+    }
+    waitingForGeneration = true
+  }
+
+  const summary = { modelId, shotGenerations }
+  await persistVideoProgress(run.id, modelId, shotGenerations, deps)
+  if (waitingForGeneration || Object.values(shotGenerations).some(progress => progress.status !== 'succeeded')) {
+    return retryUntilGenerationCompletes(task, 'Director storyboard videos are still processing', 'DIRECTOR_VIDEOS')
+  }
+  return completePhase(run.id, summary, deps, JSON.stringify(summary))
+}
+
+async function persistVideoProgress(
+  runId: string,
+  modelId: string,
+  shotGenerations: Record<string, DirectorVideoGenerationProgress>,
+  deps: DirectorPhaseTaskHandlerDeps,
+): Promise<void> {
+  await deps.directorRepository?.setPhaseRunProgress({
+    runId,
+    outputSummary: { modelId, shotGenerations },
+  })
+}
+
+function readVideoShotSnapshots(value: unknown): DirectorVideoShotSnapshot[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap((candidate) => {
+    if (typeof candidate !== 'object' || candidate === null) return []
+    const row = candidate as Record<string, unknown>
+    if (
+      typeof row.id !== 'string'
+      || typeof row.sequence !== 'number'
+      || typeof row.status !== 'string'
+      || !Array.isArray(row.referenceAssetIds)
+      || row.referenceAssetIds.some(referenceId => typeof referenceId !== 'string')
+    ) return []
+    return [{
+      id: row.id,
+      sequence: row.sequence,
+      status: row.status,
+      referenceAssetIds: row.referenceAssetIds as string[],
+    }]
+  })
+}
+
 interface RunInputSnapshot {
   title: string
   synopsis: string | null
@@ -506,6 +764,7 @@ interface RunInputSnapshot {
   analysis: unknown
   characters: unknown
   locations: unknown
+  shots: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -517,6 +776,7 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     analysis: snapshot['analysis'],
     characters: snapshot['characters'],
     locations: snapshot['locations'],
+    shots: snapshot['shots'],
   }
 }
 

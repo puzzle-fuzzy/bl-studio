@@ -200,6 +200,7 @@ export const DirectorShotSchema = z.object({
   referenceAssetIds: z.array(z.string()),
   continuity: z.record(z.string(), z.unknown()).nullable(),
   status: DirectorShotStatusSchema,
+  videoGenerationId: z.string().nullable(),
   activeVideoAssetId: z.string().nullable(),
   version: z.number().int().positive(),
   ...DirectorStaleFields,
