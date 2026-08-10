@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Loader2, LockKeyhole, Save, Sparkles } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { DirectorAnalysisResult, DirectorCharactersResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { DirectorAnalysisResult, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -67,12 +67,18 @@ export function DirectorProjectPage() {
   const [saving, setSaving] = useState(false)
   const [analysisModelId, setAnalysisModelId] = useState('')
   const [charactersModelId, setCharactersModelId] = useState('')
+  const [locationsModelId, setLocationsModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [activePhase, setActivePhase] = useState<DirectorPhase>()
   const [analysisText, setAnalysisText] = useState<string>()
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
+  const [analysisStale, setAnalysisStale] = useState(false)
   const [charactersText, setCharactersText] = useState<string>()
   const [charactersResult, setCharactersResult] = useState<DirectorCharactersResult>()
+  const [charactersStale, setCharactersStale] = useState(false)
+  const [locationsText, setLocationsText] = useState<string>()
+  const [locationsResult, setLocationsResult] = useState<DirectorLocationsResult>()
+  const [locationsStale, setLocationsStale] = useState(false)
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
@@ -94,6 +100,12 @@ export function DirectorProjectPage() {
   }, [charactersModelId, textModels])
 
   useEffect(() => {
+    if (locationsModelId.length > 0 && textModels.some(model => model.id === locationsModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setLocationsModelId(preferred.id)
+  }, [locationsModelId, textModels])
+
+  useEffect(() => {
     if (id === undefined) return
     let cancelled = false
     setLoading(true)
@@ -108,35 +120,57 @@ export function DirectorProjectPage() {
         setActivePhase(undefined)
         setAnalysisText(undefined)
         setAnalysisResult(undefined)
+        setAnalysisStale(false)
         setCharactersText(undefined)
         setCharactersResult(undefined)
+        setCharactersStale(false)
+        setLocationsText(undefined)
+        setLocationsResult(undefined)
+        setLocationsStale(false)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
+        const locationsState = next.phases.find(state => state.phase === 'locations')
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
           setActivePhase('analyze')
         } else if (charactersState?.status === 'queued' || charactersState?.status === 'running') {
           setActiveRunId(charactersState.activeRunId ?? undefined)
           setActivePhase('characters')
+        } else if (locationsState?.status === 'queued' || locationsState?.status === 'running') {
+          setActiveRunId(locationsState.activeRunId ?? undefined)
+          setActivePhase('locations')
         }
-        if ((analysisState?.status === 'completed' || analysisState?.status === 'needs_review') && analysisState.lastRunId !== null && analysisState.lastRunId !== undefined) {
+        if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
             .then(run => {
               if (!cancelled && run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
                 setAnalysisText(run.outputSummary.analysisText)
+                setAnalysisStale(run.staleAt !== null)
                 const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
                 if (parsed.success) setAnalysisResult(parsed.data)
               }
             })
             .catch(() => {})
         }
-        if ((charactersState?.status === 'completed' || charactersState?.status === 'needs_review') && charactersState.lastRunId !== null && charactersState.lastRunId !== undefined) {
+        if (charactersState?.lastRunId !== null && charactersState?.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'characters', charactersState.lastRunId)
             .then(run => {
               if (cancelled || run.status !== 'succeeded') return
               if (typeof run.outputSummary?.charactersText === 'string') setCharactersText(run.outputSummary.charactersText)
+              setCharactersStale(run.staleAt !== null)
               const parsed = DirectorCharactersResultSchema.safeParse(run.outputSummary?.characters)
               if (parsed.success) setCharactersResult(parsed.data)
+            })
+            .catch(() => {})
+        }
+        if (locationsState?.lastRunId !== null && locationsState?.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'locations', locationsState.lastRunId)
+            .then(run => {
+              if (cancelled || run.status !== 'succeeded') return
+              if (typeof run.outputSummary?.locationsText === 'string') setLocationsText(run.outputSummary.locationsText)
+              setLocationsStale(run.staleAt !== null)
+              const parsed = DirectorLocationsResultSchema.safeParse(run.outputSummary?.locations)
+              if (parsed.success) setLocationsResult(parsed.data)
             })
             .catch(() => {})
         }
@@ -166,19 +200,27 @@ export function DirectorProjectPage() {
           setProject(next)
           if (run.status === 'succeeded' && activePhase === 'analyze') {
             if (typeof run.outputSummary?.analysisText === 'string') setAnalysisText(run.outputSummary.analysisText)
+            setAnalysisStale(false)
             const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary?.analysis)
             if (parsed.success) setAnalysisResult(parsed.data)
           }
           if (run.status === 'succeeded' && activePhase === 'characters') {
             if (typeof run.outputSummary?.charactersText === 'string') setCharactersText(run.outputSummary.charactersText)
+            setCharactersStale(false)
             const parsed = DirectorCharactersResultSchema.safeParse(run.outputSummary?.characters)
             if (parsed.success) setCharactersResult(parsed.data)
+          }
+          if (run.status === 'succeeded' && activePhase === 'locations') {
+            if (typeof run.outputSummary?.locationsText === 'string') setLocationsText(run.outputSummary.locationsText)
+            setLocationsStale(false)
+            const parsed = DirectorLocationsResultSchema.safeParse(run.outputSummary?.locations)
+            if (parsed.success) setLocationsResult(parsed.data)
           }
           setActiveRunId(undefined)
           setActivePhase(undefined)
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
-            ? activePhase === 'analyze' ? '剧本分析已完成' : '角色阶段已完成'
-            : activePhase === 'analyze' ? '剧本分析未完成，请查看阶段状态' : '角色阶段未完成，请查看阶段状态')
+            ? activePhase === 'analyze' ? '剧本分析已完成' : activePhase === 'characters' ? '角色阶段已完成' : '场景阶段已完成'
+            : activePhase === 'analyze' ? '剧本分析未完成，请查看阶段状态' : activePhase === 'characters' ? '角色阶段未完成，请查看阶段状态' : '场景阶段未完成，请查看阶段状态')
           return
         }
         timer = setTimeout(() => void poll(), 2_000)
@@ -244,6 +286,27 @@ export function DirectorProjectPage() {
     }
   }
 
+  const runLocations = async () => {
+    if (id === undefined || locationsModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'locations', { modelId: locationsModelId })
+      setActiveRunId(run.id)
+      setActivePhase('locations')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'locations'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('场景阶段已加入执行队列')
+    } catch {
+      toast.error('无法启动场景阶段，请确认角色阶段已完成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const saveProject = async () => {
     if (id === undefined || !dirty || title.trim().length === 0 || storyText.trim().length === 0) return
     setSaving(true)
@@ -257,10 +320,9 @@ export function DirectorProjectPage() {
       setTitle(next.title)
       setStoryText(next.storyText)
       setSynopsis(next.synopsis ?? '')
-      setAnalysisText(undefined)
-      setAnalysisResult(undefined)
-      setCharactersText(undefined)
-      setCharactersResult(undefined)
+      if (analysisText !== undefined || analysisResult !== undefined) setAnalysisStale(true)
+      if (charactersText !== undefined || charactersResult !== undefined) setCharactersStale(true)
+      if (locationsText !== undefined || locationsResult !== undefined) setLocationsStale(true)
       toast.success('项目基础信息已保存')
     } catch {
       toast.error('保存失败，请稍后重试')
@@ -374,10 +436,10 @@ export function DirectorProjectPage() {
                 </label>
               </div>
               {analysisText !== undefined && (
-                <AnalysisReview result={analysisResult} rawText={analysisText} />
+                <AnalysisReview result={analysisResult} rawText={analysisText} stale={analysisStale} />
               )}
               {analysisText === undefined && analysisResult !== undefined && (
-                <AnalysisReview result={analysisResult} />
+                <AnalysisReview result={analysisResult} stale={analysisStale} />
               )}
             </section>
             <PhaseStatusPanel
@@ -402,8 +464,8 @@ export function DirectorProjectPage() {
                 <h2 className="text-xl font-semibold">把分析里的角色变成可持续维护的角色卡</h2>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground">本阶段只消费已确认的剧本分析，输出人物目标、冲突、弧线和视觉特征，供后续参考资产、分镜和对白阶段复用。</p>
               </div>
-              {charactersText !== undefined && <CharactersReview result={charactersResult} rawText={charactersText} />}
-              {charactersText === undefined && charactersResult !== undefined && <CharactersReview result={charactersResult} />}
+              {charactersText !== undefined && <CharactersReview result={charactersResult} rawText={charactersText} stale={charactersStale} />}
+              {charactersText === undefined && charactersResult !== undefined && <CharactersReview result={charactersResult} stale={charactersStale} />}
               {charactersText === undefined && charactersResult === undefined && (
                 <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
                   <p className="font-medium">角色阶段尚未生成结果</p>
@@ -425,7 +487,38 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters').map(tab => (
+        <TabsContent value="locations" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">场景资产</span>
+                <h2 className="text-xl font-semibold">把故事空间变成可复用的场景卡</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">本阶段消费剧本分析和角色卡，整理叙事功能、时间、氛围、视觉锚点与连续性约束，供参考资产和分镜阶段复用。</p>
+              </div>
+              {locationsText !== undefined && <LocationsReview result={locationsResult} rawText={locationsText} stale={locationsStale} />}
+              {locationsText === undefined && locationsResult !== undefined && <LocationsReview result={locationsResult} stale={locationsStale} />}
+              {locationsText === undefined && locationsResult === undefined && (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
+                  <p className="font-medium">场景阶段尚未生成结果</p>
+                  <p className="text-sm leading-6 text-muted-foreground">完成角色阶段后，在右侧选择模型并手动启动。</p>
+                </div>
+              )}
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['locations']}
+              modelId={locationsModelId}
+              textModels={textModels}
+              running={activePhase === 'locations' && activeRunId !== undefined}
+              onModelChange={setLocationsModelId}
+              onRunPhase={() => void runLocations()}
+              runLabel="生成场景卡"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -446,13 +539,13 @@ export function DirectorProjectPage() {
   )
 }
 
-function AnalysisReview({ result, rawText }: { result?: DirectorAnalysisResult; rawText?: string }) {
+function AnalysisReview({ result, rawText, stale = false }: { result?: DirectorAnalysisResult; rawText?: string; stale?: boolean }) {
   if (result === undefined) {
     return (
-      <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
         <div className="flex items-center justify-between gap-3">
           <h2 className="font-semibold">分析结果</h2>
-          <span className="text-xs text-muted-foreground">原始模型输出</span>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">原始模型输出</span>}
         </div>
         <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>
       </section>
@@ -460,10 +553,13 @@ function AnalysisReview({ result, rawText }: { result?: DirectorAnalysisResult; 
   }
 
   return (
-    <section className="flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5">
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">结构化分析</h2>
-        <Badge variant="secondary">可供后续阶段消费</Badge>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">可供后续阶段消费</Badge>
+        </div>
       </div>
 
       <div className="flex flex-col gap-2">
@@ -582,13 +678,13 @@ function AnalysisReview({ result, rawText }: { result?: DirectorAnalysisResult; 
   )
 }
 
-function CharactersReview({ result, rawText }: { result?: DirectorCharactersResult; rawText?: string }) {
+function LocationsReview({ result, rawText, stale = false }: { result?: DirectorLocationsResult; rawText?: string; stale?: boolean }) {
   if (result === undefined) {
     return (
-      <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
         <div className="flex items-center justify-between gap-3">
-          <h2 className="font-semibold">角色阶段输出</h2>
-          <span className="text-xs text-muted-foreground">原始模型输出</span>
+          <h2 className="font-semibold">场景阶段输出</h2>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">原始模型输出</span>}
         </div>
         <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>
       </section>
@@ -596,10 +692,82 @@ function CharactersReview({ result, rawText }: { result?: DirectorCharactersResu
   }
 
   return (
-    <section className="flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5">
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">场景卡</h2>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">可供分镜与资产消费</Badge>
+        </div>
+      </div>
+      <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
+        {result.locations.map((location, index) => (
+          <article key={`${location.name}-${index}`} className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium">{location.name}</h3>
+                <span className="text-xs text-muted-foreground">{location.timeOfDay}</span>
+              </div>
+              <span className="text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">{location.description}</p>
+            <div className="grid gap-3 text-sm leading-6">
+              <div>
+                <span className="text-xs text-muted-foreground">叙事功能</span>
+                <p>{location.narrativeFunction}</p>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">氛围</span>
+                <p>{location.atmosphere}</p>
+              </div>
+            </div>
+            {location.visualAnchors.length > 0 && <p className="text-xs leading-5 text-muted-foreground">视觉锚点：{location.visualAnchors.join(' · ')}</p>}
+            {location.continuityNotes.length > 0 && <p className="text-xs leading-5 text-muted-foreground">连续性：{location.continuityNotes.join(' · ')}</p>}
+          </article>
+        ))}
+      </div>
+      {result.continuityNotes.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">跨场景连续性</h3>
+            <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
+              {result.continuityNotes.map((note, index) => <li key={`${note}-${index}`}>· {note}</li>)}
+            </ul>
+          </div>
+        </>
+      )}
+      {rawText !== undefined && (
+        <details className="flex flex-col gap-2 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">查看原始模型输出</summary>
+          <p className="whitespace-pre-wrap leading-7 text-muted-foreground">{rawText}</p>
+        </details>
+      )}
+    </section>
+  )
+}
+
+function CharactersReview({ result, rawText, stale = false }: { result?: DirectorCharactersResult; rawText?: string; stale?: boolean }) {
+  if (result === undefined) {
+    return (
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">角色阶段输出</h2>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">原始模型输出</span>}
+        </div>
+        <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
       <div className="flex items-center justify-between gap-3">
         <h2 className="font-semibold">角色卡</h2>
-        <Badge variant="secondary">可供视觉与分镜消费</Badge>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">可供视觉与分镜消费</Badge>
+        </div>
       </div>
       <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
         {result.characters.map((character, index) => (

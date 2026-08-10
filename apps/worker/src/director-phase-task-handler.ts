@@ -1,10 +1,11 @@
 import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
-import { DirectorAnalysisResultSchema, type DirectorAnalysisResult, type Logger } from '@bailian-studio/shared'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { parseDirectorAnalysisOutput } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
+import { parseDirectorLocationsOutput } from './director-locations'
 import type { TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 9_000
@@ -73,6 +74,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'characters') {
     return processCharactersPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'locations') {
+    return processLocationsPhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase !== 'analyze') {
     return failPhase(run.id, {
@@ -277,11 +281,118 @@ async function processCharactersPhase(
   return retryUntilGenerationCompletes(task, `Character generation is ${generation.status}`, 'DIRECTOR_CHARACTERS')
 }
 
+async function processLocationsPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const charactersResult = DirectorCharactersResultSchema.safeParse(snapshot.characters)
+  if (!charactersResult.success) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'A validated character result is required before generating locations',
+      retriable: false,
+      code: 'DIRECTOR_LOCATIONS_INPUT_INVALID',
+    }, deps)
+  }
+  if (snapshot.storyText.length > MAX_ANALYSIS_STORY_LENGTH) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Screenplay is too long for the first locations executor (${MAX_ANALYSIS_STORY_LENGTH} characters maximum)`,
+      retriable: false,
+      code: 'DIRECTOR_LOCATIONS_INPUT_TOO_LONG',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: locationsPrompt(snapshot, charactersResult.data),
+          maxTokens: 4_096,
+          temperature: 0.4,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:locations`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director location generation is queued', 'DIRECTOR_LOCATIONS')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_LOCATIONS_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Location generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_LOCATIONS_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const locationsText = readTextOutput(generation.outputResult)
+    if (locationsText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Location generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_LOCATIONS_OUTPUT_MISSING',
+      }, deps)
+    }
+    const locations = parseDirectorLocationsOutput(locationsText)
+    if (locations === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Location generation returned text that does not match the Director location contract',
+        retriable: false,
+        code: 'DIRECTOR_LOCATIONS_OUTPUT_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, locationsText, locations }, deps, locationsText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Location generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_LOCATIONS_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Location generation is ${generation.status}`, 'DIRECTOR_LOCATIONS')
+}
+
 interface RunInputSnapshot {
   title: string
   synopsis: string | null
   storyText: string
   analysis: unknown
+  characters: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -291,6 +402,7 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     synopsis: typeof snapshot['synopsis'] === 'string' ? snapshot['synopsis'] : null,
     storyText: stringInput(snapshot, 'storyText') ?? '',
     analysis: snapshot['analysis'],
+    characters: snapshot['characters'],
   }
 }
 
@@ -317,6 +429,20 @@ function charactersPrompt(snapshot: RunInputSnapshot, analysis: DirectorAnalysis
     `项目：${snapshot.title}`,
     snapshot.synopsis === null ? '' : `简介：${snapshot.synopsis}`,
     `已确认的剧本分析：\n${JSON.stringify(analysis)}`,
+    `剧本原文：\n${snapshot.storyText}`,
+  ].filter(Boolean).join('\n\n')
+}
+
+function locationsPrompt(snapshot: RunInputSnapshot, characters: DirectorCharactersResult): string {
+  return [
+    '你是一名专业短剧导演、场景设计和连续性统筹顾问。请基于角色卡与剧本原文，生成可供参考资产、分镜和视频提示词复用的场景卡。',
+    '只返回一个 JSON 对象，不要 Markdown、代码围栏、解释文字或额外字段。',
+    'JSON 必须符合以下结构：',
+    '{"locations":[{"name":"场景名","description":"空间与叙事设定","atmosphere":"氛围","narrativeFunction":"场景在故事中的作用","timeOfDay":"时间","visualAnchors":["视觉锚点"],"continuityNotes":["连续性约束"]}],"continuityNotes":["跨场景连续性说明"]}',
+    '只使用剧本原文和角色卡中能够得到的事实；不要虚构关键地点或事件。',
+    `项目：${snapshot.title}`,
+    snapshot.synopsis === null ? '' : `简介：${snapshot.synopsis}`,
+    `角色卡：\n${JSON.stringify(characters)}`,
     `剧本原文：\n${snapshot.storyText}`,
   ].filter(Boolean).join('\n\n')
 }

@@ -93,6 +93,8 @@ const fakeDirectorRepository: DirectorRepository = {
       taskId: 'task-1',
       outputSummary: null,
       error: null,
+      staleAt: null,
+      staleReason: null,
       createdAt: '2026-08-10T00:00:00.000Z',
       startedAt: null,
       completedAt: null,

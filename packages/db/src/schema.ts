@@ -983,6 +983,8 @@ export const directorPhaseRuns = pgTable(
 			Record<string, unknown>
 		>(),
 		errorJson: jsonb("error_json").$type<Record<string, unknown>>(),
+		staleAt: timestamp("stale_at", { withTimezone: true }),
+		staleReason: text("stale_reason"),
 		taskId: text("task_id"),
 		createdBy: text("created_by").notNull().default("system"),
 		updatedBy: text("updated_by").notNull().default("system"),
@@ -1028,6 +1030,8 @@ export const directorCharacters = pgTable(
 			.default([]),
 		locked: boolean("locked").notNull().default(false),
 		version: integer("version").notNull().default(1),
+		staleAt: timestamp("stale_at", { withTimezone: true }),
+		staleReason: text("stale_reason"),
 		createdBy: text("created_by").notNull().default("system"),
 		updatedBy: text("updated_by").notNull().default("system"),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -1066,6 +1070,8 @@ export const directorLocations = pgTable(
 			.default([]),
 		locked: boolean("locked").notNull().default(false),
 		version: integer("version").notNull().default(1),
+		staleAt: timestamp("stale_at", { withTimezone: true }),
+		staleReason: text("stale_reason"),
 		createdBy: text("created_by").notNull().default("system"),
 		updatedBy: text("updated_by").notNull().default("system"),
 		deletedAt: timestamp("deleted_at", { withTimezone: true }),
@@ -1100,6 +1106,8 @@ export const directorAssets = pgTable(
 		ownerId: text("owner_id"),
 		assetId: text("asset_id"),
 		version: integer("version").notNull().default(1),
+		staleAt: timestamp("stale_at", { withTimezone: true }),
+		staleReason: text("stale_reason"),
 		metadataJson: jsonb("metadata_json")
 			.$type<Record<string, unknown>>()
 			.notNull()
@@ -1160,6 +1168,8 @@ export const directorShots = pgTable(
 		status: text("status").notNull().default("not_started"),
 		activeVideoAssetId: text("active_video_asset_id"),
 		version: integer("version").notNull().default(1),
+		staleAt: timestamp("stale_at", { withTimezone: true }),
+		staleReason: text("stale_reason"),
 		errorJson: jsonb("error_json").$type<Record<string, unknown>>(),
 		createdBy: text("created_by").notNull().default("system"),
 		updatedBy: text("updated_by").notNull().default("system"),

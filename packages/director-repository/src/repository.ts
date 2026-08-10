@@ -1,8 +1,12 @@
 import {
 	type BailianStudioDb,
+	directorAssets,
+	directorCharacters,
+	directorLocations,
 	directorPhaseRuns,
 	directorPhaseStates,
 	directorProjects,
+	directorShots,
 	taskRecords,
 } from "@bailian-studio/db";
 import {
@@ -14,7 +18,7 @@ import {
 	type DirectorProjectProgress,
 	type DirectorProjectStatus,
 } from "@bailian-studio/shared";
-import { and, desc, eq, inArray, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { DirectorRepositoryError } from "./errors";
 import type {
 	CreateDirectorProjectRepositoryInput,
@@ -88,6 +92,8 @@ function toPhaseRun(
 		taskId: row.taskId,
 		outputSummary: row.outputSummaryJson,
 		error: row.errorJson,
+		staleAt: row.staleAt?.toISOString() ?? null,
+		staleReason: row.staleReason,
 		createdAt: row.createdAt.toISOString(),
 		startedAt: row.startedAt?.toISOString() ?? null,
 		completedAt: row.completedAt?.toISOString() ?? null,
@@ -356,6 +362,57 @@ export function createDirectorRepository({
 					.where(eq(directorProjects.id, input.projectId));
 
 				if (contentChanged) {
+					const stalePatch = {
+						staleAt: now,
+						staleReason: "project_content_changed",
+						updatedAt: now,
+					};
+					await tx
+						.update(directorPhaseRuns)
+						.set(stalePatch)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						);
+					await tx
+						.update(directorCharacters)
+						.set(stalePatch)
+						.where(
+							and(
+								eq(directorCharacters.projectId, input.projectId),
+								isNull(directorCharacters.staleAt),
+							),
+						);
+					await tx
+						.update(directorLocations)
+						.set(stalePatch)
+						.where(
+							and(
+								eq(directorLocations.projectId, input.projectId),
+								isNull(directorLocations.staleAt),
+							),
+						);
+					await tx
+						.update(directorAssets)
+						.set(stalePatch)
+						.where(
+							and(
+								eq(directorAssets.projectId, input.projectId),
+								isNotNull(directorAssets.sourceRunId),
+								isNull(directorAssets.staleAt),
+							),
+						);
+					await tx
+						.update(directorShots)
+						.set(stalePatch)
+						.where(
+							and(
+								eq(directorShots.projectId, input.projectId),
+								isNull(directorShots.staleAt),
+							),
+						);
 					await tx
 						.update(directorPhaseStates)
 						.set({
@@ -453,6 +510,7 @@ export function createDirectorRepository({
 								eq(directorPhaseRuns.projectId, input.projectId),
 								eq(directorPhaseRuns.phase, "analyze"),
 								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
 							),
 						)
 						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
@@ -466,6 +524,29 @@ export function createDirectorRepository({
 					}
 					inputSnapshot.sourceRunId = sourceRun.id;
 					inputSnapshot.analysis = analysis;
+				} else if (input.phase === "locations") {
+					const [sourceRun] = await tx
+						.select()
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "characters"),
+								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					const characters = sourceRun?.outputSummaryJson?.characters;
+					if (sourceRun === undefined || characters === undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A succeeded character phase is required before generating locations",
+						);
+					}
+					inputSnapshot.sourceRunId = sourceRun.id;
+					inputSnapshot.characters = characters;
 				}
 
 				const version = state.version + 1;

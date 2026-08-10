@@ -148,6 +148,8 @@ export const DirectorPhaseRunSchema = z.object({
   taskId: z.string().nullable(),
   outputSummary: z.record(z.string(), z.unknown()).nullable(),
   error: z.record(z.string(), z.unknown()).nullable(),
+  staleAt: z.string().nullable(),
+  staleReason: z.string().nullable(),
   createdAt: z.string(),
   startedAt: z.string().nullable(),
   completedAt: z.string().nullable(),
@@ -172,6 +174,21 @@ export const DirectorCharacterDraftSchema = z.object({
 export const DirectorCharactersResultSchema = z.object({
   characters: z.array(DirectorCharacterDraftSchema).max(50),
   relationshipNotes: z.array(z.string().min(1).max(1_000)).max(50),
+}).strict()
+
+export const DirectorLocationDraftSchema = z.object({
+  name: z.string().min(1).max(160),
+  description: z.string().min(1).max(2_000),
+  atmosphere: z.string().max(500),
+  narrativeFunction: z.string().min(1).max(1_000),
+  timeOfDay: z.string().max(120),
+  visualAnchors: z.array(z.string().min(1).max(500)).max(12),
+  continuityNotes: z.array(z.string().min(1).max(500)).max(12),
+}).strict()
+
+export const DirectorLocationsResultSchema = z.object({
+  locations: z.array(DirectorLocationDraftSchema).max(50),
+  continuityNotes: z.array(z.string().min(1).max(1_000)).max(50),
 }).strict()
 
 export const DirectorAnalysisResultSchema = z.object({
@@ -205,6 +222,8 @@ export type DirectorPhaseRun = z.infer<typeof DirectorPhaseRunSchema>
 export type DirectorAnalysisResult = z.infer<typeof DirectorAnalysisResultSchema>
 export type DirectorCharacterDraft = z.infer<typeof DirectorCharacterDraftSchema>
 export type DirectorCharactersResult = z.infer<typeof DirectorCharactersResultSchema>
+export type DirectorLocationDraft = z.infer<typeof DirectorLocationDraftSchema>
+export type DirectorLocationsResult = z.infer<typeof DirectorLocationsResultSchema>
 export type ListDirectorProjectsInput = z.infer<typeof ListDirectorProjectsSchema>
 export type DirectorPhaseState = z.infer<typeof DirectorPhaseStateSchema>
 export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSchema>
