@@ -8,6 +8,7 @@ import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
 import { continuityPrompt, parseDirectorContinuityOutput, type DirectorContinuityShotInput } from './director-continuity'
+import { parseDirectorPromptRebuildOutput, promptRebuildPrompt, type DirectorPromptRebuildShotInput } from './director-prompts'
 import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary, type DirectorVideoGenerationProgress, type DirectorVideoShotSnapshot } from './director-video'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
@@ -89,6 +90,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'continuity') {
     return processContinuityPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'rebuild') {
+    return processPromptRebuildPhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase === 'videos') {
     return processVideosPhase(run, task, deps, modelId, task.userId, snapshot)
@@ -617,6 +621,113 @@ async function processContinuityPhase(
   return retryUntilGenerationCompletes(task, `Continuity generation is ${generation.status}`, 'DIRECTOR_CONTINUITY')
 }
 
+async function processPromptRebuildPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const shots = readPromptRebuildShotInputs(snapshot.shots)
+  if (shots.length === 0) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'No storyboard shots were captured for prompt rebuilding',
+      retriable: false,
+      code: 'DIRECTOR_PROMPT_REBUILD_SHOTS_MISSING',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: promptRebuildPrompt(snapshot.title, snapshot.synopsis, shots, snapshot.continuity),
+          maxTokens: 8_192,
+          temperature: 0.3,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:rebuild`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director prompt rebuild generation is queued', 'DIRECTOR_PROMPT_REBUILD')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_PROMPT_REBUILD_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Prompt rebuild generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_PROMPT_REBUILD_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const promptRebuildText = readTextOutput(generation.outputResult)
+    if (promptRebuildText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Prompt rebuild generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_PROMPT_REBUILD_OUTPUT_MISSING',
+      }, deps)
+    }
+    const promptRebuild = parseDirectorPromptRebuildOutput(promptRebuildText)
+    if (promptRebuild === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Prompt rebuild generation returned text that does not match the Director prompt contract',
+        retriable: false,
+        code: 'DIRECTOR_PROMPT_REBUILD_OUTPUT_INVALID',
+      }, deps)
+    }
+    const shotSequences = new Map(shots.map(shot => [shot.id, shot.sequence]))
+    if (promptRebuild.shots.some(shot => shotSequences.get(shot.shotId) !== shot.sequence)) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Prompt rebuild output referenced an unknown storyboard shot or mismatched its sequence',
+        retriable: false,
+        code: 'DIRECTOR_PROMPT_REBUILD_OUTPUT_SCOPE_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, promptRebuildText, promptRebuild }, deps, promptRebuildText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Prompt rebuild generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_PROMPT_REBUILD_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Prompt rebuild generation is ${generation.status}`, 'DIRECTOR_PROMPT_REBUILD')
+}
+
 async function processVideosPhase(
   run: DirectorPhaseRunForWorker,
   task: TaskRecord,
@@ -888,6 +999,31 @@ function readContinuityShotInputs(value: unknown): DirectorContinuityShotInput[]
   })
 }
 
+function readPromptRebuildShotInputs(value: unknown): DirectorPromptRebuildShotInput[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(candidate => {
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || typeof candidate.sequence !== 'number' || typeof candidate.narrative !== 'string') return []
+    const referenceAssetIds = Array.isArray(candidate.referenceAssetIds)
+      ? candidate.referenceAssetIds.filter((value): value is string => typeof value === 'string')
+      : []
+    return [{
+      id: candidate.id,
+      sequence: candidate.sequence,
+      sceneNumber: typeof candidate.sceneNumber === 'number' ? candidate.sceneNumber : null,
+      slugline: typeof candidate.slugline === 'string' ? candidate.slugline : null,
+      narrative: candidate.narrative,
+      camera: isRecord(candidate.camera) ? candidate.camera : {},
+      durationSeconds: typeof candidate.durationSeconds === 'number' ? candidate.durationSeconds : null,
+      environmentPrompt: typeof candidate.environmentPrompt === 'string' ? candidate.environmentPrompt : null,
+      videoPrompt: typeof candidate.videoPrompt === 'string' ? candidate.videoPrompt : null,
+      negativePrompt: typeof candidate.negativePrompt === 'string' ? candidate.negativePrompt : null,
+      dialogue: candidate.dialogue === null || isRecord(candidate.dialogue) ? candidate.dialogue : null,
+      continuity: candidate.continuity === null || isRecord(candidate.continuity) ? candidate.continuity : null,
+      referenceAssetIds,
+    }]
+  })
+}
+
 interface RunInputSnapshot {
   title: string
   synopsis: string | null
@@ -896,6 +1032,7 @@ interface RunInputSnapshot {
   characters: unknown
   locations: unknown
   shots: unknown
+  continuity: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -908,6 +1045,7 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     characters: snapshot['characters'],
     locations: snapshot['locations'],
     shots: snapshot['shots'],
+    continuity: snapshot['continuity'],
   }
 }
 

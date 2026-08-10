@@ -1133,6 +1133,12 @@ export function createDirectorRepository({
 				}
 
 				const patch = input.patch;
+				if (patch.expectedVersion !== undefined && patch.expectedVersion !== current.version) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_VERSION_CONFLICT",
+						"This storyboard shot changed after the prompt suggestion was generated; refresh and review it again",
+					);
+				}
 				const hasContentPatch = patch.narrative !== undefined
 					|| patch.camera !== undefined
 					|| patch.durationSeconds !== undefined
@@ -1142,6 +1148,30 @@ export function createDirectorRepository({
 					|| patch.negativePrompt !== undefined
 					|| patch.dialogue !== undefined
 					|| patch.continuity !== undefined;
+				if (hasContentPatch) {
+					const [activeRun] = await tx
+						.select({ id: directorPhaseRuns.id })
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								inArray(directorPhaseRuns.status, ["pending", "running"]),
+							),
+						)
+						.limit(1);
+					if (activeRun !== undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PROJECT_ACTIVE_RUN",
+							"Storyboard shot content cannot change while a director phase is running",
+						);
+					}
+				}
+				if (current.status === "generating" && hasContentPatch) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_GENERATING",
+						"A storyboard shot cannot be edited while its video is generating",
+					);
+				}
 				if (current.status === "locked" && (hasContentPatch || patch.status !== "needs_review")) {
 					throw new DirectorRepositoryError(
 						"DIRECTOR_SHOT_LOCKED",
@@ -1207,6 +1237,7 @@ export function createDirectorRepository({
 						...(patch.negativePrompt !== undefined ? { negativePrompt: patch.negativePrompt } : {}),
 						...(patch.dialogue !== undefined ? { dialogueJson: patch.dialogue } : {}),
 						...(patch.continuity !== undefined ? { continuityJson: patch.continuity } : {}),
+						...(hasContentPatch ? { videoGenerationId: null, errorJson: null } : {}),
 						status: nextStatus,
 						version: current.version + 1,
 						updatedBy: input.userId,
@@ -1214,6 +1245,69 @@ export function createDirectorRepository({
 					})
 					.where(eq(directorShots.id, current.id))
 					.returning();
+				if (hasContentPatch) {
+					const continuityInputChanged = patch.narrative !== undefined
+						|| patch.camera !== undefined
+						|| patch.durationSeconds !== undefined
+						|| patch.referenceAssetIds !== undefined
+						|| patch.dialogue !== undefined
+						|| patch.continuity !== undefined;
+					const invalidatedPhases: DirectorPhase[] = continuityInputChanged
+						? ["continuity", "rebuild", "dialogue", "videos", "bgm", "assemble"]
+						: ["rebuild", "dialogue", "videos", "bgm", "assemble"];
+					const firstInvalidatedPhase: DirectorPhase = continuityInputChanged ? "continuity" : "rebuild";
+						const phaseStalePatch = {
+							staleAt: now,
+							staleReason: "storyboard_shot_changed",
+							updatedAt: now,
+						};
+					await tx
+						.update(directorPhaseRuns)
+						.set(phaseStalePatch)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								inArray(directorPhaseRuns.phase, invalidatedPhases),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						);
+					if (current.activeVideoAssetId !== null) {
+						await tx
+							.update(directorAssets)
+							.set({ ...phaseStalePatch, updatedBy: input.userId })
+							.where(
+								and(
+									eq(directorAssets.id, current.activeVideoAssetId),
+									eq(directorAssets.projectId, input.projectId),
+									isNull(directorAssets.deletedAt),
+								),
+							);
+					}
+					await tx
+						.update(directorPhaseStates)
+						.set({
+							status: "not_started",
+							activeRunId: null,
+							lastErrorJson: null,
+							updatedBy: input.userId,
+							updatedAt: now,
+						})
+						.where(
+							and(
+								eq(directorPhaseStates.projectId, input.projectId),
+								inArray(directorPhaseStates.phase, invalidatedPhases),
+							),
+						);
+					await tx
+						.update(directorPhaseStates)
+						.set({ status: "ready", updatedBy: input.userId, updatedAt: now })
+						.where(
+							and(
+								eq(directorPhaseStates.projectId, input.projectId),
+								eq(directorPhaseStates.phase, firstInvalidatedPhase),
+							),
+						);
+				}
 				return next;
 			});
 			if (updated === undefined) {
@@ -1634,6 +1728,53 @@ export function createDirectorRepository({
 						);
 					}
 					inputSnapshot.shots = shotRows;
+				} else if (input.phase === "rebuild") {
+					const shotRows = await tx
+						.select({
+							id: directorShots.id,
+							sequence: directorShots.sequence,
+							sceneNumber: directorShots.sceneNumber,
+							slugline: directorShots.slugline,
+							narrative: directorShots.narrative,
+							camera: directorShots.cameraJson,
+							durationSeconds: directorShots.durationSeconds,
+							environmentPrompt: directorShots.environmentPrompt,
+							videoPrompt: directorShots.videoPrompt,
+							negativePrompt: directorShots.negativePrompt,
+							dialogue: directorShots.dialogueJson,
+							continuity: directorShots.continuityJson,
+							referenceAssetIds: directorShots.referenceAssetIdsJson,
+						})
+						.from(directorShots)
+						.where(
+							and(
+								eq(directorShots.projectId, input.projectId),
+								isNull(directorShots.deletedAt),
+								isNull(directorShots.staleAt),
+							),
+						)
+						.orderBy(directorShots.sequence);
+					if (shotRows.length === 0) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A storyboard with at least one current shot is required before rebuilding video prompts",
+						);
+					}
+					const [continuityRun] = await tx
+						.select({ outputSummary: directorPhaseRuns.outputSummaryJson })
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "continuity"),
+								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					inputSnapshot.shots = shotRows;
+					inputSnapshot.continuity = continuityRun?.outputSummary?.continuity ?? null;
 				} else if (input.phase === "videos") {
 					const shotConditions = [
 						eq(directorShots.projectId, input.projectId),

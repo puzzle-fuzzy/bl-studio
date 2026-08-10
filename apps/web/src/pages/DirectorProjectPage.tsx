@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorLocationsResult, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -97,6 +97,12 @@ export function DirectorProjectPage() {
   const [continuityText, setContinuityText] = useState<string>()
   const [continuityResult, setContinuityResult] = useState<DirectorContinuityResult>()
   const [continuityStale, setContinuityStale] = useState(false)
+  const [promptRebuildModelId, setPromptRebuildModelId] = useState('')
+  const [promptRebuildText, setPromptRebuildText] = useState<string>()
+  const [promptRebuildResult, setPromptRebuildResult] = useState<DirectorPromptRebuildResult>()
+  const [promptRebuildStale, setPromptRebuildStale] = useState(false)
+  const [applyingPromptShotId, setApplyingPromptShotId] = useState<string>()
+  const [appliedPromptShotIds, setAppliedPromptShotIds] = useState<Set<string>>(new Set())
   const [referencePickerOpen, setReferencePickerOpen] = useState(false)
   const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
   const referenceAssets = useReferenceAssetsStore(state => state.assets)
@@ -153,6 +159,12 @@ export function DirectorProjectPage() {
   }, [continuityModelId, textModels])
 
   useEffect(() => {
+    if (promptRebuildModelId.length > 0 && textModels.some(model => model.id === promptRebuildModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setPromptRebuildModelId(preferred.id)
+  }, [promptRebuildModelId, textModels])
+
+  useEffect(() => {
     if (videoModelId.length > 0 && videoModels.some(model => model.id === videoModelId)) return
     const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
     if (preferred !== undefined) setVideoModelId(preferred.id)
@@ -183,12 +195,18 @@ export function DirectorProjectPage() {
         setContinuityText(undefined)
         setContinuityResult(undefined)
         setContinuityStale(false)
+        setPromptRebuildText(undefined)
+        setPromptRebuildResult(undefined)
+        setPromptRebuildStale(false)
+        setAppliedPromptShotIds(new Set())
+        setApplyingPromptShotId(undefined)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
         const continuityState = next.phases.find(state => state.phase === 'continuity')
+        const promptRebuildState = next.phases.find(state => state.phase === 'rebuild')
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
           setActivePhase('analyze')
@@ -261,6 +279,17 @@ export function DirectorProjectPage() {
             })
             .catch(() => {})
         }
+        if (promptRebuildState?.lastRunId !== null && promptRebuildState?.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'rebuild', promptRebuildState.lastRunId)
+            .then(run => {
+              if (cancelled || run.status !== 'succeeded') return
+              if (typeof run.outputSummary?.promptRebuildText === 'string') setPromptRebuildText(run.outputSummary.promptRebuildText)
+              setPromptRebuildStale(run.staleAt !== null)
+              const parsed = DirectorPromptRebuildResultSchema.safeParse(run.outputSummary?.promptRebuild)
+              if (parsed.success) setPromptRebuildResult(parsed.data)
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => {
         if (!cancelled) setError('项目不存在，或你没有访问权限。')
@@ -312,6 +341,13 @@ export function DirectorProjectPage() {
             const parsed = DirectorContinuityResultSchema.safeParse(run.outputSummary?.continuity)
             if (parsed.success) setContinuityResult(parsed.data)
           }
+          if (run.status === 'succeeded' && activePhase === 'rebuild') {
+            if (typeof run.outputSummary?.promptRebuildText === 'string') setPromptRebuildText(run.outputSummary.promptRebuildText)
+            setPromptRebuildStale(false)
+            setAppliedPromptShotIds(new Set())
+            const parsed = DirectorPromptRebuildResultSchema.safeParse(run.outputSummary?.promptRebuild)
+            if (parsed.success) setPromptRebuildResult(parsed.data)
+          }
           setActiveRunId(undefined)
           setActivePhase(undefined)
           const phaseLabel = activePhase === 'analyze'
@@ -324,7 +360,9 @@ export function DirectorProjectPage() {
                   ? '分镜阶段'
                   : activePhase === 'continuity'
                     ? '连续性检查'
-                    : '视频生成阶段'
+                    : activePhase === 'rebuild'
+                      ? '视频提示词重建'
+                      : '视频生成阶段'
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
             ? `${phaseLabel}已完成`
             : `${phaseLabel}未完成，请查看阶段状态`)
@@ -454,6 +492,48 @@ export function DirectorProjectPage() {
       toast.error('无法启动连续性检查，请确认分镜已经生成')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const runPromptRebuild = async () => {
+    if (id === undefined || promptRebuildModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'rebuild', { modelId: promptRebuildModelId })
+      setActiveRunId(run.id)
+      setActivePhase('rebuild')
+      setPromptRebuildText(undefined)
+      setPromptRebuildResult(undefined)
+      setPromptRebuildStale(false)
+      setAppliedPromptShotIds(new Set())
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'rebuild'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('视频提示词重建已加入执行队列')
+    } catch {
+      toast.error('无法启动视频提示词重建，请确认当前分镜已经生成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const applyPromptSuggestion = async (shotId: string, patch: UpdateDirectorShotInput) => {
+    if (id === undefined) return
+    setApplyingPromptShotId(shotId)
+    try {
+      const shot = await apiClient.updateDirectorShot(id, shotId, patch)
+      setProject(current => current === undefined
+        ? current
+        : { ...current, shots: current.shots.map(candidate => candidate.id === shot.id ? shot : candidate) })
+      setAppliedPromptShotIds(current => new Set(current).add(shotId))
+      toast.success(`镜头 ${String(shot.sequence).padStart(2, '0')} 的提示词已应用，请重新审核并锁定`)
+    } catch {
+      toast.error('提示词应用失败，请确认镜头未锁定且仍属于当前分镜')
+    } finally {
+      setApplyingPromptShotId(undefined)
     }
   }
 
@@ -885,6 +965,38 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="prompts" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">可编辑建议</span>
+                <h2 className="text-xl font-semibold">重建视频提示词</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">系统会结合当前分镜和连续性检查结果生成逐镜建议。建议不会自动覆盖分镜，逐项应用后仍需人工复核并重新锁定镜头。</p>
+              </div>
+              <DirectorPromptRebuildReview
+                project={project}
+                result={promptRebuildResult}
+                rawText={promptRebuildText}
+                stale={promptRebuildStale}
+                appliedShotIds={appliedPromptShotIds}
+                applyingShotId={applyingPromptShotId}
+                onApply={(shotId, patch) => void applyPromptSuggestion(shotId, patch)}
+              />
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['rebuild']}
+              modelId={promptRebuildModelId}
+              textModels={textModels}
+              running={activePhase === 'rebuild' && activeRunId !== undefined}
+              onModelChange={setPromptRebuildModelId}
+              onRunPhase={() => void runPromptRebuild()}
+              runLabel="重建视频提示词"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
         <TabsContent value="videos" className="mt-6">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <section className="flex flex-col gap-5">
@@ -919,7 +1031,7 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'videos').map(tab => (
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'videos').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -1032,6 +1144,141 @@ function continuitySeverityLabel(severity: 'info' | 'warning' | 'error'): string
 
 function continuitySeverityVariant(severity: 'info' | 'warning' | 'error'): 'default' | 'secondary' | 'outline' | 'destructive' {
   return severity === 'error' ? 'destructive' : severity === 'warning' ? 'secondary' : 'outline'
+}
+
+function DirectorPromptRebuildReview({
+  project,
+  result,
+  rawText,
+  stale = false,
+  appliedShotIds,
+  applyingShotId,
+  onApply,
+}: {
+  project: DirectorProjectDetail
+  result?: DirectorPromptRebuildResult
+  rawText?: string
+  stale?: boolean
+  appliedShotIds: Set<string>
+  applyingShotId?: string
+  onApply: (shotId: string, patch: UpdateDirectorShotInput) => void
+}) {
+  if (result === undefined) {
+    return (
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">视频提示词建议</h2>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">等待执行结果</span>}
+        </div>
+        {rawText !== undefined && <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>}
+        {rawText === undefined && <p className="text-sm leading-7 text-muted-foreground">执行重建阶段后，这里会显示可逐镜编辑和应用的提示词建议。</p>}
+      </section>
+    )
+  }
+
+  return (
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">视频提示词建议</h2>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">{result.shots.length} 个镜头</Badge>
+        </div>
+      </div>
+      <p className="text-sm leading-7">{result.summary}</p>
+      {result.shots.length === 0 ? (
+        <p className="text-sm leading-7 text-muted-foreground">模型没有返回可应用的提示词建议。</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {result.shots.map(suggestion => {
+            const shot = project.shots.find(candidate => candidate.id === suggestion.shotId)
+            return (
+              <DirectorPromptSuggestionCard
+                key={`${suggestion.shotId}-${suggestion.sequence}`}
+                shot={shot}
+                suggestion={suggestion}
+                stale={stale}
+                applied={appliedShotIds.has(suggestion.shotId)}
+                saving={applyingShotId === suggestion.shotId}
+                onApply={patch => onApply(suggestion.shotId, patch)}
+              />
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function DirectorPromptSuggestionCard({
+  shot,
+  suggestion,
+  stale,
+  applied,
+  saving,
+  onApply,
+}: {
+  shot?: DirectorShot
+  suggestion: DirectorPromptRebuildResult['shots'][number]
+  stale: boolean
+  applied: boolean
+  saving: boolean
+  onApply: (patch: UpdateDirectorShotInput) => void
+}) {
+  const [environmentPrompt, setEnvironmentPrompt] = useState(suggestion.environmentPrompt)
+  const [videoPrompt, setVideoPrompt] = useState(suggestion.videoPrompt)
+  const [negativePrompt, setNegativePrompt] = useState(suggestion.negativePrompt)
+
+  useEffect(() => {
+    setEnvironmentPrompt(suggestion.environmentPrompt)
+    setVideoPrompt(suggestion.videoPrompt)
+    setNegativePrompt(suggestion.negativePrompt)
+  }, [suggestion.shotId, suggestion.environmentPrompt, suggestion.videoPrompt, suggestion.negativePrompt])
+
+  const locked = shot?.status === 'locked'
+  const missing = shot === undefined
+  return (
+    <article className="flex flex-col gap-4 bg-background/60 px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(suggestion.sequence).padStart(2, '0')}</span>
+          {locked && <Badge variant="outline">已锁定</Badge>}
+          {applied && <Badge variant="secondary">已应用</Badge>}
+          {missing && <Badge variant="destructive">镜头已不存在</Badge>}
+        </div>
+        <Button
+          size="sm"
+          disabled={saving || stale || locked || missing}
+          onClick={() => onApply({
+            expectedVersion: shot?.version,
+            environmentPrompt: environmentPrompt.trim().length > 0 ? environmentPrompt.trim() : null,
+            videoPrompt: videoPrompt.trim().length > 0 ? videoPrompt.trim() : null,
+            negativePrompt: negativePrompt.trim().length > 0 ? negativePrompt.trim() : null,
+          })}
+        >
+          {saving ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}
+          应用到分镜
+        </Button>
+      </div>
+      <div className="grid gap-4 xl:grid-cols-3">
+        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`director-prompt-environment-${suggestion.shotId}`}>
+          环境提示词
+          <Textarea id={`director-prompt-environment-${suggestion.shotId}`} className="min-h-28 resize-y leading-6" value={environmentPrompt} disabled={stale || locked || saving || missing} onChange={event => setEnvironmentPrompt(event.target.value)} />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`director-prompt-video-${suggestion.shotId}`}>
+          动作与镜头提示词
+          <Textarea id={`director-prompt-video-${suggestion.shotId}`} className="min-h-28 resize-y leading-6" value={videoPrompt} disabled={stale || locked || saving || missing} onChange={event => setVideoPrompt(event.target.value)} />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`director-prompt-negative-${suggestion.shotId}`}>
+          负面提示词
+          <Textarea id={`director-prompt-negative-${suggestion.shotId}`} className="min-h-28 resize-y leading-6" value={negativePrompt} disabled={stale || locked || saving || missing} onChange={event => setNegativePrompt(event.target.value)} />
+        </label>
+      </div>
+      <p className="text-sm leading-6 text-muted-foreground">调整原因：{suggestion.rationale}</p>
+      {stale && <p className="text-xs leading-5 text-muted-foreground">当前建议已过时，请重新执行提示词重建后再应用。</p>}
+      {locked && <p className="text-xs leading-5 text-muted-foreground">当前镜头已锁定，请先在分镜页解锁，应用后重新审核。</p>}
+    </article>
+  )
 }
 
 function DirectorVideoShotList({ project, assetItems, onRetry, retryingShotId }: { project: DirectorProjectDetail; assetItems: Record<string, AssetItem>; onRetry: (shotId: string) => void; retryingShotId?: string }) {
