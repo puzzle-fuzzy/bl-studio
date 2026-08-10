@@ -57,7 +57,7 @@ inject_release_tag "$ENV_INFRA"
 
 # 只把 OSS 灾备所需的五项变量投影给 backup 容器，避免把 API/Worker/SMTP 等
 # 应用机密通过 env_file 扩散到备份服务。
-pnpm exec tsx "$REPO_ROOT/infra/scripts/prepare-backup-env.ts" \
+pnpm exec tsx infra/scripts/prepare-backup-env.ts \
   || fail "prepare-backup-env 未通过"
 [[ -f "$ENV_BACKUP" ]] || fail "缺少 ${ENV_BACKUP}"
 
@@ -69,7 +69,7 @@ pnpm exec tsx "$REPO_ROOT/infra/scripts/prepare-backup-env.ts" \
 if [[ "${DEPLOY_SKIP_VERIFY:-0}" != "1" ]]; then
   if [[ -f "$REPO_ROOT/infra/env/.env.test" ]]; then
     echo "==> 前置 verify 门禁（test DB 环境，全绿才继续）"
-    pnpm exec dotenv -e "$REPO_ROOT/infra/env/.env.test" -- pnpm run verify \
+    pnpm exec dotenv -e infra/env/.env.test -- pnpm run verify \
       || fail "verify 未通过；修好后重新部署（紧急时可 DEPLOY_SKIP_VERIFY=1 绕过，需自行评估）"
   else
     fail "缺少 infra/env/.env.test：verify 门禁需要 test DB 连接串（参考 infra/env/.env.test.example）"
@@ -79,9 +79,9 @@ else
 fi
 
 # ── 预检 3：生产预检（不联网、不打印值）──────────────────────────
-pnpm exec dotenv -e "$ENV_APP" -- tsx infra/scripts/check-production-env.ts \
+pnpm exec dotenv -e infra/env/.env.production -- tsx infra/scripts/check-production-env.ts \
   || fail "check:production-env 未通过"
-pnpm exec dotenv -e "$ENV_INFRA" -- tsx infra/scripts/check-production-env.ts infra \
+pnpm exec dotenv -e infra/env/.env.prod-infra -- tsx infra/scripts/check-production-env.ts infra \
   || fail "check:production-env infra 未通过"
 
 # ── 读取部署参数（仅读取，不打印值）──────────────────────────────
