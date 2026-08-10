@@ -31,12 +31,22 @@ export {
 } from './generation-client'
 export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
+export {
+  DIRECTOR_PHASE_LABELS,
+  DIRECTOR_PHASES,
+  DIRECTOR_PHASE_STATUS,
+  DIRECTOR_PROJECT_STATUS,
+} from '@bailian-studio/shared'
 export type {
   AssetItem,
   AssetCapabilities,
   CreditBalance,
   GenerationArtifact,
   CreateGenerationResponse,
+  CreateDirectorProjectInput,
+  DirectorProjectDetail,
+  DirectorProjectListResult,
+  DirectorProjectSummary,
   CreateMediaJobResult,
   GenerationDiagnostics,
   GenerationEstimate,
@@ -109,4 +119,5 @@ export type {
   GrantPointsInput,
   AdjustPointsInput,
   PointsMutationResult,
+  UpdateDirectorProjectInput,
 } from './schemas'

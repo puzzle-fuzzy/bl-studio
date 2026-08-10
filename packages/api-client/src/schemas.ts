@@ -9,6 +9,33 @@
  * api-client 是一个纯粹的传输层，仅依赖 @bailian-studio/shared + zod。
  */
 import { z } from 'zod'
+import {
+  CreateDirectorProjectSchema,
+  DirectorProjectDetailSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
+  UpdateDirectorProjectSchema,
+  type CreateDirectorProjectInput,
+  type DirectorProjectDetail,
+  type DirectorProjectListResult,
+  type DirectorProjectSummary,
+  type UpdateDirectorProjectInput,
+} from '@bailian-studio/shared'
+
+export {
+  CreateDirectorProjectSchema,
+  DirectorProjectDetailSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
+  UpdateDirectorProjectSchema,
+}
+export type {
+  CreateDirectorProjectInput,
+  DirectorProjectDetail,
+  DirectorProjectListResult,
+  DirectorProjectSummary,
+  UpdateDirectorProjectInput,
+}
 
 export const ModelOperationSchema = z.enum([
   'text.chat',

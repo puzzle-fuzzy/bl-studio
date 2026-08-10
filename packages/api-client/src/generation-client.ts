@@ -25,6 +25,8 @@ import {
   CancelGenerationResponseSchema,
   CreditBalanceResponseSchema,
   CreateGenerationResponseSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
@@ -106,6 +108,9 @@ import type {
   CancelGenerationResult,
   CreditBalance,
   CreateGenerationResponse,
+  CreateDirectorProjectInput,
+  DirectorProjectDetail,
+  DirectorProjectListResult,
   EmailActionAccepted,
   GenerationEstimate,
   GenerationDiagnostics,
@@ -131,6 +136,7 @@ import type {
   RegistrationResult,
   RetryGenerationResult,
   UsageSummary,
+  UpdateDirectorProjectInput,
 } from './schemas'
 
 /** 带 JSON content-type 的请求头常量，供带 body 的 POST 复用。 */
@@ -293,6 +299,14 @@ export interface BailianStudioApiClient {
   getUsage(): Promise<UsageSummary>
   /** `GET /api/account/points` — 获取当前用户的可用、冻结和总积分。 */
   getCreditBalance(): Promise<CreditBalance>
+  /** `GET /api/director/projects` — 当前用户的导演台项目列表。 */
+  listDirectorProjects(params?: { limit?: number; cursor?: string }): Promise<DirectorProjectListResult>
+  /** `POST /api/director/projects` — 创建一个手动短剧制作项目。 */
+  createDirectorProject(input: CreateDirectorProjectInput): Promise<DirectorProjectDetail>
+  /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
+  getDirectorProject(id: string): Promise<DirectorProjectDetail>
+  /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
+  updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
   /** `GET /api/generations/:id` —— 获取一条生成记录（含状态、输出、错误等）。 */
   getGeneration(id: string): Promise<GenerationRecord>
   /** `GET /api/generations/:id/diagnostics` —— 当前用户可见的安全链路诊断。 */
@@ -592,6 +606,49 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         CreditBalanceResponseSchema,
       )
       return data.balance
+    },
+
+    async listDirectorProjects(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/director/projects${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorProjectListResponseSchema,
+      )
+    },
+
+    async createDirectorProject(input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async getDirectorProject(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async updateDirectorProject(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
     },
 
     async getGeneration(id) {

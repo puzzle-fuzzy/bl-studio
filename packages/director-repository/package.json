@@ -1,5 +1,5 @@
 {
-  "name": "@bailian-studio/api-client",
+  "name": "@bailian-studio/director-repository",
   "version": "0.0.0",
   "type": "module",
   "private": true,
@@ -8,17 +8,19 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run tests"
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@bailian-studio/db": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
-    "zod": "catalog:"
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"
   },
   "author": {
-    "name": "烟熏三文鱼",
+    "name": "烟灼三文鱼",
     "email": "18267094443@163.com",
     "url": "https://github.com/puzzle-fuzzy"
   },
