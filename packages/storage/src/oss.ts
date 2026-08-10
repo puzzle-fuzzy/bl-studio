@@ -14,7 +14,11 @@ import { sanitizeKey as sanitizeStorageKey } from './local'
 export interface OssClientLike {
   put(key: string, body: Uint8Array, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
   /** P1-16：流式上传（ali-oss `putStream`）。未实现时 OSS 适配器退化为缓冲写。 */
-  putStream?(key: string, stream: Readable, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
+  putStream?(
+    key: string,
+    stream: Readable,
+    options?: { headers?: Record<string, string>; contentLength?: number },
+  ): Promise<{ url?: string }>
   delete?(key: string): Promise<unknown>
   head?(key: string): Promise<unknown>
   signatureUrl(key: string, options: {
@@ -90,8 +94,8 @@ export class OssStorageAdapter implements StorageAdapter {
   }
 
   async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
-    // P1-16：流式上传。ali-oss `putStream` 对未知长度的流走 chunked 分片上传，
-    // 单遍消费入参流。字节数边流边计，不依赖服务端返回。
+    // P1-16：流式上传。已知长度时传给 ali-oss，避免生产环境的 chunked PUT；
+    // 未知长度的通用流仍允许退回 SDK 的 chunked 行为。字节数边流边计，不依赖服务端返回。
     const putStream = this.options.client.putStream
     if (putStream === undefined) throw new Error('OSS storage stream write is not configured')
     const fullKey = this.resolveWriteKey(input.key)
@@ -104,7 +108,10 @@ export class OssStorageAdapter implements StorageAdapter {
       this.options.client,
       fullKey,
       source,
-      { ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}) },
+      {
+        ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}),
+        ...(input.contentLength !== undefined ? { contentLength: input.contentLength } : {}),
+      },
     )
     return {
       provider: this.provider,

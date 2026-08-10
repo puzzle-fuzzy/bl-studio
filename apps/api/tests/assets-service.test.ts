@@ -21,6 +21,7 @@ class TestStorage implements StorageAdapter {
   deleteCalls: string[] = []
   /** P1-16：统计是否走了流式写。 */
   streamedKeys: string[] = []
+  streamedContentLengths: Array<number | undefined> = []
 
   async writeObject(input: StorageWriteInput): Promise<StorageWriteResult> {
     return { provider: 'local', key: input.key, byteSize: input.body.byteLength, url: `/stored/${input.key}` }
@@ -28,6 +29,7 @@ class TestStorage implements StorageAdapter {
 
   async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
     this.streamedKeys.push(input.key)
+    this.streamedContentLengths.push(input.contentLength)
     const reader = input.stream.getReader()
     let byteSize = 0
     for (;;) {
@@ -129,6 +131,7 @@ describe('asset upload streaming and magic-number validation', () => {
 
     expect(storage.streamedKeys).toHaveLength(1)
     expect(storage.streamedKeys[0]).toMatch(/^user_uploads\/user_1\//)
+    expect(storage.streamedContentLengths).toEqual([PNG_MAGIC.length])
   })
 
   it('rejects media whose magic number does not match the declared type', async () => {

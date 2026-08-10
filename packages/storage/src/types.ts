@@ -22,6 +22,8 @@ export interface StorageWriteStreamInput {
   /** Web 字节流（File.stream() / fetch body）；不要求可回放，适配器单遍消费。 */
   stream: ReadableStream<Uint8Array>
   contentType?: string
+  /** 已知时传入准确字节数；远端适配器可据此避免 chunked 传输。 */
+  contentLength?: number
 }
 
 /** 写入结果：实际使用的 key、可访问的 url（可能为空）、字节数。 */

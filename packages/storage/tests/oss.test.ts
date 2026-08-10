@@ -1,3 +1,4 @@
+import type { Readable } from 'node:stream'
 import { describe, expect, it } from 'vitest'
 import {
   OSS_IMAGE_THUMBNAIL_PROCESS,
@@ -18,9 +19,26 @@ class FakeOssClient implements OssClientLike {
   deleteCalls: string[] = []
   getCalls: string[] = []
   headCalls: string[] = []
+  putStreamCalls: Array<{ key: string; contentLength?: number; headers?: Record<string, string> }> = []
 
   async put(key: string, body: Uint8Array, options?: { headers?: Record<string, string> }): Promise<{ url?: string }> {
     this.putCalls.push({ key, body, headers: options?.headers })
+    return { url: `oss://bucket/${key}` }
+  }
+
+  async putStream(
+    key: string,
+    stream: Readable,
+    options?: { headers?: Record<string, string>; contentLength?: number },
+  ): Promise<{ url?: string }> {
+    this.putStreamCalls.push({
+      key,
+      ...(options?.contentLength !== undefined ? { contentLength: options.contentLength } : {}),
+      ...(options?.headers !== undefined ? { headers: options.headers } : {}),
+    })
+    for await (const _chunk of stream) {
+      // Consume the stream as the real SDK does.
+    }
     return { url: `oss://bucket/${key}` }
   }
 
@@ -73,6 +91,28 @@ describe('OssStorageAdapter', () => {
     expect(await adapter.createReadUrl({ key: result.key, expiresInSeconds: 60 })).toBe(
       'https://signed.test/generations/gen_1/art_1.png?expires=60',
     )
+  })
+
+  it('passes a known stream length to ali-oss to avoid chunked uploads', async () => {
+    const client = new FakeOssClient()
+    const adapter = new OssStorageAdapter({ client })
+
+    await expect(adapter.writeObjectStream({
+      key: 'user_uploads/user_1/image.png',
+      stream: new Blob(['hello']).stream(),
+      contentType: 'image/png',
+      contentLength: 5,
+    })).resolves.toMatchObject({
+      provider: 'oss',
+      key: 'user_uploads/user_1/image.png',
+      byteSize: 5,
+    })
+
+    expect(client.putStreamCalls).toEqual([{
+      key: 'user_uploads/user_1/image.png',
+      contentLength: 5,
+      headers: { 'Content-Type': 'image/png' },
+    }])
   })
 
   it('probes OSS access without downloading an object', async () => {
