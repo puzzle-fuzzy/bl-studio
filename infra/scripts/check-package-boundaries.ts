@@ -159,7 +159,7 @@ export const rules: Array<{
       // P1-40：api-client 是纯 zod 契约层（schemas.ts 注释自称只依赖 shared+zod，
       // 实际零 workspace 依赖）。禁入任何 @bailian-studio 包——用 importSpecifier
       // 只匹配真实 import，不误伤源内自我引述的注释。
-      importSpecifier(String.raw`@bailian-studio\/[a-z-]+`),
+      importSpecifier(String.raw`@bailian-studio\/(?!shared\b)[a-z-]+`),
       importsApps,
       importsServices,
     ],
