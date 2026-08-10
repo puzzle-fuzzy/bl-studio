@@ -328,6 +328,10 @@ export interface BailianStudioApiClient {
   requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `POST /api/director/projects/:id/phases/videos/estimate` — 估算视频阶段即将提交的镜头成本。 */
   estimateDirectorVideoPhase(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  /** `POST /api/director/projects/:id/shots/:shotId/video-runs/estimate` — 估算单镜重试成本。 */
+  estimateDirectorShotVideo(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  /** `POST /api/director/projects/:id/shots/:shotId/video-runs` — 为单个失败镜头创建视频任务。 */
+  requestDirectorShotVideoRun(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
   getDirectorPhaseRun(id: string, phase: string, runId: string): Promise<DirectorPhaseRun>
   /** `GET /api/generations/:id` —— 获取一条生成记录（含状态、输出、错误等）。 */
@@ -722,6 +726,26 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorVideoEstimateResponseSchema,
       )
       return data.estimate
+    },
+
+    async estimateDirectorShotVideo(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorVideoEstimateResponseSchema,
+      )
+      return data.estimate
+    },
+
+    async requestDirectorShotVideoRun(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
     },
 
     async getDirectorPhaseRun(id, phase, runId) {

@@ -46,6 +46,7 @@ export interface RequestDirectorPhaseRunRepositoryInput extends CreateDirectorPh
   userId: string
   projectId: string
   phase: DirectorPhase
+  shotId?: string
   now?: string
 }
 

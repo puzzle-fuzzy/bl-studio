@@ -1604,6 +1604,12 @@ export function createDirectorRepository({
 					inputSnapshot.characters = characters;
 					inputSnapshot.locations = locations;
 				} else if (input.phase === "videos") {
+					const shotConditions = [
+						eq(directorShots.projectId, input.projectId),
+						isNull(directorShots.deletedAt),
+						isNull(directorShots.staleAt),
+						...(input.shotId === undefined ? [] : [eq(directorShots.id, input.shotId)]),
+					];
 					const shotRows = await tx
 						.select({
 							id: directorShots.id,
@@ -1614,13 +1620,15 @@ export function createDirectorRepository({
 						})
 						.from(directorShots)
 						.where(
-							and(
-								eq(directorShots.projectId, input.projectId),
-								isNull(directorShots.deletedAt),
-								isNull(directorShots.staleAt),
-							),
+							and(...shotConditions),
 						)
 						.orderBy(directorShots.sequence);
+					if (input.shotId !== undefined && shotRows.length === 0) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_NOT_FOUND",
+							`Director shot not found: ${input.shotId}`,
+						);
+					}
 					if (
 						shotRows.length === 0
 						|| shotRows.some((shot) => !["locked", "failed", "generating", "succeeded"].includes(shot.status))
@@ -1631,7 +1639,14 @@ export function createDirectorRepository({
 							"Every current storyboard shot must be locked, resumable, or already generated before starting video generation",
 						);
 					}
+					if (input.shotId !== undefined && shotRows[0]?.status !== "locked" && shotRows[0]?.status !== "failed") {
+						throw new DirectorRepositoryError(
+							shotRows[0]?.status === "generating" ? "DIRECTOR_SHOT_GENERATING" : "DIRECTOR_PHASE_INPUT_NOT_READY",
+							"Only a locked or failed storyboard shot can start an individual video generation",
+						);
+					}
 					inputSnapshot.shots = shotRows;
+					if (input.shotId !== undefined) inputSnapshot.shotId = input.shotId;
 				}
 
 				const version = state.version + 1;
@@ -1812,13 +1827,28 @@ export function createDirectorRepository({
 				};
 				await materializePhaseOutput(tx, current, outputSummary, now);
 
+				const incompleteVideoShots = current.phase === "videos"
+					? await tx
+						.select({ id: directorShots.id })
+						.from(directorShots)
+						.where(
+							and(
+								eq(directorShots.projectId, current.projectId),
+								ne(directorShots.status, "succeeded"),
+								isNull(directorShots.deletedAt),
+								isNull(directorShots.staleAt),
+							),
+						)
+						.limit(1)
+					: [];
+				const phaseCompleted = incompleteVideoShots.length === 0;
 				const phaseIndex = DIRECTOR_PHASES.indexOf(current.phase as DirectorPhase);
 				await tx
 					.update(directorPhaseStates)
-					.set({ status: "completed", activeRunId: null, lastErrorJson: null, updatedBy: "worker", updatedAt: now })
+					.set({ status: phaseCompleted ? "completed" : "ready", activeRunId: null, lastErrorJson: null, updatedBy: "worker", updatedAt: now })
 					.where(eq(directorPhaseStates.activeRunId, input.runId));
 				const nextPhase = DIRECTOR_PHASES[phaseIndex + 1];
-				if (nextPhase !== undefined) {
+				if (phaseCompleted && nextPhase !== undefined) {
 					await tx
 						.update(directorPhaseStates)
 						.set({ status: "ready", updatedBy: "worker", updatedAt: now })
@@ -1833,10 +1863,15 @@ export function createDirectorRepository({
 						.update(directorProjects)
 						.set({ status: "active", updatedBy: "worker", updatedAt: now })
 						.where(eq(directorProjects.id, current.projectId));
-				} else {
+				} else if (phaseCompleted) {
 					await tx
 						.update(directorProjects)
 						.set({ status: "completed", updatedBy: "worker", updatedAt: now })
+						.where(eq(directorProjects.id, current.projectId));
+				} else {
+					await tx
+						.update(directorProjects)
+						.set({ status: "active", updatedBy: "worker", updatedAt: now })
 						.where(eq(directorProjects.id, current.projectId));
 				}
 				return toPhaseRun(updated);

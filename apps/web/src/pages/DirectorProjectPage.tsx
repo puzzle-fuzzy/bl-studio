@@ -82,6 +82,8 @@ export function DirectorProjectPage() {
   const [videoEstimate, setVideoEstimate] = useState<DirectorVideoEstimate>()
   const [videoConfirmOpen, setVideoConfirmOpen] = useState(false)
   const [videoEstimating, setVideoEstimating] = useState(false)
+  const [videoRetryShotId, setVideoRetryShotId] = useState<string>()
+  const [videoRetryingShotId, setVideoRetryingShotId] = useState<string>()
   const [analysisText, setAnalysisText] = useState<string>()
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
   const [analysisStale, setAnalysisStale] = useState(false)
@@ -395,10 +397,14 @@ export function DirectorProjectPage() {
 
   const confirmVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const retryShotId = videoRetryShotId
     setVideoConfirmOpen(false)
+    if (retryShotId !== undefined) setVideoRetryingShotId(retryShotId)
     setSaving(true)
     try {
-      const run = await apiClient.requestDirectorPhaseRun(id, 'videos', { modelId: videoModelId })
+      const run = retryShotId === undefined
+        ? await apiClient.requestDirectorPhaseRun(id, 'videos', { modelId: videoModelId })
+        : await apiClient.requestDirectorShotVideoRun(id, retryShotId, { modelId: videoModelId })
       setActiveRunId(run.id)
       setActivePhase('videos')
       setProject(current => current === undefined ? current : {
@@ -412,11 +418,14 @@ export function DirectorProjectPage() {
       toast.error('无法启动视频生成，请确认所有分镜已锁定')
     } finally {
       setSaving(false)
+      setVideoRetryingShotId(undefined)
+      setVideoRetryShotId(undefined)
     }
   }
 
   const prepareVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setVideoRetryShotId(undefined)
     setVideoEstimating(true)
     try {
       const estimate = await apiClient.estimateDirectorVideoPhase(id, { modelId: videoModelId })
@@ -430,6 +439,22 @@ export function DirectorProjectPage() {
       toast.error('暂时无法估算视频成本，请确认所有分镜已锁定')
     } finally {
       setVideoEstimating(false)
+    }
+  }
+
+  const prepareShotRetry = async (shotId: string) => {
+    if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined || videoConfirmOpen || videoEstimating || videoRetryingShotId !== undefined) return
+    setVideoRetryingShotId(shotId)
+    try {
+      const estimate = await apiClient.estimateDirectorShotVideo(id, shotId, { modelId: videoModelId })
+      setVideoRetryShotId(shotId)
+      setVideoEstimate(estimate)
+      setVideoConfirmOpen(true)
+    } catch {
+      setVideoRetryShotId(undefined)
+      toast.error('暂时无法估算单镜重试成本，请确认镜头仍处于失败状态')
+    } finally {
+      setVideoRetryingShotId(undefined)
     }
   }
 
@@ -784,7 +809,12 @@ export function DirectorProjectPage() {
                   只会提交当前版本中已经锁定的分镜。每个镜头独立计费、独立追踪，生成中的任务可以离开页面继续执行；重新生成也会保留旧视频并标记为过时。
                 </p>
               </div>
-              <DirectorVideoShotList project={project} assetItems={referenceAssets} />
+              <DirectorVideoShotList
+                project={project}
+                assetItems={referenceAssets}
+                onRetry={shotId => void prepareShotRetry(shotId)}
+                retryingShotId={videoRetryingShotId}
+              />
             </section>
             <PhaseStatusPanel
               project={project}
@@ -830,11 +860,19 @@ export function DirectorProjectPage() {
         mediaKind="image"
         onSelect={assets => void attachReferenceAsset(assets)}
       />
-      <Dialog open={videoConfirmOpen} onOpenChange={setVideoConfirmOpen}>
+      <Dialog
+        open={videoConfirmOpen}
+        onOpenChange={open => {
+          setVideoConfirmOpen(open)
+          if (!open) setVideoRetryShotId(undefined)
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>确认提交视频生成</DialogTitle>
-            <DialogDescription>这次将为当前未完成的锁定镜头创建独立视频任务。</DialogDescription>
+            <DialogDescription>
+              {videoRetryShotId === undefined ? '这次将为当前未完成的锁定镜头创建独立视频任务。' : '这次只会重试选中的失败镜头，不会重复提交已经成功的镜头。'}
+            </DialogDescription>
           </DialogHeader>
           <div className="flex flex-col gap-2 bg-muted/30 px-4 py-4 text-sm">
             <div className="flex items-center justify-between">
@@ -849,7 +887,7 @@ export function DirectorProjectPage() {
           <p className="text-xs leading-5 text-muted-foreground">这是预估费用，最终扣费以 provider 实际结算为准。确认后会按镜头独立扣费并支持续跑。</p>
           <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
             <Button variant="outline" onClick={() => setVideoConfirmOpen(false)}>取消</Button>
-            <Button onClick={() => void confirmVideoRun()} disabled={videoEstimate === undefined}>确认提交</Button>
+            <Button onClick={() => void confirmVideoRun()} disabled={videoEstimate === undefined}>{videoRetryShotId === undefined ? '确认提交' : '确认重试'}</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
@@ -857,7 +895,7 @@ export function DirectorProjectPage() {
   )
 }
 
-function DirectorVideoShotList({ project, assetItems }: { project: DirectorProjectDetail; assetItems: Record<string, AssetItem> }) {
+function DirectorVideoShotList({ project, assetItems, onRetry, retryingShotId }: { project: DirectorProjectDetail; assetItems: Record<string, AssetItem>; onRetry: (shotId: string) => void; retryingShotId?: string }) {
   if (project.shots.length === 0) {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
@@ -909,6 +947,12 @@ function DirectorVideoShotList({ project, assetItems }: { project: DirectorProje
             )}
             {videoBinding !== undefined && videoUrl === undefined && (
               <span className="shrink-0 text-xs text-muted-foreground">视频资产已生成，预览地址准备中</span>
+            )}
+            {shot.status === 'failed' && (
+              <Button variant="outline" size="sm" className="shrink-0 self-start" onClick={() => onRetry(shot.id)} disabled={retryingShotId === shot.id}>
+                {retryingShotId === shot.id ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Sparkles data-icon="inline-start" />}
+                重试本镜
+              </Button>
             )}
           </article>
         )

@@ -385,6 +385,37 @@ describe('director routes', () => {
     expect(body.data.estimate.currency).toBe('CNY')
   })
 
+  it('estimates and queues a single failed shot retry', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '单镜重试', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+    const shot = createShot(projectId, 'failed')
+    projects[0]!.project = { ...projects[0]!.project, shots: [shot] }
+
+    const estimateResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}/video-runs/estimate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'wanx-2.7-reference-video' }),
+    }))
+    const estimateBody = await estimateResponse.json() as { data: { estimate: { shotCount: number; estimatedCents: number } } }
+    expect(estimateResponse.status).toBe(200)
+    expect(estimateBody.data.estimate.shotCount).toBe(1)
+    expect(estimateBody.data.estimate.estimatedCents).toBeGreaterThan(0)
+
+    const runResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}/video-runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'wanx-2.7-reference-video' }),
+    }))
+    const runBody = await runResponse.json() as { data: { run: DirectorPhaseRun } }
+    expect(runResponse.status).toBe(200)
+    expect(runBody.data.run.phase).toBe('videos')
+  })
+
   it('binds and detaches a reference asset without changing the project asset source', async () => {
     const createResponse = await app.handle(authed('/api/director/projects', {
       method: 'POST',
