@@ -314,6 +314,17 @@ export const CreateDirectorPhaseRunSchema = z.object({
   modelId: z.string().trim().min(1).max(256),
 }).strict()
 
+export const DirectorVideoEstimateSchema = z.object({
+  modelId: z.string(),
+  estimatedCents: z.number().int().nonnegative(),
+  shotCount: z.number().int().nonnegative(),
+  currency: z.literal('CNY'),
+}).strict()
+
+export const DirectorVideoEstimateResponseSchema = z.object({
+  estimate: DirectorVideoEstimateSchema,
+}).strict()
+
 export const DirectorPhaseRunSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -394,6 +405,7 @@ export const DirectorAnalysisResultSchema = z.object({
 export type CreateDirectorProjectInput = z.infer<typeof CreateDirectorProjectSchema>
 export type UpdateDirectorProjectInput = z.infer<typeof UpdateDirectorProjectSchema>
 export type CreateDirectorPhaseRunInput = z.infer<typeof CreateDirectorPhaseRunSchema>
+export type DirectorVideoEstimate = z.infer<typeof DirectorVideoEstimateSchema>
 export type DirectorPhaseRun = z.infer<typeof DirectorPhaseRunSchema>
 export type DirectorAnalysisResult = z.infer<typeof DirectorAnalysisResultSchema>
 export type DirectorCharacterDraft = z.infer<typeof DirectorCharacterDraftSchema>

@@ -361,6 +361,30 @@ describe('director routes', () => {
     expect(body.error.code).toBe('VALIDATION_ERROR')
   })
 
+  it('estimates pending video shots from the selected model manifest', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '视频费用估价', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+    projects[0]!.project = { ...projects[0]!.project, shots: [createShot(projectId, 'locked')] }
+
+    const estimateResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/videos/estimate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'wanx-2.7-reference-video' }),
+    }))
+    const body = await estimateResponse.json() as { data: { estimate: { modelId: string; estimatedCents: number; shotCount: number; currency: string } } }
+
+    expect(estimateResponse.status).toBe(200)
+    expect(body.data.estimate.modelId).toBe('wanx-2.7-reference-video')
+    expect(body.data.estimate.shotCount).toBe(1)
+    expect(body.data.estimate.estimatedCents).toBeGreaterThan(0)
+    expect(body.data.estimate.currency).toBe('CNY')
+  })
+
   it('binds and detaches a reference asset without changing the project asset source', async () => {
     const createResponse = await app.handle(authed('/api/director/projects', {
       method: 'POST',

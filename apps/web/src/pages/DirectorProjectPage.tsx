@@ -1,12 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { Input } from '@/components/ui/input'
@@ -17,6 +18,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api'
 import { modelNameZh } from '@/lib/model-modes'
+import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 
@@ -77,6 +79,9 @@ export function DirectorProjectPage() {
   const [videoModelId, setVideoModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [activePhase, setActivePhase] = useState<DirectorPhase>()
+  const [videoEstimate, setVideoEstimate] = useState<DirectorVideoEstimate>()
+  const [videoConfirmOpen, setVideoConfirmOpen] = useState(false)
+  const [videoEstimating, setVideoEstimating] = useState(false)
   const [analysisText, setAnalysisText] = useState<string>()
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
   const [analysisStale, setAnalysisStale] = useState(false)
@@ -388,8 +393,9 @@ export function DirectorProjectPage() {
     }
   }
 
-  const runVideos = async () => {
+  const confirmVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setVideoConfirmOpen(false)
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'videos', { modelId: videoModelId })
@@ -406,6 +412,24 @@ export function DirectorProjectPage() {
       toast.error('无法启动视频生成，请确认所有分镜已锁定')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const prepareVideoRun = async () => {
+    if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setVideoEstimating(true)
+    try {
+      const estimate = await apiClient.estimateDirectorVideoPhase(id, { modelId: videoModelId })
+      setVideoEstimate(estimate)
+      if (estimate.shotCount === 0) {
+        toast.success('当前没有需要新生成的视频镜头')
+      } else {
+        setVideoConfirmOpen(true)
+      }
+    } catch {
+      toast.error('暂时无法估算视频成本，请确认所有分镜已锁定')
+    } finally {
+      setVideoEstimating(false)
     }
   }
 
@@ -767,9 +791,12 @@ export function DirectorProjectPage() {
               phases={['videos']}
               modelId={videoModelId}
               textModels={videoModels}
-              running={activePhase === 'videos' && activeRunId !== undefined}
-              onModelChange={setVideoModelId}
-              onRunPhase={() => void runVideos()}
+              running={videoEstimating || videoConfirmOpen || (activePhase === 'videos' && activeRunId !== undefined)}
+              onModelChange={value => {
+                setVideoModelId(value)
+                setVideoEstimate(undefined)
+              }}
+              onRunPhase={() => void prepareVideoRun()}
               runLabel="按锁定分镜生成视频"
               blockedByUnsavedChanges={dirty}
             />
@@ -803,6 +830,29 @@ export function DirectorProjectPage() {
         mediaKind="image"
         onSelect={assets => void attachReferenceAsset(assets)}
       />
+      <Dialog open={videoConfirmOpen} onOpenChange={setVideoConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>确认提交视频生成</DialogTitle>
+            <DialogDescription>这次将为当前未完成的锁定镜头创建独立视频任务。</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 bg-muted/30 px-4 py-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span>待生成镜头</span>
+              <span>{videoEstimate?.shotCount ?? 0}</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span>预估费用</span>
+              <span className="font-semibold">{formatCents(videoEstimate?.estimatedCents)}</span>
+            </div>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">这是预估费用，最终扣费以 provider 实际结算为准。确认后会按镜头独立扣费并支持续跑。</p>
+          <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
+            <Button variant="outline" onClick={() => setVideoConfirmOpen(false)}>取消</Button>
+            <Button onClick={() => void confirmVideoRun()} disabled={videoEstimate === undefined}>确认提交</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </>
   )
 }

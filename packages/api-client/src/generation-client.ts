@@ -30,6 +30,7 @@ import {
   DirectorAssetResponseSchema,
   DirectorShotResponseSchema,
   DirectorPhaseRunResponseSchema,
+  DirectorVideoEstimateResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
@@ -117,6 +118,7 @@ import type {
   DirectorAsset,
   DirectorShot,
   DirectorPhaseRun,
+  DirectorVideoEstimate,
   DirectorProjectDetail,
   DirectorProjectListResult,
   EmailActionAccepted,
@@ -324,6 +326,8 @@ export interface BailianStudioApiClient {
   updateDirectorShot(id: string, shotId: string, input: UpdateDirectorShotInput): Promise<DirectorShot>
   /** `POST /api/director/projects/:id/phases/:phase/runs` — 手动排队一个阶段。 */
   requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
+  /** `POST /api/director/projects/:id/phases/videos/estimate` — 估算视频阶段即将提交的镜头成本。 */
+  estimateDirectorVideoPhase(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
   /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
   getDirectorPhaseRun(id: string, phase: string, runId: string): Promise<DirectorPhaseRun>
   /** `GET /api/generations/:id` —— 获取一条生成记录（含状态、输出、错误等）。 */
@@ -708,6 +712,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorPhaseRunResponseSchema,
       )
       return data.run
+    },
+
+    async estimateDirectorVideoPhase(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/videos/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorVideoEstimateResponseSchema,
+      )
+      return data.estimate
     },
 
     async getDirectorPhaseRun(id, phase, runId) {

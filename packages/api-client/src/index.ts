@@ -31,7 +31,7 @@ export {
 } from './generation-client'
 export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
-export { DirectorAnalysisResultSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema, DirectorLocationDraftSchema, DirectorLocationsResultSchema, DirectorShotDraftSchema, DirectorShotResponseSchema, DirectorShotSchema, DirectorStoryboardResultSchema, UpdateDirectorShotSchema } from './schemas'
+export { DirectorAnalysisResultSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema, DirectorLocationDraftSchema, DirectorLocationsResultSchema, DirectorShotDraftSchema, DirectorShotResponseSchema, DirectorShotSchema, DirectorStoryboardResultSchema, DirectorVideoEstimateResponseSchema, UpdateDirectorShotSchema } from './schemas'
 export {
   DIRECTOR_PHASE_LABELS,
   DIRECTOR_PHASES,
@@ -62,6 +62,7 @@ export type {
   DirectorLocationsResult,
   DirectorPhaseRun,
   DirectorPhaseRunStatus,
+  DirectorVideoEstimate,
   DirectorProjectDetail,
   DirectorScriptVersion,
   DirectorProjectListResult,

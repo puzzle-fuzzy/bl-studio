@@ -10,7 +10,7 @@ import {
   ValidationError,
   validateInput,
 } from '@bailian-studio/shared'
-import { getBailianOperationCapability, getModelById } from '@bailian-studio/model-core'
+import { estimatePriceCents, getBailianOperationCapability, getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
@@ -94,6 +94,46 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       })
       return { success: true, data: { run } }
     })
+    .post('/projects/:id/phases/videos/estimate', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      const model = getModelById(input.modelId)
+      if (
+        model === undefined
+        || model.availability.enabled === false
+        || model.request.kind !== 'dashscope-video-task'
+        || getBailianOperationCapability(model.id) !== 'video.reference-to-video'
+      ) {
+        throw new ValidationError('视频阶段需要使用已启用的参考生视频模型', 'modelId')
+      }
+      const project = await repository.getProject({ userId: user.id, projectId: params.id })
+      if (project === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+      }
+      const pendingShots = project.shots.filter(shot => shot.status === 'locked' || shot.status === 'failed')
+      if (
+        project.shots.length === 0
+        || project.shots.some(shot => !['locked', 'failed', 'generating', 'succeeded'].includes(shot.status))
+        || project.shots.some(shot => shot.status === 'generating' && shot.videoGenerationId === null)
+      ) {
+        throw new DirectorRepositoryError(
+          'DIRECTOR_PHASE_INPUT_NOT_READY',
+          'Every current storyboard shot must be locked, resumable, or already generated before estimating video generation',
+        )
+      }
+      const estimatedCents = pendingShots.reduce((total, shot) => total + estimateDirectorShotCents(model, shot.durationSeconds, shot.referenceAssetIds.length), 0)
+      return {
+        success: true,
+        data: {
+          estimate: {
+            modelId: model.id,
+            estimatedCents,
+            shotCount: pendingShots.length,
+            currency: 'CNY' as const,
+          },
+        },
+      }
+    })
     .get('/projects/:id/phases/:phase/runs/:runId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
@@ -108,4 +148,24 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       }
       return { success: true, data: { run } }
     })
+}
+
+function estimateDirectorShotCents(
+  manifest: FrozenModelManifest,
+  durationSeconds: number | null,
+  referenceCount: number,
+): number {
+  const durationParameter = manifest.parameters.find(parameter => parameter.name === 'duration' && parameter.type === 'number')
+  const defaultDuration = durationParameter?.defaultValue
+  const requestedDuration = durationSeconds ?? (typeof defaultDuration === 'number' ? defaultDuration : 5)
+  const duration = durationParameter === undefined
+    ? requestedDuration
+    : Math.min(durationParameter.max ?? requestedDuration, Math.max(durationParameter.min ?? requestedDuration, requestedDuration))
+  const params: Record<string, unknown> = { duration }
+  for (const parameter of manifest.parameters) {
+    if (parameter.defaultValue !== undefined && parameter.name !== 'duration') params[parameter.name] = parameter.defaultValue
+  }
+  const referenceParameter = manifest.parameters.find(parameter => parameter.type === 'media' && parameter.mediaKind === 'image')
+  if (referenceParameter !== undefined && referenceCount > 0) params[referenceParameter.name] = Array.from({ length: referenceCount }, () => 'reference')
+  return estimatePriceCents(manifest, params)
 }

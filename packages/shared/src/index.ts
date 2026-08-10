@@ -40,6 +40,8 @@ export {
 export {
   CreateDirectorProjectSchema,
   CreateDirectorPhaseRunSchema,
+  DirectorVideoEstimateSchema,
+  DirectorVideoEstimateResponseSchema,
   DirectorCharacterDraftSchema,
   DirectorCharacterSchema,
   DirectorCharactersResultSchema,
@@ -82,6 +84,7 @@ export {
   UpdateDirectorProjectSchema,
   type CreateDirectorProjectInput,
   type CreateDirectorPhaseRunInput,
+  type DirectorVideoEstimate,
   type DirectorAnalysisResult,
   type AttachDirectorAssetInput,
   type DirectorAsset,
