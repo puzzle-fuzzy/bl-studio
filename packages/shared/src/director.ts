@@ -208,6 +208,18 @@ export const DirectorShotSchema = z.object({
   updatedAt: z.string(),
 }).strict()
 
+export const UpdateDirectorShotSchema = z.object({
+  narrative: z.string().trim().min(1).max(4_000).optional(),
+  camera: z.record(z.string(), z.unknown()).optional(),
+  durationSeconds: z.number().int().positive().max(120).nullable().optional(),
+  environmentPrompt: z.string().max(4_000).nullable().optional(),
+  videoPrompt: z.string().max(4_000).nullable().optional(),
+  negativePrompt: z.string().max(2_000).nullable().optional(),
+  dialogue: z.record(z.string(), z.unknown()).nullable().optional(),
+  continuity: z.record(z.string(), z.unknown()).nullable().optional(),
+  status: z.enum(['needs_review', 'ready', 'locked']).optional(),
+}).strict()
+
 export const AttachDirectorAssetSchema = z.object({
   assetId: z.string().trim().min(1).max(256),
   kind: z.enum(['uploaded_reference', 'character_reference', 'location_reference']),
@@ -290,6 +302,10 @@ export const DirectorProjectResponseSchema = z.object({
 
 export const DirectorAssetResponseSchema = z.object({
   asset: DirectorAssetSchema,
+})
+
+export const DirectorShotResponseSchema = z.object({
+  shot: DirectorShotSchema,
 })
 
 export const CreateDirectorPhaseRunSchema = z.object({
@@ -395,4 +411,5 @@ export type AttachDirectorAssetInput = z.infer<typeof AttachDirectorAssetSchema>
 export type DirectorShot = z.infer<typeof DirectorShotSchema>
 export type DirectorShotDraft = z.infer<typeof DirectorShotDraftSchema>
 export type DirectorStoryboardResult = z.infer<typeof DirectorStoryboardResultSchema>
+export type UpdateDirectorShotInput = z.infer<typeof UpdateDirectorShotSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

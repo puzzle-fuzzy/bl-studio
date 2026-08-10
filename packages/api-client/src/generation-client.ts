@@ -28,6 +28,7 @@ import {
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
   DirectorAssetResponseSchema,
+  DirectorShotResponseSchema,
   DirectorPhaseRunResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
@@ -114,6 +115,7 @@ import type {
   CreateDirectorPhaseRunInput,
   AttachDirectorAssetInput,
   DirectorAsset,
+  DirectorShot,
   DirectorPhaseRun,
   DirectorProjectDetail,
   DirectorProjectListResult,
@@ -143,6 +145,7 @@ import type {
   RetryGenerationResult,
   UsageSummary,
   UpdateDirectorProjectInput,
+  UpdateDirectorShotInput,
 } from './schemas'
 
 /** 带 JSON content-type 的请求头常量，供带 body 的 POST 复用。 */
@@ -317,6 +320,8 @@ export interface BailianStudioApiClient {
   attachDirectorAsset(id: string, input: AttachDirectorAssetInput): Promise<DirectorAsset>
   /** `DELETE /api/director/projects/:id/assets/:assetId` — 移除导演台绑定，不删除原始用户资产。 */
   detachDirectorAsset(id: string, directorAssetId: string): Promise<DirectorProjectDetail>
+  /** `PATCH /api/director/projects/:id/shots/:shotId` — 保存单镜头修改或状态。 */
+  updateDirectorShot(id: string, shotId: string, input: UpdateDirectorShotInput): Promise<DirectorShot>
   /** `POST /api/director/projects/:id/phases/:phase/runs` — 手动排队一个阶段。 */
   requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
@@ -683,6 +688,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorProjectResponseSchema,
       )
       return data.project
+    },
+
+    async updateDirectorShot(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorShotResponseSchema,
+      )
+      return data.shot
     },
 
     async requestDirectorPhaseRun(id, phase, input) {

@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
-import { DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult } from '@bailian-studio/shared'
+import { DirectorRepositoryError } from '@bailian-studio/director-repository'
+import { DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorShot } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -51,6 +52,34 @@ function createProject(input: { title: string; storyText: string; synopsis?: str
     assets: [],
     shots: [],
     phases: createPhaseStates(),
+    createdAt: '2026-08-10T00:00:00.000Z',
+    updatedAt: '2026-08-10T00:00:00.000Z',
+  }
+}
+
+function createShot(projectId: string, status: DirectorShot['status'] = 'needs_review'): DirectorShot {
+  return {
+    id: `${projectId}-shot-1`,
+    projectId,
+    sourceRunId: null,
+    sequence: 1,
+    sceneNumber: 1,
+    slugline: 'INT. TEST - DAY',
+    narrative: '测试镜头叙事',
+    camera: { shotSize: '中景', angle: '平视', movement: '固定', lens: '50mm', composition: '居中' },
+    durationSeconds: 8,
+    environmentPrompt: '测试环境',
+    videoPrompt: '测试动作',
+    negativePrompt: null,
+    dialogue: null,
+    referenceAssetIds: [],
+    continuity: null,
+    status,
+    activeVideoAssetId: null,
+    version: 1,
+    staleAt: null,
+    staleReason: null,
+    error: null,
     createdAt: '2026-08-10T00:00:00.000Z',
     updatedAt: '2026-08-10T00:00:00.000Z',
   }
@@ -120,6 +149,38 @@ const fakeDirectorRepository: DirectorRepository = {
     if (record === undefined) throw new Error('project not found')
     record.project = { ...record.project, assets: record.project.assets.filter(asset => asset.id !== input.directorAssetId) }
     return record.project
+  },
+  async updateShot(input) {
+    const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
+    if (record === undefined) throw new Error('project not found')
+    const current = record.project.shots.find(shot => shot.id === input.shotId)
+    if (current === undefined) throw new Error('shot not found')
+    const hasContentPatch = input.patch.narrative !== undefined
+      || input.patch.camera !== undefined
+      || input.patch.durationSeconds !== undefined
+      || input.patch.environmentPrompt !== undefined
+      || input.patch.videoPrompt !== undefined
+      || input.patch.negativePrompt !== undefined
+      || input.patch.dialogue !== undefined
+      || input.patch.continuity !== undefined
+    if (current.status === 'locked' && (hasContentPatch || input.patch.status !== 'needs_review')) {
+      throw new DirectorRepositoryError('DIRECTOR_SHOT_LOCKED', 'Locked director shots must be unlocked before editing')
+    }
+    const next: DirectorShot = {
+      ...current,
+      ...input.patch,
+      camera: input.patch.camera ?? current.camera,
+      durationSeconds: input.patch.durationSeconds === undefined ? current.durationSeconds : input.patch.durationSeconds,
+      environmentPrompt: input.patch.environmentPrompt === undefined ? current.environmentPrompt : input.patch.environmentPrompt,
+      videoPrompt: input.patch.videoPrompt === undefined ? current.videoPrompt : input.patch.videoPrompt,
+      negativePrompt: input.patch.negativePrompt === undefined ? current.negativePrompt : input.patch.negativePrompt,
+      dialogue: input.patch.dialogue === undefined ? current.dialogue : input.patch.dialogue,
+      continuity: input.patch.continuity === undefined ? current.continuity : input.patch.continuity,
+      status: input.patch.status ?? 'needs_review',
+      updatedAt: '2026-08-10T00:02:00.000Z',
+    }
+    record.project = { ...record.project, shots: record.project.shots.map(shot => shot.id === next.id ? next : shot) }
+    return next
   },
   async requestPhaseRun(input) {
     const run: DirectorPhaseRun = {
@@ -296,5 +357,50 @@ describe('director routes', () => {
     expect(detachResponse.status).toBe(200)
     const detached = await detachResponse.json() as { data: { project: DirectorProjectDetail } }
     expect(detached.data.project.assets).toHaveLength(0)
+  })
+
+  it('edits, locks, and unlocks a storyboard shot through the review contract', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '分镜审核项目', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+    const shot = createShot(projectId)
+    projects[0]!.project = { ...projects[0]!.project, shots: [shot] }
+
+    const editResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ narrative: '修改后的镜头叙事', durationSeconds: 12 }),
+    }))
+    const edited = await editResponse.json() as { data: { shot: DirectorShot } }
+    expect(editResponse.status).toBe(200)
+    expect(edited.data.shot.narrative).toBe('修改后的镜头叙事')
+    expect(edited.data.shot.status).toBe('needs_review')
+
+    const lockResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'locked' }),
+    }))
+    expect(lockResponse.status).toBe(200)
+
+    const blockedResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ videoPrompt: '不应直接覆盖锁定镜头' }),
+    }))
+    const blocked = await blockedResponse.json() as { error: { code: string } }
+    expect(blockedResponse.status).toBe(409)
+    expect(blocked.error.code).toBe('DIRECTOR_SHOT_LOCKED')
+
+    const unlockResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'needs_review' }),
+    }))
+    expect(unlockResponse.status).toBe(200)
   })
 })

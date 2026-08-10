@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
@@ -435,6 +435,23 @@ export function DirectorProjectPage() {
     }
   }
 
+  const updateStoryboardShot = async (shotId: string, input: UpdateDirectorShotInput) => {
+    if (id === undefined) return
+    setSaving(true)
+    try {
+      const nextShot = await apiClient.updateDirectorShot(id, shotId, input)
+      setProject(current => current === undefined ? current : {
+        ...current,
+        shots: current.shots.map(shot => shot.id === nextShot.id ? nextShot : shot),
+      })
+      toast.success(input.status === 'locked' ? '镜头已锁定' : input.status === 'needs_review' ? '镜头已解锁' : '镜头修改已保存')
+    } catch {
+      toast.error('镜头保存失败，请稍后重试')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -676,7 +693,7 @@ export function DirectorProjectPage() {
                 <h2 className="text-xl font-semibold">把剧本拆成可执行的镜头卡</h2>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground">分镜生成只产出草稿，不会自动触发视频任务。生成后请逐镜检查动作、景别、对白和参考资产，再进入后续阶段。</p>
               </div>
-              <StoryboardReview shots={project.shots} />
+              <StoryboardReview shots={project.shots} saving={saving} onSave={updateStoryboardShot} />
             </section>
             <PhaseStatusPanel
               project={project}
@@ -802,7 +819,7 @@ const SHOT_STATUS_LABELS: Record<DirectorShot['status'], string> = {
   locked: '已锁定',
 }
 
-function StoryboardReview({ shots }: { shots: DirectorShot[] }) {
+function StoryboardReview({ shots, saving, onSave }: { shots: DirectorShot[]; saving: boolean; onSave: (shotId: string, input: UpdateDirectorShotInput) => Promise<void> }) {
   if (shots.length === 0) {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
@@ -814,51 +831,118 @@ function StoryboardReview({ shots }: { shots: DirectorShot[] }) {
 
   return (
     <section className="flex flex-col gap-3">
-      {shots.map(shot => {
-        const camera = shot.camera
-        const dialogueLines = dialogueLinesFor(shot.dialogue)
-        const referenceKeys = Array.isArray(shot.continuity?.referenceKeys)
-          ? shot.continuity.referenceKeys.filter((value): value is string => typeof value === 'string')
-          : []
-        return (
-          <article key={shot.id} className={`flex flex-col gap-4 bg-muted/30 px-4 py-4 sm:px-5 ${shot.staleAt !== null ? 'opacity-65 grayscale' : ''}`}>
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(shot.sequence).padStart(2, '0')}</span>
-                  {shot.slugline !== null && <h3 className="font-semibold">{shot.slugline}</h3>}
-                  <Badge variant={shot.staleAt !== null ? 'outline' : 'secondary'}>{shot.staleAt !== null ? '已过时，仅供参考' : SHOT_STATUS_LABELS[shot.status]}</Badge>
-                </div>
-                <p className="text-sm leading-6">{shot.narrative}</p>
-              </div>
-              {shot.durationSeconds !== null && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{shot.durationSeconds}s</span>}
-            </div>
-
-            <div className="grid gap-4 text-sm sm:grid-cols-2">
-              <div className="flex flex-col gap-2">
-                <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">摄影</span>
-                <p className="leading-6 text-muted-foreground">{[camera['shotSize'], camera['angle'], camera['movement'], camera['lens']].filter((value): value is string => typeof value === 'string' && value.length > 0).join(' · ') || '尚未填写摄影参数'}</p>
-                {typeof camera['composition'] === 'string' && camera['composition'].length > 0 && <p className="leading-6 text-muted-foreground">构图：{camera['composition']}</p>}
-              </div>
-              <div className="flex flex-col gap-2">
-                <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">参考对象</span>
-                <p className="leading-6 text-muted-foreground">{referenceKeys.length > 0 ? referenceKeys.join(' · ') : '暂无明确参考对象'}</p>
-                {dialogueLines.length > 0 && <p className="leading-6 text-muted-foreground">对白：{dialogueLines.map(line => `${line.speaker}：“${line.text}”`).join(' ')}</p>}
-              </div>
-            </div>
-
-            {(shot.environmentPrompt !== null || shot.videoPrompt !== null || shot.negativePrompt !== null) && (
-              <details className="flex flex-col gap-3 text-sm">
-                <summary className="cursor-pointer text-muted-foreground">查看生成提示词</summary>
-                {shot.environmentPrompt !== null && <p className="leading-6"><span className="text-muted-foreground">环境：</span>{shot.environmentPrompt}</p>}
-                {shot.videoPrompt !== null && <p className="leading-6"><span className="text-muted-foreground">动作：</span>{shot.videoPrompt}</p>}
-                {shot.negativePrompt !== null && <p className="leading-6"><span className="text-muted-foreground">负面：</span>{shot.negativePrompt}</p>}
-              </details>
-            )}
-          </article>
-        )
-      })}
+      {shots.map(shot => <StoryboardShotCard key={shot.id} shot={shot} saving={saving} onSave={onSave} />)}
     </section>
+  )
+}
+
+function StoryboardShotCard({
+  shot,
+  saving,
+  onSave,
+}: {
+  shot: DirectorShot
+  saving: boolean
+  onSave: (shotId: string, input: UpdateDirectorShotInput) => Promise<void>
+}) {
+  const [narrative, setNarrative] = useState(shot.narrative)
+  const [environmentPrompt, setEnvironmentPrompt] = useState(shot.environmentPrompt ?? '')
+  const [videoPrompt, setVideoPrompt] = useState(shot.videoPrompt ?? '')
+  const [durationSeconds, setDurationSeconds] = useState(shot.durationSeconds === null ? '' : String(shot.durationSeconds))
+  const locked = shot.status === 'locked'
+  const stale = shot.staleAt !== null
+  const dirty = narrative !== shot.narrative
+    || environmentPrompt !== (shot.environmentPrompt ?? '')
+    || videoPrompt !== (shot.videoPrompt ?? '')
+    || durationSeconds !== (shot.durationSeconds === null ? '' : String(shot.durationSeconds))
+
+  useEffect(() => {
+    setNarrative(shot.narrative)
+    setEnvironmentPrompt(shot.environmentPrompt ?? '')
+    setVideoPrompt(shot.videoPrompt ?? '')
+    setDurationSeconds(shot.durationSeconds === null ? '' : String(shot.durationSeconds))
+  }, [shot.id, shot.version, shot.narrative, shot.environmentPrompt, shot.videoPrompt, shot.durationSeconds])
+
+  const camera = shot.camera
+  const dialogueLines = dialogueLinesFor(shot.dialogue)
+  const referenceKeys = Array.isArray(shot.continuity?.referenceKeys)
+    ? shot.continuity.referenceKeys.filter((value): value is string => typeof value === 'string')
+    : []
+  const save = () => {
+    const parsedDuration = durationSeconds.trim() === '' ? null : Number(durationSeconds)
+    if (parsedDuration !== null && (!Number.isInteger(parsedDuration) || parsedDuration < 1 || parsedDuration > 120)) return
+    void onSave(shot.id, {
+      narrative,
+      environmentPrompt: environmentPrompt.trim().length > 0 ? environmentPrompt : null,
+      videoPrompt: videoPrompt.trim().length > 0 ? videoPrompt : null,
+      durationSeconds: parsedDuration,
+    })
+  }
+
+  return (
+    <article className={`flex flex-col gap-4 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-65 grayscale' : ''}`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(shot.sequence).padStart(2, '0')}</span>
+            {shot.slugline !== null && <h3 className="font-semibold">{shot.slugline}</h3>}
+            <Badge variant={stale ? 'outline' : 'secondary'}>{stale ? '已过时，仅供参考' : SHOT_STATUS_LABELS[shot.status]}</Badge>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">{locked ? '本镜头已锁定，解锁后才能继续编辑。' : '修改后会回到待审核状态。确认无误后再锁定。'}</p>
+        </div>
+        <label className="flex items-center gap-2 text-xs text-muted-foreground" htmlFor={`shot-${shot.id}-duration`}>
+          时长
+          <Input id={`shot-${shot.id}-duration`} className="h-8 w-20" type="number" min={1} max={120} value={durationSeconds} disabled={locked || saving} onChange={event => setDurationSeconds(event.target.value)} />
+          秒
+        </label>
+      </div>
+
+      <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`shot-${shot.id}-narrative`}>
+        镜头叙事
+        <Textarea id={`shot-${shot.id}-narrative`} className="min-h-20 resize-y leading-6" value={narrative} disabled={locked || saving} onChange={event => setNarrative(event.target.value)} />
+      </label>
+
+      <div className="grid gap-4 text-sm sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">摄影</span>
+          <p className="leading-6 text-muted-foreground">{[camera['shotSize'], camera['angle'], camera['movement'], camera['lens']].filter((value): value is string => typeof value === 'string' && value.length > 0).join(' · ') || '尚未填写摄影参数'}</p>
+          {typeof camera['composition'] === 'string' && camera['composition'].length > 0 && <p className="leading-6 text-muted-foreground">构图：{camera['composition']}</p>}
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">参考对象</span>
+          <p className="leading-6 text-muted-foreground">{referenceKeys.length > 0 ? referenceKeys.join(' · ') : '暂无明确参考对象'}</p>
+          {dialogueLines.length > 0 && <p className="leading-6 text-muted-foreground">对白：{dialogueLines.map(line => `${line.speaker}：“${line.text}”`).join(' ')}</p>}
+        </div>
+      </div>
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`shot-${shot.id}-environment`}>
+          环境提示词
+          <Textarea id={`shot-${shot.id}-environment`} className="min-h-24 resize-y leading-6" value={environmentPrompt} disabled={locked || saving} onChange={event => setEnvironmentPrompt(event.target.value)} />
+        </label>
+        <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`shot-${shot.id}-video`}>
+          动作提示词
+          <Textarea id={`shot-${shot.id}-video`} className="min-h-24 resize-y leading-6" value={videoPrompt} disabled={locked || saving} onChange={event => setVideoPrompt(event.target.value)} />
+        </label>
+      </div>
+
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {locked ? (
+          <Button variant="outline" size="sm" onClick={() => void onSave(shot.id, { status: 'needs_review' })} disabled={saving}>
+            解锁编辑
+          </Button>
+        ) : (
+          <>
+            <Button variant="outline" size="sm" onClick={save} disabled={!dirty || saving || narrative.trim().length === 0}>
+              保存修改
+            </Button>
+            <Button size="sm" onClick={() => void onSave(shot.id, { status: 'locked' })} disabled={dirty || saving || stale}>
+              锁定本镜头
+            </Button>
+          </>
+        )}
+      </div>
+    </article>
   )
 }
 

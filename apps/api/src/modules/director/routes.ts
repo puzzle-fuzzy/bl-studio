@@ -6,6 +6,7 @@ import {
   CreateDirectorProjectSchema,
   ListDirectorProjectsSchema,
   UpdateDirectorProjectSchema,
+  UpdateDirectorShotSchema,
   validateInput,
 } from '@bailian-studio/shared'
 import type { ApiDependencies } from '../../dependencies'
@@ -56,6 +57,17 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         directorAssetId: params.assetId,
       })
       return { success: true, data: { project } }
+    })
+    .patch('/projects/:id/shots/:shotId', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const patch = validateInput(UpdateDirectorShotSchema, body)
+      const shot = await repository.updateShot({
+        userId: user.id,
+        projectId: params.id,
+        shotId: params.shotId,
+        patch,
+      })
+      return { success: true, data: { shot } }
     })
     .post('/projects/:id/phases/:phase/runs', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)

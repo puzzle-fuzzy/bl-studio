@@ -39,6 +39,7 @@ import type {
 	UpdateDirectorProjectRepositoryInput,
 	AttachDirectorAssetRepositoryInput,
 	DetachDirectorAssetRepositoryInput,
+	UpdateDirectorShotRepositoryInput,
 } from "./types";
 
 interface ProjectCursor {
@@ -1087,6 +1088,88 @@ export function createDirectorRepository({
 				);
 			}
 			return project;
+		},
+
+		async updateShot(input: UpdateDirectorShotRepositoryInput) {
+			const now = new Date();
+			const updated = await db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (project === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PROJECT_NOT_FOUND",
+						`Director project not found: ${input.projectId}`,
+					);
+				}
+				const [current] = await tx
+					.select()
+					.from(directorShots)
+					.where(
+						and(
+							eq(directorShots.id, input.shotId),
+							eq(directorShots.projectId, input.projectId),
+							isNull(directorShots.deletedAt),
+						),
+					)
+					.limit(1);
+				if (current === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_NOT_FOUND",
+						`Director shot not found: ${input.shotId}`,
+					);
+				}
+
+				const patch = input.patch;
+				const hasContentPatch = patch.narrative !== undefined
+					|| patch.camera !== undefined
+					|| patch.durationSeconds !== undefined
+					|| patch.environmentPrompt !== undefined
+					|| patch.videoPrompt !== undefined
+					|| patch.negativePrompt !== undefined
+					|| patch.dialogue !== undefined
+					|| patch.continuity !== undefined;
+				if (current.status === "locked" && (hasContentPatch || patch.status !== "needs_review")) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_SHOT_LOCKED",
+						"Locked director shots must be unlocked before editing",
+					);
+				}
+				const nextStatus = patch.status ?? "needs_review";
+				const [next] = await tx
+					.update(directorShots)
+					.set({
+						...(patch.narrative !== undefined ? { narrative: patch.narrative } : {}),
+						...(patch.camera !== undefined ? { cameraJson: patch.camera } : {}),
+						...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
+						...(patch.environmentPrompt !== undefined ? { environmentPrompt: patch.environmentPrompt } : {}),
+						...(patch.videoPrompt !== undefined ? { videoPrompt: patch.videoPrompt } : {}),
+						...(patch.negativePrompt !== undefined ? { negativePrompt: patch.negativePrompt } : {}),
+						...(patch.dialogue !== undefined ? { dialogueJson: patch.dialogue } : {}),
+						...(patch.continuity !== undefined ? { continuityJson: patch.continuity } : {}),
+						status: nextStatus,
+						updatedBy: input.userId,
+						updatedAt: now,
+					})
+					.where(eq(directorShots.id, current.id))
+					.returning();
+				return next;
+			});
+			if (updated === undefined) {
+				throw new DirectorRepositoryError(
+					"DIRECTOR_SHOT_NOT_FOUND",
+					`Director shot not found: ${input.shotId}`,
+				);
+			}
+			return toShot(updated);
 		},
 
 		async requestPhaseRun(input) {

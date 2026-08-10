@@ -8,15 +8,18 @@ import type {
 	DirectorPhaseState,
 	DirectorCharacter,
   DirectorLocation,
+  DirectorShot,
   DirectorProjectDetail,
   DirectorProjectProgress,
   DirectorProjectStatus,
 	DirectorProjectSummary,
 	DirectorScriptVersion,
   UpdateDirectorProjectInput,
+  UpdateDirectorShotInput,
 } from '@bailian-studio/shared'
 
 export type { AttachDirectorAssetInput, CreateDirectorPhaseRunInput, CreateDirectorProjectInput, UpdateDirectorProjectInput }
+export type { UpdateDirectorShotInput }
 
 export interface CreateDirectorProjectRepositoryInput extends CreateDirectorProjectInput {
   userId: string
@@ -95,6 +98,13 @@ export interface DetachDirectorAssetRepositoryInput {
   directorAssetId: string
 }
 
+export interface UpdateDirectorShotRepositoryInput {
+  userId: string
+  projectId: string
+  shotId: string
+  patch: UpdateDirectorShotInput
+}
+
 export interface ListDirectorProjectsResult {
   items: DirectorProjectRepositorySummary[]
   nextCursor?: string
@@ -107,6 +117,7 @@ export interface DirectorRepository {
   updateProject(input: UpdateDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
   detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>
+  updateShot(input: UpdateDirectorShotRepositoryInput): Promise<DirectorShot>
   requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>
