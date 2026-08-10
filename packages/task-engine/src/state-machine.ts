@@ -110,6 +110,7 @@ export function transitionTask(task: TaskRecord, transition: TaskTransition): Ta
 function assertTaskTypeMatchesDomain(task: TaskRecord): void {
   const expectedDomainByType: Record<TaskRecord['type'], TaskRecord['domain']> = {
     'artifact.persist': 'artifact',
+    'director.phase': 'director',
     'generation.poll': 'generation',
     'generation.submit': 'generation',
     'media.process': 'media',

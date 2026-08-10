@@ -7,7 +7,13 @@ export type {
   DirectorProjectRepositorySummary,
   DirectorRepository,
   GetDirectorProjectRepositoryInput,
+  GetDirectorPhaseRunRepositoryInput,
   ListDirectorProjectsRepositoryInput,
   ListDirectorProjectsResult,
+  DirectorPhaseRunCompletionInput,
+  DirectorPhaseRunFailureInput,
+  DirectorPhaseRunProgressInput,
+  DirectorPhaseRunForWorker,
+  RequestDirectorPhaseRunRepositoryInput,
   UpdateDirectorProjectRepositoryInput,
 } from './types'

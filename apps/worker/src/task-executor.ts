@@ -6,6 +6,7 @@
  */
 
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { createLogger, MetricsCollector, type Logger } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
@@ -13,6 +14,7 @@ import type { TaskRecord } from '@bailian-studio/task-engine'
 import { processArtifactPersistTask } from './artifact-task-handler'
 import type { ArtifactFetchPolicy } from './artifact-persist'
 import { processGenerationTask } from './generation-task-handler'
+import { processDirectorPhaseTask } from './director-phase-task-handler'
 import { processMediaTask } from './media-task-handler'
 import type { MediaProcessor } from './media-processor'
 import type { ProviderRegistry } from './providers'
@@ -23,6 +25,7 @@ export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface TaskExecutorDeps {
   readonly repository: GenerationRepository
+  readonly directorRepository?: DirectorRepository
   readonly providerRegistry: ProviderRegistry
   readonly modelRegistry: ModelRegistryLookup
   readonly storage: StorageAdapter
@@ -64,6 +67,13 @@ export class TaskExecutor {
   }
 
   private async executeTask(task: TaskRecord): Promise<TaskProcessOutcome> {
+    if (task.type === 'director.phase') {
+      return processDirectorPhaseTask(task, {
+        repository: this.deps.repository,
+        ...(this.deps.directorRepository === undefined ? {} : { directorRepository: this.deps.directorRepository }),
+        logger: this.logger,
+      })
+    }
     if (task.type === 'media.thumbnail') {
       return processThumbnailTask(task, {
         repository: this.deps.repository,

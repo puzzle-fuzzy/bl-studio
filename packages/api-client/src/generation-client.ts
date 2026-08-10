@@ -27,6 +27,7 @@ import {
   CreateGenerationResponseSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
+  DirectorPhaseRunResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
@@ -109,6 +110,8 @@ import type {
   CreditBalance,
   CreateGenerationResponse,
   CreateDirectorProjectInput,
+  CreateDirectorPhaseRunInput,
+  DirectorPhaseRun,
   DirectorProjectDetail,
   DirectorProjectListResult,
   EmailActionAccepted,
@@ -307,6 +310,10 @@ export interface BailianStudioApiClient {
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
   /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
   updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
+  /** `POST /api/director/projects/:id/phases/:phase/runs` — 手动排队一个阶段。 */
+  requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
+  /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
+  getDirectorPhaseRun(id: string, phase: string, runId: string): Promise<DirectorPhaseRun>
   /** `GET /api/generations/:id` —— 获取一条生成记录（含状态、输出、错误等）。 */
   getGeneration(id: string): Promise<GenerationRecord>
   /** `GET /api/generations/:id/diagnostics` —— 当前用户可见的安全链路诊断。 */
@@ -649,6 +656,26 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorProjectResponseSchema,
       )
       return data.project
+    },
+
+    async requestDirectorPhaseRun(id, phase, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/${encodeURIComponent(phase)}/runs`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
+    },
+
+    async getDirectorPhaseRun(id, phase, runId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/${encodeURIComponent(phase)}/runs/${encodeURIComponent(runId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
     },
 
     async getGeneration(id) {

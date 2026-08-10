@@ -950,7 +950,7 @@ export const directorPhaseStates = pgTable(
 	(table) => [
 		check(
 			"director_phase_states_status_check",
-			sql`${table.status} in ('not_started', 'ready', 'running', 'needs_review', 'failed', 'completed', 'cancelled')`,
+			sql`${table.status} in ('not_started', 'ready', 'queued', 'running', 'needs_review', 'failed', 'completed', 'cancelled')`,
 		),
 		check("director_phase_states_version_check", sql`${table.version} >= 0`),
 		uniqueIndex("director_phase_states_project_phase_idx").on(

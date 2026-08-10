@@ -2,13 +2,14 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
-import { DIRECTOR_PHASES, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult } from '@bailian-studio/shared'
+import { DIRECTOR_PHASES, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
 let currentUserId = 'user-1'
 let nextProjectId = 1
 let projects: Array<{ userId: string; project: DirectorProjectDetail }> = []
+let runs: Array<{ userId: string; run: DirectorPhaseRun }> = []
 
 const fakeAuthService = createFakeAuthService(() => ({
   id: currentUserId,
@@ -81,6 +82,42 @@ const fakeDirectorRepository: DirectorRepository = {
     }
     return record.project
   },
+  async requestPhaseRun(input) {
+    const run: DirectorPhaseRun = {
+      id: `run-${input.projectId}`,
+      projectId: input.projectId,
+      phase: input.phase,
+      status: 'pending',
+      version: 1,
+      taskId: 'task-1',
+      outputSummary: null,
+      error: null,
+      createdAt: '2026-08-10T00:00:00.000Z',
+      startedAt: null,
+      completedAt: null,
+      updatedAt: '2026-08-10T00:00:00.000Z',
+    }
+    runs.push({ userId: input.userId, run })
+    return run
+  },
+  async getPhaseRun(input) {
+    return runs.find(item => item.userId === input.userId && item.run.id === input.runId && item.run.projectId === input.projectId && item.run.phase === input.phase)?.run
+  },
+  async getPhaseRunForWorker() {
+    return undefined
+  },
+  async markPhaseRunRunning() {
+    return undefined
+  },
+  async setPhaseRunProgress() {
+    return undefined
+  },
+  async completePhaseRun() {
+    return undefined
+  },
+  async failPhaseRun() {
+    return undefined
+  },
 }
 
 const app = createTestApp({
@@ -103,6 +140,7 @@ describe('director routes', () => {
     currentUserId = 'user-1'
     nextProjectId = 1
     projects = []
+    runs = []
   })
 
   it('requires authentication', async () => {
@@ -159,5 +197,29 @@ describe('director routes', () => {
     expect(listResponse.status).toBe(200)
     expect(list.data.items).toHaveLength(0)
     expect(detailResponse.status).toBe(404)
+  })
+
+  it('queues and reads a manual phase run', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '分析项目', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+
+    const runResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/analyze/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'qwen-plus' }),
+    }))
+    const runBody = await runResponse.json() as { data: { run: DirectorPhaseRun } }
+    expect(runResponse.status).toBe(200)
+    expect(runBody.data.run.phase).toBe('analyze')
+
+    const readResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/analyze/runs/${runBody.data.run.id}`))
+    const readBody = await readResponse.json() as { data: { run: DirectorPhaseRun } }
+    expect(readResponse.status).toBe(200)
+    expect(readBody.data.run.id).toBe(runBody.data.run.id)
   })
 })

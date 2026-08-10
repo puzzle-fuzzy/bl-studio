@@ -330,6 +330,13 @@
       "when": 1786353762564,
       "tag": "0046_skinny_vindicator",
       "breakpoints": true
+    },
+    {
+      "idx": 47,
+      "version": "7",
+      "when": 1786355238772,
+      "tag": "0047_dapper_maria_hill",
+      "breakpoints": true
     }
   ]
 }

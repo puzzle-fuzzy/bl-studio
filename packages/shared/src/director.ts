@@ -40,6 +40,7 @@ export const DIRECTOR_PHASE_LABELS: Record<DirectorPhase, string> = {
 export const DIRECTOR_PHASE_STATUS = [
   'not_started',
   'ready',
+  'queued',
   'running',
   'needs_review',
   'failed',
@@ -49,11 +50,22 @@ export const DIRECTOR_PHASE_STATUS = [
 
 export type DirectorPhaseStatus = (typeof DIRECTOR_PHASE_STATUS)[number]
 
+export const DIRECTOR_PHASE_RUN_STATUS = [
+  'pending',
+  'running',
+  'succeeded',
+  'failed',
+  'cancelled',
+] as const
+
+export type DirectorPhaseRunStatus = (typeof DIRECTOR_PHASE_RUN_STATUS)[number]
+
 export const DIRECTOR_PROJECT_STATUS = ['draft', 'active', 'completed', 'archived'] as const
 export type DirectorProjectStatus = (typeof DIRECTOR_PROJECT_STATUS)[number]
 
 export const DirectorPhaseSchema = z.enum(DIRECTOR_PHASES)
 export const DirectorPhaseStatusSchema = z.enum(DIRECTOR_PHASE_STATUS)
+export const DirectorPhaseRunStatusSchema = z.enum(DIRECTOR_PHASE_RUN_STATUS)
 export const DirectorProjectStatusSchema = z.enum(DIRECTOR_PROJECT_STATUS)
 
 export const CreateDirectorProjectSchema = z.object({
@@ -122,8 +134,33 @@ export const DirectorProjectResponseSchema = z.object({
   project: DirectorProjectDetailSchema,
 })
 
+export const CreateDirectorPhaseRunSchema = z.object({
+  modelId: z.string().trim().min(1).max(256),
+}).strict()
+
+export const DirectorPhaseRunSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  phase: DirectorPhaseSchema,
+  status: DirectorPhaseRunStatusSchema,
+  version: z.number().int().positive(),
+  taskId: z.string().nullable(),
+  outputSummary: z.record(z.string(), z.unknown()).nullable(),
+  error: z.record(z.string(), z.unknown()).nullable(),
+  createdAt: z.string(),
+  startedAt: z.string().nullable(),
+  completedAt: z.string().nullable(),
+  updatedAt: z.string(),
+})
+
+export const DirectorPhaseRunResponseSchema = z.object({
+  run: DirectorPhaseRunSchema,
+})
+
 export type CreateDirectorProjectInput = z.infer<typeof CreateDirectorProjectSchema>
 export type UpdateDirectorProjectInput = z.infer<typeof UpdateDirectorProjectSchema>
+export type CreateDirectorPhaseRunInput = z.infer<typeof CreateDirectorPhaseRunSchema>
+export type DirectorPhaseRun = z.infer<typeof DirectorPhaseRunSchema>
 export type ListDirectorProjectsInput = z.infer<typeof ListDirectorProjectsSchema>
 export type DirectorPhaseState = z.infer<typeof DirectorPhaseStateSchema>
 export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSchema>

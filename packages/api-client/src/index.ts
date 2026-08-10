@@ -34,6 +34,7 @@ export { ApiClientError } from './http'
 export {
   DIRECTOR_PHASE_LABELS,
   DIRECTOR_PHASES,
+  DIRECTOR_PHASE_RUN_STATUS,
   DIRECTOR_PHASE_STATUS,
   DIRECTOR_PROJECT_STATUS,
 } from '@bailian-studio/shared'
@@ -44,6 +45,9 @@ export type {
   GenerationArtifact,
   CreateGenerationResponse,
   CreateDirectorProjectInput,
+  CreateDirectorPhaseRunInput,
+  DirectorPhaseRun,
+  DirectorPhaseRunStatus,
   DirectorProjectDetail,
   DirectorProjectListResult,
   DirectorProjectSummary,

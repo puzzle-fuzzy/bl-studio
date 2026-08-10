@@ -393,6 +393,9 @@ importers:
       '@bailian-studio/credit-ledger':
         specifier: workspace:*
         version: link:../../packages/credit-ledger
+      '@bailian-studio/director-repository':
+        specifier: workspace:*
+        version: link:../../packages/director-repository
       '@bailian-studio/generation-repository':
         specifier: workspace:*
         version: link:../../packages/generation-repository

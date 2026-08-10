@@ -1,17 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Loader2, LockKeyhole, Save, Sparkles } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { DirectorProjectDetail } from '@bailian-studio/api-client'
+import type { DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api'
+import { modelNameZh } from '@/lib/model-modes'
+import { useModelCatalogStore } from '@/stores/model-catalog-store'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
 
@@ -30,6 +33,7 @@ const TAB_ITEMS: Array<{ value: string; label: string; phases: DirectorPhase[] }
 ]
 
 const STATUS_LABELS: Record<DirectorProjectDetail['phases'][number]['status'], string> = {
+  queued: '绛夊緟鎵ц',
   not_started: '未开始',
   ready: '待确认',
   running: '执行中',
@@ -60,6 +64,21 @@ export function DirectorProjectPage() {
   const [storyText, setStoryText] = useState('')
   const [synopsis, setSynopsis] = useState('')
   const [saving, setSaving] = useState(false)
+  const [analysisModelId, setAnalysisModelId] = useState('')
+  const [activeRunId, setActiveRunId] = useState<string>()
+  const models = useModelCatalogStore(state => state.models)
+  const loadModels = useModelCatalogStore(state => state.load)
+  const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
+
+  useEffect(() => {
+    void loadModels()
+  }, [loadModels])
+
+  useEffect(() => {
+    if (analysisModelId.length > 0 && textModels.some(model => model.id === analysisModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setAnalysisModelId(preferred.id)
+  }, [analysisModelId, textModels])
 
   useEffect(() => {
     if (id === undefined) return
@@ -72,6 +91,10 @@ export function DirectorProjectPage() {
         setTitle(next.title)
         setStoryText(next.storyText)
         setSynopsis(next.synopsis ?? '')
+        const analysisState = next.phases.find(state => state.phase === 'analyze')
+        if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
+          setActiveRunId(analysisState.activeRunId ?? undefined)
+        }
       })
       .catch(() => {
         if (!cancelled) setError('项目不存在，或你没有访问权限。')
@@ -84,6 +107,34 @@ export function DirectorProjectPage() {
     }
   }, [id])
 
+  useEffect(() => {
+    if (id === undefined || activeRunId === undefined) return
+    let cancelled = false
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const poll = async () => {
+      try {
+        const run = await apiClient.getDirectorPhaseRun(id, 'analyze', activeRunId)
+        if (cancelled) return
+        if (run.status === 'succeeded' || run.status === 'failed' || run.status === 'cancelled') {
+          const next = await apiClient.getDirectorProject(id)
+          if (cancelled) return
+          setProject(next)
+          setActiveRunId(undefined)
+          toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded' ? '剧本分析已完成' : '剧本分析未完成，请查看阶段状态')
+          return
+        }
+        timer = setTimeout(() => void poll(), 2_000)
+      } catch {
+        if (!cancelled) timer = setTimeout(() => void poll(), 4_000)
+      }
+    }
+    void poll()
+    return () => {
+      cancelled = true
+      if (timer !== undefined) clearTimeout(timer)
+    }
+  }, [activeRunId, id])
+
   const progress = useMemo(() => {
     if (project === undefined) return { completed: 0, total: DIRECTOR_PHASES.length }
     return {
@@ -93,6 +144,26 @@ export function DirectorProjectPage() {
   }, [project])
 
   const dirty = project !== undefined && (title !== project.title || storyText !== project.storyText || synopsis !== (project.synopsis ?? ''))
+
+  const runAnalysis = async () => {
+    if (id === undefined || analysisModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'analyze', { modelId: analysisModelId })
+      setActiveRunId(run.id)
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'analyze'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('剧本分析已加入执行队列')
+    } catch {
+      toast.error('无法启动剧本分析，请确认阶段已准备好')
+    } finally {
+      setSaving(false)
+    }
+  }
 
   const saveProject = async () => {
     if (id === undefined || !dirty || title.trim().length === 0 || storyText.trim().length === 0) return
@@ -220,7 +291,16 @@ export function DirectorProjectPage() {
                 </label>
               </div>
             </section>
-            <PhaseStatusPanel project={project} phases={['analyze']} />
+            <PhaseStatusPanel
+              project={project}
+              phases={['analyze']}
+              analysisModelId={analysisModelId}
+              textModels={textModels}
+              running={activeRunId !== undefined}
+              onAnalysisModelChange={setAnalysisModelId}
+              onRunAnalysis={() => void runAnalysis()}
+              blockedByUnsavedChanges={dirty}
+            />
           </div>
         </TabsContent>
 
@@ -245,7 +325,25 @@ export function DirectorProjectPage() {
   )
 }
 
-function PhaseStatusPanel({ project, phases }: { project: DirectorProjectDetail; phases: DirectorPhase[] }) {
+function PhaseStatusPanel({
+  project,
+  phases,
+  analysisModelId,
+  textModels,
+  running,
+  onAnalysisModelChange,
+  onRunAnalysis,
+  blockedByUnsavedChanges,
+}: {
+  project: DirectorProjectDetail
+  phases: DirectorPhase[]
+  analysisModelId?: string
+  textModels?: ModelCatalogItem[]
+  running?: boolean
+  onAnalysisModelChange?: (value: string) => void
+  onRunAnalysis?: () => void
+  blockedByUnsavedChanges?: boolean
+}) {
   const states = project.phases.filter(state => phases.includes(state.phase))
   const status = states.find(state => state.status !== 'completed')?.status ?? states[0]?.status ?? 'not_started'
   return (
@@ -258,6 +356,33 @@ function PhaseStatusPanel({ project, phases }: { project: DirectorProjectDetail;
           <span className="text-sm text-muted-foreground">{states.length === 1 ? DIRECTOR_PHASE_LABELS[states[0]?.phase ?? 'analyze'] : '参考资产'}</span>
         </div>
       </div>
+      <Separator />
+      {phases.includes('analyze') && analysisModelId !== undefined && textModels !== undefined && onAnalysisModelChange !== undefined && onRunAnalysis !== undefined && (
+        <div className="flex flex-col gap-3">
+          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="director-analysis-model">
+            分析模型
+            <Select value={analysisModelId} onValueChange={onAnalysisModelChange} disabled={running || textModels.length === 0}>
+              <SelectTrigger id="director-analysis-model" className="w-full">
+                <SelectValue placeholder="选择文本模型" />
+              </SelectTrigger>
+              <SelectContent>
+                {textModels.map(model => <SelectItem key={model.id} value={model.id}>{modelNameZh(model)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </label>
+          <Button
+            onClick={onRunAnalysis}
+            disabled={running || blockedByUnsavedChanges || (status !== 'ready' && status !== 'failed' && status !== 'needs_review') || textModels.length === 0}
+          >
+            {running ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Sparkles data-icon="inline-start" />}
+            {running ? '分析执行中' : '开始剧本分析'}
+          </Button>
+          {blockedByUnsavedChanges && <p className="text-xs leading-5 text-muted-foreground">请先保存剧本修改，再启动分析。</p>}
+        </div>
+      )}
+      {phases.includes('analyze') && status === 'failed' && states[0]?.lastError !== null && states[0]?.lastError !== undefined && (
+        <p className="text-xs leading-5 text-destructive">{states[0].lastError.message}</p>
+      )}
       <Separator />
       <div className="flex flex-col gap-3 text-sm">
         <div className="flex items-start gap-2">

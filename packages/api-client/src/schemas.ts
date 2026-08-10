@@ -11,11 +11,17 @@
 import { z } from 'zod'
 import {
   CreateDirectorProjectSchema,
+  CreateDirectorPhaseRunSchema,
+  DirectorPhaseRunResponseSchema,
+  DirectorPhaseRunSchema,
   DirectorProjectDetailSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
   UpdateDirectorProjectSchema,
   type CreateDirectorProjectInput,
+  type CreateDirectorPhaseRunInput,
+  type DirectorPhaseRun,
+  type DirectorPhaseRunStatus,
   type DirectorProjectDetail,
   type DirectorProjectListResult,
   type DirectorProjectSummary,
@@ -23,17 +29,23 @@ import {
 } from '@bailian-studio/shared'
 
 export {
+  CreateDirectorPhaseRunSchema,
   CreateDirectorProjectSchema,
   DirectorProjectDetailSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
+  DirectorPhaseRunResponseSchema,
+  DirectorPhaseRunSchema,
   UpdateDirectorProjectSchema,
 }
 export type {
+  CreateDirectorPhaseRunInput,
   CreateDirectorProjectInput,
   DirectorProjectDetail,
   DirectorProjectListResult,
   DirectorProjectSummary,
+  DirectorPhaseRun,
+  DirectorPhaseRunStatus,
   UpdateDirectorProjectInput,
 }
 
