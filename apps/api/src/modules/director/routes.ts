@@ -7,8 +7,10 @@ import {
   ListDirectorProjectsSchema,
   UpdateDirectorProjectSchema,
   UpdateDirectorShotSchema,
+  ValidationError,
   validateInput,
 } from '@bailian-studio/shared'
+import { getBailianOperationCapability, getModelById } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
@@ -73,6 +75,17 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      if (phase === 'videos') {
+        const model = getModelById(input.modelId)
+        if (
+          model === undefined
+          || model.availability.enabled === false
+          || model.request.kind !== 'dashscope-video-task'
+          || getBailianOperationCapability(model.id) !== 'video.reference-to-video'
+        ) {
+          throw new ValidationError('视频阶段需要使用已启用的参考生视频模型', 'modelId')
+        }
+      }
       const run = await repository.requestPhaseRun({
         userId: user.id,
         projectId: params.id,

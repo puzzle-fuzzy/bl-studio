@@ -342,6 +342,25 @@ describe('director routes', () => {
     expect(readBody.data.run.id).toBe(runBody.data.run.id)
   })
 
+  it('rejects a non-reference video model before queueing the video phase', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '视频阶段模型校验', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+
+    const runResponse = await app.handle(authed(`/api/director/projects/${created.data.project.id}/phases/videos/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'qwen-plus' }),
+    }))
+    const body = await runResponse.json() as { error: { code: string } }
+
+    expect(runResponse.status).toBe(400)
+    expect(body.error.code).toBe('VALIDATION_ERROR')
+  })
+
   it('binds and detaches a reference asset without changing the project asset source', async () => {
     const createResponse = await app.handle(authed('/api/director/projects', {
       method: 'POST',
