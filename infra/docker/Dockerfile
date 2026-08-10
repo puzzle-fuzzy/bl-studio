@@ -51,6 +51,7 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
@@ -81,6 +82,7 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
