@@ -90,6 +90,7 @@ export const DirectorPhaseStateSchema = z.object({
   status: DirectorPhaseStatusSchema,
   version: z.number().int().nonnegative(),
   activeRunId: z.string().nullable(),
+  lastRunId: z.string().nullable(),
   lastError: z.object({
     code: z.string(),
     message: z.string(),

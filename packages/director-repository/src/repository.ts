@@ -63,12 +63,14 @@ function decodeCursor(value: string): ProjectCursor {
 
 function toPhaseState(
 	row: typeof directorPhaseStates.$inferSelect,
+	lastRunId: string | null = null,
 ): DirectorPhaseState {
 	return {
 		phase: row.phase as DirectorPhase,
 		status: row.status as DirectorPhaseState["status"],
 		version: row.version,
 		activeRunId: row.activeRunId,
+		lastRunId,
 		lastError: row.lastErrorJson,
 		updatedAt: row.updatedAt.toISOString(),
 	};
@@ -113,9 +115,14 @@ function projectProgress(
 function toProjectDetail(
 	row: typeof directorProjects.$inferSelect,
 	phaseRows: Array<typeof directorPhaseStates.$inferSelect>,
+	phaseRunRows: Array<typeof directorPhaseRuns.$inferSelect> = [],
 ): DirectorProjectRepositoryDetail {
+	const latestRunByPhase = new Map<string, string>();
+	for (const run of phaseRunRows) {
+		if (!latestRunByPhase.has(run.phase)) latestRunByPhase.set(run.phase, run.id);
+	}
 	const phases = phaseRows
-		.map(toPhaseState)
+		.map((phaseRow) => toPhaseState(phaseRow, latestRunByPhase.get(phaseRow.phase) ?? null))
 		.sort(
 			(a, b) =>
 				DIRECTOR_PHASES.indexOf(a.phase) - DIRECTOR_PHASES.indexOf(b.phase),
@@ -138,7 +145,7 @@ function toProjectSummary(
 	row: typeof directorProjects.$inferSelect,
 	phaseRows: Array<typeof directorPhaseStates.$inferSelect>,
 ): DirectorProjectRepositorySummary {
-	const states = phaseRows.map(toPhaseState);
+	const states = phaseRows.map((row) => toPhaseState(row));
 	return {
 		id: row.id,
 		title: row.title,
@@ -284,7 +291,12 @@ export function createDirectorRepository({
 				.select()
 				.from(directorPhaseStates)
 				.where(eq(directorPhaseStates.projectId, row.id));
-			return toProjectDetail(row, phases);
+			const runs = await db
+				.select()
+				.from(directorPhaseRuns)
+				.where(eq(directorPhaseRuns.projectId, row.id))
+				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
+			return toProjectDetail(row, phases, runs);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {

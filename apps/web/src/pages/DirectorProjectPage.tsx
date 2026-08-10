@@ -66,6 +66,7 @@ export function DirectorProjectPage() {
   const [saving, setSaving] = useState(false)
   const [analysisModelId, setAnalysisModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
+  const [analysisText, setAnalysisText] = useState<string>()
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
@@ -95,6 +96,15 @@ export function DirectorProjectPage() {
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
         }
+        if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
+            .then(run => {
+              if (!cancelled && run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
+                setAnalysisText(run.outputSummary.analysisText)
+              }
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => {
         if (!cancelled) setError('项目不存在，或你没有访问权限。')
@@ -119,6 +129,9 @@ export function DirectorProjectPage() {
           const next = await apiClient.getDirectorProject(id)
           if (cancelled) return
           setProject(next)
+          if (run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
+            setAnalysisText(run.outputSummary.analysisText)
+          }
           setActiveRunId(undefined)
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded' ? '剧本分析已完成' : '剧本分析未完成，请查看阶段状态')
           return
@@ -290,6 +303,15 @@ export function DirectorProjectPage() {
                   <Textarea id="director-project-story" value={storyText} onChange={event => setStoryText(event.target.value)} className="min-h-96 resize-y leading-7" maxLength={500_000} />
                 </label>
               </div>
+              {analysisText !== undefined && (
+                <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
+                  <div className="flex items-center justify-between gap-3">
+                    <h2 className="font-semibold">分析结果</h2>
+                    <span className="text-xs text-muted-foreground">可作为下一阶段输入参考</span>
+                  </div>
+                  <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{analysisText}</p>
+                </section>
+              )}
             </section>
             <PhaseStatusPanel
               project={project}

@@ -24,6 +24,7 @@ function createPhaseStates(): DirectorPhaseState[] {
     status: index === 0 ? 'ready' : 'not_started',
     version: 0,
     activeRunId: null,
+    lastRunId: null,
     lastError: null,
     updatedAt: '2026-08-10T00:00:00.000Z',
   }))
