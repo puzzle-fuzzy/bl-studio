@@ -4,8 +4,8 @@ import { sleep, spawnProcess } from '@bailian-studio/shared'
 
 const repositoryRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
 const composeFile = resolve(repositoryRoot, 'infra', 'docker', 'docker-compose.rehearsal.yml')
-const defaultApiOrigin = 'http://127.0.0.1:5013'
-const defaultWebOrigin = 'http://127.0.0.1:5012'
+const defaultApiOrigin = process.env.REHEARSAL_API_ORIGIN?.trim() || 'http://127.0.0.1:5013'
+const defaultWebOrigin = process.env.REHEARSAL_WEB_ORIGIN?.trim() || 'http://127.0.0.1:5012'
 const startupTimeoutMs = 180_000
 const requestTimeoutMs = 5_000
 

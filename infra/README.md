@@ -23,6 +23,17 @@ pnpm run db:up        # dev Postgres :55431 + Mailpit :11025
 pnpm run dev          # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
 ```
 
+Windows 本机若端口被其他项目占用，可在 PowerShell 中覆盖 Compose 宿主机端口：
+
+```powershell
+$env:BL_STUDIO_DEV_POSTGRES_PORT = '55441'
+$env:BL_STUDIO_DEV_MAILPIT_SMTP_PORT = '11125'
+$env:BL_STUDIO_DEV_MAILPIT_UI_PORT = '18125'
+pnpm run db:up
+```
+
+请同步修改 `infra/env/.env` 的 `DATABASE_URL` 和 `SMTP_PORT`。rehearsal 可用 `BL_STUDIO_REHEARSAL_POSTGRES_PORT`、`BL_STUDIO_REHEARSAL_API_PORT`、`BL_STUDIO_REHEARSAL_WEB_PORT` 覆盖；执行 smoke 时再设置 `REHEARSAL_API_ORIGIN`/`REHEARSAL_WEB_ORIGIN`。
+
 Windows PowerShell 使用：
 
 ```powershell

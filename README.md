@@ -47,6 +47,15 @@ cp infra/env/.env.test.example infra/env/.env.test
 pnpm run dev
 ```
 
+如果本机已有其他项目占用默认 Docker 端口，可在当前 PowerShell 会话中覆盖宿主机端口；同时把 `infra/env/.env` 中的 `DATABASE_URL`/`SMTP_PORT` 改为对应值：
+
+```powershell
+$env:BL_STUDIO_DEV_POSTGRES_PORT = '55441'
+$env:BL_STUDIO_DEV_MAILPIT_SMTP_PORT = '11125'
+$env:BL_STUDIO_DEV_MAILPIT_UI_PORT = '18125'
+pnpm run db:up
+```
+
 打开 http://localhost:5002 即可创作。
 
 > API 由 Bun 启动（Elysia 原生效能路径）；Worker、脚本、db 工具、测试均走 pnpm/Node。
@@ -88,6 +97,8 @@ pnpm run check:manifests  # 模型 manifest 一致性
 pnpm run db:studio        # drizzle-kit studio
 pnpm run e2e              # Playwright（需 test DB）
 ```
+
+rehearsal 默认使用 Web `5012`、API `5013`、Postgres `55433`；可用 `BL_STUDIO_REHEARSAL_*_PORT` 覆盖。若运行 `deploy:rehearsal:smoke`，同步设置 `REHEARSAL_API_ORIGIN` 和 `REHEARSAL_WEB_ORIGIN`。
 
 ## 架构
 
