@@ -35,7 +35,7 @@ export function Nav() {
   const { pathname } = useLocation()
 
   return (
-    <Sidebar>
+    <Sidebar collapsible="icon">
       {/* 折叠按钮相对侧边栏定位，侧边栏收缩时随之平移（不再是 fixed） */}
       <SidebarTrigger className="absolute top-3 right-2 z-10" />
       <SidebarHeader>
@@ -49,10 +49,14 @@ export function Nav() {
               {NAV_ITEMS.map(item => (
                 <SidebarMenuItem key={item.to}>
                   {/* 选中态由当前路径判断（含子路由前缀，如 /generations/:id） */}
-                  <SidebarMenuButton asChild isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}
+                    tooltip={item.label}
+                  >
                     <NavLink to={item.to}>
                       <item.icon />
-                      <span>{item.label}</span>
+                      <span className="group-data-[collapsible=icon]:hidden">{item.label}</span>
                     </NavLink>
                   </SidebarMenuButton>
                 </SidebarMenuItem>

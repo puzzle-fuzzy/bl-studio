@@ -40,11 +40,15 @@ export function NotificationMenu() {
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         {/* 侧栏底部整行触发器：铃铛 + 通知 + 未读徽标 */}
-        <SidebarMenuButton className="w-full">
+        <SidebarMenuButton
+          aria-label="通知"
+          className="relative w-full group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0!"
+          title="通知"
+        >
           <Bell className="size-4" />
-          <span>通知</span>
+          <span className="group-data-[collapsible=icon]:hidden">通知</span>
           {unreadCount > 0 && (
-            <span className="ml-auto flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+            <span className="ml-auto flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1">
               {unreadCount}
             </span>
           )}
