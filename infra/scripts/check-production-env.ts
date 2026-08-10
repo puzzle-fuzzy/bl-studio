@@ -8,7 +8,7 @@
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawnSyncResult } from '@bailian-studio/shared'
+import { spawnSyncResult } from '@bailian-studio/shared/server'
 
 export interface ProductionPreflightIssue {
   readonly key: string

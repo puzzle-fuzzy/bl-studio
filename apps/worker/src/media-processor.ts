@@ -1,7 +1,7 @@
 import { mkdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { basename, extname, join } from 'node:path'
-import { spawnProcess } from '@bailian-studio/shared'
+import { spawnProcess } from '@bailian-studio/shared/server'
 
 export type AudioFormat = 'mp3' | 'wav'
 

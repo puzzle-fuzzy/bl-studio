@@ -5,7 +5,7 @@ import { join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
-import { spawnProcess } from '@bailian-studio/shared'
+import { spawnProcess } from '@bailian-studio/shared/server'
 
 export interface ProbeMediaDurationOptions {
   ffprobePath?: string

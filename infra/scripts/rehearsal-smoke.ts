@@ -1,6 +1,6 @@
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { sleep, spawnProcess } from '@bailian-studio/shared'
+import { sleep, spawnProcess } from '@bailian-studio/shared/server'
 
 const repositoryRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
 const composeFile = resolve(repositoryRoot, 'infra', 'docker', 'docker-compose.rehearsal.yml')

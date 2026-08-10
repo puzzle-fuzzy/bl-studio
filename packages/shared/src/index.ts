@@ -8,8 +8,6 @@
 
 export { createLogger, resolveLogFormat, safeJsonStringify, type LogFormat, type Logger } from './logger'
 export { MetricsCollector, type MetricsSnapshot, type TimerSummary } from './metrics'
-export { spawnProcess, spawnSyncResult, sleep } from './process'
-export type { NodeProcessHandle, SpawnProcessOptions, SpawnSyncResult } from './process'
 export {
   CreateGenerationSchema,
   GenerationListViewSchema,
