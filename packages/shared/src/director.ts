@@ -123,6 +123,51 @@ export const DirectorLocationSchema = z.object({
   ...DirectorStaleFields,
 }).strict()
 
+export const DIRECTOR_SHOT_STATUS = [
+  'not_started',
+  'needs_review',
+  'ready',
+  'generating',
+  'succeeded',
+  'failed',
+  'locked',
+] as const
+
+export const DirectorShotStatusSchema = z.enum(DIRECTOR_SHOT_STATUS)
+
+const DirectorShotCameraSchema = z.object({
+  shotSize: z.string().max(120),
+  angle: z.string().max(120),
+  movement: z.string().max(200),
+  lens: z.string().max(120),
+  composition: z.string().max(500),
+}).strict()
+
+const DirectorShotDialogueSchema = z.array(z.object({
+  speaker: z.string().min(1).max(120),
+  text: z.string().min(1).max(2_000),
+  delivery: z.string().max(300),
+}).strict()).max(30)
+
+export const DirectorShotDraftSchema = z.object({
+  sequence: z.number().int().positive(),
+  sceneNumber: z.number().int().positive().nullable(),
+  slugline: z.string().max(300).nullable(),
+  narrative: z.string().min(1).max(4_000),
+  camera: DirectorShotCameraSchema,
+  durationSeconds: z.number().int().positive().max(120).nullable(),
+  environmentPrompt: z.string().max(4_000),
+  videoPrompt: z.string().max(4_000),
+  negativePrompt: z.string().max(2_000),
+  dialogue: DirectorShotDialogueSchema,
+  referenceKeys: z.array(z.string().min(1).max(160)).max(30),
+  continuity: z.record(z.string(), z.unknown()),
+}).strict()
+
+export const DirectorStoryboardResultSchema = z.object({
+  shots: z.array(DirectorShotDraftSchema).max(500),
+}).strict()
+
 export const DirectorAssetSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -134,6 +179,31 @@ export const DirectorAssetSchema = z.object({
   version: z.number().int().positive(),
   metadata: z.record(z.string(), z.unknown()),
   ...DirectorStaleFields,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).strict()
+
+export const DirectorShotSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  sourceRunId: z.string().nullable(),
+  sequence: z.number().int().positive(),
+  sceneNumber: z.number().int().positive().nullable(),
+  slugline: z.string().nullable(),
+  narrative: z.string(),
+  camera: z.record(z.string(), z.unknown()),
+  durationSeconds: z.number().int().positive().nullable(),
+  environmentPrompt: z.string().nullable(),
+  videoPrompt: z.string().nullable(),
+  negativePrompt: z.string().nullable(),
+  dialogue: z.record(z.string(), z.unknown()).nullable(),
+  referenceAssetIds: z.array(z.string()),
+  continuity: z.record(z.string(), z.unknown()).nullable(),
+  status: DirectorShotStatusSchema,
+  activeVideoAssetId: z.string().nullable(),
+  version: z.number().int().positive(),
+  ...DirectorStaleFields,
+  error: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 }).strict()
@@ -203,6 +273,7 @@ export const DirectorProjectDetailSchema = z.object({
   characters: z.array(DirectorCharacterSchema),
   locations: z.array(DirectorLocationSchema),
   assets: z.array(DirectorAssetSchema),
+  shots: z.array(DirectorShotSchema),
   phases: z.array(DirectorPhaseStateSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -321,4 +392,7 @@ export type DirectorCharacter = z.infer<typeof DirectorCharacterSchema>
 export type DirectorLocation = z.infer<typeof DirectorLocationSchema>
 export type DirectorAsset = z.infer<typeof DirectorAssetSchema>
 export type AttachDirectorAssetInput = z.infer<typeof AttachDirectorAssetSchema>
+export type DirectorShot = z.infer<typeof DirectorShotSchema>
+export type DirectorShotDraft = z.infer<typeof DirectorShotDraftSchema>
+export type DirectorStoryboardResult = z.infer<typeof DirectorStoryboardResultSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

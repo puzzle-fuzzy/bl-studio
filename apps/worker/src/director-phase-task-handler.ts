@@ -1,11 +1,12 @@
 import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type Logger } from '@bailian-studio/shared'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { parseDirectorAnalysisOutput } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
+import { parseDirectorStoryboardOutput } from './director-storyboard'
 import type { TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 9_000
@@ -78,6 +79,9 @@ export async function processDirectorPhaseTask(
   if (run.phase === 'locations') {
     return processLocationsPhase(run, task, deps, modelId, task.userId, snapshot)
   }
+  if (run.phase === 'storyboard') {
+    return processStoryboardPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
   if (run.phase !== 'analyze') {
     return failPhase(run.id, {
       category: 'validation',
@@ -110,7 +114,7 @@ export async function processDirectorPhaseTask(
         idempotencyKey: `director:${run.id}:analysis`,
         traceId: task.traceId,
       })
-      await deps.directorRepository.setPhaseRunProgress({
+      await deps.directorRepository?.setPhaseRunProgress({
         runId: run.id,
         outputSummary: { generationId: generation.record.id, modelId },
       })
@@ -387,12 +391,121 @@ async function processLocationsPhase(
   return retryUntilGenerationCompletes(task, `Location generation is ${generation.status}`, 'DIRECTOR_LOCATIONS')
 }
 
+async function processStoryboardPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const analysisResult = DirectorAnalysisResultSchema.safeParse(snapshot.analysis)
+  const charactersResult = DirectorCharactersResultSchema.safeParse(snapshot.characters)
+  const locationsResult = DirectorLocationsResultSchema.safeParse(snapshot.locations)
+  if (!analysisResult.success || !charactersResult.success || !locationsResult.success) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'Validated analysis, character, and location results are required before generating storyboard',
+      retriable: false,
+      code: 'DIRECTOR_STORYBOARD_INPUT_INVALID',
+    }, deps)
+  }
+  if (snapshot.storyText.length > MAX_ANALYSIS_STORY_LENGTH) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Screenplay is too long for the first storyboard executor (${MAX_ANALYSIS_STORY_LENGTH} characters maximum)`,
+      retriable: false,
+      code: 'DIRECTOR_STORYBOARD_INPUT_TOO_LONG',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: storyboardPrompt(snapshot, analysisResult.data, charactersResult.data, locationsResult.data),
+          maxTokens: 8_192,
+          temperature: 0.4,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:storyboard`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director storyboard generation is queued', 'DIRECTOR_STORYBOARD')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_STORYBOARD_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Storyboard generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_STORYBOARD_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const storyboardText = readTextOutput(generation.outputResult)
+    if (storyboardText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Storyboard generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_STORYBOARD_OUTPUT_MISSING',
+      }, deps)
+    }
+    const storyboard = parseDirectorStoryboardOutput(storyboardText)
+    if (storyboard === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Storyboard generation returned text that does not match the Director storyboard contract',
+        retriable: false,
+        code: 'DIRECTOR_STORYBOARD_OUTPUT_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, storyboardText, storyboard }, deps, storyboardText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Storyboard generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_STORYBOARD_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Storyboard generation is ${generation.status}`, 'DIRECTOR_STORYBOARD')
+}
+
 interface RunInputSnapshot {
   title: string
   synopsis: string | null
   storyText: string
   analysis: unknown
   characters: unknown
+  locations: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -403,6 +516,7 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     storyText: stringInput(snapshot, 'storyText') ?? '',
     analysis: snapshot['analysis'],
     characters: snapshot['characters'],
+    locations: snapshot['locations'],
   }
 }
 
@@ -443,6 +557,29 @@ function locationsPrompt(snapshot: RunInputSnapshot, characters: DirectorCharact
     `项目：${snapshot.title}`,
     snapshot.synopsis === null ? '' : `简介：${snapshot.synopsis}`,
     `角色卡：\n${JSON.stringify(characters)}`,
+    `剧本原文：\n${snapshot.storyText}`,
+  ].filter(Boolean).join('\n\n')
+}
+
+function storyboardPrompt(
+  snapshot: RunInputSnapshot,
+  analysis: DirectorAnalysisResult,
+  characters: DirectorCharactersResult,
+  locations: DirectorLocationsResult,
+): string {
+  return [
+    '你是一名专业短剧导演、分镜师和连续性统筹。请基于已经确认的剧本分析、角色卡和场景卡，生成可供人工审核的分镜草稿。',
+    '只返回一个 JSON 对象，不要 Markdown、代码围栏、解释文字或额外字段。',
+    '每个 shot 必须是一个可独立审核的镜头，按 sequence 从 1 开始连续编号。不要自动生成视频，不要把图片资产 ID 编造进结果。',
+    'JSON 必须符合以下结构：',
+    '{"shots":[{"sequence":1,"sceneNumber":1,"slugline":"INT. 场景 - 时间","narrative":"镜头内发生的动作","camera":{"shotSize":"景别","angle":"机位","movement":"运动","lens":"镜头","composition":"构图"},"durationSeconds":5,"environmentPrompt":"环境画面提示词","videoPrompt":"动作与镜头运动提示词","negativePrompt":"负面提示词","dialogue":[{"speaker":"角色名","text":"对白","delivery":"语气"}],"referenceKeys":["角色名或场景名"],"continuity":{"前镜头衔接":"约束"}}]}',
+    'sceneNumber、slugline、durationSeconds 可以为 null；没有对白时 dialogue 使用空数组。referenceKeys 只能填写已确认角色卡或场景卡的名称。',
+    '只使用输入中能够得到的事实；无法确认时保持克制，不要增加关键人物、地点或事件。',
+    `项目：${snapshot.title}`,
+    snapshot.synopsis === null ? '' : `简介：${snapshot.synopsis}`,
+    `剧本分析：\n${JSON.stringify(analysis)}`,
+    `角色卡：\n${JSON.stringify(characters)}`,
+    `场景卡：\n${JSON.stringify(locations)}`,
     `剧本原文：\n${snapshot.storyText}`,
   ].filter(Boolean).join('\n\n')
 }

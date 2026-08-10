@@ -20,12 +20,13 @@ import {
 	type DirectorCharacter,
 	type DirectorAsset,
 	type DirectorLocation,
+	type DirectorShot,
 	type DirectorProjectDetail,
 	type DirectorProjectProgress,
 	type DirectorProjectStatus,
 	type DirectorScriptVersion,
 } from "@bailian-studio/shared";
-import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { DirectorRepositoryError } from "./errors";
 import type {
 	CreateDirectorProjectRepositoryInput,
@@ -180,6 +181,34 @@ function toDirectorAsset(
 	};
 }
 
+function toShot(row: typeof directorShots.$inferSelect): DirectorShot {
+	return {
+		id: row.id,
+		projectId: row.projectId,
+		sourceRunId: row.sourceRunId,
+		sequence: row.sequence,
+		sceneNumber: row.sceneNumber,
+		slugline: row.slugline,
+		narrative: row.narrative,
+		camera: row.cameraJson,
+		durationSeconds: row.durationSeconds,
+		environmentPrompt: row.environmentPrompt,
+		videoPrompt: row.videoPrompt,
+		negativePrompt: row.negativePrompt,
+		dialogue: row.dialogueJson,
+		referenceAssetIds: row.referenceAssetIdsJson,
+		continuity: row.continuityJson,
+		status: row.status as DirectorShot["status"],
+		activeVideoAssetId: row.activeVideoAssetId,
+		version: row.version,
+		staleAt: row.staleAt?.toISOString() ?? null,
+		staleReason: row.staleReason,
+		error: row.errorJson,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
 function toWorkerPhaseRun(
 	row: typeof directorPhaseRuns.$inferSelect,
 ) {
@@ -204,6 +233,7 @@ function toProjectDetail(
 	characterRows: Array<typeof directorCharacters.$inferSelect>,
 	locationRows: Array<typeof directorLocations.$inferSelect>,
 	assetRows: Array<typeof directorAssets.$inferSelect>,
+	shotRows: Array<typeof directorShots.$inferSelect>,
 	phaseRunRows: Array<typeof directorPhaseRuns.$inferSelect> = [],
 ): DirectorProjectRepositoryDetail {
 	const latestRunByPhase = new Map<string, string>();
@@ -227,6 +257,7 @@ function toProjectDetail(
 		characters: characterRows.map(toCharacter),
 		locations: locationRows.map(toLocation),
 		assets: assetRows.map(toDirectorAsset),
+		shots: shotRows.map(toShot),
 		phases,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -248,10 +279,25 @@ function stringField(value: unknown): string {
 	return typeof value === "string" ? value : "";
 }
 
+function nullableStringField(value: unknown): string | null {
+	const result = stringField(value);
+	return result.length > 0 ? result : null;
+}
+
 function stringArrayField(value: unknown): string[] {
 	return Array.isArray(value)
 		? value.filter((item): item is string => typeof item === "string")
 		: [];
+}
+
+function numberField(value: unknown): number | null {
+	return typeof value === "number" && Number.isInteger(value) ? value : null;
+}
+
+function objectField(value: unknown): Record<string, unknown> {
+	return typeof value === "object" && value !== null && !Array.isArray(value)
+		? (value as Record<string, unknown>)
+		: {};
 }
 
 async function materializePhaseOutput(
@@ -300,10 +346,10 @@ async function materializePhaseOutput(
 		return;
 	}
 
-	if (run.phase !== "locations") return;
-	const records = recordArray(outputSummary.locations, "locations");
-	if (records.length === 0) return;
-	await tx
+	if (run.phase === "locations") {
+		const records = recordArray(outputSummary.locations, "locations");
+		if (records.length === 0) return;
+		await tx
 		.update(directorLocations)
 		.set({ staleAt: now, staleReason: "superseded_by_phase_run", updatedAt: now })
 		.where(
@@ -313,7 +359,7 @@ async function materializePhaseOutput(
 				isNull(directorLocations.staleAt),
 			),
 		);
-	await tx.insert(directorLocations).values(
+		await tx.insert(directorLocations).values(
 		records.map((record) => ({
 			id: crypto.randomUUID(),
 			projectId: run.projectId,
@@ -329,6 +375,50 @@ async function materializePhaseOutput(
 				continuityNotes: stringArrayField(record.continuityNotes),
 			},
 			locked: false,
+			version: run.version,
+			createdBy: run.createdBy,
+			updatedBy: run.updatedBy,
+			createdAt: now,
+			updatedAt: now,
+		})),
+		);
+		return;
+	}
+
+	if (run.phase !== "storyboard") return;
+	const shotRecords = recordArray(outputSummary.shots, "shots");
+	if (shotRecords.length === 0) return;
+	await tx
+		.update(directorShots)
+		.set({ staleAt: now, staleReason: "superseded_by_phase_run", updatedAt: now })
+		.where(
+			and(
+				eq(directorShots.projectId, run.projectId),
+				ne(directorShots.status, "locked"),
+				isNull(directorShots.staleAt),
+			),
+		);
+	await tx.insert(directorShots).values(
+		shotRecords.map((record, index) => ({
+			id: crypto.randomUUID(),
+			projectId: run.projectId,
+			sourceRunId: run.id,
+			sequence: numberField(record.sequence) ?? index + 1,
+			sceneNumber: numberField(record.sceneNumber),
+			slugline: nullableStringField(record.slugline),
+			narrative: stringField(record.narrative),
+			cameraJson: objectField(record.camera),
+			durationSeconds: numberField(record.durationSeconds),
+			environmentPrompt: nullableStringField(record.environmentPrompt),
+			videoPrompt: nullableStringField(record.videoPrompt),
+			negativePrompt: nullableStringField(record.negativePrompt),
+			dialogueJson: { lines: Array.isArray(record.dialogue) ? record.dialogue : [] },
+			referenceAssetIdsJson: [],
+			continuityJson: {
+				...objectField(record.continuity),
+				referenceKeys: stringArrayField(record.referenceKeys),
+			},
+			status: "needs_review",
 			version: run.version,
 			createdBy: run.createdBy,
 			updatedBy: run.updatedBy,
@@ -540,12 +630,22 @@ export function createDirectorRepository({
 					),
 				)
 				.orderBy(desc(directorAssets.createdAt), desc(directorAssets.id));
+			const shotRows = await db
+				.select()
+				.from(directorShots)
+				.where(
+					and(
+						eq(directorShots.projectId, row.id),
+						isNull(directorShots.deletedAt),
+					),
+				)
+				.orderBy(directorShots.sequence, desc(directorShots.createdAt), desc(directorShots.id));
 			const runs = await db
 				.select()
 				.from(directorPhaseRuns)
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
-			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, assetRows, runs);
+			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, assetRows, shotRows, runs);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
@@ -1102,6 +1202,67 @@ export function createDirectorRepository({
 					}
 					inputSnapshot.sourceRunId = sourceRun.id;
 					inputSnapshot.characters = characters;
+				} else if (input.phase === "storyboard") {
+					const [analysisRun] = await tx
+						.select()
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "analyze"),
+								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					const [charactersRun] = await tx
+						.select()
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "characters"),
+								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					const [locationsRun] = await tx
+						.select()
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "locations"),
+								eq(directorPhaseRuns.status, "succeeded"),
+								isNull(directorPhaseRuns.staleAt),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					const analysis = analysisRun?.outputSummaryJson?.analysis;
+					const characters = charactersRun?.outputSummaryJson?.characters;
+					const locations = locationsRun?.outputSummaryJson?.locations;
+					if (
+						analysisRun === undefined || analysis === undefined ||
+						charactersRun === undefined || characters === undefined ||
+						locationsRun === undefined || locations === undefined
+					) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A succeeded screenplay analysis, character phase, and location phase are required before generating storyboard",
+						);
+					}
+					inputSnapshot.sourceRunIds = {
+						analysis: analysisRun.id,
+						characters: charactersRun.id,
+						locations: locationsRun.id,
+					};
+					inputSnapshot.analysis = analysis;
+					inputSnapshot.characters = characters;
+					inputSnapshot.locations = locations;
 				}
 
 				const version = state.version + 1;

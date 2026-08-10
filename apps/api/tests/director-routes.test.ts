@@ -49,6 +49,7 @@ function createProject(input: { title: string; storyText: string; synopsis?: str
     characters: [],
     locations: [],
     assets: [],
+    shots: [],
     phases: createPhaseStates(),
     createdAt: '2026-08-10T00:00:00.000Z',
     updatedAt: '2026-08-10T00:00:00.000Z',

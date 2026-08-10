@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
@@ -73,6 +73,7 @@ export function DirectorProjectPage() {
   const [analysisModelId, setAnalysisModelId] = useState('')
   const [charactersModelId, setCharactersModelId] = useState('')
   const [locationsModelId, setLocationsModelId] = useState('')
+  const [storyboardModelId, setStoryboardModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [activePhase, setActivePhase] = useState<DirectorPhase>()
   const [analysisText, setAnalysisText] = useState<string>()
@@ -123,6 +124,12 @@ export function DirectorProjectPage() {
   }, [locationsModelId, textModels])
 
   useEffect(() => {
+    if (storyboardModelId.length > 0 && textModels.some(model => model.id === storyboardModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setStoryboardModelId(preferred.id)
+  }, [storyboardModelId, textModels])
+
+  useEffect(() => {
     if (id === undefined) return
     let cancelled = false
     setLoading(true)
@@ -158,6 +165,12 @@ export function DirectorProjectPage() {
         } else if (locationsState?.status === 'queued' || locationsState?.status === 'running') {
           setActiveRunId(locationsState.activeRunId ?? undefined)
           setActivePhase('locations')
+        } else {
+          const storyboardState = next.phases.find(state => state.phase === 'storyboard')
+          if (storyboardState?.status === 'queued' || storyboardState?.status === 'running') {
+            setActiveRunId(storyboardState.activeRunId ?? undefined)
+            setActivePhase('storyboard')
+          }
         }
         if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
@@ -237,9 +250,16 @@ export function DirectorProjectPage() {
           }
           setActiveRunId(undefined)
           setActivePhase(undefined)
+          const phaseLabel = activePhase === 'analyze'
+            ? '剧本分析'
+            : activePhase === 'characters'
+              ? '角色阶段'
+              : activePhase === 'locations'
+                ? '场景阶段'
+                : '分镜阶段'
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
-            ? activePhase === 'analyze' ? '剧本分析已完成' : activePhase === 'characters' ? '角色阶段已完成' : '场景阶段已完成'
-            : activePhase === 'analyze' ? '剧本分析未完成，请查看阶段状态' : activePhase === 'characters' ? '角色阶段未完成，请查看阶段状态' : '场景阶段未完成，请查看阶段状态')
+            ? `${phaseLabel}已完成`
+            : `${phaseLabel}未完成，请查看阶段状态`)
           return
         }
         timer = setTimeout(() => void poll(), 2_000)
@@ -270,6 +290,7 @@ export function DirectorProjectPage() {
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'analyze', { modelId: analysisModelId })
       setActiveRunId(run.id)
+      setActivePhase('analyze')
       setProject(current => current === undefined ? current : {
         ...current,
         phases: current.phases.map(state => state.phase === 'analyze'
@@ -321,6 +342,27 @@ export function DirectorProjectPage() {
       toast.success('场景阶段已加入执行队列')
     } catch {
       toast.error('无法启动场景阶段，请确认角色阶段已完成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runStoryboard = async () => {
+    if (id === undefined || storyboardModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'storyboard', { modelId: storyboardModelId })
+      setActiveRunId(run.id)
+      setActivePhase('storyboard')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'storyboard'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('分镜阶段已加入执行队列')
+    } catch {
+      toast.error('无法启动分镜阶段，请确认分析、角色和场景都已完成')
     } finally {
       setSaving(false)
     }
@@ -626,7 +668,31 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references').map(tab => (
+        <TabsContent value="storyboard" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">人工审核点</span>
+                <h2 className="text-xl font-semibold">把剧本拆成可执行的镜头卡</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">分镜生成只产出草稿，不会自动触发视频任务。生成后请逐镜检查动作、景别、对白和参考资产，再进入后续阶段。</p>
+              </div>
+              <StoryboardReview shots={project.shots} />
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['storyboard']}
+              modelId={storyboardModelId}
+              textModels={textModels}
+              running={activePhase === 'storyboard' && activeRunId !== undefined}
+              onModelChange={setStoryboardModelId}
+              onRunPhase={() => void runStoryboard()}
+              runLabel="生成分镜草稿"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -724,6 +790,85 @@ function ReferenceEntityGroup({
       </div>
     </section>
   )
+}
+
+const SHOT_STATUS_LABELS: Record<DirectorShot['status'], string> = {
+  not_started: '未开始',
+  needs_review: '待审核',
+  ready: '已确认',
+  generating: '生成中',
+  succeeded: '已完成',
+  failed: '失败',
+  locked: '已锁定',
+}
+
+function StoryboardReview({ shots }: { shots: DirectorShot[] }) {
+  if (shots.length === 0) {
+    return (
+      <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
+        <p className="font-medium">还没有分镜草稿</p>
+        <p className="max-w-md text-sm leading-6 text-muted-foreground">完成剧本分析、角色和场景阶段后，在右侧手动生成第一版分镜。</p>
+      </div>
+    )
+  }
+
+  return (
+    <section className="flex flex-col gap-3">
+      {shots.map(shot => {
+        const camera = shot.camera
+        const dialogueLines = dialogueLinesFor(shot.dialogue)
+        const referenceKeys = Array.isArray(shot.continuity?.referenceKeys)
+          ? shot.continuity.referenceKeys.filter((value): value is string => typeof value === 'string')
+          : []
+        return (
+          <article key={shot.id} className={`flex flex-col gap-4 bg-muted/30 px-4 py-4 sm:px-5 ${shot.staleAt !== null ? 'opacity-65 grayscale' : ''}`}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(shot.sequence).padStart(2, '0')}</span>
+                  {shot.slugline !== null && <h3 className="font-semibold">{shot.slugline}</h3>}
+                  <Badge variant={shot.staleAt !== null ? 'outline' : 'secondary'}>{shot.staleAt !== null ? '已过时，仅供参考' : SHOT_STATUS_LABELS[shot.status]}</Badge>
+                </div>
+                <p className="text-sm leading-6">{shot.narrative}</p>
+              </div>
+              {shot.durationSeconds !== null && <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{shot.durationSeconds}s</span>}
+            </div>
+
+            <div className="grid gap-4 text-sm sm:grid-cols-2">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">摄影</span>
+                <p className="leading-6 text-muted-foreground">{[camera['shotSize'], camera['angle'], camera['movement'], camera['lens']].filter((value): value is string => typeof value === 'string' && value.length > 0).join(' · ') || '尚未填写摄影参数'}</p>
+                {typeof camera['composition'] === 'string' && camera['composition'].length > 0 && <p className="leading-6 text-muted-foreground">构图：{camera['composition']}</p>}
+              </div>
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">参考对象</span>
+                <p className="leading-6 text-muted-foreground">{referenceKeys.length > 0 ? referenceKeys.join(' · ') : '暂无明确参考对象'}</p>
+                {dialogueLines.length > 0 && <p className="leading-6 text-muted-foreground">对白：{dialogueLines.map(line => `${line.speaker}：“${line.text}”`).join(' ')}</p>}
+              </div>
+            </div>
+
+            {(shot.environmentPrompt !== null || shot.videoPrompt !== null || shot.negativePrompt !== null) && (
+              <details className="flex flex-col gap-3 text-sm">
+                <summary className="cursor-pointer text-muted-foreground">查看生成提示词</summary>
+                {shot.environmentPrompt !== null && <p className="leading-6"><span className="text-muted-foreground">环境：</span>{shot.environmentPrompt}</p>}
+                {shot.videoPrompt !== null && <p className="leading-6"><span className="text-muted-foreground">动作：</span>{shot.videoPrompt}</p>}
+                {shot.negativePrompt !== null && <p className="leading-6"><span className="text-muted-foreground">负面：</span>{shot.negativePrompt}</p>}
+              </details>
+            )}
+          </article>
+        )
+      })}
+    </section>
+  )
+}
+
+function dialogueLinesFor(dialogue: DirectorShot['dialogue']): Array<{ speaker: string; text: string }> {
+  if (dialogue === null || !Array.isArray(dialogue.lines)) return []
+  return dialogue.lines.filter((line): line is { speaker: string; text: string } => {
+    if (typeof line !== 'object' || line === null || Array.isArray(line)) return false
+    const candidate = line as { speaker?: unknown; text?: unknown }
+    return typeof candidate.speaker === 'string' && typeof candidate.text === 'string'
+  })
 }
 
 function AnalysisReview({ result, rawText, stale = false }: { result?: DirectorAnalysisResult; rawText?: string; stale?: boolean }) {
