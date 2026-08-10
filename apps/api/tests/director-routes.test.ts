@@ -369,7 +369,7 @@ describe('director routes', () => {
     }))
     const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
     const projectId = created.data.project.id
-    projects[0]!.project = { ...projects[0]!.project, shots: [createShot(projectId, 'locked')] }
+    projects[0]!.project = { ...projects[0]!.project, shots: [{ ...createShot(projectId, 'locked'), referenceAssetIds: ['director-ref-1'] }] }
 
     const estimateResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/videos/estimate`, {
       method: 'POST',
@@ -393,7 +393,7 @@ describe('director routes', () => {
     }))
     const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
     const projectId = created.data.project.id
-    const shot = createShot(projectId, 'failed')
+    const shot = { ...createShot(projectId, 'failed'), referenceAssetIds: ['director-ref-1'] }
     projects[0]!.project = { ...projects[0]!.project, shots: [shot] }
 
     const estimateResponse = await app.handle(authed(`/api/director/projects/${projectId}/shots/${shot.id}/video-runs/estimate`, {

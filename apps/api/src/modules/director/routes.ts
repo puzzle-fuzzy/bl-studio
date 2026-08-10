@@ -10,7 +10,7 @@ import {
   ValidationError,
   validateInput,
 } from '@bailian-studio/shared'
-import { estimatePriceCents, getBailianOperationCapability, getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
+import { estimatePriceCents, getBailianOperationCapability, getModelById, validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
@@ -89,6 +89,7 @@ export function createDirectorRoutes(deps: ApiDependencies) {
           'Only a locked or failed storyboard shot can be retried individually',
         )
       }
+      validateDirectorVideoShots(model, [shot])
       return {
         success: true,
         data: {
@@ -104,7 +105,22 @@ export function createDirectorRoutes(deps: ApiDependencies) {
     .post('/projects/:id/shots/:shotId/video-runs', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      requireDirectorVideoModel(input.modelId)
+      const model = requireDirectorVideoModel(input.modelId)
+      const project = await repository.getProject({ userId: user.id, projectId: params.id })
+      if (project === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+      }
+      const shot = project.shots.find(candidate => candidate.id === params.shotId)
+      if (shot === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_SHOT_NOT_FOUND', `Director shot not found: ${params.shotId}`)
+      }
+      if (shot.status !== 'locked' && shot.status !== 'failed') {
+        throw new DirectorRepositoryError(
+          shot.status === 'generating' ? 'DIRECTOR_SHOT_GENERATING' : 'DIRECTOR_PHASE_INPUT_NOT_READY',
+          'Only a locked or failed storyboard shot can be retried individually',
+        )
+      }
+      validateDirectorVideoShots(model, [shot])
       const run = await repository.requestPhaseRun({
         userId: user.id,
         projectId: params.id,
@@ -119,7 +135,12 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const phase = validateInput(DirectorPhaseSchema, params.phase)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
       if (phase === 'videos') {
-        requireDirectorVideoModel(input.modelId)
+        const model = requireDirectorVideoModel(input.modelId)
+        const project = await repository.getProject({ userId: user.id, projectId: params.id })
+        if (project === undefined) {
+          throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+        }
+        validateDirectorVideoShots(model, project.shots.filter(shot => shot.status === 'locked' || shot.status === 'failed'))
       }
       const run = await repository.requestPhaseRun({
         userId: user.id,
@@ -148,6 +169,7 @@ export function createDirectorRoutes(deps: ApiDependencies) {
           'Every current storyboard shot must be locked, resumable, or already generated before estimating video generation',
         )
       }
+      validateDirectorVideoShots(model, pendingShots)
       const estimatedCents = pendingShots.reduce((total, shot) => total + estimateDirectorShotCents(model, shot.durationSeconds, shot.referenceAssetIds.length), 0)
       return {
         success: true,
@@ -182,6 +204,33 @@ function estimateDirectorShotCents(
   durationSeconds: number | null,
   referenceCount: number,
 ): number {
+  return estimatePriceCents(manifest, directorVideoParams(manifest, durationSeconds, referenceCount))
+}
+
+function validateDirectorVideoShots(
+  manifest: FrozenModelManifest,
+  shots: ReadonlyArray<{ durationSeconds: number | null; referenceAssetIds: string[] }>,
+): void {
+  for (const shot of shots) {
+    const params = directorVideoParams(manifest, shot.durationSeconds, shot.referenceAssetIds.length)
+    const promptParameter = manifest.parameters.find(parameter => parameter.name === 'prompt' && parameter.type === 'text')
+    if (promptParameter !== undefined) params[promptParameter.name] = 'director video estimate'
+    const validation = validateModelParams(manifest, params)
+    if (validation.valid) continue
+    const issue = validation.errors[0]
+    throw new ValidationError(
+      issue?.messages['zh-CN'] ?? issue?.message ?? '视频镜头参数不满足模型约束',
+      'shots',
+      { modelId: manifest.id, code: issue?.code ?? 'PARAMETERS_INVALID' },
+    )
+  }
+}
+
+function directorVideoParams(
+  manifest: FrozenModelManifest,
+  durationSeconds: number | null,
+  referenceCount: number,
+): Record<string, unknown> {
   const durationParameter = manifest.parameters.find(parameter => parameter.name === 'duration' && parameter.type === 'number')
   const defaultDuration = durationParameter?.defaultValue
   const requestedDuration = durationSeconds ?? (typeof defaultDuration === 'number' ? defaultDuration : 5)
@@ -192,9 +241,13 @@ function estimateDirectorShotCents(
   for (const parameter of manifest.parameters) {
     if (parameter.defaultValue !== undefined && parameter.name !== 'duration') params[parameter.name] = parameter.defaultValue
   }
-  const referenceParameter = manifest.parameters.find(parameter => parameter.type === 'media' && parameter.mediaKind === 'image')
+  const referenceParameter = manifest.parameters.find(parameter => (
+    parameter.type === 'media'
+    && parameter.mediaKind === 'image'
+    && manifest.request.bindings[parameter.name]?.target === 'input.media'
+  ))
   if (referenceParameter !== undefined && referenceCount > 0) params[referenceParameter.name] = Array.from({ length: referenceCount }, () => 'reference')
-  return estimatePriceCents(manifest, params)
+  return params
 }
 
 function requireDirectorVideoModel(modelId: string): FrozenModelManifest {
@@ -204,8 +257,13 @@ function requireDirectorVideoModel(modelId: string): FrozenModelManifest {
     || model.availability.enabled === false
     || model.request.kind !== 'dashscope-video-task'
     || getBailianOperationCapability(model.id) !== 'video.reference-to-video'
+    || !model.parameters.some(parameter => (
+      parameter.type === 'media'
+      && parameter.mediaKind === 'image'
+      && model.request.bindings[parameter.name]?.target === 'input.media'
+    ))
   ) {
-    throw new ValidationError('视频阶段需要使用已启用的参考生视频模型', 'modelId')
+    throw new ValidationError('视频阶段需要使用支持参考图像输入的已启用参考生视频模型', 'modelId')
   }
   return model
 }

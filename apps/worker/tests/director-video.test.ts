@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getModelById } from '@bailian-studio/model-core'
 import type { DirectorAsset } from '@bailian-studio/shared'
-import { buildDirectorVideoGenerationInput, parseDirectorVideoRunSummary } from '../src/director-video'
+import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary } from '../src/director-video'
 
 const shot = {
   narrative: '人物抬头看向远处，随后缓慢向前走。',
@@ -42,13 +42,19 @@ describe('director video input', () => {
     expect(input.params.prompt).toContain('图1')
   })
 
-  it('keeps a reference-optional model usable for text-only shots', () => {
+  it('rejects a manifest that requires a reference when a shot has none', () => {
     const manifest = getModelById('wan3-reference-to-video')
     expect(manifest).toBeDefined()
-    const input = buildDirectorVideoGenerationInput({ ...shot, referenceAssetIds: [] }, [], manifest!)
+    expect(() => buildDirectorVideoGenerationInput({ ...shot, referenceAssetIds: [] }, [], manifest!)).toThrowError(DirectorVideoInputError)
+  })
 
-    expect(input.assetRefs).toBeUndefined()
-    expect(input.params.prompt).toContain('人物抬头')
+  it('supports angle-bracket image bindings such as Keling reference video', () => {
+    const manifest = getModelById('keling-reference-video')
+    expect(manifest).toBeDefined()
+    const input = buildDirectorVideoGenerationInput(shot, [referenceAsset], manifest!)
+
+    expect(input.assetRefs).toEqual({ references: ['user-asset-1'] })
+    expect(input.params.prompt).toContain('<<<image_1>>>')
   })
 })
 

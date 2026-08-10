@@ -1,4 +1,4 @@
-import type { FrozenModelManifest, ReferenceFormat } from '@bailian-studio/model-core'
+import { validateModelParams, type FrozenModelManifest, type ReferenceFormat } from '@bailian-studio/model-core'
 import type { DirectorAsset, DirectorShot } from '@bailian-studio/shared'
 
 const REFERENCE_ASSET_KINDS = new Set<DirectorAsset['kind']>([
@@ -55,9 +55,11 @@ export function buildDirectorVideoGenerationInput(
     )
   }
 
-  const referenceParameter = Object.entries(manifest.request.bindings).find(([, binding]) => (
-    binding.target === 'input.media' && binding.mediaType === 'reference_image'
-  ))?.[0]
+  const referenceParameter = manifest.parameters.find(parameter => (
+    parameter.type === 'media'
+    && parameter.mediaKind === 'image'
+    && manifest.request.bindings[parameter.name]?.target === 'input.media'
+  ))?.name
   const promptParameter = manifest.parameters.find(parameter => parameter.name === 'prompt' && parameter.type === 'text')
   if (referenceParameter === undefined || promptParameter === undefined) {
     throw new DirectorVideoInputError(
@@ -109,6 +111,18 @@ export function buildDirectorVideoGenerationInput(
     params[durationParameter.name] = Math.min(maximum, Math.max(minimum, shot.durationSeconds))
   }
 
+  const validation = validateModelParams(manifest, {
+    ...params,
+    [referenceParameter]: references.map((_, index) => `asset://director-reference/${index}`),
+  })
+  if (!validation.valid) {
+    const firstIssue = validation.errors[0]
+    throw new DirectorVideoInputError(
+      `DIRECTOR_VIDEO_${firstIssue?.code ?? 'PARAMETERS_INVALID'}`,
+      firstIssue?.messages['zh-CN'] ?? firstIssue?.message ?? '视频模型参数不满足 manifest 约束',
+    )
+  }
+
   return {
     params,
     ...(references.length === 0 ? {} : { assetRefs: { [referenceParameter]: references.map(asset => asset.assetId as string) } }),
@@ -153,6 +167,8 @@ function buildPrompt(
     ? ''
     : referenceFormat === 'image-bracket'
       ? `参考图按顺序使用 [Image 1] 到 [Image ${referenceCount}]，保持角色与场景一致。`
+      : referenceFormat === 'angle-bracket'
+        ? `参考图按顺序使用 <<<image_1>>> 到 <<<image_${referenceCount}>>>，保持角色与场景一致。`
       : `参考图按顺序使用图1到图${referenceCount}，保持角色与场景一致。`
   return [
     shot.environmentPrompt,
