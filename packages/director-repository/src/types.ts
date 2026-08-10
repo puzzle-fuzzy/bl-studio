@@ -3,7 +3,9 @@ import type {
   CreateDirectorProjectInput,
   DirectorPhase,
   DirectorPhaseRun,
-  DirectorPhaseState,
+	DirectorPhaseState,
+	DirectorCharacter,
+	DirectorLocation,
   DirectorProjectDetail,
   DirectorProjectProgress,
   DirectorProjectStatus,
@@ -75,6 +77,8 @@ export interface DirectorProjectRepositorySummary extends DirectorProjectSummary
 export interface DirectorProjectRepositoryDetail extends DirectorProjectDetail {
   phases: DirectorPhaseState[]
   scriptVersion: DirectorScriptVersion
+  characters: DirectorCharacter[]
+  locations: DirectorLocation[]
 }
 
 export interface ListDirectorProjectsResult {

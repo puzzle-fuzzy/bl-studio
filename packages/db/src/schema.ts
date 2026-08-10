@@ -1061,6 +1061,10 @@ export const directorCharacters = pgTable(
 			.$type<string[]>()
 			.notNull()
 			.default([]),
+		metadataJson: jsonb("metadata_json")
+			.$type<Record<string, unknown>>()
+			.notNull()
+			.default({}),
 		locked: boolean("locked").notNull().default(false),
 		version: integer("version").notNull().default(1),
 		staleAt: timestamp("stale_at", { withTimezone: true }),
@@ -1101,6 +1105,10 @@ export const directorLocations = pgTable(
 			.$type<string[]>()
 			.notNull()
 			.default([]),
+		metadataJson: jsonb("metadata_json")
+			.$type<Record<string, unknown>>()
+			.notNull()
+			.default({}),
 		locked: boolean("locked").notNull().default(false),
 		version: integer("version").notNull().default(1),
 		staleAt: timestamp("stale_at", { withTimezone: true }),

@@ -76,6 +76,38 @@ export const DirectorScriptVersionSchema = z.object({
   createdAt: z.string(),
 }).strict()
 
+const DirectorStaleFields = {
+  staleAt: z.string().nullable(),
+  staleReason: z.string().nullable(),
+}
+
+export const DirectorCharacterSchema = z.object({
+  id: z.string(),
+  sourceRunId: z.string().nullable(),
+  name: z.string(),
+  role: z.string().nullable(),
+  description: z.string(),
+  traits: z.array(z.string()),
+  referenceAssetIds: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  locked: z.boolean(),
+  version: z.number().int().positive(),
+  ...DirectorStaleFields,
+}).strict()
+
+export const DirectorLocationSchema = z.object({
+  id: z.string(),
+  sourceRunId: z.string().nullable(),
+  name: z.string(),
+  description: z.string(),
+  atmosphere: z.string().nullable(),
+  referenceAssetIds: z.array(z.string()),
+  metadata: z.record(z.string(), z.unknown()),
+  locked: z.boolean(),
+  version: z.number().int().positive(),
+  ...DirectorStaleFields,
+}).strict()
+
 export const CreateDirectorProjectSchema = z.object({
   title: z.string().trim().min(1).max(120),
   storyText: z.string().trim().min(1).max(500_000),
@@ -130,6 +162,8 @@ export const DirectorProjectDetailSchema = z.object({
   status: DirectorProjectStatusSchema,
   settings: z.record(z.string(), z.unknown()),
   scriptVersion: DirectorScriptVersionSchema,
+  characters: z.array(DirectorCharacterSchema),
+  locations: z.array(DirectorLocationSchema),
   phases: z.array(DirectorPhaseStateSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -240,4 +274,6 @@ export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSche
 export type DirectorProjectSummary = z.infer<typeof DirectorProjectSummarySchema>
 export type DirectorProjectDetail = z.infer<typeof DirectorProjectDetailSchema>
 export type DirectorScriptVersion = z.infer<typeof DirectorScriptVersionSchema>
+export type DirectorCharacter = z.infer<typeof DirectorCharacterSchema>
+export type DirectorLocation = z.infer<typeof DirectorLocationSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

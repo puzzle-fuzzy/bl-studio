@@ -351,6 +351,13 @@
       "when": 1786376027353,
       "tag": "0049_minor_blue_shield",
       "breakpoints": true
+    },
+    {
+      "idx": 50,
+      "version": "7",
+      "when": 1786376268454,
+      "tag": "0050_mighty_butterfly",
+      "breakpoints": true
     }
   ]
 }

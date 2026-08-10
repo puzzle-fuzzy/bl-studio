@@ -1,5 +1,6 @@
 import {
 	type BailianStudioDb,
+	type BailianStudioDbTransaction,
 	directorAssets,
 	directorCharacters,
 	directorLocations,
@@ -15,6 +16,8 @@ import {
 	type DirectorPhase,
 	type DirectorPhaseRun,
 	type DirectorPhaseState,
+	type DirectorCharacter,
+	type DirectorLocation,
 	type DirectorProjectDetail,
 	type DirectorProjectProgress,
 	type DirectorProjectStatus,
@@ -116,6 +119,43 @@ function toScriptVersion(
 	};
 }
 
+function toCharacter(
+	row: typeof directorCharacters.$inferSelect,
+): DirectorCharacter {
+	return {
+		id: row.id,
+		sourceRunId: row.sourceRunId,
+		name: row.name,
+		role: row.role,
+		description: row.description,
+		traits: row.traitsJson,
+		referenceAssetIds: row.referenceAssetIdsJson,
+		metadata: row.metadataJson,
+		locked: row.locked,
+		version: row.version,
+		staleAt: row.staleAt?.toISOString() ?? null,
+		staleReason: row.staleReason,
+	};
+}
+
+function toLocation(
+	row: typeof directorLocations.$inferSelect,
+): DirectorLocation {
+	return {
+		id: row.id,
+		sourceRunId: row.sourceRunId,
+		name: row.name,
+		description: row.description,
+		atmosphere: row.atmosphere,
+		referenceAssetIds: row.referenceAssetIdsJson,
+		metadata: row.metadataJson,
+		locked: row.locked,
+		version: row.version,
+		staleAt: row.staleAt?.toISOString() ?? null,
+		staleReason: row.staleReason,
+	};
+}
+
 function toWorkerPhaseRun(
 	row: typeof directorPhaseRuns.$inferSelect,
 ) {
@@ -137,6 +177,8 @@ function toProjectDetail(
 	row: typeof directorProjects.$inferSelect,
 	phaseRows: Array<typeof directorPhaseStates.$inferSelect>,
 	scriptVersion: typeof directorScriptVersions.$inferSelect,
+	characterRows: Array<typeof directorCharacters.$inferSelect>,
+	locationRows: Array<typeof directorLocations.$inferSelect>,
 	phaseRunRows: Array<typeof directorPhaseRuns.$inferSelect> = [],
 ): DirectorProjectRepositoryDetail {
 	const latestRunByPhase = new Map<string, string>();
@@ -157,11 +199,117 @@ function toProjectDetail(
 		status: row.status as DirectorProjectStatus,
 		settings: row.settingsJson,
 		scriptVersion: toScriptVersion(scriptVersion),
+		characters: characterRows.map(toCharacter),
+		locations: locationRows.map(toLocation),
 		phases,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
 	};
 	return detail;
+}
+
+function recordArray(value: unknown, key: string): Array<Record<string, unknown>> {
+	if (typeof value !== "object" || value === null || Array.isArray(value)) return [];
+	const items = (value as Record<string, unknown>)[key];
+	if (!Array.isArray(items)) return [];
+	return items.filter(
+		(item): item is Record<string, unknown> =>
+			typeof item === "object" && item !== null && !Array.isArray(item),
+	);
+}
+
+function stringField(value: unknown): string {
+	return typeof value === "string" ? value : "";
+}
+
+function stringArrayField(value: unknown): string[] {
+	return Array.isArray(value)
+		? value.filter((item): item is string => typeof item === "string")
+		: [];
+}
+
+async function materializePhaseOutput(
+	tx: BailianStudioDbTransaction,
+	run: typeof directorPhaseRuns.$inferSelect,
+	outputSummary: Record<string, unknown>,
+	now: Date,
+): Promise<void> {
+	if (run.phase === "characters") {
+		const records = recordArray(outputSummary.characters, "characters");
+		if (records.length === 0) return;
+		await tx
+			.update(directorCharacters)
+			.set({ staleAt: now, staleReason: "superseded_by_phase_run", updatedAt: now })
+			.where(
+				and(
+					eq(directorCharacters.projectId, run.projectId),
+					eq(directorCharacters.locked, false),
+					isNull(directorCharacters.staleAt),
+				),
+			);
+		await tx.insert(directorCharacters).values(
+			records.map((record) => ({
+				id: crypto.randomUUID(),
+				projectId: run.projectId,
+				sourceRunId: run.id,
+				name: stringField(record.name),
+				role: stringField(record.role),
+				description: stringField(record.description),
+				traitsJson: stringArrayField(record.traits),
+				referenceAssetIdsJson: [],
+				metadataJson: {
+					goal: stringField(record.goal),
+					conflict: stringField(record.conflict),
+					arc: stringField(record.arc),
+					visualSignature: stringField(record.visualSignature),
+				},
+				locked: false,
+				version: run.version,
+				createdBy: run.createdBy,
+				updatedBy: run.updatedBy,
+				createdAt: now,
+				updatedAt: now,
+			})),
+		);
+		return;
+	}
+
+	if (run.phase !== "locations") return;
+	const records = recordArray(outputSummary.locations, "locations");
+	if (records.length === 0) return;
+	await tx
+		.update(directorLocations)
+		.set({ staleAt: now, staleReason: "superseded_by_phase_run", updatedAt: now })
+		.where(
+			and(
+				eq(directorLocations.projectId, run.projectId),
+				eq(directorLocations.locked, false),
+				isNull(directorLocations.staleAt),
+			),
+		);
+	await tx.insert(directorLocations).values(
+		records.map((record) => ({
+			id: crypto.randomUUID(),
+			projectId: run.projectId,
+			sourceRunId: run.id,
+			name: stringField(record.name),
+			description: stringField(record.description),
+			atmosphere: stringField(record.atmosphere),
+			referenceAssetIdsJson: [],
+			metadataJson: {
+				narrativeFunction: stringField(record.narrativeFunction),
+				timeOfDay: stringField(record.timeOfDay),
+				visualAnchors: stringArrayField(record.visualAnchors),
+				continuityNotes: stringArrayField(record.continuityNotes),
+			},
+			locked: false,
+			version: run.version,
+			createdBy: run.createdBy,
+			updatedBy: run.updatedBy,
+			createdAt: now,
+			updatedAt: now,
+		})),
+	);
 }
 
 function toProjectSummary(
@@ -336,12 +484,32 @@ export function createDirectorRepository({
 					`Director project has no screenplay version: ${row.id}`,
 				);
 			}
+			const characterRows = await db
+				.select()
+				.from(directorCharacters)
+				.where(
+					and(
+						eq(directorCharacters.projectId, row.id),
+						isNull(directorCharacters.deletedAt),
+					),
+				)
+				.orderBy(desc(directorCharacters.createdAt), desc(directorCharacters.id));
+			const locationRows = await db
+				.select()
+				.from(directorLocations)
+				.where(
+					and(
+						eq(directorLocations.projectId, row.id),
+						isNull(directorLocations.deletedAt),
+					),
+				)
+				.orderBy(desc(directorLocations.createdAt), desc(directorLocations.id));
 			const runs = await db
 				.select()
 				.from(directorPhaseRuns)
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
-			return toProjectDetail(row, phases, scriptVersion, runs);
+			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, runs);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
@@ -797,6 +965,11 @@ export function createDirectorRepository({
 					.where(eq(directorPhaseRuns.id, input.runId))
 					.returning();
 				if (updated === undefined) return undefined;
+				const outputSummary = {
+					...(current.outputSummaryJson ?? {}),
+					...input.outputSummary,
+				};
+				await materializePhaseOutput(tx, current, outputSummary, now);
 
 				const phaseIndex = DIRECTOR_PHASES.indexOf(current.phase as DirectorPhase);
 				await tx
