@@ -6,6 +6,7 @@ import {
 	directorPhaseRuns,
 	directorPhaseStates,
 	directorProjects,
+	directorScriptVersions,
 	directorShots,
 	taskRecords,
 } from "@bailian-studio/db";
@@ -17,6 +18,7 @@ import {
 	type DirectorProjectDetail,
 	type DirectorProjectProgress,
 	type DirectorProjectStatus,
+	type DirectorScriptVersion,
 } from "@bailian-studio/shared";
 import { and, desc, eq, inArray, isNotNull, isNull, sql } from "drizzle-orm";
 import { DirectorRepositoryError } from "./errors";
@@ -86,6 +88,7 @@ function toPhaseRun(
 	return {
 		id: row.id,
 		projectId: row.projectId,
+		scriptVersionId: row.scriptVersionId,
 		phase: row.phase as DirectorPhase,
 		status: row.status as DirectorPhaseRun["status"],
 		version: row.version,
@@ -98,6 +101,18 @@ function toPhaseRun(
 		startedAt: row.startedAt?.toISOString() ?? null,
 		completedAt: row.completedAt?.toISOString() ?? null,
 		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
+function toScriptVersion(
+	row: typeof directorScriptVersions.$inferSelect,
+): DirectorScriptVersion {
+	return {
+		id: row.id,
+		version: row.version,
+		storyText: row.storyText,
+		synopsis: row.synopsis,
+		createdAt: row.createdAt.toISOString(),
 	};
 }
 
@@ -121,6 +136,7 @@ function projectProgress(
 function toProjectDetail(
 	row: typeof directorProjects.$inferSelect,
 	phaseRows: Array<typeof directorPhaseStates.$inferSelect>,
+	scriptVersion: typeof directorScriptVersions.$inferSelect,
 	phaseRunRows: Array<typeof directorPhaseRuns.$inferSelect> = [],
 ): DirectorProjectRepositoryDetail {
 	const latestRunByPhase = new Map<string, string>();
@@ -140,6 +156,7 @@ function toProjectDetail(
 		synopsis: row.synopsis,
 		status: row.status as DirectorProjectStatus,
 		settings: row.settingsJson,
+		scriptVersion: toScriptVersion(scriptVersion),
 		phases,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -193,6 +210,16 @@ export function createDirectorRepository({
 					settingsJson: {},
 					createdBy: input.userId,
 					updatedBy: input.userId,
+					createdAt: now,
+					updatedAt: now,
+				});
+				await tx.insert(directorScriptVersions).values({
+					id: crypto.randomUUID(),
+					projectId,
+					version: 1,
+					storyText: input.storyText,
+					synopsis: input.synopsis ?? null,
+					createdBy: input.userId,
 					createdAt: now,
 					updatedAt: now,
 				});
@@ -297,12 +324,24 @@ export function createDirectorRepository({
 				.select()
 				.from(directorPhaseStates)
 				.where(eq(directorPhaseStates.projectId, row.id));
+			const [scriptVersion] = await db
+				.select()
+				.from(directorScriptVersions)
+				.where(eq(directorScriptVersions.projectId, row.id))
+				.orderBy(desc(directorScriptVersions.version))
+				.limit(1);
+			if (scriptVersion === undefined) {
+				throw new DirectorRepositoryError(
+					"DIRECTOR_DATABASE_ERROR",
+					`Director project has no screenplay version: ${row.id}`,
+				);
+			}
 			const runs = await db
 				.select()
 				.from(directorPhaseRuns)
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
-			return toProjectDetail(row, phases, runs);
+			return toProjectDetail(row, phases, scriptVersion, runs);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
@@ -327,11 +366,10 @@ export function createDirectorRepository({
 					);
 				}
 
-				const contentChanged =
-					(patch.title !== undefined && patch.title !== current.title) ||
+				const scriptChanged =
 					(patch.storyText !== undefined && patch.storyText !== current.storyText) ||
 					(patch.synopsis !== undefined && patch.synopsis !== current.synopsis);
-				if (contentChanged) {
+				if (scriptChanged) {
 					const [activeRun] = await tx
 						.select({ id: directorPhaseRuns.id })
 						.from(directorPhaseRuns)
@@ -361,7 +399,32 @@ export function createDirectorRepository({
 					})
 					.where(eq(directorProjects.id, input.projectId));
 
-				if (contentChanged) {
+				if (scriptChanged) {
+					const [latestScriptVersion] = await tx
+						.select({ version: directorScriptVersions.version })
+						.from(directorScriptVersions)
+						.where(eq(directorScriptVersions.projectId, input.projectId))
+						.orderBy(desc(directorScriptVersions.version))
+						.limit(1);
+					if (latestScriptVersion === undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_DATABASE_ERROR",
+							`Director project has no screenplay version: ${input.projectId}`,
+						);
+					}
+					await tx.insert(directorScriptVersions).values({
+						id: crypto.randomUUID(),
+						projectId: input.projectId,
+						version: latestScriptVersion.version + 1,
+						storyText: patch.storyText ?? current.storyText,
+						synopsis:
+							patch.synopsis === undefined
+								? current.synopsis
+								: patch.synopsis,
+						createdBy: input.userId,
+						createdAt: now,
+						updatedAt: now,
+					});
 					const stalePatch = {
 						staleAt: now,
 						staleReason: "project_content_changed",
@@ -469,6 +532,18 @@ export function createDirectorRepository({
 						`Director project not found: ${input.projectId}`,
 					);
 				}
+				const [scriptVersion] = await tx
+					.select()
+					.from(directorScriptVersions)
+					.where(eq(directorScriptVersions.projectId, project.id))
+					.orderBy(desc(directorScriptVersions.version))
+					.limit(1);
+				if (scriptVersion === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_DATABASE_ERROR",
+						`Director project has no screenplay version: ${project.id}`,
+					);
+				}
 
 				const [state] = await tx
 					.select()
@@ -496,9 +571,10 @@ export function createDirectorRepository({
 				const inputSnapshot: Record<string, unknown> = {
 					phase: input.phase,
 					modelId: input.modelId,
+					scriptVersionId: scriptVersion.id,
 					title: project.title,
-					storyText: project.storyText,
-					synopsis: project.synopsis,
+					storyText: scriptVersion.storyText,
+					synopsis: scriptVersion.synopsis,
 					settings: project.settingsJson,
 				};
 				if (input.phase === "characters") {
@@ -555,6 +631,7 @@ export function createDirectorRepository({
 					.values({
 						id: runId,
 						projectId: input.projectId,
+						scriptVersionId: scriptVersion.id,
 						phase: input.phase,
 						status: "pending",
 						version,

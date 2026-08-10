@@ -68,6 +68,14 @@ export const DirectorPhaseStatusSchema = z.enum(DIRECTOR_PHASE_STATUS)
 export const DirectorPhaseRunStatusSchema = z.enum(DIRECTOR_PHASE_RUN_STATUS)
 export const DirectorProjectStatusSchema = z.enum(DIRECTOR_PROJECT_STATUS)
 
+export const DirectorScriptVersionSchema = z.object({
+  id: z.string(),
+  version: z.number().int().positive(),
+  storyText: z.string(),
+  synopsis: z.string().nullable(),
+  createdAt: z.string(),
+}).strict()
+
 export const CreateDirectorProjectSchema = z.object({
   title: z.string().trim().min(1).max(120),
   storyText: z.string().trim().min(1).max(500_000),
@@ -121,6 +129,7 @@ export const DirectorProjectDetailSchema = z.object({
   synopsis: z.string().nullable(),
   status: DirectorProjectStatusSchema,
   settings: z.record(z.string(), z.unknown()),
+  scriptVersion: DirectorScriptVersionSchema,
   phases: z.array(DirectorPhaseStateSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -142,6 +151,7 @@ export const CreateDirectorPhaseRunSchema = z.object({
 export const DirectorPhaseRunSchema = z.object({
   id: z.string(),
   projectId: z.string(),
+  scriptVersionId: z.string(),
   phase: DirectorPhaseSchema,
   status: DirectorPhaseRunStatusSchema,
   version: z.number().int().positive(),
@@ -229,4 +239,5 @@ export type DirectorPhaseState = z.infer<typeof DirectorPhaseStateSchema>
 export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSchema>
 export type DirectorProjectSummary = z.infer<typeof DirectorProjectSummarySchema>
 export type DirectorProjectDetail = z.infer<typeof DirectorProjectDetailSchema>
+export type DirectorScriptVersion = z.infer<typeof DirectorScriptVersionSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

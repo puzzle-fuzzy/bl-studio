@@ -35,6 +35,7 @@ import {
   type DirectorProjectDetail,
   type DirectorProjectListResult,
   type DirectorProjectSummary,
+  type DirectorScriptVersion,
   type UpdateDirectorProjectInput,
 } from '@bailian-studio/shared'
 
@@ -64,6 +65,7 @@ export type {
   DirectorProjectDetail,
   DirectorProjectListResult,
   DirectorProjectSummary,
+  DirectorScriptVersion,
   DirectorPhaseRun,
   DirectorPhaseRunStatus,
   UpdateDirectorProjectInput,

@@ -39,6 +39,13 @@ function createProject(input: { title: string; storyText: string; synopsis?: str
     synopsis: input.synopsis ?? null,
     status: 'draft',
     settings: {},
+    scriptVersion: {
+      id: `${id}-script-1`,
+      version: 1,
+      storyText: input.storyText,
+      synopsis: input.synopsis ?? null,
+      createdAt: '2026-08-10T00:00:00.000Z',
+    },
     phases: createPhaseStates(),
     createdAt: '2026-08-10T00:00:00.000Z',
     updatedAt: '2026-08-10T00:00:00.000Z',
@@ -87,6 +94,7 @@ const fakeDirectorRepository: DirectorRepository = {
     const run: DirectorPhaseRun = {
       id: `run-${input.projectId}`,
       projectId: input.projectId,
+      scriptVersionId: `script-${input.projectId}-1`,
       phase: input.phase,
       status: 'pending',
       version: 1,

@@ -924,6 +924,36 @@ export const directorProjects = pgTable(
 	],
 );
 
+/** Immutable screenplay snapshots. A project keeps its current text for
+ * compatibility, while every meaningful screenplay change creates a new
+ * version that downstream phase runs can reference explicitly. */
+export const directorScriptVersions = pgTable(
+	"director_script_versions",
+	{
+		id: text("id").primaryKey(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => directorProjects.id, { onDelete: "cascade" }),
+		version: integer("version").notNull(),
+		storyText: text("story_text").notNull(),
+		synopsis: text("synopsis"),
+		createdBy: text("created_by").notNull().default("system"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+		updatedAt: timestamp("updated_at", { withTimezone: true }).notNull(),
+	},
+	(table) => [
+		check("director_script_versions_version_check", sql`${table.version} > 0`),
+		uniqueIndex("director_script_versions_project_version_idx").on(
+			table.projectId,
+			table.version,
+		),
+		index("director_script_versions_project_created_idx").on(
+			table.projectId,
+			table.createdAt,
+		),
+	],
+);
+
 /** Current UI state for every phase. Keeping this materialized avoids deriving
  * the project navigator from a growing run-history table on every request. */
 export const directorPhaseStates = pgTable(
@@ -973,6 +1003,9 @@ export const directorPhaseRuns = pgTable(
 		projectId: text("project_id")
 			.notNull()
 			.references(() => directorProjects.id, { onDelete: "cascade" }),
+		scriptVersionId: text("script_version_id")
+			.notNull()
+			.references(() => directorScriptVersions.id),
 		phase: text("phase").notNull(),
 		status: text("status").notNull().default("pending"),
 		version: integer("version").notNull(),

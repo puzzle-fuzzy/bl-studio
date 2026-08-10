@@ -22,6 +22,7 @@ export {
   directorPhaseRuns,
   directorPhaseStates,
   directorProjects,
+  directorScriptVersions,
   directorShots,
   generationArtifacts,
   generationEvents,

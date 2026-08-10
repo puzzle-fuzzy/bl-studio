@@ -7,7 +7,8 @@ import type {
   DirectorProjectDetail,
   DirectorProjectProgress,
   DirectorProjectStatus,
-  DirectorProjectSummary,
+	DirectorProjectSummary,
+	DirectorScriptVersion,
   UpdateDirectorProjectInput,
 } from '@bailian-studio/shared'
 
@@ -73,6 +74,7 @@ export interface DirectorProjectRepositorySummary extends DirectorProjectSummary
 
 export interface DirectorProjectRepositoryDetail extends DirectorProjectDetail {
   phases: DirectorPhaseState[]
+  scriptVersion: DirectorScriptVersion
 }
 
 export interface ListDirectorProjectsResult {

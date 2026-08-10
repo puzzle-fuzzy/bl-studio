@@ -364,6 +364,7 @@ export function DirectorProjectPage() {
           </Button>
           <div className="flex items-center gap-2">
             <Badge variant="outline">{project.status === 'draft' ? '草稿' : project.status}</Badge>
+            <Badge variant="secondary">剧本 v{project.scriptVersion.version}</Badge>
             {dirty && <span className="text-xs text-muted-foreground">有未保存修改</span>}
             <Button size="sm" onClick={() => void saveProject()} disabled={!dirty || saving}>
               {saving ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}

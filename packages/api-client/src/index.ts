@@ -55,6 +55,7 @@ export type {
   DirectorPhaseRun,
   DirectorPhaseRunStatus,
   DirectorProjectDetail,
+  DirectorScriptVersion,
   DirectorProjectListResult,
   DirectorProjectSummary,
   CreateMediaJobResult,
