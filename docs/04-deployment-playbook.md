@@ -93,6 +93,8 @@ pnpm run verify && pnpm run deploy:prod
 
 ### 2.3 部署后验证（都应通过）
 
+除健康检查外，`deploy:prod` 会校验公网 API 返回的完整 `BAILIAN_STUDIO_RELEASE_TAG`，并校验公网首页实际加载的 `index` bundle 是否来自本次构建的 web 镜像。`deploy:prod:web` 只执行后者；任一版本不一致都会让部署失败，避免健康但旧版本继续对外服务。
+
 ```bash
 # 在服务器上
 docker ps --format '{{.Names}} {{.Status}}' | grep bailian
