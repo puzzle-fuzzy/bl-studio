@@ -1,4 +1,4 @@
-import { Bookmark, Brush, Images, Library, Sparkles, Wrench } from 'lucide-react'
+import { Bookmark, Brush, Images, Library, PenLine, Sparkles, Wrench } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -23,6 +23,7 @@ import { UserMenu } from '@/components/layout/UserMenu'
 const NAV_ITEMS = [
   { to: '/gallery', label: '首页', icon: Images },
   { to: '/create', label: '创作', icon: Brush },
+  { to: '/writing', label: '写作', icon: PenLine },
   { to: '/catalog', label: '全部模型', icon: Sparkles },
   { to: '/prompts', label: '提示词', icon: Bookmark },
   { to: '/functions', label: '辅助工具', icon: Wrench },
@@ -44,7 +45,7 @@ export function Nav() {
         <SidebarGroup>
           <SidebarGroupLabel>工作台</SidebarGroupLabel>
           <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
+            <SidebarMenu className="gap-1">
               {NAV_ITEMS.map(item => (
                 <SidebarMenuItem key={item.to}>
                   {/* 选中态由当前路径判断（含子路由前缀，如 /generations/:id） */}
