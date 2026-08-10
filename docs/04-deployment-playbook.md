@@ -118,6 +118,10 @@ docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra \
 
 ---
 
+### Windows / WSL 发布说明
+
+在 Windows clone 上执行 `pnpm run deploy:prod` 时，脚本会使用仓库相对路径调用 Node/tsx，避免 WSL 路径被 Windows Node 错误转换。`DEPLOY_SSH_KEY` 可以填写 Windows 风格的 `C:/...` 路径；脚本会自动解析挂载路径、复用同目录的 `known_hosts`，并在 WSL 中调用 Windows OpenSSH，避免私钥权限和主机指纹不一致导致发布挂起。
+
 ## 3. 分步手动流程（一键失败时用）
 
 镜像已构建/已传输时，可在服务器上分步执行（`COMPOSE` 定义见下）：

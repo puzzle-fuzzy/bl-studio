@@ -29,13 +29,19 @@ DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM)"
 DEPLOY_REMOTE_DIR="${DEPLOY_REMOTE_DIR:-/opt/bailian-studio}"
 DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
+source "$REPO_ROOT/infra/scripts/resolve-deploy-ssh-key.sh"
+DEPLOY_SSH_KEY="$(resolve_deploy_ssh_key "$DEPLOY_SSH_KEY")"
+if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
+  echo "DEPLOY_SSH_KEY 不存在或无法从当前 Bash 环境访问" >&2
+  exit 1
+fi
+DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
 SERVER_HOST="${DEPLOY_HOST##*@}"
 SSH_RESOLVED_HOST="$(ssh -G "$DEPLOY_HOST" 2>/dev/null | awk '$1=="hostname" {print $2; exit}' || true)"
 SERVER_HOST="${SSH_RESOLVED_HOST:-$SERVER_HOST}"
 
 ssh_cmd() {
-  if [[ -n "$DEPLOY_SSH_KEY" ]]; then ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
-  else ssh "$DEPLOY_HOST" "$1"; fi
+  deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
 }
 
 git diff --quiet && git diff --cached --quiet || { echo "工作区不干净，请先提交" >&2; exit 1; }
@@ -55,7 +61,7 @@ EXPECTED_INDEX_ASSET="$(docker run --rm --entrypoint sh "bailian-studio-web:$SHA
 
 echo "==> 传输 web 镜像（约 20MB）"
 docker save -o "web-$SHA.tar" "bailian-studio-web:$SHA"
-rsync -az "web-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "web-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
 
 echo "==> 服务器 load + 重建 web 容器"
 ssh_cmd "docker load -i $DEPLOY_REMOTE_DIR/web-$SHA.tar && rm -f $DEPLOY_REMOTE_DIR/web-$SHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$SHA docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml up -d --no-deps web"

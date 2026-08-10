@@ -46,12 +46,15 @@ DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY "$ENV_INFRA")"
 [[ -n "$DEPLOY_HOST" ]] || fail "缺少 DEPLOY_HOST"
 [[ -n "$DEPLOY_REMOTE_DIR" ]] || fail "缺少 DEPLOY_REMOTE_DIR"
 
+source "$REPO_ROOT/infra/scripts/resolve-deploy-ssh-key.sh"
+DEPLOY_SSH_KEY="$(resolve_deploy_ssh_key "$DEPLOY_SSH_KEY")"
+if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
+  fail "DEPLOY_SSH_KEY 不存在或无法从当前 Bash 环境访问"
+fi
+DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
+
 ssh_cmd() {
-  if [[ -n "$DEPLOY_SSH_KEY" ]]; then
-    ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
-  else
-    ssh "$DEPLOY_HOST" "$1"
-  fi
+  deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
 }
 
 echo "==> 确认旧镜像 $SHA 已在服务器（不重传）"
@@ -83,7 +86,7 @@ inject_tag "$ENV_INFRA"
 
 # 把更新后的 env 同步到服务器（本地 docker context 默认 Desktop，必须走 SSH 在服务器上 up）。
 ssh_cmd "mkdir -p $REMOTE_INFRA/env"
-rsync -az "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production $REMOTE_INFRA/env/.env.prod-infra"
 
 echo "==> 服务器上复用旧镜像滚动 up（--no-build --pull never）"
