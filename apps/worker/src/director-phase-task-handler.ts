@@ -3,6 +3,7 @@ import type { GenerationRepository } from '@bailian-studio/generation-repository
 import type { Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
+import { parseDirectorAnalysisOutput } from './director-analysis'
 import type { TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 9_000
@@ -141,7 +142,16 @@ export async function processDirectorPhaseTask(
         code: 'DIRECTOR_ANALYSIS_OUTPUT_MISSING',
       }, deps)
     }
-    return completePhase(run.id, { generationId, modelId, analysisText }, deps)
+    const analysis = parseDirectorAnalysisOutput(analysisText)
+    if (analysis === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Analysis generation returned text that does not match the Director analysis contract',
+        retriable: false,
+        code: 'DIRECTOR_ANALYSIS_OUTPUT_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, analysisText, analysis }, deps)
   }
   if (generation.status === 'failed' || generation.status === 'cancelled') {
     return failPhase(run.id, {
@@ -172,9 +182,11 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): {
 
 function analysisPrompt(title: string, synopsis: string | null, storyText: string): string {
   return [
-    '你是一名专业短剧编剧与导演顾问。请分析下面的剧本，输出结构化但易读的创作分析。',
-    '必须覆盖：一句话梗概、主题与受众、三幕/节拍结构、主要角色弧线、场景与视觉线索、潜在连续性风险、后续分镜建议。',
-    '不要改写原剧本，不要编造原文没有的关键事实。',
+    '你是一名专业短剧编剧与导演顾问。请分析下面的剧本。',
+    '只返回一个 JSON 对象，不要 Markdown、代码围栏、解释文字或额外字段。',
+    'JSON 必须符合以下结构：',
+    '{"summary":"一句话梗概","theme":"主题","audience":"受众","structure":[{"name":"结构段落","purpose":"作用","beats":["关键节拍"]}],"characters":[{"name":"角色名","role":"角色功能","description":"角色描述","traits":["特质"]}],"locations":[{"name":"场景名","description":"场景描述","atmosphere":"氛围"}],"continuityRisks":["连续性风险"],"visualMotifs":["视觉母题"]}',
+    '不要编造原文没有的关键事实；如果信息不足，使用空数组或明确写出不确定性。',
     `项目：${title}`,
     synopsis === null ? '' : `简介：${synopsis}`,
     `剧本：\n${storyText}`,

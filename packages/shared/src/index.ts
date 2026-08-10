@@ -40,6 +40,7 @@ export {
 export {
   CreateDirectorProjectSchema,
   CreateDirectorPhaseRunSchema,
+  DirectorAnalysisResultSchema,
   DirectorPhaseSchema,
   DirectorPhaseRunResponseSchema,
   DirectorPhaseRunSchema,
@@ -61,6 +62,7 @@ export {
   UpdateDirectorProjectSchema,
   type CreateDirectorProjectInput,
   type CreateDirectorPhaseRunInput,
+  type DirectorAnalysisResult,
   type DirectorPhase,
   type DirectorPhaseRun,
   type DirectorPhaseRunStatus,

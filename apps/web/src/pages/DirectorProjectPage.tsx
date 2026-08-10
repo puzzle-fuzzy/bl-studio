@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Loader2, LockKeyhole, Save, Sparkles } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { DirectorAnalysisResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -67,6 +68,7 @@ export function DirectorProjectPage() {
   const [analysisModelId, setAnalysisModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [analysisText, setAnalysisText] = useState<string>()
+  const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
@@ -101,6 +103,8 @@ export function DirectorProjectPage() {
             .then(run => {
               if (!cancelled && run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
                 setAnalysisText(run.outputSummary.analysisText)
+                const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
+                if (parsed.success) setAnalysisResult(parsed.data)
               }
             })
             .catch(() => {})
@@ -131,6 +135,8 @@ export function DirectorProjectPage() {
           setProject(next)
           if (run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
             setAnalysisText(run.outputSummary.analysisText)
+            const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
+            if (parsed.success) setAnalysisResult(parsed.data)
           }
           setActiveRunId(undefined)
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded' ? '剧本分析已完成' : '剧本分析未完成，请查看阶段状态')
@@ -304,13 +310,10 @@ export function DirectorProjectPage() {
                 </label>
               </div>
               {analysisText !== undefined && (
-                <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <h2 className="font-semibold">分析结果</h2>
-                    <span className="text-xs text-muted-foreground">可作为下一阶段输入参考</span>
-                  </div>
-                  <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{analysisText}</p>
-                </section>
+                <AnalysisReview result={analysisResult} rawText={analysisText} />
+              )}
+              {analysisText === undefined && analysisResult !== undefined && (
+                <AnalysisReview result={analysisResult} />
               )}
             </section>
             <PhaseStatusPanel
@@ -344,6 +347,142 @@ export function DirectorProjectPage() {
         ))}
       </Tabs>
     </main>
+  )
+}
+
+function AnalysisReview({ result, rawText }: { result?: DirectorAnalysisResult; rawText?: string }) {
+  if (result === undefined) {
+    return (
+      <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">分析结果</h2>
+          <span className="text-xs text-muted-foreground">原始模型输出</span>
+        </div>
+        <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">结构化分析</h2>
+        <Badge variant="secondary">可供后续阶段消费</Badge>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">一句话梗概</span>
+        <p className="text-sm leading-7">{result.summary}</p>
+      </div>
+
+      <Separator />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <div className="flex flex-col gap-2">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">主题与命题</span>
+          <p className="text-sm leading-6 text-muted-foreground">{result.theme}</p>
+        </div>
+        <div className="flex flex-col gap-2">
+          <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">目标观众</span>
+          <p className="text-sm leading-6 text-muted-foreground">{result.audience}</p>
+        </div>
+      </div>
+
+      {result.structure.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold">结构节拍</h3>
+            <div className="flex flex-col gap-4">
+              {result.structure.map((section, index) => (
+                <div key={`${section.name}-${index}`} className="flex flex-col gap-2">
+                  <div className="flex items-baseline justify-between gap-3">
+                    <span className="text-sm font-medium">{section.name}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">{section.purpose}</p>
+                  {section.beats.length > 0 && (
+                    <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
+                      {section.beats.map((beat, beatIndex) => <li key={`${beat}-${beatIndex}`}>· {beat}</li>)}
+                    </ul>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {result.characters.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold">角色卡</h3>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              {result.characters.map((character, index) => (
+                <div key={`${character.name}-${index}`} className="flex flex-col gap-1">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-sm font-medium">{character.name}</span>
+                    {character.role.length > 0 && <span className="text-xs text-muted-foreground">{character.role}</span>}
+                  </div>
+                  <p className="text-sm leading-6 text-muted-foreground">{character.description}</p>
+                  {character.traits.length > 0 && <p className="text-xs leading-5 text-muted-foreground">{character.traits.join(' · ')}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {result.locations.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-3">
+            <h3 className="text-sm font-semibold">场景卡</h3>
+            <div className="grid gap-x-6 gap-y-4 sm:grid-cols-2">
+              {result.locations.map((location, index) => (
+                <div key={`${location.name}-${index}`} className="flex flex-col gap-1">
+                  <span className="text-sm font-medium">{location.name}</span>
+                  <p className="text-sm leading-6 text-muted-foreground">{location.description}</p>
+                  {location.atmosphere.length > 0 && <p className="text-xs leading-5 text-muted-foreground">氛围：{location.atmosphere}</p>}
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
+
+      {(result.continuityRisks.length > 0 || result.visualMotifs.length > 0) && (
+        <>
+          <Separator />
+          <div className="grid gap-5 sm:grid-cols-2">
+            {result.continuityRisks.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold">连续性风险</h3>
+                <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
+                  {result.continuityRisks.map((risk, index) => <li key={`${risk}-${index}`}>· {risk}</li>)}
+                </ul>
+              </div>
+            )}
+            {result.visualMotifs.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <h3 className="text-sm font-semibold">视觉母题</h3>
+                <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
+                  {result.visualMotifs.map((motif, index) => <li key={`${motif}-${index}`}>· {motif}</li>)}
+                </ul>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+
+      {rawText !== undefined && (
+        <details className="flex flex-col gap-2 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">查看原始模型输出</summary>
+          <p className="whitespace-pre-wrap leading-7 text-muted-foreground">{rawText}</p>
+        </details>
+      )}
+    </section>
   )
 }
 

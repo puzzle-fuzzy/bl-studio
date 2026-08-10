@@ -158,10 +158,35 @@ export const DirectorPhaseRunResponseSchema = z.object({
   run: DirectorPhaseRunSchema,
 })
 
+export const DirectorAnalysisResultSchema = z.object({
+  summary: z.string().min(1).max(2_000),
+  theme: z.string().min(1).max(2_000),
+  audience: z.string().min(1).max(1_000),
+  structure: z.array(z.object({
+    name: z.string().min(1).max(120),
+    purpose: z.string().min(1).max(1_000),
+    beats: z.array(z.string().min(1).max(500)).max(20),
+  }).strict()).max(12),
+  characters: z.array(z.object({
+    name: z.string().min(1).max(120),
+    role: z.string().max(120),
+    description: z.string().min(1).max(2_000),
+    traits: z.array(z.string().min(1).max(120)).max(12),
+  }).strict()).max(50),
+  locations: z.array(z.object({
+    name: z.string().min(1).max(120),
+    description: z.string().min(1).max(2_000),
+    atmosphere: z.string().max(500),
+  }).strict()).max(50),
+  continuityRisks: z.array(z.string().min(1).max(1_000)).max(30),
+  visualMotifs: z.array(z.string().min(1).max(500)).max(30),
+}).strict()
+
 export type CreateDirectorProjectInput = z.infer<typeof CreateDirectorProjectSchema>
 export type UpdateDirectorProjectInput = z.infer<typeof UpdateDirectorProjectSchema>
 export type CreateDirectorPhaseRunInput = z.infer<typeof CreateDirectorPhaseRunSchema>
 export type DirectorPhaseRun = z.infer<typeof DirectorPhaseRunSchema>
+export type DirectorAnalysisResult = z.infer<typeof DirectorAnalysisResultSchema>
 export type ListDirectorProjectsInput = z.infer<typeof ListDirectorProjectsSchema>
 export type DirectorPhaseState = z.infer<typeof DirectorPhaseStateSchema>
 export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSchema>

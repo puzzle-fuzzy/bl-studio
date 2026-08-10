@@ -12,6 +12,7 @@ import { z } from 'zod'
 import {
   CreateDirectorProjectSchema,
   CreateDirectorPhaseRunSchema,
+  DirectorAnalysisResultSchema,
   DirectorPhaseRunResponseSchema,
   DirectorPhaseRunSchema,
   DirectorProjectDetailSchema,
@@ -22,6 +23,7 @@ import {
   type CreateDirectorPhaseRunInput,
   type DirectorPhaseRun,
   type DirectorPhaseRunStatus,
+  type DirectorAnalysisResult,
   type DirectorProjectDetail,
   type DirectorProjectListResult,
   type DirectorProjectSummary,
@@ -30,6 +32,7 @@ import {
 
 export {
   CreateDirectorPhaseRunSchema,
+  DirectorAnalysisResultSchema,
   CreateDirectorProjectSchema,
   DirectorProjectDetailSchema,
   DirectorProjectListResponseSchema,
@@ -40,6 +43,7 @@ export {
 }
 export type {
   CreateDirectorPhaseRunInput,
+  DirectorAnalysisResult,
   CreateDirectorProjectInput,
   DirectorProjectDetail,
   DirectorProjectListResult,
