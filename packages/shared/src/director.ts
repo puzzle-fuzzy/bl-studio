@@ -212,6 +212,7 @@ export const UpdateDirectorShotSchema = z.object({
   narrative: z.string().trim().min(1).max(4_000).optional(),
   camera: z.record(z.string(), z.unknown()).optional(),
   durationSeconds: z.number().int().positive().max(120).nullable().optional(),
+  referenceAssetIds: z.array(z.string().trim().min(1).max(256)).max(30).optional(),
   environmentPrompt: z.string().max(4_000).nullable().optional(),
   videoPrompt: z.string().max(4_000).nullable().optional(),
   negativePrompt: z.string().max(2_000).nullable().optional(),

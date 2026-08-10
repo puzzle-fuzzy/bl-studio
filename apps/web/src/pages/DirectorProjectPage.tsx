@@ -693,7 +693,7 @@ export function DirectorProjectPage() {
                 <h2 className="text-xl font-semibold">把剧本拆成可执行的镜头卡</h2>
                 <p className="max-w-2xl text-sm leading-6 text-muted-foreground">分镜生成只产出草稿，不会自动触发视频任务。生成后请逐镜检查动作、景别、对白和参考资产，再进入后续阶段。</p>
               </div>
-              <StoryboardReview shots={project.shots} saving={saving} onSave={updateStoryboardShot} />
+              <StoryboardReview project={project} shots={project.shots} assetItems={referenceAssets} saving={saving} onSave={updateStoryboardShot} />
             </section>
             <PhaseStatusPanel
               project={project}
@@ -819,7 +819,7 @@ const SHOT_STATUS_LABELS: Record<DirectorShot['status'], string> = {
   locked: '已锁定',
 }
 
-function StoryboardReview({ shots, saving, onSave }: { shots: DirectorShot[]; saving: boolean; onSave: (shotId: string, input: UpdateDirectorShotInput) => Promise<void> }) {
+function StoryboardReview({ project, shots, assetItems, saving, onSave }: { project: DirectorProjectDetail; shots: DirectorShot[]; assetItems: Record<string, AssetItem>; saving: boolean; onSave: (shotId: string, input: UpdateDirectorShotInput) => Promise<void> }) {
   if (shots.length === 0) {
     return (
       <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
@@ -831,17 +831,108 @@ function StoryboardReview({ shots, saving, onSave }: { shots: DirectorShot[]; sa
 
   return (
     <section className="flex flex-col gap-3">
-      {shots.map(shot => <StoryboardShotCard key={shot.id} shot={shot} saving={saving} onSave={onSave} />)}
+      {shots.map(shot => <StoryboardShotCard key={shot.id} project={project} shot={shot} assetItems={assetItems} saving={saving} onSave={onSave} />)}
     </section>
   )
 }
 
-function StoryboardShotCard({
+function referenceKeysForShot(shot: DirectorShot): string[] {
+  return Array.isArray(shot.continuity?.referenceKeys)
+    ? shot.continuity.referenceKeys.filter((value): value is string => typeof value === 'string' && value.length > 0)
+    : []
+}
+
+function referenceBindingsForKey(project: DirectorProjectDetail, key: string): DirectorAsset[] {
+  const ownerIds = [
+    ...project.characters.filter(character => character.staleAt === null && character.name === key).map(character => character.id),
+    ...project.locations.filter(location => location.staleAt === null && location.name === key).map(location => location.id),
+  ]
+  return project.assets.filter(asset => asset.staleAt === null && asset.assetId !== null && asset.ownerId !== null && ownerIds.includes(asset.ownerId))
+}
+
+function ShotReferencePicker({
+  project,
   shot,
+  assetItems,
+  selectedIds,
+  disabled,
+  onChange,
+}: {
+  project: DirectorProjectDetail
+  shot: DirectorShot
+  assetItems: Record<string, AssetItem>
+  selectedIds: string[]
+  disabled: boolean
+  onChange: (assetId: string) => void
+}) {
+  const referenceKeys = referenceKeysForShot(shot)
+  if (referenceKeys.length === 0) {
+    return (
+      <div className="flex flex-col gap-2 bg-background/50 px-3 py-3 text-sm">
+        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">参考资产确认</span>
+        <p className="leading-6 text-muted-foreground">本镜头没有模型建议的角色或场景参考，可直接进入人工审核。</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-3 bg-background/50 px-3 py-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <span className="text-xs uppercase tracking-[0.14em] text-muted-foreground">参考资产确认</span>
+        <span className="text-xs text-muted-foreground">已选 {selectedIds.length} 项；锁定前必须完成确认</span>
+      </div>
+      <div className="flex flex-col gap-3">
+        {referenceKeys.map(key => {
+          const bindings = referenceBindingsForKey(project, key)
+          return (
+            <div key={key} className="flex flex-col gap-2">
+              <span className="text-sm font-medium">{key}</span>
+              {bindings.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {bindings.map(binding => {
+                    const asset = binding.assetId === null ? undefined : assetItems[binding.assetId]
+                    const selected = selectedIds.includes(binding.id)
+                    return (
+                      <button
+                        key={binding.id}
+                        type="button"
+                        className={`flex items-center gap-2 px-2 py-2 text-left text-xs transition-colors ${selected ? 'bg-primary/10 text-primary' : 'bg-muted/60 text-muted-foreground hover:bg-muted'}`}
+                        aria-pressed={selected}
+                        disabled={disabled}
+                        onClick={() => onChange(binding.id)}
+                      >
+                        <span className="size-10 shrink-0 overflow-hidden bg-background/70">
+                          <AssetThumbnail kind="image" url={asset?.url} thumbnailUrl={asset?.thumbnailUrl} alt={asset?.fileName ?? `${key} 参考资产`} />
+                        </span>
+                        <span className="flex items-center gap-1">
+                          {selected && <Check className="size-3.5" />}
+                          {asset?.fileName ?? '图片资产'}
+                        </span>
+                      </button>
+                    )
+                  })}
+                </div>
+              ) : (
+                <p className="text-xs leading-5 text-amber-700 dark:text-amber-300">尚未为此对象绑定当前参考图，请先到“参考资产”Tab 完成绑定。</p>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
+function StoryboardShotCard({
+  project,
+  shot,
+  assetItems,
   saving,
   onSave,
 }: {
+  project: DirectorProjectDetail
   shot: DirectorShot
+  assetItems: Record<string, AssetItem>
   saving: boolean
   onSave: (shotId: string, input: UpdateDirectorShotInput) => Promise<void>
 }) {
@@ -849,25 +940,29 @@ function StoryboardShotCard({
   const [environmentPrompt, setEnvironmentPrompt] = useState(shot.environmentPrompt ?? '')
   const [videoPrompt, setVideoPrompt] = useState(shot.videoPrompt ?? '')
   const [durationSeconds, setDurationSeconds] = useState(shot.durationSeconds === null ? '' : String(shot.durationSeconds))
+  const [referenceAssetIds, setReferenceAssetIds] = useState(shot.referenceAssetIds)
   const locked = shot.status === 'locked'
   const stale = shot.staleAt !== null
   const dirty = narrative !== shot.narrative
     || environmentPrompt !== (shot.environmentPrompt ?? '')
     || videoPrompt !== (shot.videoPrompt ?? '')
     || durationSeconds !== (shot.durationSeconds === null ? '' : String(shot.durationSeconds))
+    || referenceAssetIds.join('|') !== shot.referenceAssetIds.join('|')
 
   useEffect(() => {
     setNarrative(shot.narrative)
     setEnvironmentPrompt(shot.environmentPrompt ?? '')
     setVideoPrompt(shot.videoPrompt ?? '')
     setDurationSeconds(shot.durationSeconds === null ? '' : String(shot.durationSeconds))
-  }, [shot.id, shot.version, shot.narrative, shot.environmentPrompt, shot.videoPrompt, shot.durationSeconds])
+    setReferenceAssetIds(shot.referenceAssetIds)
+  }, [shot.id, shot.version, shot.narrative, shot.environmentPrompt, shot.videoPrompt, shot.durationSeconds, shot.referenceAssetIds.join('|')])
 
   const camera = shot.camera
   const dialogueLines = dialogueLinesFor(shot.dialogue)
-  const referenceKeys = Array.isArray(shot.continuity?.referenceKeys)
-    ? shot.continuity.referenceKeys.filter((value): value is string => typeof value === 'string')
-    : []
+  const referenceKeys = referenceKeysForShot(shot)
+  const toggleReferenceAsset = (assetId: string) => {
+    setReferenceAssetIds(current => current.includes(assetId) ? current.filter(id => id !== assetId) : [...current, assetId])
+  }
   const save = () => {
     const parsedDuration = durationSeconds.trim() === '' ? null : Number(durationSeconds)
     if (parsedDuration !== null && (!Number.isInteger(parsedDuration) || parsedDuration < 1 || parsedDuration > 120)) return
@@ -876,6 +971,7 @@ function StoryboardShotCard({
       environmentPrompt: environmentPrompt.trim().length > 0 ? environmentPrompt : null,
       videoPrompt: videoPrompt.trim().length > 0 ? videoPrompt : null,
       durationSeconds: parsedDuration,
+      referenceAssetIds,
     })
   }
 
@@ -914,6 +1010,8 @@ function StoryboardShotCard({
           {dialogueLines.length > 0 && <p className="leading-6 text-muted-foreground">对白：{dialogueLines.map(line => `${line.speaker}：“${line.text}”`).join(' ')}</p>}
         </div>
       </div>
+
+      <ShotReferencePicker project={project} shot={shot} assetItems={assetItems} selectedIds={referenceAssetIds} disabled={locked || saving} onChange={toggleReferenceAsset} />
 
       <div className="grid gap-4 sm:grid-cols-2">
         <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`shot-${shot.id}-environment`}>

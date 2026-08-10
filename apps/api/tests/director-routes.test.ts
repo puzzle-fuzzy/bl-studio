@@ -158,6 +158,7 @@ const fakeDirectorRepository: DirectorRepository = {
     const hasContentPatch = input.patch.narrative !== undefined
       || input.patch.camera !== undefined
       || input.patch.durationSeconds !== undefined
+      || input.patch.referenceAssetIds !== undefined
       || input.patch.environmentPrompt !== undefined
       || input.patch.videoPrompt !== undefined
       || input.patch.negativePrompt !== undefined
@@ -171,6 +172,7 @@ const fakeDirectorRepository: DirectorRepository = {
       ...input.patch,
       camera: input.patch.camera ?? current.camera,
       durationSeconds: input.patch.durationSeconds === undefined ? current.durationSeconds : input.patch.durationSeconds,
+      referenceAssetIds: input.patch.referenceAssetIds === undefined ? current.referenceAssetIds : [...new Set(input.patch.referenceAssetIds)],
       environmentPrompt: input.patch.environmentPrompt === undefined ? current.environmentPrompt : input.patch.environmentPrompt,
       videoPrompt: input.patch.videoPrompt === undefined ? current.videoPrompt : input.patch.videoPrompt,
       negativePrompt: input.patch.negativePrompt === undefined ? current.negativePrompt : input.patch.negativePrompt,

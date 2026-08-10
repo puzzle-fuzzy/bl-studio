@@ -1132,6 +1132,7 @@ export function createDirectorRepository({
 				const hasContentPatch = patch.narrative !== undefined
 					|| patch.camera !== undefined
 					|| patch.durationSeconds !== undefined
+					|| patch.referenceAssetIds !== undefined
 					|| patch.environmentPrompt !== undefined
 					|| patch.videoPrompt !== undefined
 					|| patch.negativePrompt !== undefined
@@ -1144,12 +1145,59 @@ export function createDirectorRepository({
 					);
 				}
 				const nextStatus = patch.status ?? "needs_review";
+				const referenceAssetIds = patch.referenceAssetIds ?? current.referenceAssetIdsJson;
+				if (patch.referenceAssetIds !== undefined || nextStatus === "ready" || nextStatus === "locked") {
+					const referenceRows = referenceAssetIds.length === 0
+						? []
+						: await tx
+							.select({ id: directorAssets.id, kind: directorAssets.kind, staleAt: directorAssets.staleAt })
+							.from(directorAssets)
+							.where(
+								and(
+									eq(directorAssets.projectId, input.projectId),
+									inArray(directorAssets.id, [...new Set(referenceAssetIds)]),
+									isNull(directorAssets.deletedAt),
+								),
+							)
+					if (referenceRows.length !== new Set(referenceAssetIds).size) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_REFERENCE_INVALID",
+							"Every storyboard reference must point to an active asset binding in this project",
+						);
+					}
+					if (referenceRows.some((row) => !["uploaded_reference", "character_reference", "location_reference"].includes(row.kind))) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_REFERENCE_INVALID",
+							"Only image reference bindings can be used by a storyboard shot",
+						);
+					}
+					const referenceKeys = stringArrayField(objectField(current.continuityJson).referenceKeys);
+					if ((nextStatus === "ready" || nextStatus === "locked") && current.staleAt !== null) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_REFERENCE_INVALID",
+							"Stale storyboard shots cannot be confirmed for video generation",
+						);
+					}
+					if ((nextStatus === "ready" || nextStatus === "locked") && referenceKeys.length > 0 && referenceAssetIds.length === 0) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_REFERENCE_INVALID",
+							"Resolve the suggested storyboard references before confirming this shot",
+						);
+					}
+					if ((nextStatus === "ready" || nextStatus === "locked") && referenceRows.some((row) => row.staleAt !== null)) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_SHOT_REFERENCE_INVALID",
+							"Stale asset bindings cannot be used for video generation",
+						);
+					}
+				}
 				const [next] = await tx
 					.update(directorShots)
 					.set({
 						...(patch.narrative !== undefined ? { narrative: patch.narrative } : {}),
 						...(patch.camera !== undefined ? { cameraJson: patch.camera } : {}),
 						...(patch.durationSeconds !== undefined ? { durationSeconds: patch.durationSeconds } : {}),
+						...(patch.referenceAssetIds !== undefined ? { referenceAssetIdsJson: [...new Set(patch.referenceAssetIds)] } : {}),
 						...(patch.environmentPrompt !== undefined ? { environmentPrompt: patch.environmentPrompt } : {}),
 						...(patch.videoPrompt !== undefined ? { videoPrompt: patch.videoPrompt } : {}),
 						...(patch.negativePrompt !== undefined ? { negativePrompt: patch.negativePrompt } : {}),
@@ -1346,6 +1394,30 @@ export function createDirectorRepository({
 					inputSnapshot.analysis = analysis;
 					inputSnapshot.characters = characters;
 					inputSnapshot.locations = locations;
+				} else if (input.phase === "videos") {
+					const shotRows = await tx
+						.select({
+							id: directorShots.id,
+							sequence: directorShots.sequence,
+							status: directorShots.status,
+							referenceAssetIds: directorShots.referenceAssetIdsJson,
+						})
+						.from(directorShots)
+						.where(
+							and(
+								eq(directorShots.projectId, input.projectId),
+								isNull(directorShots.deletedAt),
+								isNull(directorShots.staleAt),
+							),
+						)
+						.orderBy(directorShots.sequence);
+					if (shotRows.length === 0 || shotRows.some((shot) => shot.status !== "locked")) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"Every current storyboard shot must be locked before starting video generation",
+						);
+					}
+					inputSnapshot.shots = shotRows;
 				}
 
 				const version = state.version + 1;
