@@ -15,6 +15,10 @@ services:
       interval: 2s
       timeout: 2s
       retries: 20
+    # Named volume: routine `docker compose down` keeps the dev schema/data.
+    # Use `pnpm run db:reset` (or `down -v`) only when an intentional reset is needed.
+    volumes:
+      - bailian-studio-postgres-dev-data:/var/lib/postgresql/data
 
   # Development-only SMTP sink. It accepts mail without credentials and keeps
   # verification links out of application logs. Production must use a real
@@ -25,3 +29,6 @@ services:
     ports:
       - "11025:1025"
       - "18025:8025"
+
+volumes:
+  bailian-studio-postgres-dev-data:
