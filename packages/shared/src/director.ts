@@ -68,6 +68,21 @@ export const DirectorPhaseStatusSchema = z.enum(DIRECTOR_PHASE_STATUS)
 export const DirectorPhaseRunStatusSchema = z.enum(DIRECTOR_PHASE_RUN_STATUS)
 export const DirectorProjectStatusSchema = z.enum(DIRECTOR_PROJECT_STATUS)
 
+export const DIRECTOR_ASSET_KINDS = [
+  'uploaded_reference',
+  'character_reference',
+  'location_reference',
+  'storyboard_frame',
+  'shot_video',
+  'music',
+  'final_video',
+] as const
+
+export type DirectorAssetKind = (typeof DIRECTOR_ASSET_KINDS)[number]
+
+export const DirectorAssetKindSchema = z.enum(DIRECTOR_ASSET_KINDS)
+export const DirectorAssetOwnerTypeSchema = z.enum(['character', 'location'])
+
 export const DirectorScriptVersionSchema = z.object({
   id: z.string(),
   version: z.number().int().positive(),
@@ -106,6 +121,29 @@ export const DirectorLocationSchema = z.object({
   locked: z.boolean(),
   version: z.number().int().positive(),
   ...DirectorStaleFields,
+}).strict()
+
+export const DirectorAssetSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  sourceRunId: z.string().nullable(),
+  kind: DirectorAssetKindSchema,
+  ownerType: DirectorAssetOwnerTypeSchema.nullable(),
+  ownerId: z.string().nullable(),
+  assetId: z.string().nullable(),
+  version: z.number().int().positive(),
+  metadata: z.record(z.string(), z.unknown()),
+  ...DirectorStaleFields,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+}).strict()
+
+export const AttachDirectorAssetSchema = z.object({
+  assetId: z.string().trim().min(1).max(256),
+  kind: z.enum(['uploaded_reference', 'character_reference', 'location_reference']),
+  ownerType: DirectorAssetOwnerTypeSchema.optional(),
+  ownerId: z.string().trim().min(1).max(256).optional(),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 }).strict()
 
 export const CreateDirectorProjectSchema = z.object({
@@ -164,6 +202,7 @@ export const DirectorProjectDetailSchema = z.object({
   scriptVersion: DirectorScriptVersionSchema,
   characters: z.array(DirectorCharacterSchema),
   locations: z.array(DirectorLocationSchema),
+  assets: z.array(DirectorAssetSchema),
   phases: z.array(DirectorPhaseStateSchema),
   createdAt: z.string(),
   updatedAt: z.string(),
@@ -176,6 +215,10 @@ export const DirectorProjectListResponseSchema = z.object({
 
 export const DirectorProjectResponseSchema = z.object({
   project: DirectorProjectDetailSchema,
+})
+
+export const DirectorAssetResponseSchema = z.object({
+  asset: DirectorAssetSchema,
 })
 
 export const CreateDirectorPhaseRunSchema = z.object({
@@ -276,4 +319,6 @@ export type DirectorProjectDetail = z.infer<typeof DirectorProjectDetailSchema>
 export type DirectorScriptVersion = z.infer<typeof DirectorScriptVersionSchema>
 export type DirectorCharacter = z.infer<typeof DirectorCharacterSchema>
 export type DirectorLocation = z.infer<typeof DirectorLocationSchema>
+export type DirectorAsset = z.infer<typeof DirectorAssetSchema>
+export type AttachDirectorAssetInput = z.infer<typeof AttachDirectorAssetSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

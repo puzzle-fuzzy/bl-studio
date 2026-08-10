@@ -47,6 +47,8 @@ export type {
   CreateGenerationResponse,
   CreateDirectorProjectInput,
   CreateDirectorPhaseRunInput,
+  AttachDirectorAssetInput,
+  DirectorAsset,
   DirectorAnalysisResult,
   DirectorCharacterDraft,
   DirectorCharacter,

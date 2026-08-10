@@ -27,6 +27,7 @@ import {
   CreateGenerationResponseSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
+  DirectorAssetResponseSchema,
   DirectorPhaseRunResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
@@ -111,6 +112,8 @@ import type {
   CreateGenerationResponse,
   CreateDirectorProjectInput,
   CreateDirectorPhaseRunInput,
+  AttachDirectorAssetInput,
+  DirectorAsset,
   DirectorPhaseRun,
   DirectorProjectDetail,
   DirectorProjectListResult,
@@ -310,6 +313,10 @@ export interface BailianStudioApiClient {
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
   /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
   updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
+  /** `POST /api/director/projects/:id/assets` — 显式绑定一个已有图片资产。 */
+  attachDirectorAsset(id: string, input: AttachDirectorAssetInput): Promise<DirectorAsset>
+  /** `DELETE /api/director/projects/:id/assets/:assetId` — 移除导演台绑定，不删除原始用户资产。 */
+  detachDirectorAsset(id: string, directorAssetId: string): Promise<DirectorProjectDetail>
   /** `POST /api/director/projects/:id/phases/:phase/runs` — 手动排队一个阶段。 */
   requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
@@ -652,6 +659,26 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}`,
         { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async attachDirectorAsset(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/assets`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorAssetResponseSchema,
+      )
+      return data.asset
+    },
+
+    async detachDirectorAsset(id, directorAssetId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/assets/${encodeURIComponent(directorAssetId)}`,
+        { method: 'DELETE', credentials: 'include' },
         fetchImpl,
         DirectorProjectResponseSchema,
       )

@@ -12,7 +12,10 @@ import { z } from 'zod'
 import {
   CreateDirectorProjectSchema,
   CreateDirectorPhaseRunSchema,
+  AttachDirectorAssetSchema,
   DirectorAnalysisResultSchema,
+  DirectorAssetResponseSchema,
+  DirectorAssetSchema,
   DirectorCharacterDraftSchema,
   DirectorCharactersResultSchema,
   DirectorLocationDraftSchema,
@@ -25,6 +28,8 @@ import {
   UpdateDirectorProjectSchema,
   type CreateDirectorProjectInput,
   type CreateDirectorPhaseRunInput,
+  type AttachDirectorAssetInput,
+  type DirectorAsset,
   type DirectorPhaseRun,
   type DirectorPhaseRunStatus,
   type DirectorAnalysisResult,
@@ -43,7 +48,10 @@ import {
 
 export {
   CreateDirectorPhaseRunSchema,
+  AttachDirectorAssetSchema,
   DirectorAnalysisResultSchema,
+  DirectorAssetResponseSchema,
+  DirectorAssetSchema,
   DirectorCharacterDraftSchema,
   DirectorCharactersResultSchema,
   DirectorLocationDraftSchema,
@@ -58,7 +66,9 @@ export {
 }
 export type {
   CreateDirectorPhaseRunInput,
+  AttachDirectorAssetInput,
   DirectorAnalysisResult,
+  DirectorAsset,
   DirectorCharacterDraft,
   DirectorCharacter,
   DirectorCharactersResult,

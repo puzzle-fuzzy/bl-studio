@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
-import { DIRECTOR_PHASES, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult } from '@bailian-studio/shared'
+import { DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -48,6 +48,7 @@ function createProject(input: { title: string; storyText: string; synopsis?: str
     },
     characters: [],
     locations: [],
+    assets: [],
     phases: createPhaseStates(),
     createdAt: '2026-08-10T00:00:00.000Z',
     updatedAt: '2026-08-10T00:00:00.000Z',
@@ -90,6 +91,33 @@ const fakeDirectorRepository: DirectorRepository = {
       synopsis: input.patch.synopsis === undefined ? record.project.synopsis : input.patch.synopsis,
       updatedAt: '2026-08-10T00:01:00.000Z',
     }
+    return record.project
+  },
+  async attachAsset(input) {
+    const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
+    if (record === undefined) throw new Error('project not found')
+    const asset: DirectorAsset = {
+      id: `director-asset-${input.assetId}`,
+      projectId: input.projectId,
+      sourceRunId: null,
+      kind: input.kind,
+      ownerType: input.ownerType ?? null,
+      ownerId: input.ownerId ?? null,
+      assetId: input.assetId,
+      version: 1,
+      metadata: input.metadata ?? {},
+      staleAt: null,
+      staleReason: null,
+      createdAt: '2026-08-10T00:00:00.000Z',
+      updatedAt: '2026-08-10T00:00:00.000Z',
+    }
+    record.project = { ...record.project, assets: [...record.project.assets, asset] }
+    return asset
+  },
+  async detachAsset(input) {
+    const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
+    if (record === undefined) throw new Error('project not found')
+    record.project = { ...record.project, assets: record.project.assets.filter(asset => asset.id !== input.directorAssetId) }
     return record.project
   },
   async requestPhaseRun(input) {
@@ -234,5 +262,38 @@ describe('director routes', () => {
     const readBody = await readResponse.json() as { data: { run: DirectorPhaseRun } }
     expect(readResponse.status).toBe(200)
     expect(readBody.data.run.id).toBe(runBody.data.run.id)
+  })
+
+  it('binds and detaches a reference asset without changing the project asset source', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '参考资产项目', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+
+    const attachResponse = await app.handle(authed(`/api/director/projects/${projectId}/assets`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        assetId: 'user-image-1',
+        kind: 'character_reference',
+        ownerType: 'character',
+        ownerId: 'character-1',
+      }),
+    }))
+    const attached = await attachResponse.json() as { data: { asset: DirectorAsset } }
+    expect(attachResponse.status).toBe(200)
+    expect(attached.data.asset.assetId).toBe('user-image-1')
+
+    const detailResponse = await app.handle(authed(`/api/director/projects/${projectId}`))
+    const detail = await detailResponse.json() as { data: { project: DirectorProjectDetail } }
+    expect(detail.data.project.assets).toHaveLength(1)
+
+    const detachResponse = await app.handle(authed(`/api/director/projects/${projectId}/assets/${attached.data.asset.id}`, { method: 'DELETE' }))
+    expect(detachResponse.status).toBe(200)
+    const detached = await detachResponse.json() as { data: { project: DirectorProjectDetail } }
+    expect(detached.data.project.assets).toHaveLength(0)
   })
 })

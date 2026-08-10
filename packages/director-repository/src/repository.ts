@@ -10,6 +10,7 @@ import {
 	directorScriptVersions,
 	directorShots,
 	taskRecords,
+	userAssets,
 } from "@bailian-studio/db";
 import {
 	DIRECTOR_PHASES,
@@ -17,6 +18,7 @@ import {
 	type DirectorPhaseRun,
 	type DirectorPhaseState,
 	type DirectorCharacter,
+	type DirectorAsset,
 	type DirectorLocation,
 	type DirectorProjectDetail,
 	type DirectorProjectProgress,
@@ -34,6 +36,8 @@ import type {
 	ListDirectorProjectsRepositoryInput,
 	ListDirectorProjectsResult,
 	UpdateDirectorProjectRepositoryInput,
+	AttachDirectorAssetRepositoryInput,
+	DetachDirectorAssetRepositoryInput,
 } from "./types";
 
 interface ProjectCursor {
@@ -156,6 +160,26 @@ function toLocation(
 	};
 }
 
+function toDirectorAsset(
+	row: typeof directorAssets.$inferSelect,
+): DirectorAsset {
+	return {
+		id: row.id,
+		projectId: row.projectId,
+		sourceRunId: row.sourceRunId,
+		kind: row.kind as DirectorAsset["kind"],
+		ownerType: row.ownerType as DirectorAsset["ownerType"],
+		ownerId: row.ownerId,
+		assetId: row.assetId,
+		version: row.version,
+		metadata: row.metadataJson,
+		staleAt: row.staleAt?.toISOString() ?? null,
+		staleReason: row.staleReason,
+		createdAt: row.createdAt.toISOString(),
+		updatedAt: row.updatedAt.toISOString(),
+	};
+}
+
 function toWorkerPhaseRun(
 	row: typeof directorPhaseRuns.$inferSelect,
 ) {
@@ -179,6 +203,7 @@ function toProjectDetail(
 	scriptVersion: typeof directorScriptVersions.$inferSelect,
 	characterRows: Array<typeof directorCharacters.$inferSelect>,
 	locationRows: Array<typeof directorLocations.$inferSelect>,
+	assetRows: Array<typeof directorAssets.$inferSelect>,
 	phaseRunRows: Array<typeof directorPhaseRuns.$inferSelect> = [],
 ): DirectorProjectRepositoryDetail {
 	const latestRunByPhase = new Map<string, string>();
@@ -201,6 +226,7 @@ function toProjectDetail(
 		scriptVersion: toScriptVersion(scriptVersion),
 		characters: characterRows.map(toCharacter),
 		locations: locationRows.map(toLocation),
+		assets: assetRows.map(toDirectorAsset),
 		phases,
 		createdAt: row.createdAt.toISOString(),
 		updatedAt: row.updatedAt.toISOString(),
@@ -504,12 +530,22 @@ export function createDirectorRepository({
 					),
 				)
 				.orderBy(desc(directorLocations.createdAt), desc(directorLocations.id));
+			const assetRows = await db
+				.select()
+				.from(directorAssets)
+				.where(
+					and(
+						eq(directorAssets.projectId, row.id),
+						isNull(directorAssets.deletedAt),
+					),
+				)
+				.orderBy(desc(directorAssets.createdAt), desc(directorAssets.id));
 			const runs = await db
 				.select()
 				.from(directorPhaseRuns)
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
-			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, runs);
+			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, assetRows, runs);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
@@ -669,6 +705,281 @@ export function createDirectorRepository({
 				userId: input.userId,
 				projectId: input.projectId,
 			});
+			if (project === undefined) {
+				throw new DirectorRepositoryError(
+					"DIRECTOR_PROJECT_NOT_FOUND",
+					`Director project not found: ${input.projectId}`,
+				);
+			}
+			return project;
+		},
+
+		async attachAsset(input: AttachDirectorAssetRepositoryInput) {
+			const now = new Date();
+			return db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (project === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PROJECT_NOT_FOUND",
+						`Director project not found: ${input.projectId}`,
+					);
+				}
+
+				const [userAsset] = await tx
+					.select()
+					.from(userAssets)
+					.where(
+						and(
+							eq(userAssets.id, input.assetId),
+							eq(userAssets.userId, input.userId),
+							isNull(userAssets.deletedAt),
+						),
+					)
+					.limit(1);
+				if (userAsset === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_ASSET_NOT_FOUND",
+						`User asset not found: ${input.assetId}`,
+					);
+				}
+				if (userAsset.kind !== "image") {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_ASSET_KIND_NOT_SUPPORTED",
+						"Only image assets can be used as character or location references",
+					);
+				}
+
+				const expectedOwnerType =
+					input.kind === "character_reference"
+						? "character"
+						: input.kind === "location_reference"
+							? "location"
+							: null;
+				const ownerType = input.ownerType ?? null;
+				const ownerId = input.ownerId ?? null;
+				if (
+					ownerType !== expectedOwnerType ||
+					(ownerType === null ? ownerId !== null : ownerId === null)
+				) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_ASSET_OWNER_INVALID",
+						`Asset kind ${input.kind} does not match its owner`,
+					);
+				}
+
+				const ownerFilter = ownerType === null
+					? isNull(directorAssets.ownerType)
+					: eq(directorAssets.ownerType, ownerType);
+				const ownerIdFilter = ownerId === null
+					? isNull(directorAssets.ownerId)
+					: eq(directorAssets.ownerId, ownerId);
+				const activeBindingFilter = and(
+					eq(directorAssets.projectId, input.projectId),
+					eq(directorAssets.kind, input.kind),
+					eq(directorAssets.assetId, input.assetId),
+					ownerFilter,
+					ownerIdFilter,
+					isNull(directorAssets.deletedAt),
+				);
+				const [existing] = await tx
+					.select()
+					.from(directorAssets)
+					.where(activeBindingFilter)
+					.limit(1);
+				if (existing !== undefined) return toDirectorAsset(existing);
+
+				if (ownerType === "character") {
+					const [owner] = await tx
+						.select()
+						.from(directorCharacters)
+						.where(
+							and(
+								eq(directorCharacters.id, ownerId as string),
+								eq(directorCharacters.projectId, input.projectId),
+								isNull(directorCharacters.deletedAt),
+							),
+						)
+						.limit(1);
+					if (owner === undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_ASSET_OWNER_NOT_FOUND",
+							`Director character not found: ${ownerId}`,
+						);
+					}
+					await tx
+						.update(directorCharacters)
+						.set({
+							referenceAssetIdsJson: [...new Set([...owner.referenceAssetIdsJson, input.assetId])],
+							updatedBy: input.userId,
+							updatedAt: now,
+						})
+						.where(eq(directorCharacters.id, owner.id));
+				} else if (ownerType === "location") {
+					const [owner] = await tx
+						.select()
+						.from(directorLocations)
+						.where(
+							and(
+								eq(directorLocations.id, ownerId as string),
+								eq(directorLocations.projectId, input.projectId),
+								isNull(directorLocations.deletedAt),
+							),
+						)
+						.limit(1);
+					if (owner === undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_ASSET_OWNER_NOT_FOUND",
+							`Director location not found: ${ownerId}`,
+						);
+					}
+					await tx
+						.update(directorLocations)
+						.set({
+							referenceAssetIdsJson: [...new Set([...owner.referenceAssetIdsJson, input.assetId])],
+							updatedBy: input.userId,
+							updatedAt: now,
+						})
+						.where(eq(directorLocations.id, owner.id));
+				}
+
+				const [created] = await tx
+					.insert(directorAssets)
+					.values({
+						id: crypto.randomUUID(),
+						projectId: input.projectId,
+						sourceRunId: null,
+						kind: input.kind,
+						ownerType,
+						ownerId,
+						assetId: input.assetId,
+						version: 1,
+						metadataJson: input.metadata ?? {},
+						createdBy: input.userId,
+						updatedBy: input.userId,
+						createdAt: now,
+						updatedAt: now,
+					})
+					.returning();
+				if (created === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_DATABASE_ERROR",
+						"Director asset binding could not be created",
+					);
+				}
+				return toDirectorAsset(created);
+			});
+		},
+
+		async detachAsset(input: DetachDirectorAssetRepositoryInput) {
+			const now = new Date();
+			await db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (project === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PROJECT_NOT_FOUND",
+						`Director project not found: ${input.projectId}`,
+					);
+				}
+				const [binding] = await tx
+					.select()
+					.from(directorAssets)
+					.where(
+						and(
+							eq(directorAssets.id, input.directorAssetId),
+							eq(directorAssets.projectId, input.projectId),
+							isNull(directorAssets.deletedAt),
+						),
+					)
+					.limit(1);
+				if (binding === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_ASSET_NOT_FOUND",
+						`Director asset binding not found: ${input.directorAssetId}`,
+					);
+				}
+				await tx
+					.update(directorAssets)
+					.set({ deletedAt: now, deletedBy: input.userId, updatedBy: input.userId, updatedAt: now })
+					.where(eq(directorAssets.id, binding.id));
+
+				if (binding.ownerType !== "character" && binding.ownerType !== "location") return;
+				if (binding.ownerId === null || binding.assetId === null) return;
+				const sibling = and(
+					eq(directorAssets.projectId, input.projectId),
+					eq(directorAssets.ownerType, binding.ownerType),
+					eq(directorAssets.ownerId, binding.ownerId),
+					eq(directorAssets.assetId, binding.assetId),
+					isNull(directorAssets.deletedAt),
+				);
+				const activeSiblings = await tx.select({ id: directorAssets.id }).from(directorAssets).where(sibling).limit(1);
+				if (activeSiblings.length > 0) return;
+				if (binding.ownerType === "character") {
+					const [owner] = await tx
+						.select()
+						.from(directorCharacters)
+						.where(
+							and(
+								eq(directorCharacters.id, binding.ownerId),
+								eq(directorCharacters.projectId, input.projectId),
+								isNull(directorCharacters.deletedAt),
+							),
+						)
+						.limit(1);
+					if (owner !== undefined) {
+						await tx
+							.update(directorCharacters)
+							.set({
+								referenceAssetIdsJson: owner.referenceAssetIdsJson.filter((assetId) => assetId !== binding.assetId),
+								updatedBy: input.userId,
+								updatedAt: now,
+							})
+							.where(eq(directorCharacters.id, owner.id));
+					}
+				} else {
+					const [owner] = await tx
+						.select()
+						.from(directorLocations)
+						.where(
+							and(
+								eq(directorLocations.id, binding.ownerId),
+								eq(directorLocations.projectId, input.projectId),
+								isNull(directorLocations.deletedAt),
+							),
+						)
+						.limit(1);
+					if (owner !== undefined) {
+						await tx
+							.update(directorLocations)
+							.set({
+								referenceAssetIdsJson: owner.referenceAssetIdsJson.filter((assetId) => assetId !== binding.assetId),
+								updatedBy: input.userId,
+								updatedAt: now,
+							})
+							.where(eq(directorLocations.id, owner.id));
+					}
+				}
+			});
+			const project = await this.getProject({ userId: input.userId, projectId: input.projectId });
 			if (project === undefined) {
 				throw new DirectorRepositoryError(
 					"DIRECTOR_PROJECT_NOT_FOUND",

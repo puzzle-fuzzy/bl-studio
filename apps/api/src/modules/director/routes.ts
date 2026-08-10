@@ -1,5 +1,6 @@
 import { Elysia } from 'elysia'
 import {
+  AttachDirectorAssetSchema,
   CreateDirectorPhaseRunSchema,
   DirectorPhaseSchema,
   CreateDirectorProjectSchema,
@@ -39,6 +40,21 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const patch = validateInput(UpdateDirectorProjectSchema, body)
       const project = await repository.updateProject({ userId: user.id, projectId: params.id, patch })
+      return { success: true, data: { project } }
+    })
+    .post('/projects/:id/assets', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(AttachDirectorAssetSchema, body)
+      const asset = await repository.attachAsset({ userId: user.id, projectId: params.id, ...input })
+      return { success: true, data: { asset } }
+    })
+    .delete('/projects/:id/assets/:assetId', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const project = await repository.detachAsset({
+        userId: user.id,
+        projectId: params.id,
+        directorAssetId: params.assetId,
+      })
       return { success: true, data: { project } }
     })
     .post('/projects/:id/phases/:phase/runs', async ({ request, params, body }) => {

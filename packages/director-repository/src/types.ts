@@ -1,11 +1,13 @@
 import type {
   CreateDirectorPhaseRunInput,
   CreateDirectorProjectInput,
+  AttachDirectorAssetInput,
+  DirectorAsset,
   DirectorPhase,
   DirectorPhaseRun,
 	DirectorPhaseState,
 	DirectorCharacter,
-	DirectorLocation,
+  DirectorLocation,
   DirectorProjectDetail,
   DirectorProjectProgress,
   DirectorProjectStatus,
@@ -14,7 +16,7 @@ import type {
   UpdateDirectorProjectInput,
 } from '@bailian-studio/shared'
 
-export type { CreateDirectorPhaseRunInput, CreateDirectorProjectInput, UpdateDirectorProjectInput }
+export type { AttachDirectorAssetInput, CreateDirectorPhaseRunInput, CreateDirectorProjectInput, UpdateDirectorProjectInput }
 
 export interface CreateDirectorProjectRepositoryInput extends CreateDirectorProjectInput {
   userId: string
@@ -79,6 +81,18 @@ export interface DirectorProjectRepositoryDetail extends DirectorProjectDetail {
   scriptVersion: DirectorScriptVersion
   characters: DirectorCharacter[]
   locations: DirectorLocation[]
+  assets: DirectorAsset[]
+}
+
+export interface AttachDirectorAssetRepositoryInput extends AttachDirectorAssetInput {
+  userId: string
+  projectId: string
+}
+
+export interface DetachDirectorAssetRepositoryInput {
+  userId: string
+  projectId: string
+  directorAssetId: string
 }
 
 export interface ListDirectorProjectsResult {
@@ -91,6 +105,8 @@ export interface DirectorRepository {
   listProjects(input: ListDirectorProjectsRepositoryInput): Promise<ListDirectorProjectsResult>
   getProject(input: GetDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail | undefined>
   updateProject(input: UpdateDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail>
+  attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
+  detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>

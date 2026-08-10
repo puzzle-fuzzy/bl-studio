@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, CircleDashed, FileText, Loader2, LockKeyhole, Save, Sparkles } from 'lucide-react'
+import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2 } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { DirectorAnalysisResult, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
+import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
@@ -15,9 +17,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api'
 import { modelNameZh } from '@/lib/model-modes'
+import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
+type ReferenceOwnerType = 'character' | 'location'
+type ReferenceTarget = { ownerType: ReferenceOwnerType; ownerId: string }
 
 const TAB_ITEMS: Array<{ value: string; label: string; phases: DirectorPhase[] }> = [
   { value: 'analyze', label: '剧本分析', phases: ['analyze'] },
@@ -79,9 +84,21 @@ export function DirectorProjectPage() {
   const [locationsText, setLocationsText] = useState<string>()
   const [locationsResult, setLocationsResult] = useState<DirectorLocationsResult>()
   const [locationsStale, setLocationsStale] = useState(false)
+  const [referencePickerOpen, setReferencePickerOpen] = useState(false)
+  const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
+  const referenceAssets = useReferenceAssetsStore(state => state.assets)
+  const loadReferenceAssets = useReferenceAssetsStore(state => state.getAssets)
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
+  const boundReferenceAssetIds = useMemo(() => {
+    if (project === undefined) return []
+    return [...new Set(project.assets.map(asset => asset.assetId).filter((assetId): assetId is string => assetId !== null))]
+  }, [project])
+
+  useEffect(() => {
+    if (boundReferenceAssetIds.length > 0) void loadReferenceAssets(boundReferenceAssetIds)
+  }, [boundReferenceAssetIds.join('|'), loadReferenceAssets])
 
   useEffect(() => {
     void loadModels()
@@ -127,6 +144,8 @@ export function DirectorProjectPage() {
         setLocationsText(undefined)
         setLocationsResult(undefined)
         setLocationsStale(false)
+        setReferencePickerOpen(false)
+        setReferenceTarget(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
@@ -331,6 +350,49 @@ export function DirectorProjectPage() {
     }
   }
 
+  const openReferencePicker = (target: ReferenceTarget) => {
+    setReferenceTarget(target)
+    setReferencePickerOpen(true)
+  }
+
+  const attachReferenceAsset = async (assets: AssetItem[]) => {
+    const asset = assets[0]
+    if (id === undefined || referenceTarget === undefined || asset === undefined) return
+    setSaving(true)
+    try {
+      await apiClient.attachDirectorAsset(id, {
+        assetId: asset.id,
+        kind: referenceTarget.ownerType === 'character' ? 'character_reference' : 'location_reference',
+        ownerType: referenceTarget.ownerType,
+        ownerId: referenceTarget.ownerId,
+      })
+      const next = await apiClient.getDirectorProject(id)
+      setProject(next)
+      void loadReferenceAssets([asset.id])
+      toast.success('参考资产已绑定到当前项目')
+    } catch {
+      toast.error('参考资产绑定失败，请稍后重试')
+    } finally {
+      setSaving(false)
+      setReferencePickerOpen(false)
+      setReferenceTarget(undefined)
+    }
+  }
+
+  const detachReferenceAsset = async (asset: DirectorAsset) => {
+    if (id === undefined) return
+    setSaving(true)
+    try {
+      const next = await apiClient.detachDirectorAsset(id, asset.id)
+      setProject(next)
+      toast.success('已移除导演台引用，原始资产仍保留在资产库')
+    } catch {
+      toast.error('移除引用失败，请稍后重试')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   if (loading) {
     return (
       <main className="mx-auto flex w-full max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
@@ -356,7 +418,8 @@ export function DirectorProjectPage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
+    <>
+      <main className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-5 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-4">
         <div className="flex items-center justify-between gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate('/director')}>
@@ -519,7 +582,51 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations').map(tab => (
+        <TabsContent value="references" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">手动确认</span>
+                <h2 className="text-xl font-semibold">为角色和场景挑选参考资产</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">这里绑定的是资产库里的现有图片。绑定关系可以随时替换或移除，移除不会删除原始资产；后续生成出的参考图也会沿用这套关系和失效标记。</p>
+              </div>
+              {project.characters.filter(character => character.staleAt === null).length > 0 && (
+                <ReferenceEntityGroup
+                  title="角色参考"
+                  ownerType="character"
+                  entities={project.characters.filter(character => character.staleAt === null).map(character => ({ id: character.id, name: character.name, subtitle: character.role }))}
+                  bindings={project.assets}
+                  assetItems={referenceAssets}
+                  saving={saving}
+                  onAdd={openReferencePicker}
+                  onRemove={asset => void detachReferenceAsset(asset)}
+                />
+              )}
+              {project.locations.filter(location => location.staleAt === null).length > 0 && (
+                <ReferenceEntityGroup
+                  title="场景参考"
+                  ownerType="location"
+                  entities={project.locations.filter(location => location.staleAt === null).map(location => ({ id: location.id, name: location.name, subtitle: location.atmosphere }))}
+                  bindings={project.assets}
+                  assetItems={referenceAssets}
+                  saving={saving}
+                  onAdd={openReferencePicker}
+                  onRemove={asset => void detachReferenceAsset(asset)}
+                />
+              )}
+              {project.characters.every(character => character.staleAt !== null) && project.locations.every(location => location.staleAt !== null) && (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
+                  <ImageIcon className="size-8 text-muted-foreground" />
+                  <p className="font-medium">还没有可绑定的角色或场景卡</p>
+                  <p className="max-w-md text-sm leading-6 text-muted-foreground">先完成角色、场景阶段并确认结果，再在这里手动选择参考图片。</p>
+                </div>
+              )}
+            </section>
+            <PhaseStatusPanel project={project} phases={['characterRefs', 'locationRefs']} />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -536,7 +643,86 @@ export function DirectorProjectPage() {
           </TabsContent>
         ))}
       </Tabs>
-    </main>
+      </main>
+      <AssetPickerDialog
+        open={referencePickerOpen}
+        onOpenChange={open => {
+          setReferencePickerOpen(open)
+          if (!open) setReferenceTarget(undefined)
+        }}
+        mediaKind="image"
+        onSelect={assets => void attachReferenceAsset(assets)}
+      />
+    </>
+  )
+}
+
+function ReferenceEntityGroup({
+  title,
+  ownerType,
+  entities,
+  bindings,
+  assetItems,
+  saving,
+  onAdd,
+  onRemove,
+}: {
+  title: string
+  ownerType: ReferenceOwnerType
+  entities: Array<{ id: string; name: string; subtitle: string | null }>
+  bindings: DirectorAsset[]
+  assetItems: Record<string, AssetItem>
+  saving: boolean
+  onAdd: (target: ReferenceTarget) => void
+  onRemove: (asset: DirectorAsset) => void
+}) {
+  const bindingKind = ownerType === 'character' ? 'character_reference' : 'location_reference'
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-3">
+        <h3 className="font-semibold">{title}</h3>
+        <span className="text-xs text-muted-foreground">{entities.length} 个对象</span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {entities.map(entity => {
+          const entityBindings = bindings.filter(binding => binding.kind === bindingKind && binding.ownerType === ownerType && binding.ownerId === entity.id)
+          return (
+            <article key={entity.id} className="flex flex-col gap-4 bg-muted/30 px-4 py-4 sm:flex-row sm:items-start sm:justify-between">
+              <div className="flex min-w-0 flex-col gap-1">
+                <div className="flex items-center gap-2">
+                  <h4 className="font-medium">{entity.name}</h4>
+                  {entity.subtitle !== null && entity.subtitle.length > 0 && <span className="truncate text-xs text-muted-foreground">{entity.subtitle}</span>}
+                </div>
+                <p className="text-xs leading-5 text-muted-foreground">绑定后会作为后续分镜与视频阶段的参考输入。</p>
+              </div>
+              <div className="flex shrink-0 flex-wrap items-center gap-2 sm:max-w-[24rem] sm:justify-end">
+                {entityBindings.map(binding => {
+                  const asset = binding.assetId === null ? undefined : assetItems[binding.assetId]
+                  return (
+                    <div key={binding.id} className="group relative flex size-20 flex-col overflow-hidden bg-background/70 ring-1 ring-border/60" title={asset?.fileName ?? '参考资产'}>
+                      <AssetThumbnail kind="image" url={asset?.url} thumbnailUrl={asset?.thumbnailUrl} alt={asset?.fileName ?? '参考资产'} />
+                      <button
+                        type="button"
+                        className="absolute top-1 right-1 flex size-5 items-center justify-center bg-black/60 text-white opacity-0 transition-opacity group-hover:opacity-100 focus-visible:opacity-100"
+                        onClick={() => onRemove(binding)}
+                        disabled={saving}
+                        aria-label="移除参考资产"
+                      >
+                        <Trash2 className="size-3" />
+                      </button>
+                      {binding.staleAt !== null && <span className="absolute inset-x-0 bottom-0 bg-amber-500/90 px-1 py-0.5 text-center text-[10px] text-white">已过时</span>}
+                    </div>
+                  )
+                })}
+                <Button variant="ghost" size="sm" onClick={() => onAdd({ ownerType, ownerId: entity.id })} disabled={saving}>
+                  <Plus data-icon="inline-start" /> 添加图片
+                </Button>
+              </div>
+            </article>
+          )
+        })}
+      </div>
+    </section>
   )
 }
 
