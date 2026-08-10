@@ -3,7 +3,7 @@ import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
-import { DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorShot } from '@bailian-studio/shared'
+import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorShot } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -185,6 +185,10 @@ const fakeDirectorRepository: DirectorRepository = {
     record.project = { ...record.project, shots: record.project.shots.map(shot => shot.id === next.id ? next : shot) }
     return next
   },
+  async getAssemblyPreflight(input) {
+    const project = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)?.project
+    return project === undefined ? undefined : buildDirectorAssemblyPreflight(project, input.settings)
+  },
   async startShotVideo(input) {
     const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
     if (record === undefined) throw new Error('project not found')
@@ -199,6 +203,9 @@ const fakeDirectorRepository: DirectorRepository = {
     return false
   },
   async finalizeDirectorMusic() {
+    return undefined
+  },
+  async finalizeDirectorAssembly() {
     return undefined
   },
   async requestPhaseRun(input) {
@@ -345,7 +352,7 @@ describe('director routes', () => {
     expect(readBody.data.run.id).toBe(runBody.data.run.id)
   })
 
-  it('does not queue the assemble phase before a real media executor is available', async () => {
+  it('does not queue the assemble phase without a complete media preflight', async () => {
     const createResponse = await app.handle(authed('/api/director/projects', {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -356,13 +363,53 @@ describe('director routes', () => {
     const runResponse = await app.handle(authed(`/api/director/projects/${created.data.project.id}/phases/assemble/runs`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ modelId: 'qwen-plus' }),
+    body: JSON.stringify({ assembly: { width: 1080, height: 1920, fps: 30, audioVolume: 1 } }),
     }))
     const body = await runResponse.json() as { error: { code: string } }
 
-    expect(runResponse.status).toBe(400)
-    expect(body.error.code).toBe('VALIDATION_ERROR')
+    expect(runResponse.status).toBe(409)
+    expect(body.error.code).toBe('DIRECTOR_PHASE_INPUT_NOT_READY')
     expect(runs).toHaveLength(0)
+  })
+
+  it('preflights and queues a ready assembly plan with ordered shot assets', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '鍚堟垚棰勬', storyText: '鏁呬簨姝ｆ枃' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+    const currentProject = projects[0]!.project
+    const firstShot = { ...createShot(projectId, 'succeeded'), activeVideoAssetId: 'director-video-1' }
+    const secondShot = { ...createShot(projectId, 'succeeded'), id: `${projectId}-shot-2`, sequence: 2, activeVideoAssetId: 'director-video-2', durationSeconds: 4 }
+    const assets: DirectorAsset[] = [
+      { id: 'director-video-1', projectId, sourceRunId: null, kind: 'shot_video', ownerType: null, ownerId: null, assetId: 'asset-video-1', version: 1, metadata: {}, staleAt: null, staleReason: null, createdAt: currentProject.createdAt, updatedAt: currentProject.updatedAt },
+      { id: 'director-video-2', projectId, sourceRunId: null, kind: 'shot_video', ownerType: null, ownerId: null, assetId: 'asset-video-2', version: 1, metadata: {}, staleAt: null, staleReason: null, createdAt: currentProject.createdAt, updatedAt: currentProject.updatedAt },
+      { id: 'director-music-1', projectId, sourceRunId: null, kind: 'music', ownerType: null, ownerId: null, assetId: 'asset-music-1', version: 1, metadata: {}, staleAt: null, staleReason: null, createdAt: currentProject.createdAt, updatedAt: currentProject.updatedAt },
+    ]
+    projects[0]!.project = { ...currentProject, shots: [secondShot, firstShot], assets }
+
+    const preflightResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/assemble/preflight`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ assembly: { width: 720, height: 1280, fps: 24, audioVolume: 0.8 } }),
+    }))
+    const preflightBody = await preflightResponse.json() as { data: { preflight: { ready: boolean; plan: { shots: Array<{ shotId: string }>; settings: { fps: number } } } } }
+    expect(preflightResponse.status).toBe(200)
+    expect(preflightBody.data.preflight.ready).toBe(true)
+    expect(preflightBody.data.preflight.plan.shots.map(shot => shot.shotId)).toEqual([firstShot.id, secondShot.id])
+    expect(preflightBody.data.preflight.plan.settings.fps).toBe(24)
+
+    const runResponse = await app.handle(authed(`/api/director/projects/${projectId}/phases/assemble/runs`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ assembly: { width: 720, height: 1280, fps: 24, audioVolume: 0.8 } }),
+    }))
+    const runBody = await runResponse.json() as { data: { run: DirectorPhaseRun } }
+    expect(runResponse.status).toBe(200)
+    expect(runBody.data.run.phase).toBe('assemble')
+    expect(runs).toHaveLength(1)
   })
 
   it('rejects a non-reference video model before queueing the video phase', async () => {

@@ -40,10 +40,13 @@ export {
   FfmpegMediaProcessor,
   createFfmpegMediaProcessor,
   ffmpegThumbnailArgs,
+  ffmpegAssemblyArgs,
   type ExtractAudioInput,
   type ExtractAudioOutput,
   type GenerateThumbnailInput,
   type GenerateThumbnailOutput,
+  type AssembleVideoInput,
+  type AssembleVideoOutput,
   type MediaProcessor,
 } from './media-processor'
 export {

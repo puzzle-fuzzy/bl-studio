@@ -14,6 +14,9 @@ import {
 } from "@bailian-studio/db";
 import {
 	DIRECTOR_PHASES,
+	buildDirectorAssemblyPreflight,
+	buildDirectorAssemblyPreflightFromCandidates,
+	type DirectorAssemblyPreflight,
 	type DirectorPhase,
 	type DirectorPhaseRun,
 	type DirectorPhaseState,
@@ -40,6 +43,7 @@ import type {
 	AttachDirectorAssetRepositoryInput,
 	DetachDirectorAssetRepositoryInput,
 	UpdateDirectorShotRepositoryInput,
+	GetDirectorAssemblyPreflightRepositoryInput,
 	StartDirectorShotVideoRepositoryInput,
 	MarkDirectorShotVideoFailedRepositoryInput,
 	FinalizeDirectorShotVideoRepositoryInput,
@@ -651,6 +655,11 @@ export function createDirectorRepository({
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
 			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, assetRows, shotRows, runs);
+		},
+
+		async getAssemblyPreflight(input: GetDirectorAssemblyPreflightRepositoryInput): Promise<DirectorAssemblyPreflight | undefined> {
+			const project = await this.getProject({ userId: input.userId, projectId: input.projectId });
+			return project === undefined ? undefined : buildDirectorAssemblyPreflight(project, input.settings);
 		},
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
@@ -1602,6 +1611,76 @@ export function createDirectorRepository({
 			});
 		},
 
+		async finalizeDirectorAssembly(input) {
+			const now = new Date(input.now ?? new Date().toISOString());
+			return db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(and(
+						eq(directorProjects.id, input.projectId),
+						eq(directorProjects.userId, input.userId),
+						isNull(directorProjects.deletedAt),
+					))
+					.limit(1);
+				if (project === undefined) return undefined;
+
+				const [existing] = await tx
+					.select()
+					.from(directorAssets)
+					.where(and(
+						eq(directorAssets.projectId, input.projectId),
+						eq(directorAssets.sourceRunId, input.phaseRunId),
+						eq(directorAssets.kind, "final_video"),
+						isNull(directorAssets.deletedAt),
+					))
+					.limit(1);
+				if (existing !== undefined) return toDirectorAsset(existing);
+
+				const [userAsset] = await tx
+					.select({ id: userAssets.id })
+					.from(userAssets)
+					.where(and(
+						eq(userAssets.id, input.outputAssetId),
+						eq(userAssets.userId, input.userId),
+						eq(userAssets.kind, "video"),
+						eq(userAssets.status, "ready"),
+						isNull(userAssets.deletedAt),
+					))
+					.limit(1);
+				if (userAsset === undefined) return undefined;
+
+				await tx
+					.update(directorAssets)
+					.set({ staleAt: now, staleReason: "superseded_by_final_video", updatedBy: "worker", updatedAt: now })
+					.where(and(
+						eq(directorAssets.projectId, input.projectId),
+						eq(directorAssets.kind, "final_video"),
+						isNull(directorAssets.deletedAt),
+						isNull(directorAssets.staleAt),
+					));
+				const [created] = await tx
+					.insert(directorAssets)
+					.values({
+						id: crypto.randomUUID(),
+						projectId: input.projectId,
+						sourceRunId: input.phaseRunId,
+						kind: "final_video",
+						ownerType: null,
+						ownerId: null,
+						assetId: userAsset.id,
+						version: 1,
+						metadataJson: { mediaJobId: input.mediaJobId, outputAssetId: input.outputAssetId },
+						createdBy: "worker",
+						updatedBy: "worker",
+						createdAt: now,
+						updatedAt: now,
+					})
+					.returning();
+				return created === undefined ? undefined : toDirectorAsset(created);
+			});
+		},
+
 		async requestPhaseRun(input) {
 			const now = new Date(input.now ?? new Date().toISOString());
 			const runId = crypto.randomUUID();
@@ -1653,7 +1732,24 @@ export function createDirectorRepository({
 						`Director phase not found: ${input.phase}`,
 					);
 				}
-				if (state.status !== "ready" && state.status !== "failed" && state.status !== "needs_review") {
+				let optionalMusicAssembly = false;
+				if (input.phase === "assemble" && state.status === "not_started") {
+					const prerequisiteStates = await tx
+						.select({ phase: directorPhaseStates.phase, status: directorPhaseStates.status })
+						.from(directorPhaseStates)
+						.where(
+							and(
+								eq(directorPhaseStates.projectId, input.projectId),
+								inArray(directorPhaseStates.phase, ["videos", "bgm"]),
+							),
+						);
+					const videosState = prerequisiteStates.find(candidate => candidate.phase === "videos");
+					const musicState = prerequisiteStates.find(candidate => candidate.phase === "bgm");
+					optionalMusicAssembly = videosState?.status === "completed"
+						&& musicState?.status !== "queued"
+						&& musicState?.status !== "running";
+				}
+				if (!optionalMusicAssembly && state.status !== "ready" && state.status !== "failed" && state.status !== "needs_review") {
 					throw new DirectorRepositoryError(
 						"DIRECTOR_PHASE_NOT_READY",
 						`Director phase is not ready: ${input.phase}`,
@@ -1662,13 +1758,49 @@ export function createDirectorRepository({
 
 				const inputSnapshot: Record<string, unknown> = {
 					phase: input.phase,
-					modelId: input.modelId,
+					modelId: input.modelId ?? null,
 					scriptVersionId: scriptVersion.id,
 					title: project.title,
 					storyText: scriptVersion.storyText,
 					synopsis: scriptVersion.synopsis,
 					settings: project.settingsJson,
 				};
+				if (input.phase === "assemble") {
+					const currentShots = await tx
+						.select({
+							id: directorShots.id,
+							sequence: directorShots.sequence,
+							version: directorShots.version,
+							status: directorShots.status,
+							activeVideoAssetId: directorShots.activeVideoAssetId,
+							durationSeconds: directorShots.durationSeconds,
+							staleAt: directorShots.staleAt,
+						})
+						.from(directorShots)
+						.where(and(eq(directorShots.projectId, input.projectId), isNull(directorShots.deletedAt)));
+					const currentAssets = await tx
+						.select({
+							id: directorAssets.id,
+							kind: directorAssets.kind,
+							assetId: directorAssets.assetId,
+							sourceRunId: directorAssets.sourceRunId,
+							staleAt: directorAssets.staleAt,
+						})
+						.from(directorAssets)
+						.where(and(eq(directorAssets.projectId, input.projectId), isNull(directorAssets.deletedAt)));
+					const preflight = buildDirectorAssemblyPreflightFromCandidates(
+						currentShots.map(shot => ({ ...shot, staleAt: shot.staleAt?.toISOString() ?? null })),
+						currentAssets.map(asset => ({ ...asset, staleAt: asset.staleAt?.toISOString() ?? null })),
+						input.assembly,
+					);
+					if (!preflight.ready) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							preflight.issues[0]?.message ?? "Director assembly inputs are not ready",
+						);
+					}
+					inputSnapshot.assembly = preflight.plan;
+				}
 				if (input.phase === "bgm") {
 					inputSnapshot.music = {
 						prompt: input.prompt ?? null,

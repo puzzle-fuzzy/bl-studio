@@ -130,13 +130,35 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       })
       return { success: true, data: { run } }
     })
+    .post('/projects/:id/phases/assemble/runs', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      const preflight = await repository.getAssemblyPreflight({
+        userId: user.id,
+        projectId: params.id,
+        ...(input.assembly === undefined ? {} : { settings: input.assembly }),
+      })
+      if (preflight === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+      }
+      if (!preflight.ready) {
+        throw new DirectorRepositoryError(
+          'DIRECTOR_PHASE_INPUT_NOT_READY',
+          preflight.issues[0]?.message ?? 'Assembly inputs are not ready',
+        )
+      }
+      const run = await repository.requestPhaseRun({
+        userId: user.id,
+        projectId: params.id,
+        phase: 'assemble',
+        ...input,
+      })
+      return { success: true, data: { run } }
+    })
     .post('/projects/:id/phases/:phase/runs', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      if (phase === 'assemble') {
-        throw new ValidationError('合成阶段尚未接入真实媒体执行器，请先完成合成预检')
-      }
       if (phase === 'videos') {
         const model = requireDirectorVideoModel(input.modelId)
         const project = await repository.getProject({ userId: user.id, projectId: params.id })
@@ -218,6 +240,19 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         },
       }
     })
+    .post('/projects/:id/phases/assemble/preflight', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      const preflight = await repository.getAssemblyPreflight({
+        userId: user.id,
+        projectId: params.id,
+        ...(input.assembly === undefined ? {} : { settings: input.assembly }),
+      })
+      if (preflight === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+      }
+      return { success: true, data: { preflight } }
+    })
     .get('/projects/:id/phases/:phase/runs/:runId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
@@ -242,8 +277,8 @@ function estimateDirectorShotCents(
   return estimatePriceCents(manifest, directorVideoParams(manifest, durationSeconds, referenceCount))
 }
 
-function requireDirectorMusicModel(modelId: string): FrozenModelManifest {
-  const model = getModelById(modelId)
+function requireDirectorMusicModel(modelId: string | undefined): FrozenModelManifest {
+  const model = modelId === undefined ? undefined : getModelById(modelId)
   if (model === undefined || model.availability.enabled === false || getBailianOperationCapability(model.id) !== 'music.generate') {
     throw new ValidationError('音乐阶段需要使用已启用的音乐生成模型')
   }
@@ -313,8 +348,8 @@ function directorVideoParams(
   return params
 }
 
-function requireDirectorVideoModel(modelId: string): FrozenModelManifest {
-  const model = getModelById(modelId)
+function requireDirectorVideoModel(modelId: string | undefined): FrozenModelManifest {
+  const model = modelId === undefined ? undefined : getModelById(modelId)
   if (
     model === undefined
     || model.availability.enabled === false

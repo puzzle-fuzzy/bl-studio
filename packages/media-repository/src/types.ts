@@ -1,6 +1,6 @@
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 
-export type MediaOperation = 'video.extract_audio'
+export type MediaOperation = 'video.extract_audio' | 'video.assemble'
 export type MediaJobStatus = 'queued' | 'processing' | 'succeeded' | 'failed' | 'cancelled'
 export type MediaSourceKind = 'image' | 'video' | 'audio'
 export type MediaOutputKind = 'image' | 'video' | 'audio' | 'text'
@@ -28,7 +28,20 @@ export interface CreateMediaJobInput {
     kind: MediaSourceKind
     fileName?: string
   }
+  assembly?: {
+    videoSources: Array<{
+      assetId: string
+      kind: 'video'
+      fileName?: string
+    }>
+    musicSource?: {
+      assetId: string
+      kind: 'audio'
+      fileName?: string
+    }
+  }
   options?: Record<string, unknown>
+  idempotencyKey?: string
   /** 辅助媒体动作对应的一条生命周期 trace。 */
   traceId?: string
   now?: string
@@ -40,6 +53,11 @@ export interface MediaSource {
   fileName: string
   mimeType: string
   byteSize: number
+}
+
+export interface MediaCompositeSource extends MediaSource {
+  assetId: string
+  kind: MediaSourceKind
 }
 
 export interface CreateMediaJobResult {

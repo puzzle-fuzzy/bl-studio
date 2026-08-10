@@ -1,7 +1,8 @@
 import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { MediaRepository } from '@bailian-studio/media-repository'
 import { getBailianOperationCapability, validateModelParams } from '@bailian-studio/model-core'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
+import { DirectorAnalysisResultSchema, DirectorAssemblyPlanSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { parseDirectorAnalysisOutput } from './director-analysis'
@@ -20,6 +21,7 @@ const PHASE_POLL_DELAY_MS = 5_000
 export interface DirectorPhaseTaskHandlerDeps {
   readonly repository: GenerationRepository
   readonly directorRepository?: DirectorRepository
+  readonly mediaRepository?: MediaRepository
   readonly modelRegistry: ModelRegistryLookup
   readonly logger: Logger
 }
@@ -62,6 +64,18 @@ export async function processDirectorPhaseTask(
   await deps.directorRepository.markPhaseRunRunning({ runId: phaseRunId })
   const modelId = stringInput(task.input, 'modelId') ?? stringInput(run.outputSummary ?? {}, 'modelId')
   const snapshot = runInputSnapshot(run)
+
+  if (run.phase === 'assemble') {
+    if (task.userId === undefined) {
+      return failPhase(run.id, {
+        category: 'auth',
+        message: 'Director assembly task is missing its owner',
+        retriable: false,
+        code: 'DIRECTOR_USER_ID_REQUIRED',
+      }, deps)
+    }
+    return processAssemblyPhase(run, task, deps, task.userId, snapshot)
+  }
 
   if (modelId === undefined) {
     return failPhase(run.id, {
@@ -940,6 +954,133 @@ async function processMusicPhase(
   return retryUntilGenerationCompletes(task, `Music generation is ${generation.status}`, 'DIRECTOR_MUSIC')
 }
 
+async function processAssemblyPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const mediaRepository = deps.mediaRepository
+  if (mediaRepository === undefined) {
+    return failPhase(run.id, {
+      category: 'system',
+      message: 'Media repository is not configured for director assembly',
+      retriable: false,
+      code: 'DIRECTOR_ASSEMBLY_MEDIA_REPOSITORY_UNAVAILABLE',
+    }, deps)
+  }
+  const parsedPlan = DirectorAssemblyPlanSchema.safeParse(snapshot.assembly)
+  if (!parsedPlan.success || parsedPlan.data.shots.length === 0) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'A validated assembly plan with video shots is required',
+      retriable: false,
+      code: 'DIRECTOR_ASSEMBLY_INPUT_INVALID',
+    }, deps)
+  }
+
+  const mediaJobId = stringInput(run.outputSummary ?? {}, 'mediaJobId')
+  if (mediaJobId === undefined) {
+    try {
+      const plan = parsedPlan.data
+      const firstShot = plan.shots[0]
+      if (firstShot === undefined) {
+        return failPhase(run.id, {
+          category: 'validation',
+          message: 'A validated assembly plan with video shots is required',
+          retriable: false,
+          code: 'DIRECTOR_ASSEMBLY_INPUT_INVALID',
+        }, deps)
+      }
+      const mediaJob = await mediaRepository.createMediaJob({
+        userId,
+        operation: 'video.assemble',
+        source: {
+          assetId: firstShot.assetId,
+          kind: 'video',
+          fileName: `shot-${firstShot.sequence}.mp4`,
+        },
+        assembly: {
+          videoSources: plan.shots.map(shot => ({
+            assetId: shot.assetId,
+            kind: 'video' as const,
+            fileName: `shot-${shot.sequence}.mp4`,
+          })),
+          ...(plan.music === null ? {} : {
+            musicSource: {
+              assetId: plan.music.assetId,
+              kind: 'audio' as const,
+              fileName: 'director-music.mp3',
+            },
+          }),
+        },
+        options: plan.settings,
+        idempotencyKey: `director:${run.id}:assemble`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { mediaJobId: mediaJob.job.id },
+      })
+      deps.logger.info('director.assembly_media_job_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        mediaJobId: mediaJob.job.id,
+      })
+      return retryUntilGenerationCompletes(task, 'Director assembly media job is queued', 'DIRECTOR_ASSEMBLY')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_ASSEMBLY_JOB_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const mediaJob = await mediaRepository.getMediaJob({ userId, jobId: mediaJobId })
+  if (mediaJob === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Assembly media job not found: ${mediaJobId}`,
+      retriable: false,
+      code: 'DIRECTOR_ASSEMBLY_JOB_NOT_FOUND',
+    }, deps)
+  }
+  if (mediaJob.status === 'succeeded') {
+    if (mediaJob.outputAssetId === undefined) {
+      return failPhase(run.id, {
+        category: 'system',
+        message: 'Assembly media job succeeded without an output asset',
+        retriable: false,
+        code: 'DIRECTOR_ASSEMBLY_OUTPUT_MISSING',
+      }, deps)
+    }
+    const finalAsset = await deps.directorRepository?.finalizeDirectorAssembly({
+      userId,
+      projectId: run.projectId,
+      phaseRunId: run.id,
+      mediaJobId,
+      outputAssetId: mediaJob.outputAssetId,
+    })
+    if (finalAsset === undefined) {
+      return retryUntilGenerationCompletes(task, 'Assembly output is ready but final asset is not persisted', 'DIRECTOR_ASSEMBLY_ASSET')
+    }
+    const summary = { mediaJobId, outputAssetId: mediaJob.outputAssetId, finalVideoAssetId: finalAsset.id }
+    return completePhase(run.id, summary, deps, JSON.stringify(summary))
+  }
+  if (mediaJob.status === 'failed' || mediaJob.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'system',
+      message: mediaJob.error?.message ?? `Assembly media job ${mediaJob.status}`,
+      retriable: false,
+      code: mediaJob.error?.code ?? 'DIRECTOR_ASSEMBLY_JOB_FAILED',
+    }, deps)
+  }
+  return retryUntilGenerationCompletes(task, `Assembly media job is ${mediaJob.status}`, 'DIRECTOR_ASSEMBLY')
+}
+
 async function processVideosPhase(
   run: DirectorPhaseRunForWorker,
   task: TaskRecord,
@@ -1262,6 +1403,7 @@ interface RunInputSnapshot {
   shots: unknown
   continuity: unknown
   music: unknown
+  assembly: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -1276,6 +1418,7 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     shots: snapshot['shots'],
     continuity: snapshot['continuity'],
     music: snapshot['music'],
+    assembly: snapshot['assembly'],
   }
 }
 

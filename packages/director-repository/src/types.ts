@@ -16,6 +16,8 @@ import type {
 	DirectorScriptVersion,
   UpdateDirectorProjectInput,
   UpdateDirectorShotInput,
+  DirectorAssemblyPreflight,
+  DirectorAssemblySettingsInput,
 } from '@bailian-studio/shared'
 
 export type { AttachDirectorAssetInput, CreateDirectorPhaseRunInput, CreateDirectorProjectInput, UpdateDirectorProjectInput }
@@ -106,6 +108,12 @@ export interface UpdateDirectorShotRepositoryInput {
   patch: UpdateDirectorShotInput
 }
 
+export interface GetDirectorAssemblyPreflightRepositoryInput {
+  userId: string
+  projectId: string
+  settings?: DirectorAssemblySettingsInput
+}
+
 export interface StartDirectorShotVideoRepositoryInput {
   userId: string
   projectId: string
@@ -133,6 +141,15 @@ export interface FinalizeDirectorMusicRepositoryInput {
   now?: string
 }
 
+export interface FinalizeDirectorAssemblyRepositoryInput {
+  userId: string
+  projectId: string
+  phaseRunId: string
+  mediaJobId: string
+  outputAssetId: string
+  now?: string
+}
+
 export interface ListDirectorProjectsResult {
   items: DirectorProjectRepositorySummary[]
   nextCursor?: string
@@ -146,10 +163,12 @@ export interface DirectorRepository {
   attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
   detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   updateShot(input: UpdateDirectorShotRepositoryInput): Promise<DirectorShot>
+  getAssemblyPreflight(input: GetDirectorAssemblyPreflightRepositoryInput): Promise<DirectorAssemblyPreflight | undefined>
   startShotVideo(input: StartDirectorShotVideoRepositoryInput): Promise<DirectorShot>
   markShotVideoFailed(input: MarkDirectorShotVideoFailedRepositoryInput): Promise<boolean>
   finalizeShotVideo(input: FinalizeDirectorShotVideoRepositoryInput): Promise<boolean>
   finalizeDirectorMusic(input: FinalizeDirectorMusicRepositoryInput): Promise<DirectorAsset | undefined>
+  finalizeDirectorAssembly(input: FinalizeDirectorAssemblyRepositoryInput): Promise<DirectorAsset | undefined>
   requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>

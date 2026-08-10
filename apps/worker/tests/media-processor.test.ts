@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { FfmpegMediaProcessor, ffmpegThumbnailArgs, type FfmpegProcess } from '../src/media-processor'
+import { FfmpegMediaProcessor, ffmpegAssemblyArgs, ffmpegThumbnailArgs, type FfmpegProcess } from '../src/media-processor'
 
 describe('FfmpegMediaProcessor source boundary', () => {
   it('rejects a source body that exceeds the configured maximum before spawning ffmpeg', async () => {
@@ -42,6 +42,48 @@ describe('FfmpegMediaProcessor source boundary', () => {
     expect(args).toContain('-an')
     expect(args).toContain('libwebp')
     expect(args.at(-1)).toBe('thumbnail.webp')
+  })
+
+  it('builds a multi-source assembly command with optional looped music', () => {
+    const args = ffmpegAssemblyArgs(
+      ['shot-1.mp4', 'shot-2.mp4'],
+      'music.mp3',
+      'assembled.mp4',
+      { width: 1080, height: 1920, fps: 30, audioVolume: 0.75 },
+    )
+
+    expect(args).toContain('-stream_loop')
+    expect(args).toContain('-1')
+    expect(args).toContain('music.mp3')
+    expect(args.join('\n')).toContain('[v0][v1]concat=n=2:v=1:a=0[outv]')
+    expect(args).toContain('-map')
+    expect(args).toContain('[outv]')
+    expect(args).toContain('volume=0.75')
+    expect(args.at(-1)).toBe('assembled.mp4')
+  })
+
+  it('rejects assembly input that exceeds the aggregate byte limit before spawning ffmpeg', async () => {
+    let spawned = false
+    const processor = new FfmpegMediaProcessor({
+      maxAssemblyInputBytes: 2,
+      spawn: () => {
+        spawned = true
+        throw new Error('should not spawn')
+      },
+    })
+
+    await expect(processor.assembleVideo({
+      jobId: 'media_job_assembly_large',
+      videoSources: [
+        { sourceBody: new Uint8Array([1, 2]), sourceFileName: 'shot-1.mp4' },
+        { sourceBody: new Uint8Array([3]), sourceFileName: 'shot-2.mp4' },
+      ],
+      width: 1080,
+      height: 1920,
+      fps: 30,
+      audioVolume: 1,
+    })).rejects.toMatchObject({ taskError: { code: 'MEDIA_ASSEMBLY_INPUT_TOO_LARGE' } })
+    expect(spawned).toBe(false)
   })
 
   it('spawns ffmpeg detached so timeout kills cover the whole process group (P1-25)', async () => {

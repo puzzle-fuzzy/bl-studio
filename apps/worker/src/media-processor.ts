@@ -33,9 +33,35 @@ export interface GenerateThumbnailOutput {
   metadata: Readonly<{ format: 'webp'; maxDimension: number }>
 }
 
+export interface AssembleVideoInput {
+  jobId: string
+  videoSources: Array<{
+    sourceBody: Uint8Array
+    sourceFileName?: string
+    sourceMimeType?: string
+  }>
+  musicSource?: {
+    sourceBody: Uint8Array
+    sourceFileName?: string
+    sourceMimeType?: string
+  }
+  width: number
+  height: number
+  fps: number
+  audioVolume: number
+}
+
+export interface AssembleVideoOutput {
+  body: Uint8Array
+  fileName: string
+  mimeType: 'video/mp4'
+  metadata: Readonly<{ width: number; height: number; fps: number; hasMusic: boolean }>
+}
+
 export interface MediaProcessor {
   extractAudio(input: ExtractAudioInput): Promise<ExtractAudioOutput>
   generateThumbnail(input: GenerateThumbnailInput): Promise<GenerateThumbnailOutput>
+  assembleVideo?(input: AssembleVideoInput): Promise<AssembleVideoOutput>
 }
 
 export interface FfmpegMediaProcessorOptions {
@@ -43,6 +69,8 @@ export interface FfmpegMediaProcessorOptions {
   maxInputBytes?: number
   processTimeoutMs?: number
   maxThumbnailOutputBytes?: number
+  maxAssemblyInputBytes?: number
+  maxAssemblyOutputBytes?: number
   spawn?: FfmpegSpawn
 }
 
@@ -62,6 +90,8 @@ export class FfmpegMediaProcessor implements MediaProcessor {
   private readonly maxInputBytes: number
   private readonly processTimeoutMs: number
   private readonly maxThumbnailOutputBytes: number
+  private readonly maxAssemblyInputBytes: number
+  private readonly maxAssemblyOutputBytes: number
   private readonly spawn: FfmpegSpawn
 
   constructor(options: FfmpegMediaProcessorOptions = {}) {
@@ -69,6 +99,8 @@ export class FfmpegMediaProcessor implements MediaProcessor {
     this.maxInputBytes = options.maxInputBytes ?? 100 * 1024 * 1024
     this.processTimeoutMs = options.processTimeoutMs ?? 5 * 60 * 1000
     this.maxThumbnailOutputBytes = options.maxThumbnailOutputBytes ?? 5 * 1024 * 1024
+    this.maxAssemblyInputBytes = options.maxAssemblyInputBytes ?? 500 * 1024 * 1024
+    this.maxAssemblyOutputBytes = options.maxAssemblyOutputBytes ?? 500 * 1024 * 1024
     // P1-25：默认 spawn 走 detached 独立进程组，超时 kill 才能连 ffmpeg 的子进程一起杀。
     this.spawn = options.spawn ?? ((command, spawnOptions) => spawnProcess(command, { ...spawnOptions, detached: true }))
   }
@@ -102,6 +134,59 @@ export class FfmpegMediaProcessor implements MediaProcessor {
       body,
       mimeType: 'image/webp',
       metadata: { format: 'webp', maxDimension: 640 },
+    }
+  }
+
+  async assembleVideo(input: AssembleVideoInput): Promise<AssembleVideoOutput> {
+    assertAssemblySettings(input)
+    if (input.videoSources.length === 0 || input.videoSources.length > 500) {
+      throw mediaProcessingError('Assembly requires between 1 and 500 video sources', 'MEDIA_ASSEMBLY_INPUT_INVALID')
+    }
+    const totalInputBytes = input.videoSources.reduce((total, source) => total + source.sourceBody.byteLength, 0)
+      + (input.musicSource?.sourceBody.byteLength ?? 0)
+    if (totalInputBytes > this.maxAssemblyInputBytes) {
+      throw mediaProcessingError(
+        `Assembly sources exceed the configured byte limit: ${totalInputBytes} > ${this.maxAssemblyInputBytes}`,
+        'MEDIA_ASSEMBLY_INPUT_TOO_LARGE',
+      )
+    }
+    for (const source of input.videoSources) this.assertValidLimits(source.sourceBody)
+    if (input.musicSource !== undefined) this.assertValidLimits(input.musicSource.sourceBody)
+
+    const workDir = join(tmpdir(), `bailian-studio-assembly-${input.jobId}-${crypto.randomUUID()}`)
+    const outputPath = join(workDir, 'assembled.mp4')
+    const videoPaths = input.videoSources.map((source, index) => join(workDir, `video-${index}${sourceExtension(source.sourceFileName, source.sourceMimeType)}`))
+    const musicPath = input.musicSource === undefined
+      ? undefined
+      : join(workDir, `music${sourceExtension(input.musicSource.sourceFileName, input.musicSource.sourceMimeType)}`)
+
+    try {
+      await mkdir(workDir, { recursive: true })
+      await Promise.all(input.videoSources.map(async (source, index) => {
+        const videoPath = videoPaths[index]
+        if (videoPath === undefined) throw mediaProcessingError('Assembly video path is missing', 'MEDIA_ASSEMBLY_INPUT_INVALID')
+        await writeFile(videoPath, source.sourceBody)
+      }))
+      if (input.musicSource !== undefined && musicPath !== undefined) await writeFile(musicPath, input.musicSource.sourceBody)
+      const proc = this.spawn([this.ffmpegPath, ...ffmpegAssemblyArgs(videoPaths, musicPath, outputPath, input)], {
+        stdout: 'pipe',
+        stderr: 'pipe',
+        detached: true,
+      })
+      const body = await this.readFfmpegOutput(proc, outputPath, this.maxAssemblyOutputBytes)
+      return {
+        body,
+        fileName: 'assembled.mp4',
+        mimeType: 'video/mp4',
+        metadata: {
+          width: input.width,
+          height: input.height,
+          fps: input.fps,
+          hasMusic: input.musicSource !== undefined,
+        },
+      }
+    } finally {
+      await rm(workDir, { recursive: true, force: true })
     }
   }
 
@@ -166,6 +251,43 @@ export class FfmpegMediaProcessor implements MediaProcessor {
     }
   }
 
+  private async readFfmpegOutput(
+    proc: FfmpegProcess,
+    outputPath: string,
+    maxOutputBytes: number,
+  ): Promise<Uint8Array> {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined
+    const stderrTail = collectStderrTail(proc.stderr, MAX_FFMPEG_STDERR_BYTES).catch(() => '')
+    try {
+      const exitCode = await Promise.race([
+        proc.exited,
+        new Promise<never>((_, reject) => {
+          timeoutId = setTimeout(() => {
+            proc.kill()
+            reject(mediaProcessingError(`ffmpeg exceeded ${this.processTimeoutMs}ms`, 'MEDIA_PROCESS_TIMEOUT'))
+          }, this.processTimeoutMs)
+        }),
+      ])
+      const stderr = await stderrTail
+      if (exitCode !== 0) {
+        throw mediaProcessingError(
+          `ffmpeg failed with exit code ${exitCode}: ${stderr.trim() || 'no stderr output'}`,
+          'FFMPEG_FAILED',
+        )
+      }
+      const body = new Uint8Array(await readFile(outputPath))
+      if (body.byteLength > maxOutputBytes) {
+        throw mediaProcessingError(
+          `Media output exceeds the configured byte limit: ${body.byteLength} > ${maxOutputBytes}`,
+          'MEDIA_OUTPUT_TOO_LARGE',
+        )
+      }
+      return body
+    } finally {
+      if (timeoutId !== undefined) clearTimeout(timeoutId)
+    }
+  }
+
   private assertValidLimits(sourceBody: Uint8Array, maxOutputBytes?: number): void {
     if (!Number.isSafeInteger(this.maxInputBytes) || this.maxInputBytes <= 0) {
       throw mediaProcessingError('Media input limit must be a positive integer', 'MEDIA_PROCESSOR_INVALID_CONFIG')
@@ -208,6 +330,35 @@ export function ffmpegThumbnailArgs(
     '-c:v', 'libwebp',
     '-quality', '78',
     '-compression_level', '4',
+    outputPath,
+  ]
+}
+
+export function ffmpegAssemblyArgs(
+  videoPaths: readonly string[],
+  musicPath: string | undefined,
+  outputPath: string,
+  input: Pick<AssembleVideoInput, 'width' | 'height' | 'fps' | 'audioVolume'>,
+): string[] {
+  const filters = videoPaths.map((_, index) => (
+    `[${index}:v]scale=${input.width}:${input.height}:force_original_aspect_ratio=decrease,pad=${input.width}:${input.height}:(ow-iw)/2:(oh-ih)/2:color=black,fps=${input.fps},format=yuv420p,setsar=1[v${index}]`
+  ))
+  filters.push(`${videoPaths.map((_, index) => `[v${index}]`).join('')}concat=n=${videoPaths.length}:v=1:a=0[outv]`)
+  return [
+    '-y',
+    ...videoPaths.flatMap(path => ['-i', path]),
+    ...(musicPath === undefined ? [] : ['-stream_loop', '-1', '-i', musicPath]),
+    '-filter_complex', filters.join(';'),
+    '-map', '[outv]',
+    ...(musicPath === undefined
+      ? ['-an']
+      : ['-map', `${videoPaths.length}:a:0`, '-filter:a', `volume=${input.audioVolume}`, '-c:a', 'aac', '-b:a', '192k']),
+    '-c:v', 'libx264',
+    '-preset', 'medium',
+    '-crf', '20',
+    '-pix_fmt', 'yuv420p',
+    '-movflags', '+faststart',
+    '-shortest',
     outputPath,
   ]
 }
@@ -279,6 +430,13 @@ function outputFileName(sourceFileName: string | undefined, format: AudioFormat)
 
 function mimeTypeForAudioFormat(format: AudioFormat): string {
   return format === 'wav' ? 'audio/wav' : 'audio/mpeg'
+}
+
+function assertAssemblySettings(input: Pick<AssembleVideoInput, 'width' | 'height' | 'fps' | 'audioVolume'>): void {
+  if (!Number.isInteger(input.width) || input.width < 360 || input.width > 2160) throw mediaProcessingError('Assembly width is invalid', 'MEDIA_ASSEMBLY_INPUT_INVALID')
+  if (!Number.isInteger(input.height) || input.height < 360 || input.height > 3840) throw mediaProcessingError('Assembly height is invalid', 'MEDIA_ASSEMBLY_INPUT_INVALID')
+  if (!Number.isInteger(input.fps) || input.fps < 12 || input.fps > 60) throw mediaProcessingError('Assembly fps is invalid', 'MEDIA_ASSEMBLY_INPUT_INVALID')
+  if (!Number.isFinite(input.audioVolume) || input.audioVolume < 0 || input.audioVolume > 2) throw mediaProcessingError('Assembly audio volume is invalid', 'MEDIA_ASSEMBLY_INPUT_INVALID')
 }
 
 function mediaProcessingError(message: string, code: string): Error & {

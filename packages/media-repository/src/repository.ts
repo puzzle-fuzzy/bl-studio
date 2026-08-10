@@ -1,4 +1,4 @@
-import { and, eq, isNull, notInArray } from 'drizzle-orm'
+import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 import { mediaJobs, taskRecords, userAssets, type BailianStudioDb } from '@bailian-studio/db'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import { createMediaJobId, createMediaTaskId } from './id'
@@ -11,6 +11,7 @@ import type {
   FailMediaJobInput,
   GetMediaJobInput,
   MediaJob,
+  MediaCompositeSource,
   MediaSource,
 } from './types'
 
@@ -23,9 +24,44 @@ export interface MediaRepository {
   getMediaJob(input: GetMediaJobInput): Promise<MediaJob | undefined>
   getMediaJobById(jobId: string): Promise<MediaJob | undefined>
   getMediaSource(jobId: string): Promise<MediaSource | undefined>
+  getMediaSources(jobId: string): Promise<MediaCompositeSource[]>
   markMediaJobProcessing(jobId: string, now?: string): Promise<MediaJob>
   completeMediaJob(input: CompleteMediaJobInput): Promise<MediaJob>
   failMediaJob(input: FailMediaJobInput): Promise<MediaJob>
+}
+
+interface AssemblySourceReference {
+  assetId: string
+  kind: 'video' | 'audio'
+  fileName?: string
+}
+
+interface AssemblyInput {
+  videoSources: AssemblySourceReference[]
+  musicSource?: AssemblySourceReference
+}
+
+function readAssemblyInput(value: unknown): AssemblyInput | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
+  const record = value as Record<string, unknown>
+  const videoSources = Array.isArray(record.videoSources)
+    ? record.videoSources.flatMap(item => {
+        if (typeof item !== 'object' || item === null || Array.isArray(item)) return []
+        const source = item as Record<string, unknown>
+        return typeof source.assetId === 'string' && source.kind === 'video'
+          ? [{ assetId: source.assetId, kind: 'video' as const, ...(typeof source.fileName === 'string' ? { fileName: source.fileName } : {}) }]
+          : []
+      })
+    : []
+  const musicValue = record.musicSource
+  let musicSource: AssemblySourceReference | undefined
+  if (typeof musicValue === 'object' && musicValue !== null && !Array.isArray(musicValue)) {
+    const source = musicValue as Record<string, unknown>
+    if (typeof source.assetId === 'string' && source.kind === 'audio') {
+      musicSource = { assetId: source.assetId, kind: 'audio', ...(typeof source.fileName === 'string' ? { fileName: source.fileName } : {}) }
+    }
+  }
+  return { videoSources, ...(musicSource === undefined ? {} : { musicSource }) }
 }
 
 function nowIso(): string {
@@ -71,7 +107,7 @@ function taskErrorJson(error: NonNullable<TaskRecord['errorJson']>): Record<stri
 }
 
 function validateCreateInput(input: CreateMediaJobInput): void {
-  if (input.operation !== 'video.extract_audio') {
+  if (input.operation !== 'video.extract_audio' && input.operation !== 'video.assemble') {
     throw new MediaRepositoryError('MEDIA_JOB_INVALID_OPERATION', `Unsupported media operation: ${input.operation}`)
   }
   if (input.source.kind !== 'video') {
@@ -80,10 +116,31 @@ function validateCreateInput(input: CreateMediaJobInput): void {
   if (input.source.assetId.trim().length === 0) {
     throw new MediaRepositoryError('MEDIA_SOURCE_ASSET_NOT_FOUND', 'Media source asset is required')
   }
+  if (input.operation === 'video.assemble') {
+    const videos = input.assembly?.videoSources ?? []
+    if (videos.length === 0 || videos.length > 500 || videos.some(source => source.assetId.trim().length === 0)) {
+      throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'video.assemble requires between 1 and 500 video sources')
+    }
+    if (videos[0]?.assetId !== input.source.assetId) {
+      throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'The primary media source must be the first assembly video')
+    }
+    if (new Set(videos.map(source => source.assetId)).size !== videos.length) {
+      throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'Assembly video sources must be unique')
+    }
+    if (input.assembly?.musicSource?.assetId !== undefined && input.assembly.musicSource.assetId.trim().length === 0) {
+      throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'Assembly music source is invalid')
+    }
+  } else if (input.assembly !== undefined) {
+    throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'Assembly input is only valid for video.assemble')
+  }
 }
 
 function defaultOptions(options: Record<string, unknown> | undefined): Record<string, unknown> {
   return { format: 'mp3', ...(options ?? {}) }
+}
+
+function operationOptions(operation: CreateMediaJobInput['operation'], options: Record<string, unknown> | undefined): Record<string, unknown> {
+  return operation === 'video.assemble' ? { ...(options ?? {}) } : defaultOptions(options)
 }
 
 export function createMediaRepository(options: CreateMediaRepositoryOptions): MediaRepository {
@@ -96,6 +153,27 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
       const jobId = createMediaJobId()
       const traceId = input.traceId ?? crypto.randomUUID()
       return db.transaction(async tx => {
+        if (input.idempotencyKey !== undefined) {
+          const [existingJob] = await tx
+            .select()
+            .from(mediaJobs)
+            .where(and(
+              eq(mediaJobs.userId, input.userId),
+              eq(mediaJobs.operation, input.operation),
+              isNull(mediaJobs.deletedAt),
+              sql`${mediaJobs.inputJson}->>'idempotencyKey' = ${input.idempotencyKey}`,
+            ))
+            .limit(1)
+          if (existingJob !== undefined) {
+            const [existingTask] = await tx
+              .select()
+              .from(taskRecords)
+              .where(and(eq(taskRecords.recordId, existingJob.id), eq(taskRecords.type, 'media.process')))
+              .limit(1)
+            if (existingTask === undefined) throw new MediaRepositoryError('DATABASE_ERROR', `Media task missing for idempotent job: ${existingJob.id}`)
+            return { job: toMediaJob(existingJob), task: toTaskRecord(existingTask) }
+          }
+        }
         const [sourceAsset] = await tx
           .select({
             id: userAssets.id,
@@ -125,7 +203,40 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
             kind: input.source.kind,
             fileName: input.source.fileName ?? sourceAsset.fileName,
           },
-          options: defaultOptions(input.options),
+          ...(input.assembly === undefined ? {} : { assembly: input.assembly }),
+          options: operationOptions(input.operation, input.options),
+          ...(input.idempotencyKey === undefined ? {} : { idempotencyKey: input.idempotencyKey }),
+        }
+
+        if (input.operation === 'video.assemble') {
+          const assembly = input.assembly
+          if (assembly === undefined) {
+            throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'Assembly input is required for video.assemble')
+          }
+          const sourceIds = [
+            ...assembly.videoSources.map(source => source.assetId),
+            ...(assembly.musicSource === undefined ? [] : [assembly.musicSource.assetId]),
+          ]
+          const sourceRows = await tx
+            .select({ id: userAssets.id, kind: userAssets.kind })
+            .from(userAssets)
+            .where(and(
+              eq(userAssets.userId, input.userId),
+              inArray(userAssets.id, sourceIds),
+              isNull(userAssets.deletedAt),
+              eq(userAssets.status, 'ready'),
+            ))
+          const sourceKinds = new Map(sourceRows.map(row => [row.id, row.kind]))
+          const missing = sourceIds.find(id => sourceKinds.get(id) === undefined)
+          if (missing !== undefined) {
+            throw new MediaRepositoryError('MEDIA_SOURCE_ASSET_NOT_FOUND', `Media source asset not found: ${missing}`)
+          }
+          if (assembly.videoSources.some(source => sourceKinds.get(source.assetId) !== 'video')) {
+            throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'Every assembly video source must be a ready video asset')
+          }
+          if (assembly.musicSource !== undefined && sourceKinds.get(assembly.musicSource.assetId) !== 'audio') {
+            throw new MediaRepositoryError('MEDIA_ASSEMBLY_INPUT_INVALID', 'The assembly music source must be a ready audio asset')
+          }
         }
 
         const [jobRow] = await tx
@@ -156,7 +267,7 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
           input: {
             jobId,
             operation: input.operation,
-            options: defaultOptions(input.options),
+            options: operationOptions(input.operation, input.options),
           },
           attempts: 0,
           maxAttempts: 3,
@@ -231,6 +342,53 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
         mimeType: row.mimeType,
         byteSize: row.byteSize,
       }
+    },
+
+    async getMediaSources(jobId): Promise<MediaCompositeSource[]> {
+      const [job] = await db
+        .select({ userId: mediaJobs.userId, input: mediaJobs.inputJson })
+        .from(mediaJobs)
+        .where(and(eq(mediaJobs.id, jobId), isNull(mediaJobs.deletedAt)))
+        .limit(1)
+      if (job === undefined) return []
+      const assembly = readAssemblyInput(job.input['assembly'])
+      if (assembly === undefined) return []
+      const refs = [
+        ...assembly.videoSources,
+        ...(assembly.musicSource === undefined ? [] : [assembly.musicSource]),
+      ]
+      if (refs.length === 0) return []
+      const rows = await db
+        .select({
+          id: userAssets.id,
+          kind: userAssets.kind,
+          storageProvider: userAssets.storageProvider,
+          storageKey: userAssets.storageKey,
+          fileName: userAssets.fileName,
+          mimeType: userAssets.mimeType,
+          byteSize: userAssets.byteSize,
+        })
+        .from(userAssets)
+        .where(and(
+          eq(userAssets.userId, job.userId),
+          inArray(userAssets.id, refs.map(ref => ref.assetId)),
+          eq(userAssets.status, 'ready'),
+          isNull(userAssets.deletedAt),
+        ))
+      const byId = new Map(rows.map(row => [row.id, row]))
+      return refs.flatMap(ref => {
+        const row = byId.get(ref.assetId)
+        if (row === undefined || row.storageProvider === null || row.storageKey === null || row.fileName === null || row.mimeType === null || row.byteSize === null) return []
+        return [{
+          assetId: row.id,
+          kind: row.kind as MediaCompositeSource['kind'],
+          storageProvider: row.storageProvider,
+          storageKey: row.storageKey,
+          fileName: ref.fileName ?? row.fileName,
+          mimeType: row.mimeType,
+          byteSize: row.byteSize,
+        }]
+      })
     },
 
     async markMediaJobProcessing(jobId, now = nowIso()) {

@@ -1,13 +1,13 @@
 # 导演台合成阶段实施契约
 
-状态：设计完成，尚未接入执行器。
+状态：已接入真实执行链路，进入验收与持续优化阶段。
 
 ## 当前结论
 
-合成阶段暂不创建真实任务。当前媒体管道只支持单个视频源的
-`video.extract_audio`，`MediaProcessor` 也只提供抽音频和缩略图能力；导演资产虽然
-已经预留 `final_video` 类型，但没有多源输入快照、音视频混流、输出资产回写和幂等
-重试契约。直接开放合成按钮会把任务排进队列后由 Worker 以“阶段未实现”失败。
+合成阶段现在创建真实的 `media.process` 任务。媒体管道支持多视频源的
+`video.assemble`，Worker 通过 FFmpeg 统一分辨率、帧率、像素格式并可选混入音乐；
+完成后同时写入 `user_assets(kind=video)` 与 `director_assets(kind=final_video)`。
+合成按钮必须先通过预检和用户确认，避免把不完整的镜头清单送入队列。
 
 ## 输入契约
 
@@ -31,8 +31,8 @@
 2. Worker 有界地读取所有视频和可选音频，先做容器/轨道兼容性检查，再调用新的
    `MediaProcessor.assembleVideo`。FFmpeg 参数只能由结构化输入生成，不能拼接用户原始
    shell 字符串。
-3. 视频统一到受控的分辨率、像素格式、帧率和音频采样率后 concat；音乐使用明确的
-   `volume`、`adelay`、`短于成片时长时的处理策略`，并由 `-shortest`/淡出策略控制尾部。
+3. 视频统一到受控的分辨率、像素格式和帧率后 concat；音乐使用明确的 `volume`，
+  通过 loop 输入和 `-shortest` 控制尾部，不对用户输入拼接 shell 字符串。
 4. 输出写入应用存储，使用稳定的 `asset_{mediaJobId}_video` ID；完成事务同时创建
    `user_assets(kind=video, source=derived)` 和 `director_assets(kind=final_video)`。
 5. 同一个任务重试必须复用同一输出 ID；已成功任务只允许幂等返回，不能重复扣费或
@@ -49,9 +49,9 @@
 
 ## 实施顺序
 
-1. 扩展媒体任务类型和 Repository 的多源输入/幂等模型（优先补 repository 测试）。
-2. 扩展 FFmpeg Processor 与有界输入读取，补 codec、超时、输出大小和临时文件清理测试。
-3. 增加导演合成 preflight、phase worker 和 `final_video` 回写。
-4. 最后接入 UI 确认、顺序预览、失败恢复和旧版本标记，并跑全仓构建、迁移与部署演练。
+1. ✅ 扩展媒体任务类型和 Repository 的多源输入/幂等模型，并补充仓储集成测试。
+2. ✅ 扩展 FFmpeg Processor 与有界输入读取，覆盖 codec、超时、输出大小和临时文件清理边界。
+3. ✅ 增加导演合成 preflight、phase worker 和 `final_video` 回写。
+4. ✅ 接入 UI 确认、顺序预览、失败恢复和旧版本标记；下一步是线上媒体样本验收和播放器预览。
 
-在这四步完成前，`assemble` 保持只读规划态，不创建队列任务。
+输入变化会让新的合成回到预检状态，但不会删除已经生成的镜头、音乐或历史成片。

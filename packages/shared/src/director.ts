@@ -358,7 +358,7 @@ export const DirectorShotResponseSchema = z.object({
 })
 
 export const CreateDirectorPhaseRunSchema = z.object({
-  modelId: z.string().trim().min(1).max(256),
+  modelId: z.string().trim().min(1).max(256).optional(),
   prompt: z.string().trim().max(2_000).optional(),
   lyrics: z.string().trim().max(2_000).optional(),
   isInstrumental: z.boolean().optional(),
@@ -366,6 +366,12 @@ export const CreateDirectorPhaseRunSchema = z.object({
   gender: z.enum(['female', 'male']).optional(),
   format: z.enum(['mp3', 'wav']).optional(),
   duration: z.number().int().positive().max(600).optional(),
+  assembly: z.object({
+    width: z.number().int().min(360).max(2160).optional(),
+    height: z.number().int().min(360).max(3840).optional(),
+    fps: z.number().int().min(12).max(60).optional(),
+    audioVolume: z.number().min(0).max(2).optional(),
+  }).strict().optional(),
 }).strict()
 
 export const DirectorVideoEstimateSchema = z.object({

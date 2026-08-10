@@ -7,6 +7,7 @@ export type {
   DirectorProjectRepositorySummary,
   DirectorRepository,
   GetDirectorProjectRepositoryInput,
+  GetDirectorAssemblyPreflightRepositoryInput,
   GetDirectorPhaseRunRepositoryInput,
   ListDirectorProjectsRepositoryInput,
   ListDirectorProjectsResult,
@@ -15,6 +16,7 @@ export type {
   DirectorPhaseRunProgressInput,
   DirectorPhaseRunForWorker,
   FinalizeDirectorMusicRepositoryInput,
+  FinalizeDirectorAssemblyRepositoryInput,
   RequestDirectorPhaseRunRepositoryInput,
   UpdateDirectorProjectRepositoryInput,
 } from './types'

@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
@@ -115,6 +115,13 @@ export function DirectorProjectPage() {
   const [musicEstimate, setMusicEstimate] = useState<DirectorMusicEstimate>()
   const [musicConfirmOpen, setMusicConfirmOpen] = useState(false)
   const [musicEstimating, setMusicEstimating] = useState(false)
+  const [assemblyPreflight, setAssemblyPreflight] = useState<DirectorAssemblyPreflight>()
+  const [assemblyWidth, setAssemblyWidth] = useState('1080')
+  const [assemblyHeight, setAssemblyHeight] = useState('1920')
+  const [assemblyFps, setAssemblyFps] = useState('30')
+  const [assemblyAudioVolume, setAssemblyAudioVolume] = useState('1')
+  const [assemblyPreflighting, setAssemblyPreflighting] = useState(false)
+  const [assemblyConfirmOpen, setAssemblyConfirmOpen] = useState(false)
   const [referencePickerOpen, setReferencePickerOpen] = useState(false)
   const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
   const referenceAssets = useReferenceAssetsStore(state => state.assets)
@@ -233,6 +240,8 @@ export function DirectorProjectPage() {
         setDialogueStale(false)
         setAppliedDialogueShotIds(new Set())
         setApplyingDialogueShotId(undefined)
+        setAssemblyPreflight(undefined)
+        setAssemblyConfirmOpen(false)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
@@ -683,6 +692,61 @@ export function DirectorProjectPage() {
     }
   }
 
+  const readAssemblySettings = () => {
+    const width = Number.parseInt(assemblyWidth, 10)
+    const height = Number.parseInt(assemblyHeight, 10)
+    const fps = Number.parseInt(assemblyFps, 10)
+    const audioVolume = Number.parseFloat(assemblyAudioVolume)
+    if (!Number.isInteger(width) || !Number.isInteger(height) || !Number.isInteger(fps) || !Number.isFinite(audioVolume)) return undefined
+    if (width < 360 || width > 2160 || height < 360 || height > 3840 || fps < 12 || fps > 60 || audioVolume < 0 || audioVolume > 2) return undefined
+    return { width, height, fps, audioVolume }
+  }
+
+  const prepareAssemblyRun = async () => {
+    const settings = readAssemblySettings()
+    if (id === undefined || settings === undefined || dirty || activeRunId !== undefined || assemblyPreflighting || assemblyConfirmOpen) {
+      if (settings === undefined) toast.error('请检查合成参数范围')
+      return
+    }
+    setAssemblyPreflighting(true)
+    try {
+      const preflight = await apiClient.getDirectorAssemblyPreflight(id, { assembly: settings })
+      setAssemblyPreflight(preflight)
+      if (!preflight.ready) {
+        toast.error(preflight.issues[0]?.message ?? '当前镜头还不能合成')
+        return
+      }
+      setAssemblyConfirmOpen(true)
+    } catch {
+      toast.error('合成预检失败，请确认视频镜头已经完成并重试')
+    } finally {
+      setAssemblyPreflighting(false)
+    }
+  }
+
+  const confirmAssemblyRun = async () => {
+    const settings = readAssemblySettings()
+    if (id === undefined || settings === undefined || assemblyPreflight?.ready !== true || dirty || activeRunId !== undefined) return
+    setAssemblyConfirmOpen(false)
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'assemble', { assembly: settings })
+      setActiveRunId(run.id)
+      setActivePhase('assemble')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'assemble'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('合成任务已加入执行队列')
+    } catch {
+      toast.error('合成任务启动失败，请重新执行预检')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const confirmVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
     const retryShotId = videoRetryShotId
@@ -853,6 +917,12 @@ export function DirectorProjectPage() {
       </main>
     )
   }
+
+  const assemblyState = phaseStateFor(project, ['assemble'])
+  const latestFinalVideo = project.assets.find(asset => asset.kind === 'final_video' && asset.staleAt === null)
+  const latestFinalVideoAsset = latestFinalVideo?.assetId === null || latestFinalVideo?.assetId === undefined
+    ? undefined
+    : referenceAssets[latestFinalVideo.assetId]
 
   return (
     <>
@@ -1246,7 +1316,143 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'dialogue' && tab.value !== 'videos' && tab.value !== 'bgm').map(tab => (
+        <TabsContent value="assemble" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-6">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">人工确认 · 最终输出</span>
+                <h2 className="text-xl font-semibold">把已确认镜头合成为成片</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">
+                  合成只读取当前有效的镜头视频和音乐资产，不会重新生成内容。每次执行都会保存输入快照；如果剧本或镜头发生变化，旧成片会保留并标记为过时。
+                </p>
+              </div>
+
+              <div className="grid gap-6 md:grid-cols-2">
+                <div className="flex flex-col gap-3 bg-muted/30 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">合成清单</span>
+                    <span className="text-xs text-muted-foreground">按镜头顺序</span>
+                  </div>
+                  {assemblyPreflight === undefined ? (
+                    <p className="text-sm leading-6 text-muted-foreground">点击右侧“预检并合成”，系统会检查每个镜头是否有可用视频。</p>
+                  ) : assemblyPreflight.plan.shots.length === 0 ? (
+                    <p className="text-sm leading-6 text-muted-foreground">还没有可用于合成的镜头。</p>
+                  ) : (
+                    <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+                      {assemblyPreflight.plan.shots.map(shot => (
+                        <div key={shot.shotId} className="flex items-center justify-between gap-3 text-sm">
+                          <span className="truncate">镜头 {String(shot.sequence).padStart(2, '0')}</span>
+                          <span className="shrink-0 tabular-nums text-muted-foreground">{shot.durationSeconds.toFixed(1)}s</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {assemblyPreflight?.issues.map(issue => (
+                    <div key={`${issue.code}-${issue.shotId ?? 'project'}`} className="flex items-start gap-2 text-sm text-destructive">
+                      <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+                      <span className="leading-6">{issue.message}</span>
+                    </div>
+                  ))}
+                  {assemblyPreflight?.warnings.map(warning => (
+                    <p key={warning} className="text-xs leading-5 text-muted-foreground">{warning}</p>
+                  ))}
+                </div>
+
+                <div className="flex flex-col gap-3 bg-muted/30 px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium">输出参数</span>
+                    <span className="text-xs text-muted-foreground">竖屏默认</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="flex flex-col gap-2 text-sm" htmlFor="director-assembly-width">
+                      宽度
+                      <Input id="director-assembly-width" type="number" min={360} max={2160} value={assemblyWidth} disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined} onChange={event => { setAssemblyWidth(event.target.value); setAssemblyPreflight(undefined) }} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm" htmlFor="director-assembly-height">
+                      高度
+                      <Input id="director-assembly-height" type="number" min={360} max={3840} value={assemblyHeight} disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined} onChange={event => { setAssemblyHeight(event.target.value); setAssemblyPreflight(undefined) }} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm" htmlFor="director-assembly-fps">
+                      帧率
+                      <Input id="director-assembly-fps" type="number" min={12} max={60} value={assemblyFps} disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined} onChange={event => { setAssemblyFps(event.target.value); setAssemblyPreflight(undefined) }} />
+                    </label>
+                    <label className="flex flex-col gap-2 text-sm" htmlFor="director-assembly-volume">
+                      音量
+                      <Input id="director-assembly-volume" type="number" min={0} max={2} step={0.1} value={assemblyAudioVolume} disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined} onChange={event => { setAssemblyAudioVolume(event.target.value); setAssemblyPreflight(undefined) }} />
+                    </label>
+                  </div>
+                </div>
+              </div>
+
+              <Separator />
+
+              <div className="flex flex-col gap-3 text-sm">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">当前有效镜头</span>
+                  <span className="tabular-nums">{assemblyPreflight?.plan.shots.length ?? '—'}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">预计时长</span>
+                  <span className="tabular-nums">{assemblyPreflight === undefined ? '—' : `${assemblyPreflight.plan.totalDurationSeconds.toFixed(1)} 秒`}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                  <span className="text-muted-foreground">背景音乐</span>
+                  <span>{assemblyPreflight?.plan.music === null ? '无，将保留原镜头画面' : assemblyPreflight?.plan.music === undefined ? '—' : '已加入合成'}</span>
+                </div>
+              </div>
+
+              {latestFinalVideo !== undefined && (
+                <div className="flex flex-col gap-2 bg-primary/5 px-4 py-4 text-sm">
+                  <span className="font-medium">已有一版可用成片</span>
+                  {latestFinalVideoAsset !== undefined && (
+                    <div className="aspect-video max-w-xl overflow-hidden bg-muted/40">
+                      <AssetThumbnail
+                        kind="video"
+                        url={latestFinalVideoAsset.url}
+                        thumbnailUrl={latestFinalVideoAsset.thumbnailUrl}
+                        alt="当前成片预览"
+                      />
+                    </div>
+                  )}
+                  <span className="leading-6 text-muted-foreground">资产 ID：{latestFinalVideo.assetId ?? '未知'}。再次合成只会创建新版本，旧资产仍保留。</span>
+                </div>
+              )}
+            </section>
+
+            <aside className="relative flex flex-col gap-4 lg:pl-6">
+              <Separator orientation="vertical" className="absolute inset-y-0 left-0 hidden h-auto lg:block" />
+              <div className="flex flex-col gap-1">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">合成状态</span>
+                <div className="flex items-center gap-2">
+                  <Badge variant={statusVariant(assemblyState?.status ?? 'not_started')}>{STATUS_LABELS[assemblyState?.status ?? 'not_started']}</Badge>
+                  <span className="text-sm text-muted-foreground">视频合成</span>
+                </div>
+              </div>
+              <Separator />
+              <Button
+                onClick={() => void prepareAssemblyRun()}
+                disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined || dirty}
+              >
+                {assemblyPreflighting ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Video data-icon="inline-start" />}
+                {assemblyPreflighting ? '正在预检' : '预检并合成'}
+              </Button>
+              {dirty && <p className="text-xs leading-5 text-muted-foreground">请先保存剧本修改，再执行合成。</p>}
+              <Separator />
+              <div className="flex flex-col gap-3 text-sm">
+                <div className="flex items-start gap-2">
+                  <LockKeyhole className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="leading-6 text-muted-foreground">合成不消耗模型额度，只创建一条媒体处理任务。</span>
+                </div>
+                <div className="flex items-start gap-2">
+                  <CircleDashed className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="leading-6 text-muted-foreground">页面关闭后任务仍会由 Worker 继续执行。</span>
+                </div>
+              </div>
+            </aside>
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'dialogue' && tab.value !== 'videos' && tab.value !== 'bgm' && tab.value !== 'assemble').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -1318,6 +1524,25 @@ export function DirectorProjectPage() {
           <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
             <Button variant="outline" onClick={() => setMusicConfirmOpen(false)}>取消</Button>
             <Button onClick={() => void confirmMusicRun()} disabled={musicEstimate === undefined}>确认生成</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={assemblyConfirmOpen} onOpenChange={setAssemblyConfirmOpen}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>确认合成成片</DialogTitle>
+            <DialogDescription>这一步只会执行本地媒体合成，不会再次调用视频或音乐生成模型。</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 bg-muted/30 px-4 py-4 text-sm">
+            <div className="flex items-center justify-between gap-3"><span>镜头数量</span><span>{assemblyPreflight?.plan.shots.length ?? 0}</span></div>
+            <div className="flex items-center justify-between gap-3"><span>预计时长</span><span>{assemblyPreflight?.plan.totalDurationSeconds.toFixed(1) ?? '0.0'} 秒</span></div>
+            <div className="flex items-center justify-between gap-3"><span>输出尺寸</span><span>{assemblyPreflight?.plan.settings.width} × {assemblyPreflight?.plan.settings.height} / {assemblyPreflight?.plan.settings.fps} fps</span></div>
+            <div className="flex items-center justify-between gap-3"><span>背景音乐</span><span>{assemblyPreflight?.plan.music === null ? '不使用' : '使用当前有效音乐'}</span></div>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">确认后会创建一个可追踪的媒体任务。合成失败时，已生成的镜头和音乐资产不会被删除。</p>
+          <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
+            <Button variant="outline" onClick={() => setAssemblyConfirmOpen(false)}>取消</Button>
+            <Button onClick={() => void confirmAssemblyRun()} disabled={assemblyPreflight?.ready !== true || saving}>确认合成</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
