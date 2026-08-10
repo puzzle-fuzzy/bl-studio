@@ -196,6 +196,24 @@ export const DirectorPromptRebuildResultSchema = z.object({
   shots: z.array(DirectorPromptRebuildShotSchema).max(500),
 }).strict()
 
+export const DirectorDialogueLineSchema = z.object({
+  speaker: z.string().min(1).max(200),
+  text: z.string().min(1).max(2_000),
+  delivery: z.string().max(500),
+}).strict()
+
+export const DirectorDialogueShotSchema = z.object({
+  shotId: z.string().min(1),
+  sequence: z.number().int().positive(),
+  lines: z.array(DirectorDialogueLineSchema).max(100),
+  rationale: z.string().max(2_000),
+}).strict()
+
+export const DirectorDialogueResultSchema = z.object({
+  summary: z.string().min(1).max(4_000),
+  shots: z.array(DirectorDialogueShotSchema).max(500),
+}).strict()
+
 export const DirectorAssetSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -458,5 +476,8 @@ export type DirectorContinuityIssue = z.infer<typeof DirectorContinuityIssueSche
 export type DirectorContinuityResult = z.infer<typeof DirectorContinuityResultSchema>
 export type DirectorPromptRebuildShot = z.infer<typeof DirectorPromptRebuildShotSchema>
 export type DirectorPromptRebuildResult = z.infer<typeof DirectorPromptRebuildResultSchema>
+export type DirectorDialogueLine = z.infer<typeof DirectorDialogueLineSchema>
+export type DirectorDialogueShot = z.infer<typeof DirectorDialogueShotSchema>
+export type DirectorDialogueResult = z.infer<typeof DirectorDialogueResultSchema>
 export type UpdateDirectorShotInput = z.infer<typeof UpdateDirectorShotSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>

@@ -1775,6 +1775,33 @@ export function createDirectorRepository({
 						.limit(1);
 					inputSnapshot.shots = shotRows;
 					inputSnapshot.continuity = continuityRun?.outputSummary?.continuity ?? null;
+				} else if (input.phase === "dialogue") {
+					const shotRows = await tx
+						.select({
+							id: directorShots.id,
+							sequence: directorShots.sequence,
+							sceneNumber: directorShots.sceneNumber,
+							slugline: directorShots.slugline,
+							narrative: directorShots.narrative,
+							dialogue: directorShots.dialogueJson,
+							continuity: directorShots.continuityJson,
+						})
+						.from(directorShots)
+						.where(
+							and(
+								eq(directorShots.projectId, input.projectId),
+								isNull(directorShots.deletedAt),
+								isNull(directorShots.staleAt),
+							),
+						)
+						.orderBy(directorShots.sequence);
+					if (shotRows.length === 0) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A storyboard with at least one current shot is required before rebuilding dialogue",
+						);
+					}
+					inputSnapshot.shots = shotRows;
 				} else if (input.phase === "videos") {
 					const shotConditions = [
 						eq(directorShots.projectId, input.projectId),

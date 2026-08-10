@@ -9,6 +9,7 @@ import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
 import { continuityPrompt, parseDirectorContinuityOutput, type DirectorContinuityShotInput } from './director-continuity'
 import { parseDirectorPromptRebuildOutput, promptRebuildPrompt, type DirectorPromptRebuildShotInput } from './director-prompts'
+import { dialoguePrompt, parseDirectorDialogueOutput, type DirectorDialogueShotInput } from './director-dialogue'
 import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary, type DirectorVideoGenerationProgress, type DirectorVideoShotSnapshot } from './director-video'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
@@ -93,6 +94,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'rebuild') {
     return processPromptRebuildPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'dialogue') {
+    return processDialoguePhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase === 'videos') {
     return processVideosPhase(run, task, deps, modelId, task.userId, snapshot)
@@ -728,6 +732,113 @@ async function processPromptRebuildPhase(
   return retryUntilGenerationCompletes(task, `Prompt rebuild generation is ${generation.status}`, 'DIRECTOR_PROMPT_REBUILD')
 }
 
+async function processDialoguePhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const shots = readDialogueShotInputs(snapshot.shots)
+  if (shots.length === 0) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'No storyboard shots were captured for dialogue review',
+      retriable: false,
+      code: 'DIRECTOR_DIALOGUE_SHOTS_MISSING',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: dialoguePrompt(snapshot.title, snapshot.synopsis, shots),
+          maxTokens: 8_192,
+          temperature: 0.3,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:dialogue`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director dialogue generation is queued', 'DIRECTOR_DIALOGUE')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_DIALOGUE_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Dialogue generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_DIALOGUE_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const dialogueText = readTextOutput(generation.outputResult)
+    if (dialogueText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Dialogue generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_DIALOGUE_OUTPUT_MISSING',
+      }, deps)
+    }
+    const dialogue = parseDirectorDialogueOutput(dialogueText)
+    if (dialogue === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Dialogue generation returned text that does not match the Director dialogue contract',
+        retriable: false,
+        code: 'DIRECTOR_DIALOGUE_OUTPUT_INVALID',
+      }, deps)
+    }
+    const shotSequences = new Map(shots.map(shot => [shot.id, shot.sequence]))
+    if (dialogue.shots.some(shot => shotSequences.get(shot.shotId) !== shot.sequence)) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Dialogue output referenced an unknown storyboard shot or mismatched its sequence',
+        retriable: false,
+        code: 'DIRECTOR_DIALOGUE_OUTPUT_SCOPE_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, dialogueText, dialogue }, deps, dialogueText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Dialogue generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_DIALOGUE_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Dialogue generation is ${generation.status}`, 'DIRECTOR_DIALOGUE')
+}
+
 async function processVideosPhase(
   run: DirectorPhaseRunForWorker,
   task: TaskRecord,
@@ -1020,6 +1131,22 @@ function readPromptRebuildShotInputs(value: unknown): DirectorPromptRebuildShotI
       dialogue: candidate.dialogue === null || isRecord(candidate.dialogue) ? candidate.dialogue : null,
       continuity: candidate.continuity === null || isRecord(candidate.continuity) ? candidate.continuity : null,
       referenceAssetIds,
+    }]
+  })
+}
+
+function readDialogueShotInputs(value: unknown): DirectorDialogueShotInput[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(candidate => {
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || typeof candidate.sequence !== 'number' || typeof candidate.narrative !== 'string') return []
+    return [{
+      id: candidate.id,
+      sequence: candidate.sequence,
+      sceneNumber: typeof candidate.sceneNumber === 'number' ? candidate.sceneNumber : null,
+      slugline: typeof candidate.slugline === 'string' ? candidate.slugline : null,
+      narrative: candidate.narrative,
+      dialogue: candidate.dialogue === null || isRecord(candidate.dialogue) ? candidate.dialogue : null,
+      continuity: candidate.continuity === null || isRecord(candidate.continuity) ? candidate.continuity : null,
     }]
   })
 }

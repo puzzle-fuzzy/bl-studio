@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorLocationsResult, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -103,6 +103,12 @@ export function DirectorProjectPage() {
   const [promptRebuildStale, setPromptRebuildStale] = useState(false)
   const [applyingPromptShotId, setApplyingPromptShotId] = useState<string>()
   const [appliedPromptShotIds, setAppliedPromptShotIds] = useState<Set<string>>(new Set())
+  const [dialogueModelId, setDialogueModelId] = useState('')
+  const [dialogueText, setDialogueText] = useState<string>()
+  const [dialogueResult, setDialogueResult] = useState<DirectorDialogueResult>()
+  const [dialogueStale, setDialogueStale] = useState(false)
+  const [applyingDialogueShotId, setApplyingDialogueShotId] = useState<string>()
+  const [appliedDialogueShotIds, setAppliedDialogueShotIds] = useState<Set<string>>(new Set())
   const [referencePickerOpen, setReferencePickerOpen] = useState(false)
   const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
   const referenceAssets = useReferenceAssetsStore(state => state.assets)
@@ -165,6 +171,12 @@ export function DirectorProjectPage() {
   }, [promptRebuildModelId, textModels])
 
   useEffect(() => {
+    if (dialogueModelId.length > 0 && textModels.some(model => model.id === dialogueModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setDialogueModelId(preferred.id)
+  }, [dialogueModelId, textModels])
+
+  useEffect(() => {
     if (videoModelId.length > 0 && videoModels.some(model => model.id === videoModelId)) return
     const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
     if (preferred !== undefined) setVideoModelId(preferred.id)
@@ -200,6 +212,11 @@ export function DirectorProjectPage() {
         setPromptRebuildStale(false)
         setAppliedPromptShotIds(new Set())
         setApplyingPromptShotId(undefined)
+        setDialogueText(undefined)
+        setDialogueResult(undefined)
+        setDialogueStale(false)
+        setAppliedDialogueShotIds(new Set())
+        setApplyingDialogueShotId(undefined)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
@@ -207,6 +224,7 @@ export function DirectorProjectPage() {
         const locationsState = next.phases.find(state => state.phase === 'locations')
         const continuityState = next.phases.find(state => state.phase === 'continuity')
         const promptRebuildState = next.phases.find(state => state.phase === 'rebuild')
+        const dialogueState = next.phases.find(state => state.phase === 'dialogue')
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
           setActivePhase('analyze')
@@ -290,6 +308,17 @@ export function DirectorProjectPage() {
             })
             .catch(() => {})
         }
+        if (dialogueState?.lastRunId !== null && dialogueState?.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'dialogue', dialogueState.lastRunId)
+            .then(run => {
+              if (cancelled || run.status !== 'succeeded') return
+              if (typeof run.outputSummary?.dialogueText === 'string') setDialogueText(run.outputSummary.dialogueText)
+              setDialogueStale(run.staleAt !== null)
+              const parsed = DirectorDialogueResultSchema.safeParse(run.outputSummary?.dialogue)
+              if (parsed.success) setDialogueResult(parsed.data)
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => {
         if (!cancelled) setError('项目不存在，或你没有访问权限。')
@@ -348,6 +377,13 @@ export function DirectorProjectPage() {
             const parsed = DirectorPromptRebuildResultSchema.safeParse(run.outputSummary?.promptRebuild)
             if (parsed.success) setPromptRebuildResult(parsed.data)
           }
+          if (run.status === 'succeeded' && activePhase === 'dialogue') {
+            if (typeof run.outputSummary?.dialogueText === 'string') setDialogueText(run.outputSummary.dialogueText)
+            setDialogueStale(false)
+            setAppliedDialogueShotIds(new Set())
+            const parsed = DirectorDialogueResultSchema.safeParse(run.outputSummary?.dialogue)
+            if (parsed.success) setDialogueResult(parsed.data)
+          }
           setActiveRunId(undefined)
           setActivePhase(undefined)
           const phaseLabel = activePhase === 'analyze'
@@ -362,7 +398,9 @@ export function DirectorProjectPage() {
                     ? '连续性检查'
                     : activePhase === 'rebuild'
                       ? '视频提示词重建'
-                      : '视频生成阶段'
+                      : activePhase === 'dialogue'
+                        ? '对白整理'
+                        : '视频生成阶段'
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
             ? `${phaseLabel}已完成`
             : `${phaseLabel}未完成，请查看阶段状态`)
@@ -534,6 +572,50 @@ export function DirectorProjectPage() {
       toast.error('提示词应用失败，请确认镜头未锁定且仍属于当前分镜')
     } finally {
       setApplyingPromptShotId(undefined)
+    }
+  }
+
+  const runDialogue = async () => {
+    if (id === undefined || dialogueModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'dialogue', { modelId: dialogueModelId })
+      setActiveRunId(run.id)
+      setActivePhase('dialogue')
+      setDialogueText(undefined)
+      setDialogueResult(undefined)
+      setDialogueStale(false)
+      setAppliedDialogueShotIds(new Set())
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'dialogue'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('对白整理已加入执行队列')
+    } catch {
+      toast.error('无法启动对白整理，请确认当前分镜已经生成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const applyDialogueSuggestion = async (shotId: string, lines: Array<{ speaker: string; text: string; delivery: string }>) => {
+    if (id === undefined) return
+    const shot = project?.shots.find(candidate => candidate.id === shotId)
+    if (shot === undefined) return
+    setApplyingDialogueShotId(shotId)
+    try {
+      const updated = await apiClient.updateDirectorShot(id, shotId, { expectedVersion: shot.version, dialogue: { lines } })
+      setProject(current => current === undefined
+        ? current
+        : { ...current, shots: current.shots.map(candidate => candidate.id === updated.id ? updated : candidate) })
+      setAppliedDialogueShotIds(current => new Set(current).add(shotId))
+      toast.success(`镜头 ${String(updated.sequence).padStart(2, '0')} 的对白已应用，请重新审核并锁定`)
+    } catch {
+      toast.error('对白应用失败，请确认镜头未锁定且仍属于当前分镜')
+    } finally {
+      setApplyingDialogueShotId(undefined)
     }
   }
 
@@ -997,6 +1079,38 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="dialogue" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">可编辑建议</span>
+                <h2 className="text-xl font-semibold">整理逐镜对白</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">系统会根据当前镜头叙事整理对白、说话人和表演语气。对白建议不会自动覆盖分镜，应用后镜头会回到待审核状态。</p>
+              </div>
+              <DirectorDialogueReview
+                project={project}
+                result={dialogueResult}
+                rawText={dialogueText}
+                stale={dialogueStale}
+                appliedShotIds={appliedDialogueShotIds}
+                applyingShotId={applyingDialogueShotId}
+                onApply={(shotId, lines) => void applyDialogueSuggestion(shotId, lines)}
+              />
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['dialogue']}
+              modelId={dialogueModelId}
+              textModels={textModels}
+              running={activePhase === 'dialogue' && activeRunId !== undefined}
+              onModelChange={setDialogueModelId}
+              onRunPhase={() => void runDialogue()}
+              runLabel="整理逐镜对白"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
         <TabsContent value="videos" className="mt-6">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <section className="flex flex-col gap-5">
@@ -1031,7 +1145,7 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'videos').map(tab => (
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'dialogue' && tab.value !== 'videos').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -1207,6 +1321,136 @@ function DirectorPromptRebuildReview({
         </div>
       )}
     </section>
+  )
+}
+
+function DirectorDialogueReview({
+  project,
+  result,
+  rawText,
+  stale = false,
+  appliedShotIds,
+  applyingShotId,
+  onApply,
+}: {
+  project: DirectorProjectDetail
+  result?: DirectorDialogueResult
+  rawText?: string
+  stale?: boolean
+  appliedShotIds: Set<string>
+  applyingShotId?: string
+  onApply: (shotId: string, lines: Array<{ speaker: string; text: string; delivery: string }>) => void
+}) {
+  if (result === undefined) {
+    return (
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">对白建议</h2>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">等待执行结果</span>}
+        </div>
+        {rawText !== undefined && <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>}
+        {rawText === undefined && <p className="text-sm leading-7 text-muted-foreground">执行对白整理后，这里会显示可逐镜编辑和应用的对白建议。</p>}
+      </section>
+    )
+  }
+
+  return (
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">对白建议</h2>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">{result.shots.length} 个镜头</Badge>
+        </div>
+      </div>
+      <p className="text-sm leading-7">{result.summary}</p>
+      {result.shots.length === 0 ? (
+        <p className="text-sm leading-7 text-muted-foreground">模型没有返回可应用的对白建议。</p>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {result.shots.map(suggestion => (
+            <DirectorDialogueSuggestionCard
+              key={`${suggestion.shotId}-${suggestion.sequence}`}
+              shot={project.shots.find(candidate => candidate.id === suggestion.shotId)}
+              suggestion={suggestion}
+              stale={stale}
+              applied={appliedShotIds.has(suggestion.shotId)}
+              saving={applyingShotId === suggestion.shotId}
+              onApply={lines => onApply(suggestion.shotId, lines)}
+            />
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function DirectorDialogueSuggestionCard({
+  shot,
+  suggestion,
+  stale,
+  applied,
+  saving,
+  onApply,
+}: {
+  shot?: DirectorShot
+  suggestion: DirectorDialogueResult['shots'][number]
+  stale: boolean
+  applied: boolean
+  saving: boolean
+  onApply: (lines: Array<{ speaker: string; text: string; delivery: string }>) => void
+}) {
+  const [lines, setLines] = useState(suggestion.lines)
+
+  useEffect(() => {
+    setLines(suggestion.lines)
+  }, [suggestion.shotId, suggestion.lines])
+
+  const locked = shot?.status === 'locked'
+  const missing = shot === undefined
+  const invalid = lines.some(line => line.speaker.trim().length === 0 || line.text.trim().length === 0)
+  const disabled = stale || locked || missing || saving
+  return (
+    <article className="flex flex-col gap-4 bg-background/60 px-4 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(suggestion.sequence).padStart(2, '0')}</span>
+          {locked && <Badge variant="outline">已锁定</Badge>}
+          {applied && <Badge variant="secondary">已应用</Badge>}
+          {missing && <Badge variant="destructive">镜头已不存在</Badge>}
+        </div>
+        <Button
+          size="sm"
+          disabled={disabled || invalid}
+          onClick={() => onApply(lines.map(line => ({
+            speaker: line.speaker.trim(),
+            text: line.text.trim(),
+            delivery: line.delivery.trim(),
+          })))}
+        >
+          {saving ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Check data-icon="inline-start" />}
+          应用到分镜
+        </Button>
+      </div>
+      {lines.length === 0 && <p className="text-sm leading-6 text-muted-foreground">当前镜头没有对白，点击下方按钮添加一行。</p>}
+      <div className="flex flex-col gap-3">
+        {lines.map((line, index) => (
+          <div key={`${suggestion.shotId}-line-${index}`} className="grid gap-3 md:grid-cols-[10rem_minmax(0,1fr)_10rem_auto]">
+            <Input value={line.speaker} placeholder="说话人" disabled={disabled} onChange={event => setLines(current => current.map((candidate, lineIndex) => lineIndex === index ? { ...candidate, speaker: event.target.value } : candidate))} />
+            <Textarea value={line.text} placeholder="台词" className="min-h-10 resize-y leading-6" disabled={disabled} onChange={event => setLines(current => current.map((candidate, lineIndex) => lineIndex === index ? { ...candidate, text: event.target.value } : candidate))} />
+            <Input value={line.delivery} placeholder="语气" disabled={disabled} onChange={event => setLines(current => current.map((candidate, lineIndex) => lineIndex === index ? { ...candidate, delivery: event.target.value } : candidate))} />
+            <Button variant="ghost" size="icon" aria-label="删除对白" disabled={disabled} onClick={() => setLines(current => current.filter((_, lineIndex) => lineIndex !== index))}><Trash2 className="size-4" /></Button>
+          </div>
+        ))}
+      </div>
+      <Button variant="outline" size="sm" className="self-start" disabled={disabled} onClick={() => setLines(current => [...current, { speaker: '', text: '', delivery: '' }])}>
+        <Plus data-icon="inline-start" />
+        添加对白
+      </Button>
+      <p className="text-sm leading-6 text-muted-foreground">调整原因：{suggestion.rationale}</p>
+      {stale && <p className="text-xs leading-5 text-muted-foreground">当前建议已过时，请重新执行对白整理后再应用。</p>}
+      {locked && <p className="text-xs leading-5 text-muted-foreground">当前镜头已锁定，请先在分镜页解锁，应用后重新审核。</p>}
+    </article>
   )
 }
 
