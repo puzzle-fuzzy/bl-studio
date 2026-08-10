@@ -13,6 +13,8 @@ import {
   CreateDirectorProjectSchema,
   CreateDirectorPhaseRunSchema,
   DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
+  DirectorMusicEstimateSchema,
   AttachDirectorAssetSchema,
   DirectorAnalysisResultSchema,
   DirectorAssetResponseSchema,
@@ -38,6 +40,7 @@ import {
   type CreateDirectorProjectInput,
   type CreateDirectorPhaseRunInput,
   type DirectorVideoEstimate,
+  type DirectorMusicEstimate,
   type AttachDirectorAssetInput,
   type DirectorAsset,
   type DirectorShot,
@@ -66,6 +69,8 @@ import {
 export {
   CreateDirectorPhaseRunSchema,
   DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
+  DirectorMusicEstimateSchema,
   AttachDirectorAssetSchema,
   DirectorAnalysisResultSchema,
   DirectorAssetResponseSchema,
@@ -93,6 +98,7 @@ export {
 export type {
   CreateDirectorPhaseRunInput,
   DirectorVideoEstimate,
+  DirectorMusicEstimate,
   AttachDirectorAssetInput,
   DirectorAnalysisResult,
   DirectorAsset,

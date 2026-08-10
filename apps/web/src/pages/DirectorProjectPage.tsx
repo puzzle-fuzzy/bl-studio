@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
@@ -109,6 +109,12 @@ export function DirectorProjectPage() {
   const [dialogueStale, setDialogueStale] = useState(false)
   const [applyingDialogueShotId, setApplyingDialogueShotId] = useState<string>()
   const [appliedDialogueShotIds, setAppliedDialogueShotIds] = useState<Set<string>>(new Set())
+  const [musicModelId, setMusicModelId] = useState('')
+  const [musicPrompt, setMusicPrompt] = useState('')
+  const [musicDuration, setMusicDuration] = useState('60')
+  const [musicEstimate, setMusicEstimate] = useState<DirectorMusicEstimate>()
+  const [musicConfirmOpen, setMusicConfirmOpen] = useState(false)
+  const [musicEstimating, setMusicEstimating] = useState(false)
   const [referencePickerOpen, setReferencePickerOpen] = useState(false)
   const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
   const referenceAssets = useReferenceAssetsStore(state => state.assets)
@@ -119,6 +125,11 @@ export function DirectorProjectPage() {
   const videoModels = useMemo(() => models.filter(model => (
     model.category === 'video'
     && model.operation === 'video.reference-to-video'
+    && model.availability?.enabled !== false
+  )), [models])
+  const musicModels = useMemo(() => models.filter(model => (
+    model.category === 'audio'
+    && model.operation === 'music.generate'
     && model.availability?.enabled !== false
   )), [models])
   const boundReferenceAssetIds = useMemo(() => {
@@ -181,6 +192,11 @@ export function DirectorProjectPage() {
     const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
     if (preferred !== undefined) setVideoModelId(preferred.id)
   }, [videoModelId, videoModels])
+
+  useEffect(() => {
+    if (musicModelId.length > 0 && musicModels.some(model => model.id === musicModelId)) return
+    if (musicModels[0] !== undefined) setMusicModelId(musicModels[0].id)
+  }, [musicModelId, musicModels])
 
   useEffect(() => {
     if (id === undefined) return
@@ -616,6 +632,54 @@ export function DirectorProjectPage() {
       toast.error('对白应用失败，请确认镜头未锁定且仍属于当前分镜')
     } finally {
       setApplyingDialogueShotId(undefined)
+    }
+  }
+
+  const prepareMusicRun = async () => {
+    const duration = Number.parseInt(musicDuration, 10)
+    if (id === undefined || musicModelId.length === 0 || musicPrompt.trim().length === 0 || !Number.isInteger(duration) || duration < 1 || dirty || activeRunId !== undefined || musicEstimating || musicConfirmOpen) return
+    setMusicEstimating(true)
+    try {
+      const estimate = await apiClient.estimateDirectorMusic(id, {
+        modelId: musicModelId,
+        prompt: musicPrompt.trim(),
+        isInstrumental: true,
+        duration,
+      })
+      setMusicEstimate(estimate)
+      setMusicConfirmOpen(true)
+    } catch {
+      toast.error('无法估算音乐费用，请确认音乐描述和模型配置')
+    } finally {
+      setMusicEstimating(false)
+    }
+  }
+
+  const confirmMusicRun = async () => {
+    const duration = Number.parseInt(musicDuration, 10)
+    if (id === undefined || musicModelId.length === 0 || musicPrompt.trim().length === 0 || !Number.isInteger(duration)) return
+    setMusicConfirmOpen(false)
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'bgm', {
+        modelId: musicModelId,
+        prompt: musicPrompt.trim(),
+        isInstrumental: true,
+        duration,
+      })
+      setActiveRunId(run.id)
+      setActivePhase('bgm')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'bgm'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('音乐生成已加入执行队列')
+    } catch {
+      toast.error('无法启动音乐生成，请确认当前阶段已准备好')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -1145,7 +1209,44 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'dialogue' && tab.value !== 'videos').map(tab => (
+        <TabsContent value="bgm" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">费用确认后执行</span>
+                <h2 className="text-xl font-semibold">生成背景音乐</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">音乐生成会真实消耗额度。先填写音乐描述并查看预估费用，确认后才会创建任务；新的音乐会保留旧版本并将其标记为过时。</p>
+              </div>
+              <div className="flex flex-col gap-4 bg-muted/30 px-4 py-4 sm:px-5">
+                <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="director-music-prompt">
+                  音乐描述
+                  <Textarea id="director-music-prompt" className="min-h-28 resize-y leading-6" value={musicPrompt} disabled={musicEstimating || musicConfirmOpen || activeRunId !== undefined} onChange={event => setMusicPrompt(event.target.value)} placeholder="例如：克制、悬疑的钢琴与低频弦乐，适合雨夜追踪场景" />
+                </label>
+                <label className="flex max-w-xs flex-col gap-2 text-sm font-medium" htmlFor="director-music-duration">
+                  费用预估时长（秒）
+                  <Input id="director-music-duration" type="number" min={1} max={600} value={musicDuration} disabled={musicEstimating || musicConfirmOpen || activeRunId !== undefined} onChange={event => setMusicDuration(event.target.value)} />
+                </label>
+                {project.assets.some(asset => asset.kind === 'music' && asset.staleAt === null) && <p className="text-sm leading-6 text-muted-foreground">当前已有可用音乐资产，重新生成后旧资产仍会保留在资产历史中。</p>}
+              </div>
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['bgm']}
+              modelId={musicModelId}
+              textModels={musicModels}
+              running={musicEstimating || musicConfirmOpen || (activePhase === 'bgm' && activeRunId !== undefined)}
+              onModelChange={value => {
+                setMusicModelId(value)
+                setMusicEstimate(undefined)
+              }}
+              onRunPhase={() => void prepareMusicRun()}
+              runLabel="生成背景音乐"
+              blockedByUnsavedChanges={dirty || musicPrompt.trim().length === 0}
+            />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'prompts' && tab.value !== 'dialogue' && tab.value !== 'videos' && tab.value !== 'bgm').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -1200,6 +1301,23 @@ export function DirectorProjectPage() {
           <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
             <Button variant="outline" onClick={() => setVideoConfirmOpen(false)}>取消</Button>
             <Button onClick={() => void confirmVideoRun()} disabled={videoEstimate === undefined}>{videoRetryShotId === undefined ? '确认提交' : '确认重试'}</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog open={musicConfirmOpen} onOpenChange={setMusicConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>确认生成背景音乐</DialogTitle>
+            <DialogDescription>确认后会创建真实音乐生成任务并扣除实际费用，生成结果会回写到导演台音乐资产。</DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-col gap-2 bg-muted/30 px-4 py-4 text-sm">
+            <div className="flex items-center justify-between"><span>费用预估时长</span><span>{musicEstimate?.durationSeconds ?? 0} 秒</span></div>
+            <div className="flex items-center justify-between"><span>预估费用</span><span className="font-semibold">{formatCents(musicEstimate?.estimatedCents)}</span></div>
+          </div>
+          <p className="text-xs leading-5 text-muted-foreground">这是预估费用，最终扣费以 provider 实际结算为准。</p>
+          <DialogFooter className="border-t-0 bg-transparent px-0 pb-0">
+            <Button variant="outline" onClick={() => setMusicConfirmOpen(false)}>取消</Button>
+            <Button onClick={() => void confirmMusicRun()} disabled={musicEstimate === undefined}>确认生成</Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

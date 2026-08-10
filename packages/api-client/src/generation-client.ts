@@ -31,6 +31,7 @@ import {
   DirectorShotResponseSchema,
   DirectorPhaseRunResponseSchema,
   DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
@@ -119,6 +120,7 @@ import type {
   DirectorShot,
   DirectorPhaseRun,
   DirectorVideoEstimate,
+  DirectorMusicEstimate,
   DirectorProjectDetail,
   DirectorProjectListResult,
   EmailActionAccepted,
@@ -328,6 +330,8 @@ export interface BailianStudioApiClient {
   requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `POST /api/director/projects/:id/phases/videos/estimate` — 估算视频阶段即将提交的镜头成本。 */
   estimateDirectorVideoPhase(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  /** `POST /api/director/projects/:id/phases/bgm/estimate` */
+  estimateDirectorMusic(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorMusicEstimate>
   /** `POST /api/director/projects/:id/shots/:shotId/video-runs/estimate` — 估算单镜重试成本。 */
   estimateDirectorShotVideo(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
   /** `POST /api/director/projects/:id/shots/:shotId/video-runs` — 为单个失败镜头创建视频任务。 */
@@ -724,6 +728,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
         fetchImpl,
         DirectorVideoEstimateResponseSchema,
+      )
+      return data.estimate
+    },
+
+    async estimateDirectorMusic(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/bgm/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorMusicEstimateResponseSchema,
       )
       return data.estimate
     },

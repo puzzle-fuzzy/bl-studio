@@ -359,6 +359,13 @@ export const DirectorShotResponseSchema = z.object({
 
 export const CreateDirectorPhaseRunSchema = z.object({
   modelId: z.string().trim().min(1).max(256),
+  prompt: z.string().trim().max(2_000).optional(),
+  lyrics: z.string().trim().max(2_000).optional(),
+  isInstrumental: z.boolean().optional(),
+  enableAigcWatermark: z.boolean().optional(),
+  gender: z.enum(['female', 'male']).optional(),
+  format: z.enum(['mp3', 'wav']).optional(),
+  duration: z.number().int().positive().max(600).optional(),
 }).strict()
 
 export const DirectorVideoEstimateSchema = z.object({
@@ -370,6 +377,17 @@ export const DirectorVideoEstimateSchema = z.object({
 
 export const DirectorVideoEstimateResponseSchema = z.object({
   estimate: DirectorVideoEstimateSchema,
+}).strict()
+
+export const DirectorMusicEstimateSchema = z.object({
+  modelId: z.string(),
+  estimatedCents: z.number().int().nonnegative(),
+  durationSeconds: z.number().int().positive(),
+  currency: z.literal('CNY'),
+}).strict()
+
+export const DirectorMusicEstimateResponseSchema = z.object({
+  estimate: DirectorMusicEstimateSchema,
 }).strict()
 
 export const DirectorPhaseRunSchema = z.object({
@@ -453,6 +471,7 @@ export type CreateDirectorProjectInput = z.infer<typeof CreateDirectorProjectSch
 export type UpdateDirectorProjectInput = z.infer<typeof UpdateDirectorProjectSchema>
 export type CreateDirectorPhaseRunInput = z.infer<typeof CreateDirectorPhaseRunSchema>
 export type DirectorVideoEstimate = z.infer<typeof DirectorVideoEstimateSchema>
+export type DirectorMusicEstimate = z.infer<typeof DirectorMusicEstimateSchema>
 export type DirectorPhaseRun = z.infer<typeof DirectorPhaseRunSchema>
 export type DirectorAnalysisResult = z.infer<typeof DirectorAnalysisResultSchema>
 export type DirectorCharacterDraft = z.infer<typeof DirectorCharacterDraftSchema>

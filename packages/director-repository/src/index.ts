@@ -14,6 +14,7 @@ export type {
   DirectorPhaseRunFailureInput,
   DirectorPhaseRunProgressInput,
   DirectorPhaseRunForWorker,
+  FinalizeDirectorMusicRepositoryInput,
   RequestDirectorPhaseRunRepositoryInput,
   UpdateDirectorProjectRepositoryInput,
 } from './types'

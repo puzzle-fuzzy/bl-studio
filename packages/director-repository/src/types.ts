@@ -125,6 +125,14 @@ export interface FinalizeDirectorShotVideoRepositoryInput {
   now?: string
 }
 
+export interface FinalizeDirectorMusicRepositoryInput {
+  userId: string
+  projectId: string
+  phaseRunId: string
+  generationId: string
+  now?: string
+}
+
 export interface ListDirectorProjectsResult {
   items: DirectorProjectRepositorySummary[]
   nextCursor?: string
@@ -141,6 +149,7 @@ export interface DirectorRepository {
   startShotVideo(input: StartDirectorShotVideoRepositoryInput): Promise<DirectorShot>
   markShotVideoFailed(input: MarkDirectorShotVideoFailedRepositoryInput): Promise<boolean>
   finalizeShotVideo(input: FinalizeDirectorShotVideoRepositoryInput): Promise<boolean>
+  finalizeDirectorMusic(input: FinalizeDirectorMusicRepositoryInput): Promise<DirectorAsset | undefined>
   requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>

@@ -1523,6 +1523,85 @@ export function createDirectorRepository({
 			});
 		},
 
+		async finalizeDirectorMusic(input) {
+			const now = new Date(input.now ?? new Date().toISOString());
+			return db.transaction(async (tx) => {
+				const [project] = await tx
+					.select({ id: directorProjects.id })
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (project === undefined) return undefined;
+
+				const [existing] = await tx
+					.select()
+					.from(directorAssets)
+					.where(
+						and(
+							eq(directorAssets.projectId, input.projectId),
+							eq(directorAssets.sourceRunId, input.phaseRunId),
+							eq(directorAssets.kind, "music"),
+							isNull(directorAssets.deletedAt),
+						),
+					)
+					.limit(1);
+				if (existing !== undefined) return toDirectorAsset(existing);
+
+				const [userAsset] = await tx
+					.select({ id: userAssets.id })
+					.from(userAssets)
+					.where(
+						and(
+							eq(userAssets.userId, input.userId),
+							eq(userAssets.recordId, input.generationId),
+							eq(userAssets.kind, "audio"),
+							eq(userAssets.status, "ready"),
+							isNull(userAssets.deletedAt),
+						),
+					)
+					.orderBy(userAssets.createdAt)
+					.limit(1);
+				if (userAsset === undefined) return undefined;
+
+				await tx
+					.update(directorAssets)
+					.set({ staleAt: now, staleReason: "superseded_by_music", updatedBy: "worker", updatedAt: now })
+					.where(
+						and(
+							eq(directorAssets.projectId, input.projectId),
+							eq(directorAssets.kind, "music"),
+							isNull(directorAssets.deletedAt),
+							isNull(directorAssets.staleAt),
+						),
+					);
+				const [created] = await tx
+					.insert(directorAssets)
+					.values({
+						id: crypto.randomUUID(),
+						projectId: input.projectId,
+						sourceRunId: input.phaseRunId,
+						kind: "music",
+						ownerType: null,
+						ownerId: null,
+						assetId: userAsset.id,
+						version: 1,
+						metadataJson: { generationId: input.generationId },
+						createdBy: "worker",
+						updatedBy: "worker",
+						createdAt: now,
+						updatedAt: now,
+					})
+					.returning();
+				return created === undefined ? undefined : toDirectorAsset(created);
+			});
+		},
+
 		async requestPhaseRun(input) {
 			const now = new Date(input.now ?? new Date().toISOString());
 			const runId = crypto.randomUUID();
@@ -1590,6 +1669,17 @@ export function createDirectorRepository({
 					synopsis: scriptVersion.synopsis,
 					settings: project.settingsJson,
 				};
+				if (input.phase === "bgm") {
+					inputSnapshot.music = {
+						prompt: input.prompt ?? null,
+						lyrics: input.lyrics ?? null,
+						isInstrumental: input.isInstrumental ?? false,
+						enableAigcWatermark: input.enableAigcWatermark ?? false,
+						gender: input.gender ?? "female",
+						format: input.format ?? "mp3",
+						duration: input.duration ?? 60,
+					};
+				}
 				if (input.phase === "characters") {
 					const [sourceRun] = await tx
 						.select()

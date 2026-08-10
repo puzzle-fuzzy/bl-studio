@@ -142,6 +142,13 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         }
         validateDirectorVideoShots(model, project.shots.filter(shot => shot.status === 'locked' || shot.status === 'failed'))
       }
+      if (phase === 'bgm') {
+        const model = requireDirectorMusicModel(input.modelId)
+        const validation = validateModelParams(model, directorMusicParams(input))
+        if (!validation.valid) {
+          throw new ValidationError(validation.errors[0]?.message ?? 'Invalid music generation parameters')
+        }
+      }
       const run = await repository.requestPhaseRun({
         userId: user.id,
         projectId: params.id,
@@ -183,6 +190,31 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         },
       }
     })
+    .post('/projects/:id/phases/bgm/estimate', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CreateDirectorPhaseRunSchema, body)
+      const model = requireDirectorMusicModel(input.modelId)
+      const paramsForModel = directorMusicParams(input)
+      const validation = validateModelParams(model, paramsForModel)
+      if (!validation.valid) {
+        throw new ValidationError(validation.errors[0]?.message ?? 'Invalid music generation parameters')
+      }
+      const project = await repository.getProject({ userId: user.id, projectId: params.id })
+      if (project === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
+      }
+      return {
+        success: true,
+        data: {
+          estimate: {
+            modelId: model.id,
+            estimatedCents: estimatePriceCents(model, paramsForModel),
+            durationSeconds: Number(paramsForModel.duration),
+            currency: 'CNY' as const,
+          },
+        },
+      }
+    })
     .get('/projects/:id/phases/:phase/runs/:runId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
@@ -205,6 +237,34 @@ function estimateDirectorShotCents(
   referenceCount: number,
 ): number {
   return estimatePriceCents(manifest, directorVideoParams(manifest, durationSeconds, referenceCount))
+}
+
+function requireDirectorMusicModel(modelId: string): FrozenModelManifest {
+  const model = getModelById(modelId)
+  if (model === undefined || model.availability.enabled === false || getBailianOperationCapability(model.id) !== 'music.generate') {
+    throw new ValidationError('音乐阶段需要使用已启用的音乐生成模型')
+  }
+  return model
+}
+
+function directorMusicParams(input: {
+  prompt?: string
+  lyrics?: string
+  isInstrumental?: boolean
+  enableAigcWatermark?: boolean
+  gender?: 'female' | 'male'
+  format?: 'mp3' | 'wav'
+  duration?: number
+}): Record<string, unknown> {
+  return {
+    ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+    ...(input.lyrics === undefined ? {} : { lyrics: input.lyrics }),
+    isInstrumental: input.isInstrumental ?? false,
+    enableAigcWatermark: input.enableAigcWatermark ?? false,
+    gender: input.gender ?? 'female',
+    format: input.format ?? 'mp3',
+    duration: input.duration ?? 60,
+  }
 }
 
 function validateDirectorVideoShots(

@@ -1,5 +1,6 @@
 import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import { getBailianOperationCapability, validateModelParams } from '@bailian-studio/model-core'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
@@ -97,6 +98,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'dialogue') {
     return processDialoguePhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'bgm') {
+    return processMusicPhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase === 'videos') {
     return processVideosPhase(run, task, deps, modelId, task.userId, snapshot)
@@ -839,6 +843,103 @@ async function processDialoguePhase(
   return retryUntilGenerationCompletes(task, `Dialogue generation is ${generation.status}`, 'DIRECTOR_DIALOGUE')
 }
 
+async function processMusicPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const manifest = deps.modelRegistry.getModelById(modelId)
+  if (manifest === undefined || manifest.availability.enabled === false || getBailianOperationCapability(manifest.id) !== 'music.generate') {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Music model is unavailable: ${modelId}`,
+      retriable: false,
+      code: 'DIRECTOR_MUSIC_MODEL_UNAVAILABLE',
+    }, deps)
+  }
+
+  const musicInput = isRecord(snapshot.music) ? snapshot.music : {}
+  const params = musicGenerationParams(musicInput)
+  const validation = validateModelParams(manifest, params)
+  if (!validation.valid) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: validation.errors[0]?.message ?? 'Music generation parameters are invalid',
+      retriable: false,
+      code: 'DIRECTOR_MUSIC_INPUT_INVALID',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params,
+        idempotencyKey: `director:${run.id}:bgm`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director music generation is queued', 'DIRECTOR_MUSIC')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_MUSIC_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Music generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_MUSIC_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const musicAsset = await deps.directorRepository?.finalizeDirectorMusic({
+      userId,
+      projectId: run.projectId,
+      phaseRunId: run.id,
+      generationId,
+    })
+    if (musicAsset === undefined) {
+      return retryUntilGenerationCompletes(task, 'Music generation succeeded but its audio asset is not ready', 'DIRECTOR_MUSIC_ASSET')
+    }
+    const summary = { generationId, modelId, musicAssetId: musicAsset.id }
+    return completePhase(run.id, summary, deps, JSON.stringify(summary))
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Music generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_MUSIC_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Music generation is ${generation.status}`, 'DIRECTOR_MUSIC')
+}
+
 async function processVideosPhase(
   run: DirectorPhaseRunForWorker,
   task: TaskRecord,
@@ -1160,6 +1261,7 @@ interface RunInputSnapshot {
   locations: unknown
   shots: unknown
   continuity: unknown
+  music: unknown
 }
 
 function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
@@ -1173,6 +1275,19 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     locations: snapshot['locations'],
     shots: snapshot['shots'],
     continuity: snapshot['continuity'],
+    music: snapshot['music'],
+  }
+}
+
+function musicGenerationParams(input: Record<string, unknown>): Record<string, unknown> {
+  return {
+    ...(typeof input.prompt === 'string' && input.prompt.trim().length > 0 ? { prompt: input.prompt.trim() } : {}),
+    ...(typeof input.lyrics === 'string' && input.lyrics.trim().length > 0 ? { lyrics: input.lyrics.trim() } : {}),
+    isInstrumental: input.isInstrumental === true,
+    gender: input.gender === 'male' ? 'male' : 'female',
+    format: input.format === 'wav' ? 'wav' : 'mp3',
+    enableAigcWatermark: input.enableAigcWatermark === true,
+    duration: typeof input.duration === 'number' && Number.isInteger(input.duration) && input.duration > 0 ? input.duration : 60,
   }
 }
 

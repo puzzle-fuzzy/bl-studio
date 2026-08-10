@@ -198,6 +198,9 @@ const fakeDirectorRepository: DirectorRepository = {
   async finalizeShotVideo() {
     return false
   },
+  async finalizeDirectorMusic() {
+    return undefined
+  },
   async requestPhaseRun(input) {
     const run: DirectorPhaseRun = {
       id: `run-${input.projectId}`,
@@ -381,6 +384,28 @@ describe('director routes', () => {
     expect(estimateResponse.status).toBe(200)
     expect(body.data.estimate.modelId).toBe('wanx-2.7-reference-video')
     expect(body.data.estimate.shotCount).toBe(1)
+    expect(body.data.estimate.estimatedCents).toBeGreaterThan(0)
+    expect(body.data.estimate.currency).toBe('CNY')
+  })
+
+  it('estimates music cost from the selected music manifest before queueing', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '音乐费用估算', storyText: '故事正文' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+
+    const estimateResponse = await app.handle(authed(`/api/director/projects/${created.data.project.id}/phases/bgm/estimate`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'fun-music-v1', prompt: '克制的悬疑钢琴背景音乐', isInstrumental: true, duration: 60 }),
+    }))
+    const body = await estimateResponse.json() as { data: { estimate: { modelId: string; estimatedCents: number; durationSeconds: number; currency: string } } }
+
+    expect(estimateResponse.status).toBe(200)
+    expect(body.data.estimate.modelId).toBe('fun-music-v1')
+    expect(body.data.estimate.durationSeconds).toBe(60)
     expect(body.data.estimate.estimatedCents).toBeGreaterThan(0)
     expect(body.data.estimate.currency).toBe('CNY')
   })
