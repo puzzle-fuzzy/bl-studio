@@ -35,7 +35,12 @@ pnpm run db:push        # 推送 schema 到 dev DB
 pnpm run db:push:test   # 推送 schema 到 test DB
 
 # 本地环境文件（gitignored）
+# macOS/Linux:
 cp infra/env/.env.example infra/env/.env
+cp infra/env/.env.test.example infra/env/.env.test
+# Windows PowerShell:
+# Copy-Item infra/env/.env.example infra/env/.env
+# Copy-Item infra/env/.env.test.example infra/env/.env.test
 # 如需 Worker 真正调 DashScope，填入 DASHSCOPE_API_KEY
 
 # 同时启动 API(5003, bun) / Worker(tsx) / Web(5002, vite)
@@ -45,6 +50,30 @@ pnpm run dev
 打开 http://localhost:5002 即可创作。
 
 > API 由 Bun 启动（Elysia 原生效能路径）；Worker、脚本、db 工具、测试均走 pnpm/Node。
+
+### Windows 首次运行
+
+要求：Node 24.12.x、pnpm 10.9.0、Bun 1.4.x、Docker Desktop。先确认 `docker info`
+可以访问 Linux engine，再执行上面的安装和数据库命令。测试/verify/db 命令已使用
+跨平台进程调用，不需要 Git Bash。
+
+开发数据库使用 named volume，普通 `pnpm run db:down` 会保留数据；只有明确需要重置
+时才执行：
+
+```powershell
+docker compose -f infra/docker/docker-compose.yml down -v
+```
+
+本地生产形态演练需要 Linux 版 ffmpeg/ffprobe，Windows 宿主机的 `.exe` 不能直接挂进
+Linux 容器。准备一次：
+
+```powershell
+pnpm run fetch:static-ffmpeg:windows
+pnpm run deploy:rehearsal:up
+```
+
+生产发布脚本仍依赖 Linux Bash、rsync 和远程 Linux 命令；Windows 上请在 WSL/Linux
+环境执行，或使用 Linux CI，不要在普通 PowerShell 中直接运行 `deploy:prod`。
 
 ## 常用命令
 

@@ -34,7 +34,7 @@ jobs:
           version: 10.9.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       # 用 migrate（而非 push）准备 test DB：生产只走 migrate，CI 必须覆盖同一条路径；
@@ -72,12 +72,36 @@ jobs:
           version: 10.9.0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: 1.4.0
       - uses: actions/setup-node@v4
         with:
-          node-version: 24
+          node-version: 24.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm run db:migrate:test
       - run: node infra/scripts/playwright-cli.cjs install --with-deps chromium
       - run: node infra/scripts/playwright-cli.cjs test --config=e2e/playwright.config.ts
+
+  # Windows portability gate. It intentionally avoids a database service: the
+  # goal is to catch install, path, process-spawn, typecheck, and package-boundary
+  # regressions that Ubuntu CI cannot see.
+  windows-portability:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.9.0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24.12.0
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run check:boundaries
+      - run: pnpm run check:manifests
+      - run: pnpm run typecheck:root
+      - run: pnpm run typecheck
+      - run: pnpm exec vitest run packages/storage/tests/paths.test.ts

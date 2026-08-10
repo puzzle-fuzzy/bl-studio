@@ -61,6 +61,20 @@ git status --porcelain   # 必须无输出
 > `deploy:prod` 现在会在「上一次提交只改前端」时打印 web-only 提示（非阻断）。日常前端热修
 > 一律走 web-only，只有后端变更才全量重传 runtime 镜像。
 
+### Windows 开发与生产发布边界
+
+Windows PowerShell 支持本地安装、dev/test 数据库、typecheck、测试和 rehearsal。
+rehearsal 使用 Linux 容器，首次运行前执行：
+
+```powershell
+pnpm run fetch:static-ffmpeg:windows
+pnpm run deploy:rehearsal:up
+```
+
+`deploy:prod`、`deploy:prod:web`、备份、回滚和观测脚本依赖 Bash、rsync、awk 及
+Linux 远程命令，必须在 Linux/WSL 或 Linux CI 执行；不要在普通 Windows PowerShell
+中直接执行生产发布脚本。
+
 ### 2.2 一键发布
 
 ```bash

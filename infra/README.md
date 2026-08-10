@@ -23,6 +23,28 @@ pnpm run db:up        # dev Postgres :55431 + Mailpit :11025
 pnpm run dev          # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
 ```
 
+Windows PowerShell 使用：
+
+```powershell
+Copy-Item infra/env/.env.example infra/env/.env
+Copy-Item infra/env/.env.test.example infra/env/.env.test
+pnpm run db:up
+pnpm run dev
+```
+
+开发 Postgres 使用 named volume，普通 `pnpm run db:down` 不会删除数据；需要清空
+开发库时再执行 `docker compose -f infra/docker/docker-compose.yml down -v`。
+
+本地 rehearsal 在 Windows 上先准备 Linux 静态媒体工具：
+
+```powershell
+pnpm run fetch:static-ffmpeg:windows
+pnpm run deploy:rehearsal:up
+```
+
+生产 `deploy:*` 和观测/备份 Bash 脚本面向 Linux/WSL 服务器，不属于普通 PowerShell
+本地命令；Windows 开发验证与生产发布边界保持分离。
+
 ## 生产部署
 
 生产编排为单机 Docker Compose，HTTPS 由**宿主机 nginx** 终止（与 dev/lunar/p2p 等
