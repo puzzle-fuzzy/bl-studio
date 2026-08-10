@@ -1432,6 +1432,12 @@ export function DirectorProjectPage() {
                 </div>
               </div>
               <Separator />
+              {assemblyState?.lastError !== null && assemblyState?.lastError !== undefined && (
+                <div className="flex items-start gap-2 text-sm text-destructive">
+                  <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                  <span className="leading-6">{assemblyState.lastError.message}</span>
+                </div>
+              )}
               <Button
                 onClick={() => void prepareAssemblyRun()}
                 disabled={assemblyPreflighting || assemblyConfirmOpen || activeRunId !== undefined || dirty}
