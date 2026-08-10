@@ -11,3 +11,7 @@ and classifies provider failures.
   provider directly.
 - Provider model selection comes from manifests, not model-id conditionals in
   the runner.
+
+For the maintenance sequence covering official-document drift, offline fixtures,
+and operator-owned live canaries, see
+[`docs/bailian/PROVIDER-CONTRACT-CHECKLIST.md`](../../docs/bailian/PROVIDER-CONTRACT-CHECKLIST.md).

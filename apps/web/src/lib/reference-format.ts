@@ -35,7 +35,7 @@ export function filterReferenceAssets<T extends { fileName?: string | null }>(
   if (q === '') return [...assets]
   return assets.filter((asset, index) => {
     if (`图${index + 1}`.toLowerCase().includes(q)) return true
-    return asset.fileName !== undefined && asset.fileName !== null && asset.fileName.toLowerCase().includes(q)
+    return asset.fileName?.toLowerCase().includes(q) === true
   })
 }
 

@@ -71,7 +71,7 @@ export function resolveDashScopeCancelTarget(
   requireTaskId(providerTaskId)
   // 通用异步任务取消端点 = 轮询模板 + /cancel（所有 async manifest 的轮询模板均以
   // /tasks/{taskId} 结尾，见文件头注释）。
-  const url = resolveTemplate(polling.endpointTemplate, options.workspaceId, { taskId: providerTaskId }) + '/cancel'
+  const url = `${resolveTemplate(polling.endpointTemplate, options.workspaceId, { taskId: providerTaskId })}/cancel`
   assertTrustedDashScopeEndpoint(url, 'cancel')
   return {
     method: 'POST',

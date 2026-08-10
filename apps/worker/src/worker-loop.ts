@@ -5,7 +5,6 @@
  */
 
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { createLogger, MetricsCollector, type Logger, type MetricsSnapshot } from '@bailian-studio/shared'
@@ -402,6 +401,7 @@ export class WorkerLoop {
       }
     }
 
+    const workerId = task.lockedBy
     let lost = false
     let activeRenewal: Promise<void> | undefined
     let stopped = false
@@ -414,7 +414,7 @@ export class WorkerLoop {
         try {
           const renewed = await this.config.repository.renewTaskLock({
             taskId: task.id,
-            workerId: task.lockedBy!,
+            workerId,
             now: now.toISOString(),
             lockedUntil: new Date(now.getTime() + this.lockDurationMs).toISOString(),
           })

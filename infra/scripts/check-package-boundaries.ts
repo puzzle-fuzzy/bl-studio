@@ -13,8 +13,8 @@ function escapeRegExp(value: string): string {
 
 const importsApps = importSpecifier(String.raw`(?:\.\.\/)*apps`)
 const importsServices = importSpecifier(String.raw`(?:\.\.\/)*services`)
-const importsReact = importSpecifier(String.raw`react`)
-const importsElysia = importSpecifier(String.raw`elysia`)
+const importsReact = importSpecifier('react')
+const importsElysia = importSpecifier('elysia')
 const importsProviderDashScopePackage = importSpecifier(String.raw`(?:\.\.\/)*packages\/provider-dashscope`)
 const importsApiSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:api|apps\/api|services\/api)`)
 const importsWorkerSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:worker|apps\/worker|services\/worker)`)

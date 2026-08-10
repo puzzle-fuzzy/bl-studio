@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
-import { type DashScopeFetch } from '@bailian-studio/provider-dashscope'
+import type { DashScopeFetch } from '@bailian-studio/provider-dashscope'
 import { DashScopeProviderRunner } from '../../src/providers'
 import type { ProviderExecuteInput } from '../../src/providers'
 

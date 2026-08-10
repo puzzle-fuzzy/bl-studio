@@ -1,5 +1,5 @@
 import type { AssetItem, ModelCatalogItem } from '@bailian-studio/api-client'
-import { buildParameterFormSchema, removeHiddenParameterValues } from './parameter-form-schema'
+import { removeHiddenParameterValues } from './parameter-form-schema'
 import { referenceFormatOf, resolvePromptReferences } from './reference-format'
 
 /**

@@ -16,13 +16,9 @@ export interface RehearsalSmokeOptions {
   readonly webOrigin: string
 }
 
-export interface RehearsalCommandRunner {
-  (args: readonly string[]): Promise<void>
-}
+export type RehearsalCommandRunner = (args: readonly string[]) => Promise<void>
 
-export interface RehearsalCommandCapture {
-  (args: readonly string[]): Promise<string>
-}
+export type RehearsalCommandCapture = (args: readonly string[]) => Promise<string>
 
 /**
  * 断言容器日志中出现 JSON-lines 结构化条目（LOG_FORMAT=json 生效）。

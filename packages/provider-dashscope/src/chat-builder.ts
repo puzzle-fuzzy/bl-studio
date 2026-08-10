@@ -92,7 +92,7 @@ function buildChinesePrompt(detailLevel: 'standard' | 'detailed'): string {
 请确保每个场景都有时间戳标注。`
 
   if (detailLevel === 'detailed') {
-    return base + `\n\n此外，请额外包含以下细节：
+    return `${base}\n\n此外，请额外包含以下细节：
 5. 镜头语言：推拉摇移跟、焦距变化、拍摄角度
 6. 角色表情与情绪：每个角色的面部表情和情绪状态
 7. 色彩基调：场景的主色调和光影变化
@@ -132,7 +132,7 @@ Sound: Rain continues, distant siren.
 Every scene must have a timestamp.`
 
   if (detailLevel === 'detailed') {
-    return base + `\n\nAdditionally, include:
+    return `${base}\n\nAdditionally, include:
 5. Camera work: movements, focal length, angles
 6. Character expressions and emotions
 7. Color palette and lighting
@@ -172,7 +172,7 @@ function buildBilingualPrompt(detailLevel: 'standard' | 'detailed'): string {
 请确保每个场景都有时间戳标注，且每一个对白行都包含中英文两个版本。`
 
   if (detailLevel === 'detailed') {
-    return base + `\n\n此外，请额外包含以下细节（同样中英文双语）：
+    return `${base}\n\n此外，请额外包含以下细节（同样中英文双语）：
 5. 镜头语言：推拉摇移跟、焦距变化、拍摄角度
 6. 角色表情与情绪：每个角色的面部表情和情绪状态
 7. 色彩基调：场景的主色调和光影变化

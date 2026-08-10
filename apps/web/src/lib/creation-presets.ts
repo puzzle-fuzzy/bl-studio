@@ -1,5 +1,5 @@
 import type { ModelParameter } from '@bailian-studio/api-client'
-import { buildParameterFormSchema, removeHiddenParameterValues } from './parameter-form-schema'
+import { removeHiddenParameterValues } from './parameter-form-schema'
 
 /**
  * 创作预设（版本化 localStorage）。

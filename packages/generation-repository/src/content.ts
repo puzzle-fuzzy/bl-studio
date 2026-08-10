@@ -284,18 +284,21 @@ export function createContentRepository(db: BailianStudioDb): ContentRepository 
 
     let rows: GalleryListRow[]
     if (hot) {
+      if (likeCountSub === undefined || likeCountExpr === undefined) {
+        throw new Error('Hot gallery query is missing like-count expressions')
+      }
       rows = await db
         .select({
           record: generationRecords,
           authorId: users.id,
           authorDisplayName: users.displayName,
-          likeCount: likeCountExpr!,
+          likeCount: likeCountExpr,
         })
         .from(generationRecords)
         .innerJoin(users, and(eq(users.id, generationRecords.userId), isNull(users.bannedAt), isNull(users.deletedAt)))
-        .leftJoin(likeCountSub!, eq(likeCountSub!.recordId, generationRecords.id))
+        .leftJoin(likeCountSub, eq(likeCountSub.recordId, generationRecords.id))
         .where(and(...conditions))
-        .orderBy(desc(likeCountExpr!), desc(generationRecords.createdAt), desc(generationRecords.id))
+        .orderBy(desc(likeCountExpr), desc(generationRecords.createdAt), desc(generationRecords.id))
         .limit(limit + 1)
     } else {
       rows = await db

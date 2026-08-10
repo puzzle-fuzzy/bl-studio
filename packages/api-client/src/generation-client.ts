@@ -11,18 +11,13 @@
 import { z } from 'zod'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
-  AdminCreateUserInputSchema,
   AdminListUsersResponseSchema,
   AdminStatsOverviewSchema,
-  AdminUpdateUserInputSchema,
   AdminUserDetailResponseSchema,
   AdminUserResponseSchema,
-  AdjustPointsInputSchema,
   AssetCapabilitiesSchema,
   BatchAffectedResponseSchema,
-  BatchGrantPointsRequestSchema,
   BatchGrantPointsResponseSchema,
-  BatchUsersRequestSchema,
   AssetItemSchema,
   AssetResponseSchema,
   ApiErrorSchema,
@@ -39,7 +34,6 @@ import {
   GenerationShareResponseSchema,
   AdminAnalyticsSchema,
   AdminModelCostsResponseSchema,
-  AdminModelCostsUpdateInputSchema,
   AdminModelCostsUpdateResponseSchema,
   AdminGalleryHideResultSchema,
   FeedbackItemResponseSchema,
@@ -53,19 +47,13 @@ import {
   NotificationReadAllSchema,
   NotificationReadSchema,
   NotificationUnreadCountSchema,
-  SubmitFeedbackInputSchema,
-  UpdateFeedbackStatusInputSchema,
-  CreatePromptLibraryInputSchema,
   FavoriteMutationResponseSchema,
   GalleryDetailSchema,
-  GrantPointsInputSchema,
   ListPromptLibraryResponseSchema,
   PromptLibraryItemResponseSchema,
-  UpdatePromptLibraryInputSchema,
   LikeMutationResponseSchema,
   ListArtifactsResponseSchema,
   ListGalleryResponseSchema,
-  SetVisibilityInputSchema,
   SetVisibilityResponseSchema,
   ListAssetsResponseSchema,
   ListGenerationArtifactsResponseSchema,
@@ -111,7 +99,6 @@ import type {
   UserFeedback,
   CreatePromptLibraryInput,
   ListPromptLibraryResult,
-  ModelCost,
   PromptLibraryItem,
   UpdatePromptLibraryInput,
   AssetCapabilities,
@@ -746,14 +733,15 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
 
     async retryGeneration(id, input) {
       // 仅当显式带 idempotencyKey 时才发 JSON body，否则发空 POST。
-      const hasBody = input?.idempotencyKey !== undefined
+      const idempotencyKey = input?.idempotencyKey
+      const hasBody = idempotencyKey !== undefined
       return unwrapData(
         `${base}/api/generations/${encodeURIComponent(id)}/retry`,
         hasBody
           ? {
             method: 'POST',
             headers: JSON_HEADERS,
-            body: JSON.stringify({ idempotencyKey: input!.idempotencyKey }),
+            body: JSON.stringify({ idempotencyKey }),
             credentials: 'include',
           }
           : { method: 'POST', credentials: 'include' },

@@ -67,9 +67,9 @@ export function buildBackupEnvironment(
 
 /** 将备份变量写为稳定、dotenv-safe 的内容；调用方负责写入并收紧权限。 */
 export function renderBackupEnvironment(environment: EnvironmentSource): string {
-  return Object.entries(environment)
+  return `${Object.entries(environment)
     .map(([key, value]) => `${key}=${encodeDotenvValue(value ?? '')}`)
-    .join('\n') + '\n'
+    .join('\n')}\n`
 }
 
 export async function prepareBackupEnvironment(

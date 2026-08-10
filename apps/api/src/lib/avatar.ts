@@ -20,7 +20,9 @@ const CELL = CANVAS / GRID
 
 function hueFromSeed(digest: Uint8Array): number {
   // 用两个字节派生色相，避免低字节相关性导致的相邻用户配色雷同。
-  return ((digest[0]! << 8) | digest[1]!) % 360
+  const high = digest[0] ?? 0
+  const low = digest[1] ?? 0
+  return ((high << 8) | low) % 360
 }
 
 /** 同一色相的 5 档明度，供网格填充产生立体感（仍是单色系，符合 identicon 直觉）。 */
@@ -32,7 +34,8 @@ function cellShades(hue: number): string[] {
 function cellIsSet(digest: Uint8Array, row: number, col: number): boolean {
   // 派生稳定但不显式的位索引：与行/列线性组合，避免简单逐字节产生的规律图案。
   const index = 1 + row * HALF + col
-  const byte = digest[index % digest.length]!
+  if (digest.length === 0) return false
+  const byte = digest[index % digest.length] ?? 0
   return ((byte >> (index % 8)) & 1) === 1
 }
 

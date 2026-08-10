@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { AuthError } from '@bailian-studio/auth'
 import type { CreditBalance, CreditLedger, GrantCreditsResult } from '@bailian-studio/credit-ledger'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import { CreditLedgerError } from '@bailian-studio/credit-ledger'

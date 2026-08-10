@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import { Clapperboard, FileAudio, Mic } from 'lucide-react'
 import type { AssetItem, CreateGenerationRequest, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
@@ -108,7 +108,7 @@ function ExtractAudioTool() {
       icon={<FileAudio className="size-5" />}
       title="视频提取音频"
       description="从视频中提取音轨并保存为素材。"
-      render={render => (
+      render={() => (
         <div className="space-y-3">
           <AssetSelector asset={asset} onOpen={() => setPickerOpen(true)} kindLabel="视频" />
           <AssetPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} mediaKind="video" onSelect={assets => setAsset(assets[0] ?? null)} />

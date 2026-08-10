@@ -47,7 +47,7 @@ describe('FfmpegMediaProcessor source boundary', () => {
   it('spawns ffmpeg detached so timeout kills cover the whole process group (P1-25)', async () => {
     let receivedOptions: { stdout: 'pipe'; stderr: 'pipe'; detached?: boolean } | undefined
     const processor = new FfmpegMediaProcessor({
-      spawn: (command, options) => {
+      spawn: (_command, options) => {
         receivedOptions = options
         return {
           exited: Promise.resolve(1),

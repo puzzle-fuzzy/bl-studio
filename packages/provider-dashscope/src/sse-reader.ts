@@ -12,6 +12,22 @@ export interface SseResult {
 
 export type SseEventValidator = (event: unknown) => void
 
+type JsonRecord = Record<string, unknown>
+
+function asJsonRecord(value: unknown): JsonRecord | undefined {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+    ? value as JsonRecord
+    : undefined
+}
+
+function numberOrZero(value: unknown): number {
+  return typeof value === 'number' && Number.isFinite(value) ? value : 0
+}
+
+function optionalNumber(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
 export class SseEventParseError extends Error {
   constructor(public readonly line: string) {
     super('Provider stream contains an invalid JSON event')
@@ -57,9 +73,14 @@ export async function readSseStream(
     if (!trimmed.startsWith('data: ')) return
 
     const jsonStr = trimmed.slice(6)
-    let data: Record<string, any>
+    let data: JsonRecord
     try {
-      data = JSON.parse(jsonStr) as Record<string, any>
+      const parsed = asJsonRecord(JSON.parse(jsonStr))
+      if (parsed === undefined) {
+        if (validateEvent !== undefined) throw new SseEventParseError(trimmed)
+        return
+      }
+      data = parsed
     } catch {
       if (validateEvent !== undefined) throw new SseEventParseError(trimmed)
       return
@@ -69,28 +90,32 @@ export async function readSseStream(
     try {
       const choices = data.choices
       if (Array.isArray(choices) && choices.length > 0) {
-        const delta = choices[0].delta
+        const choice = asJsonRecord(choices[0])
+        const delta = asJsonRecord(choice?.delta)
         if (typeof delta?.content === 'string') {
           text += delta.content
         }
       }
       // usage chunk — choices 可能为空数组或不存在
-      if (data.usage) {
+      const providerUsage = asJsonRecord(data.usage)
+      if (providerUsage !== undefined) {
+        const promptDetails = asJsonRecord(providerUsage.prompt_tokens_details)
+        const completionDetails = asJsonRecord(providerUsage.completion_tokens_details)
         usage = {
-          promptTokens: data.usage.prompt_tokens ?? 0,
-          completionTokens: data.usage.completion_tokens ?? 0,
-          ...(data.usage.prompt_tokens_details
+          promptTokens: numberOrZero(providerUsage.prompt_tokens),
+          completionTokens: numberOrZero(providerUsage.completion_tokens),
+          ...(promptDetails !== undefined
             ? {
                 promptTokensDetails: {
-                  textTokens: data.usage.prompt_tokens_details.text_tokens,
-                  audioTokens: data.usage.prompt_tokens_details.audio_tokens,
+                  textTokens: optionalNumber(promptDetails.text_tokens),
+                  audioTokens: optionalNumber(promptDetails.audio_tokens),
                 },
               }
             : {}),
-          ...(data.usage.completion_tokens_details
+          ...(completionDetails !== undefined
             ? {
                 completionTokensDetails: {
-                  textTokens: data.usage.completion_tokens_details.text_tokens,
+                  textTokens: optionalNumber(completionDetails.text_tokens),
                 },
               }
             : {}),

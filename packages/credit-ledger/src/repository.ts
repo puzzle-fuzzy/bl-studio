@@ -368,7 +368,7 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
       validateText(input.idempotencyKey, 'idempotencyKey')
       const now = nowOrDefault(input.now)
       return options.db.transaction(async tx => {
-        const account = await ensureCreditAccountInTransaction(tx, { userId: input.userId, now })
+        await ensureCreditAccountInTransaction(tx, { userId: input.userId, now })
         const result = await appendMutation(tx, {
           account: await findLockedAccount(tx, input.userId),
           userId: input.userId,

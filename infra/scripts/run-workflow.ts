@@ -16,6 +16,7 @@ const commands: Record<Workflow, string[][]> = {
     ['run', 'check:db-migrations'],
     ['run', 'check:boundaries'],
     ['run', 'check:manifests'],
+    ['run', 'docs:bailian:snapshot:check'],
     ['run', 'lint'],
     ['run', 'typecheck:root'],
     ['run', 'typecheck'],

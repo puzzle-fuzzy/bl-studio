@@ -225,14 +225,17 @@ function findUniqueRoot(root: AliyunNavigationNode, alias: string): AliyunNaviga
   const matches: AliyunNavigationNode[] = []
   const pending = [root]
   while (pending.length > 0) {
-    const node = pending.pop()!
+    const node = pending.pop()
+    if (node === undefined) break
     if (node.alias === alias) matches.push(node)
     pending.push(...node.children)
   }
   if (matches.length !== 1) {
     throw new Error(`Official navigation root ${alias} matched ${matches.length} node(s)`)
   }
-  return matches[0]!
+  const [match] = matches
+  if (match === undefined) throw new Error(`Official navigation root ${alias} is missing`)
+  return match
 }
 
 export function discoverOfficialDocuments(
@@ -247,7 +250,8 @@ export function discoverOfficialDocuments(
     const root = findUniqueRoot(navigationRoot, rootAlias)
     const pending: Array<{ node: AliyunNavigationNode, path: string[] }> = [{ node: root, path: [root.title] }]
     while (pending.length > 0) {
-      const current = pending.pop()!
+      const current = pending.pop()
+      if (current === undefined) break
       const { node, path } = current
       for (const child of [...node.children].reverse()) {
         pending.push({ node: child, path: [...path, child.title] })
@@ -422,11 +426,15 @@ function markdownTable(node: HTMLElement): string {
   const rows = Array.from(node.querySelectorAll('tr'))
   const matrix: string[][] = []
   for (const [rowIndex, row] of rows.entries()) {
-    matrix[rowIndex] ??= []
+    let currentRow = matrix[rowIndex]
+    if (currentRow === undefined) {
+      currentRow = []
+      matrix[rowIndex] = currentRow
+    }
     let columnIndex = 0
     const cells = Array.from(row.children).filter(child => child.nodeName === 'TD' || child.nodeName === 'TH')
     for (const cell of cells) {
-      while (matrix[rowIndex]![columnIndex] !== undefined) columnIndex += 1
+      while (currentRow[columnIndex] !== undefined) columnIndex += 1
       const rowSpan = Math.max(1, Number.parseInt(cell.getAttribute('rowspan') ?? '1', 10) || 1)
       const columnSpan = Math.max(1, Number.parseInt(cell.getAttribute('colspan') ?? '1', 10) || 1)
       const value = (cell.textContent ?? '')
@@ -436,9 +444,13 @@ function markdownTable(node: HTMLElement): string {
         .trim()
         .replace(/\|/g, '\\|')
       for (let rowOffset = 0; rowOffset < rowSpan; rowOffset += 1) {
-        matrix[rowIndex + rowOffset] ??= []
+        let targetRow = matrix[rowIndex + rowOffset]
+        if (targetRow === undefined) {
+          targetRow = []
+          matrix[rowIndex + rowOffset] = targetRow
+        }
         for (let columnOffset = 0; columnOffset < columnSpan; columnOffset += 1) {
-          matrix[rowIndex + rowOffset]![columnIndex + columnOffset] = value
+          targetRow[columnIndex + columnOffset] = value
         }
       }
       columnIndex += columnSpan

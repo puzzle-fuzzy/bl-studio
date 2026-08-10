@@ -71,7 +71,6 @@ import {
   type TaskRecordRow,
 } from './mappers'
 import type {
-  AdminGalleryItem,
   CostMarginRow,
   ContentReport,
   ContentReportReason,
@@ -501,7 +500,9 @@ function refsFromRows(
   }
   const refs: GenerationAssetRefs = {}
   for (const parameterName of [...grouped.keys()].sort()) {
-    const ids = grouped.get(parameterName)!
+    const entries = grouped.get(parameterName)
+    if (entries === undefined) continue
+    const ids = entries
       .sort((left, right) => left.position - right.position)
       .map(({ assetId }) => assetId)
     refs[parameterName] = ids

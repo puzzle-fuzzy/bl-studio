@@ -37,8 +37,8 @@ try {
   if (current !== undefined) {
     const found = new Set(
       [...current.matchAll(/'([^']+)'/g)]
-        .map(match => match[1]!)
-        .filter(action => action.includes('.')),
+        .map(match => match[1])
+        .filter((action): action is string => action?.includes('.') === true),
     )
     const same =
       found.size === EXPECTED_ACTIONS.length && EXPECTED_ACTIONS.every(action => found.has(action))

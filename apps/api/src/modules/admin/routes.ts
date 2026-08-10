@@ -638,7 +638,7 @@ export function createAdminRoutes(deps: ApiDependencies) {
       }
     })
     .get('/api/admin/gallery/generations/:id/artifacts/:artifactId', async ({ request, params, set }) => {
-      const actor = await requireAdminUser(request, deps.authService)
+      await requireAdminUser(request, deps.authService)
       const { id, artifactId } = validateInput(AdminGalleryArtifactParamsSchema, params)
 
       const artifact = await deps.generationRepository.getAdminGalleryArtifact({ recordId: id, artifactId })

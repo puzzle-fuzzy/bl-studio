@@ -308,7 +308,7 @@ describe('TaskExecutor.processTask', () => {
   })
 
   it('fails an overdue artifact persistence task before touching storage', async () => {
-    const { repo, storage, processTask } = setup({ artifactPersistTimeoutMs: 1 })
+    const { storage, processTask } = setup({ artifactPersistTimeoutMs: 1 })
 
     const outcome = await processTask(makeTask({ type: 'artifact.persist', domain: 'artifact' }))
 

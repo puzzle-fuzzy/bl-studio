@@ -217,7 +217,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         throw error
       }
     })
-    .post('/reset-password', async ({ request, body, set }) => {
+    .post('/reset-password', async ({ request, body }) => {
       try {
         const input = validateInput(ResetPasswordSchema, body)
         await deps.authService.resetPassword(input.token, input.newPassword)

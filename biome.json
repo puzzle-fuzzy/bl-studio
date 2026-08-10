@@ -13,7 +13,36 @@
   "linter": {
     "enabled": true,
     "rules": {
-      "preset": "recommended"
+      "preset": "recommended",
+      "complexity": {
+        "useLiteralKeys": "off"
+      }
     }
-  }
+  },
+  "overrides": [
+    {
+      "includes": [
+        "**/*.test.{js,jsx,mjs,cjs,ts,tsx}",
+        "**/tests/**",
+        "e2e/**"
+      ],
+      "linter": {
+        "rules": {
+          "style": {
+            "noNonNullAssertion": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["infra/scripts/**", "e2e/**"],
+      "linter": {
+        "rules": {
+          "suspicious": {
+            "noUndeclaredEnvVars": "off"
+          }
+        }
+      }
+    }
+  ]
 }

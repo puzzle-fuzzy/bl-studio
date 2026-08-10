@@ -76,6 +76,6 @@ export function buildLoginUrl(returnTo: string, config: AuthCallbackConfig): str
  * 给开放重定向攻击留下绕过空间。
  */
 export function resolvePostLoginRedirect(rawCallback: string | null | undefined, fallback: string, allowedOrigins: readonly string[]): string {
-  if (isAllowedCallback(rawCallback, allowedOrigins)) return rawCallback!
-  return fallback
+  if (!isAllowedCallback(rawCallback, allowedOrigins)) return fallback
+  return rawCallback ?? fallback
 }

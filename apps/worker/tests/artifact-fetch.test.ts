@@ -143,7 +143,7 @@ describe('fetchProviderArtifact', () => {
 
   it('maps an aborted fetch after the deadline to a structured timeout', async () => {
     const fetchImpl: ArtifactFetch = async (_input, init) => {
-      await new Promise<void>((resolve, reject) => {
+      await new Promise<void>((_resolve, reject) => {
         init?.signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
       })
       throw new Error('unreachable')

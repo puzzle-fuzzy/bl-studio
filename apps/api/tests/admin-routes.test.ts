@@ -40,7 +40,7 @@ const fakeGenerationRepository = {
     audits.push(input)
     return {} as never
   },
-  listUnifiedAssets: async (userId: string, options: { limit?: number; kind?: string }) => {
+  listUnifiedAssets: async (_userId: string, options: { limit?: number; kind?: string }) => {
     const count = options.limit ?? 1
     return {
       items: Array.from({ length: count }, (_, i) => ({
