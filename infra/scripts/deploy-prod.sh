@@ -156,6 +156,8 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg VITE_LEGAL_CONTACT_EMAIL="$LEGAL_CONTACT_EMAIL" \
   --build-arg VITE_LEGAL_EFFECTIVE_DATE="$LEGAL_EFFECTIVE_DATE" \
   -t "bailian-studio-web:$SHA" .
+EXPECTED_INDEX_ASSET="$(docker run --rm --entrypoint sh "bailian-studio-web:$SHA" -c "grep -oE '/assets/index-[A-Za-z0-9_-]+\\.js' /usr/share/nginx/html/index.html | head -n 1")"
+[[ -n "$EXPECTED_INDEX_ASSET" ]] || fail "无法从 web 镜像读取 index bundle"
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile.backup \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   -t "bailian-studio-backup:$SHA" .
@@ -230,6 +232,7 @@ done
 [[ -n "$smoke_ok" ]] || fail "公网冒烟未通过（检查 DNS / 80/443 开放 / 宿主机 nginx 日志）"
 
 # ── 清理 ─────────────────────────────────────────────────────────
+bash "$REPO_ROOT/infra/scripts/verify-web-release.sh" "$EXPECTED_INDEX_ASSET" "$SITE_DOMAIN" "$SERVER_HOST"
 rm -f "images-$SHA.tar"
 ssh_cmd "rm -f $DEPLOY_REMOTE_DIR/images-$SHA.tar; docker image prune -f >/dev/null 2>&1 || true"
 

@@ -29,6 +29,9 @@ DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM)"
 DEPLOY_REMOTE_DIR="${DEPLOY_REMOTE_DIR:-/opt/bailian-studio}"
 DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
+SERVER_HOST="${DEPLOY_HOST##*@}"
+SSH_RESOLVED_HOST="$(ssh -G "$DEPLOY_HOST" 2>/dev/null | awk '$1=="hostname" {print $2; exit}' || true)"
+SERVER_HOST="${SSH_RESOLVED_HOST:-$SERVER_HOST}"
 
 ssh_cmd() {
   if [[ -n "$DEPLOY_SSH_KEY" ]]; then ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
@@ -47,6 +50,8 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg VITE_LEGAL_CONTACT_EMAIL="$LEGAL_CONTACT_EMAIL" \
   --build-arg VITE_LEGAL_EFFECTIVE_DATE="$LEGAL_EFFECTIVE_DATE" \
   -t "bailian-studio-web:$SHA" .
+EXPECTED_INDEX_ASSET="$(docker run --rm --entrypoint sh "bailian-studio-web:$SHA" -c "grep -oE '/assets/index-[A-Za-z0-9_-]+\\.js' /usr/share/nginx/html/index.html | head -n 1")"
+[[ -n "$EXPECTED_INDEX_ASSET" ]] || { echo "无法从 web 镜像读取 index bundle" >&2; exit 1; }
 
 echo "==> 传输 web 镜像（约 20MB）"
 docker save -o "web-$SHA.tar" "bailian-studio-web:$SHA"
@@ -54,5 +59,6 @@ rsync -az "web-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
 
 echo "==> 服务器 load + 重建 web 容器"
 ssh_cmd "docker load -i $DEPLOY_REMOTE_DIR/web-$SHA.tar && rm -f $DEPLOY_REMOTE_DIR/web-$SHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$SHA docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml up -d --no-deps web"
+bash "$REPO_ROOT/infra/scripts/verify-web-release.sh" "$EXPECTED_INDEX_ASSET" "$SITE_DOMAIN" "$SERVER_HOST"
 
 echo "==> web 已更新（tag ${SHA:0:12}）"
