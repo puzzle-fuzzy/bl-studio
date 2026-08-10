@@ -118,7 +118,14 @@ export async function uploadAsset(args: {
 
   // P1-16：适配器支持流式时直接 pipeTo（大上传不整块载入内存），并传入准确长度，
   // 让 OSS 适配器避免 chunked PUT；否则退化缓冲写。
-  const stored = storage.writeObjectStream !== undefined
+  const stored = storage.writeObjectMultipart !== undefined
+    ? await storage.writeObjectMultipart({
+        key,
+        file,
+        contentType: mimeType,
+        byteSize: file.size,
+      })
+    : storage.writeObjectStream !== undefined
     ? await storage.writeObjectStream({
         key,
         stream: file.stream(),

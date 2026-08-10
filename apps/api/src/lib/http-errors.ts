@@ -10,6 +10,7 @@ import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bail
 import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
 import { CreditLedgerError, type CreditLedgerErrorCode } from '@bailian-studio/credit-ledger'
 import { ValidationError } from '@bailian-studio/shared'
+import { StorageError } from '@bailian-studio/storage'
 import { ZodError } from 'zod'
 import { getRequestTrace } from './middleware'
 import { RequestBodyTooLargeError } from './request-guards'
@@ -90,6 +91,11 @@ const CREDIT_LEDGER_STATUS: Record<CreditLedgerErrorCode, number> = {
   POINTS_DATABASE_ERROR: 500,
 }
 
+const STORAGE_STATUS = {
+  STORAGE_UPLOAD_TIMEOUT: 504,
+  STORAGE_UPLOAD_NETWORK_ERROR: 503,
+} as const
+
 export function httpStatusForError(error: unknown): number {
   if (requestBodyTooLargeError(error) !== undefined) {
     return 413
@@ -108,6 +114,9 @@ export function httpStatusForError(error: unknown): number {
   }
   if (error instanceof ValidationError) {
     return 400
+  }
+  if (error instanceof StorageError) {
+    return STORAGE_STATUS[error.code]
   }
   if (error instanceof ZodError) {
     return 400
@@ -206,6 +215,10 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   if (error instanceof ValidationError) {
     const message = error.field !== undefined ? `${error.field}: ${error.message}` : error.message
     return { success: false, error: { code: 'VALIDATION_ERROR', message } }
+  }
+
+  if (error instanceof StorageError) {
+    return { success: false, error: { code: error.code, message: error.message } }
   }
 
   if (error instanceof ZodError) {

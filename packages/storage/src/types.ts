@@ -26,6 +26,29 @@ export interface StorageWriteStreamInput {
   contentLength?: number
 }
 
+/** 可回放的文件写入请求，供支持分片/重试的存储后端使用。 */
+export interface StorageWriteFileInput {
+  key: string
+  file: Blob
+  contentType?: string
+  byteSize: number
+}
+
+export type StorageErrorCode = 'STORAGE_UPLOAD_TIMEOUT' | 'STORAGE_UPLOAD_NETWORK_ERROR'
+
+/** 对外暴露稳定错误码，同时保留原始错误供服务端日志和诊断使用。 */
+export class StorageError extends Error {
+  readonly name = 'StorageError'
+
+  constructor(
+    readonly code: StorageErrorCode,
+    message: string,
+    options?: { cause?: unknown },
+  ) {
+    super(message, options)
+  }
+}
+
 /** 写入结果：实际使用的 key、可访问的 url（可能为空）、字节数。 */
 export interface StorageWriteResult {
   provider: StorageProvider
@@ -83,6 +106,8 @@ export interface StorageAdapter {
    * 入参流不要求可回放，适配器必须单遍消费。
    */
   writeObjectStream?(input: StorageWriteStreamInput): Promise<StorageWriteResult>
+  /** 支持文件回放的存储后端可使用分片上传，避免单个不可重试的长连接。 */
+  writeObjectMultipart?(input: StorageWriteFileInput): Promise<StorageWriteResult>
   /** 对配置后端执行可选连通性/就绪探测。 */
   healthCheck?(): Promise<void>
   /** worker 侧媒体处理使用的可选读能力。 */

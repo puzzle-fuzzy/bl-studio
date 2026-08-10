@@ -15,8 +15,12 @@ export {
   OSS_VIDEO_SNAPSHOT_PROCESS,
   OSS_MIN_EXPIRES_SECONDS,
   OSS_MAX_EXPIRES_SECONDS,
+  DEFAULT_OSS_MULTIPART_PART_SIZE_BYTES,
+  DEFAULT_OSS_MULTIPART_PARALLEL,
+  DEFAULT_OSS_RETRY_MAX,
   type CreateOssClientOptions,
   type OssClientLike,
   type OssStorageAdapterOptions,
 } from './oss'
-export type { StorageAdapter, StorageDeleteInput, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
+export { StorageError } from './types'
+export type { StorageAdapter, StorageDeleteInput, StorageErrorCode, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteFileInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'

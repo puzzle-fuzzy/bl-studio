@@ -49,6 +49,19 @@ class TestStorage implements StorageAdapter {
   }
 }
 
+class MultipartTestStorage extends TestStorage {
+  multipartKeys: string[] = []
+  multipartContentTypes: Array<string | undefined> = []
+
+  async writeObjectMultipart(input: { key: string; file: Blob; contentType?: string; byteSize: number }): Promise<StorageWriteResult> {
+    this.multipartKeys.push(input.key)
+    this.multipartContentTypes.push(input.contentType)
+    const body = new Uint8Array(await input.file.arrayBuffer())
+    expect(body.byteLength).toBe(input.byteSize)
+    return { provider: 'local', key: input.key, byteSize: body.byteLength, url: `/stored/${input.key}` }
+  }
+}
+
 describe('asset media duration validation', () => {
   it('parses format duration and falls back to audio/video stream durations', () => {
     expect(parseMediaDuration(JSON.stringify({ format: { duration: '12.5' } }))).toBe(12.5)
@@ -132,6 +145,25 @@ describe('asset upload streaming and magic-number validation', () => {
     expect(storage.streamedKeys).toHaveLength(1)
     expect(storage.streamedKeys[0]).toMatch(/^user_uploads\/user_1\//)
     expect(storage.streamedContentLengths).toEqual([PNG_MAGIC.length])
+  })
+
+  it('prefers multipart upload when the adapter supports replayable files', async () => {
+    const storage = new MultipartTestStorage()
+    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+
+    await uploadAsset({
+      file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
+      userId: 'user_1',
+      kindParam: null,
+      storage,
+      repository,
+      config: testAssetConfig,
+    })
+
+    expect(storage.multipartKeys).toHaveLength(1)
+    expect(storage.multipartKeys[0]).toMatch(/^user_uploads\/user_1\//)
+    expect(storage.multipartContentTypes).toEqual(['image/png'])
+    expect(storage.streamedKeys).toHaveLength(0)
   })
 
   it('rejects media whose magic number does not match the declared type', async () => {
