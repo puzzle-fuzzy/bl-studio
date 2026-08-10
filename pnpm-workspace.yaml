@@ -2,6 +2,9 @@ packages:
   - apps/*
   - packages/*
 
+onlyBuiltDependencies:
+  - esbuild
+
 # 共享依赖版本中心。取 npm 最新稳定版；新增共享依赖时在此登记，包内引用 "catalog:"。
 catalog:
   "@node-rs/argon2": ^2.0.2
