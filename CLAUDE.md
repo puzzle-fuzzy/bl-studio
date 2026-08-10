@@ -25,10 +25,14 @@ pnpm run verify           # check:db-migrations + boundaries + manifests + typec
 pnpm run check:boundaries # 包边界
 pnpm run check:manifests  # manifest 一致性
 pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 infra/scripts/check-db-migrations.ts）
-# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库）：
+# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库；
+# 脚本通过 dotenv-cli 注入连接串，兼容 Windows，不要在命令行内联 DATABASE_URL）：
 # 改了 schema.ts 后正式流程是 `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 提交迁移，
 # 生产/CI 一律走 `db:migrate`（db:migrate:test / db:migrate:production）——push 掩盖漂移正是 P0-06 要堵的。
 ```
+
+Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和测试命令；生产
+`deploy:*`、备份与观测脚本仍要求 Linux/WSL（Bash、rsync、Linux 远程命令）。
 
 ## 生产部署（做部署前必读）
 
