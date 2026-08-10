@@ -7,6 +7,7 @@ import { parseDirectorAnalysisOutput } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
+import { continuityPrompt, parseDirectorContinuityOutput, type DirectorContinuityShotInput } from './director-continuity'
 import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary, type DirectorVideoGenerationProgress, type DirectorVideoShotSnapshot } from './director-video'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
@@ -85,6 +86,9 @@ export async function processDirectorPhaseTask(
   }
   if (run.phase === 'storyboard') {
     return processStoryboardPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase === 'continuity') {
+    return processContinuityPhase(run, task, deps, modelId, task.userId, snapshot)
   }
   if (run.phase === 'videos') {
     return processVideosPhase(run, task, deps, modelId, task.userId, snapshot)
@@ -506,6 +510,113 @@ async function processStoryboardPhase(
   return retryUntilGenerationCompletes(task, `Storyboard generation is ${generation.status}`, 'DIRECTOR_STORYBOARD')
 }
 
+async function processContinuityPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const shots = readContinuityShotInputs(snapshot.shots)
+  if (shots.length === 0) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'No storyboard shots were captured for continuity review',
+      retriable: false,
+      code: 'DIRECTOR_CONTINUITY_SHOTS_MISSING',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: continuityPrompt(snapshot.title, snapshot.synopsis, shots),
+          maxTokens: 4_096,
+          temperature: 0.2,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:continuity`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director continuity generation is queued', 'DIRECTOR_CONTINUITY')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_CONTINUITY_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Continuity generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_CONTINUITY_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const continuityText = readTextOutput(generation.outputResult)
+    if (continuityText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Continuity generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_CONTINUITY_OUTPUT_MISSING',
+      }, deps)
+    }
+    const continuity = parseDirectorContinuityOutput(continuityText)
+    if (continuity === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Continuity generation returned text that does not match the Director continuity contract',
+        retriable: false,
+        code: 'DIRECTOR_CONTINUITY_OUTPUT_INVALID',
+      }, deps)
+    }
+    const shotSequences = new Map(shots.map(shot => [shot.id, shot.sequence]))
+    if (continuity.issues.some(issue => shotSequences.get(issue.shotId) !== issue.sequence)) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Continuity output referenced an unknown storyboard shot or mismatched its sequence',
+        retriable: false,
+        code: 'DIRECTOR_CONTINUITY_OUTPUT_SCOPE_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, continuityText, continuity }, deps, continuityText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Continuity generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_CONTINUITY_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Continuity generation is ${generation.status}`, 'DIRECTOR_CONTINUITY')
+}
+
 async function processVideosPhase(
   run: DirectorPhaseRunForWorker,
   task: TaskRecord,
@@ -757,6 +868,26 @@ function readVideoShotSnapshots(value: unknown): DirectorVideoShotSnapshot[] {
   })
 }
 
+function readContinuityShotInputs(value: unknown): DirectorContinuityShotInput[] {
+  if (!Array.isArray(value)) return []
+  return value.flatMap(candidate => {
+    if (!isRecord(candidate) || typeof candidate.id !== 'string' || typeof candidate.sequence !== 'number' || typeof candidate.narrative !== 'string') return []
+    return [{
+      id: candidate.id,
+      sequence: candidate.sequence,
+      sceneNumber: typeof candidate.sceneNumber === 'number' ? candidate.sceneNumber : null,
+      slugline: typeof candidate.slugline === 'string' ? candidate.slugline : null,
+      narrative: candidate.narrative,
+      camera: isRecord(candidate.camera) ? candidate.camera : {},
+      durationSeconds: typeof candidate.durationSeconds === 'number' ? candidate.durationSeconds : null,
+      environmentPrompt: typeof candidate.environmentPrompt === 'string' ? candidate.environmentPrompt : null,
+      videoPrompt: typeof candidate.videoPrompt === 'string' ? candidate.videoPrompt : null,
+      dialogue: candidate.dialogue === null || isRecord(candidate.dialogue) ? candidate.dialogue : null,
+      continuity: candidate.continuity === null || isRecord(candidate.continuity) ? candidate.continuity : null,
+    }]
+  })
+}
+
 interface RunInputSnapshot {
   title: string
   synopsis: string | null
@@ -907,6 +1038,10 @@ function failed(error: TaskError): TaskProcessOutcome {
 function stringInput(input: Record<string, unknown>, key: string): string | undefined {
   const value = input[key]
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 function staleRunError(status: string): TaskError {

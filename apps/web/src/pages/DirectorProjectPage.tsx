@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorCharactersResult, DirectorContinuityResult, DirectorLocationsResult, DirectorProjectDetail, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
-import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -76,6 +76,7 @@ export function DirectorProjectPage() {
   const [charactersModelId, setCharactersModelId] = useState('')
   const [locationsModelId, setLocationsModelId] = useState('')
   const [storyboardModelId, setStoryboardModelId] = useState('')
+  const [continuityModelId, setContinuityModelId] = useState('')
   const [videoModelId, setVideoModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
   const [activePhase, setActivePhase] = useState<DirectorPhase>()
@@ -93,6 +94,9 @@ export function DirectorProjectPage() {
   const [locationsText, setLocationsText] = useState<string>()
   const [locationsResult, setLocationsResult] = useState<DirectorLocationsResult>()
   const [locationsStale, setLocationsStale] = useState(false)
+  const [continuityText, setContinuityText] = useState<string>()
+  const [continuityResult, setContinuityResult] = useState<DirectorContinuityResult>()
+  const [continuityStale, setContinuityStale] = useState(false)
   const [referencePickerOpen, setReferencePickerOpen] = useState(false)
   const [referenceTarget, setReferenceTarget] = useState<ReferenceTarget>()
   const referenceAssets = useReferenceAssetsStore(state => state.assets)
@@ -143,6 +147,12 @@ export function DirectorProjectPage() {
   }, [storyboardModelId, textModels])
 
   useEffect(() => {
+    if (continuityModelId.length > 0 && textModels.some(model => model.id === continuityModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setContinuityModelId(preferred.id)
+  }, [continuityModelId, textModels])
+
+  useEffect(() => {
     if (videoModelId.length > 0 && videoModels.some(model => model.id === videoModelId)) return
     const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
     if (preferred !== undefined) setVideoModelId(preferred.id)
@@ -170,11 +180,15 @@ export function DirectorProjectPage() {
         setLocationsText(undefined)
         setLocationsResult(undefined)
         setLocationsStale(false)
+        setContinuityText(undefined)
+        setContinuityResult(undefined)
+        setContinuityStale(false)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
+        const continuityState = next.phases.find(state => state.phase === 'continuity')
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
           setActivePhase('analyze')
@@ -236,6 +250,17 @@ export function DirectorProjectPage() {
             })
             .catch(() => {})
         }
+        if (continuityState?.lastRunId !== null && continuityState?.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'continuity', continuityState.lastRunId)
+            .then(run => {
+              if (cancelled || run.status !== 'succeeded') return
+              if (typeof run.outputSummary?.continuityText === 'string') setContinuityText(run.outputSummary.continuityText)
+              setContinuityStale(run.staleAt !== null)
+              const parsed = DirectorContinuityResultSchema.safeParse(run.outputSummary?.continuity)
+              if (parsed.success) setContinuityResult(parsed.data)
+            })
+            .catch(() => {})
+        }
       })
       .catch(() => {
         if (!cancelled) setError('项目不存在，或你没有访问权限。')
@@ -281,6 +306,12 @@ export function DirectorProjectPage() {
             const parsed = DirectorLocationsResultSchema.safeParse(run.outputSummary?.locations)
             if (parsed.success) setLocationsResult(parsed.data)
           }
+          if (run.status === 'succeeded' && activePhase === 'continuity') {
+            if (typeof run.outputSummary?.continuityText === 'string') setContinuityText(run.outputSummary.continuityText)
+            setContinuityStale(false)
+            const parsed = DirectorContinuityResultSchema.safeParse(run.outputSummary?.continuity)
+            if (parsed.success) setContinuityResult(parsed.data)
+          }
           setActiveRunId(undefined)
           setActivePhase(undefined)
           const phaseLabel = activePhase === 'analyze'
@@ -291,7 +322,9 @@ export function DirectorProjectPage() {
                 ? '场景阶段'
                 : activePhase === 'storyboard'
                   ? '分镜阶段'
-                  : '视频生成阶段'
+                  : activePhase === 'continuity'
+                    ? '连续性检查'
+                    : '视频生成阶段'
           toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
             ? `${phaseLabel}已完成`
             : `${phaseLabel}未完成，请查看阶段状态`)
@@ -398,6 +431,27 @@ export function DirectorProjectPage() {
       toast.success('分镜阶段已加入执行队列')
     } catch {
       toast.error('无法启动分镜阶段，请确认分析、角色和场景都已完成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const runContinuity = async () => {
+    if (id === undefined || continuityModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'continuity', { modelId: continuityModelId })
+      setActiveRunId(run.id)
+      setActivePhase('continuity')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'continuity'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('连续性检查已加入执行队列')
+    } catch {
+      toast.error('无法启动连续性检查，请确认分镜已经生成')
     } finally {
       setSaving(false)
     }
@@ -807,6 +861,30 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
+        <TabsContent value="continuity" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-5">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">人工复核</span>
+                <h2 className="text-xl font-semibold">连续性检查</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">检查角色、场景、时间、动作和镜头之间是否存在会影响拍摄或视频生成的衔接风险。结果只作为建议，不会自动修改已审核分镜。</p>
+              </div>
+              <DirectorContinuityReview result={continuityResult} rawText={continuityText} stale={continuityStale} />
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['continuity']}
+              modelId={continuityModelId}
+              textModels={textModels}
+              running={activePhase === 'continuity' && activeRunId !== undefined}
+              onModelChange={setContinuityModelId}
+              onRunPhase={() => void runContinuity()}
+              runLabel="检查分镜连续性"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
         <TabsContent value="videos" className="mt-6">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <section className="flex flex-col gap-5">
@@ -841,7 +919,7 @@ export function DirectorProjectPage() {
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'videos').map(tab => (
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters' && tab.value !== 'locations' && tab.value !== 'references' && tab.value !== 'storyboard' && tab.value !== 'continuity' && tab.value !== 'videos').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -901,6 +979,59 @@ export function DirectorProjectPage() {
       </Dialog>
     </>
   )
+}
+
+function DirectorContinuityReview({ result, rawText, stale = false }: { result?: DirectorContinuityResult; rawText?: string; stale?: boolean }) {
+  if (result === undefined) {
+    return (
+      <section className={`flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">连续性结论</h2>
+          {stale ? <Badge variant="outline">已过时，仅供参考</Badge> : <span className="text-xs text-muted-foreground">等待执行结果</span>}
+        </div>
+        {rawText !== undefined && <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>}
+        {rawText === undefined && <p className="text-sm leading-7 text-muted-foreground">执行连续性检查后，这里会显示结构化风险和修正建议。</p>}
+      </section>
+    )
+  }
+
+  return (
+    <section className={`flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5 ${stale ? 'opacity-70 grayscale' : ''}`}>
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">连续性结论</h2>
+        <div className="flex items-center gap-2">
+          {stale && <Badge variant="outline">已过时，仅供参考</Badge>}
+          <Badge variant="secondary">{result.issues.length} 条建议</Badge>
+        </div>
+      </div>
+      <p className="text-sm leading-7">{result.summary}</p>
+      {result.issues.length === 0 ? (
+        <p className="text-sm leading-7 text-muted-foreground">暂未发现需要人工处理的连续性问题。</p>
+      ) : (
+        <div className="flex flex-col gap-3">
+          {result.issues.map(issue => (
+            <article key={`${issue.shotId}-${issue.sequence}-${issue.category}-${issue.issue}`} className="flex flex-col gap-2 bg-background/60 px-4 py-4">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-xs tabular-nums text-muted-foreground">镜头 {String(issue.sequence).padStart(2, '0')}</span>
+                <Badge variant={continuitySeverityVariant(issue.severity)}>{continuitySeverityLabel(issue.severity)}</Badge>
+                <span className="text-xs text-muted-foreground">{issue.category}</span>
+              </div>
+              <p className="text-sm leading-6">{issue.issue}</p>
+              <p className="text-sm leading-6 text-muted-foreground">建议：{issue.suggestion}</p>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
+function continuitySeverityLabel(severity: 'info' | 'warning' | 'error'): string {
+  return severity === 'error' ? '必须处理' : severity === 'warning' ? '建议处理' : '提示'
+}
+
+function continuitySeverityVariant(severity: 'info' | 'warning' | 'error'): 'default' | 'secondary' | 'outline' | 'destructive' {
+  return severity === 'error' ? 'destructive' : severity === 'warning' ? 'secondary' : 'outline'
 }
 
 function DirectorVideoShotList({ project, assetItems, onRetry, retryingShotId }: { project: DirectorProjectDetail; assetItems: Record<string, AssetItem>; onRetry: (shotId: string) => void; retryingShotId?: string }) {

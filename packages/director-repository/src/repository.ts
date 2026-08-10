@@ -1603,6 +1603,37 @@ export function createDirectorRepository({
 					inputSnapshot.analysis = analysis;
 					inputSnapshot.characters = characters;
 					inputSnapshot.locations = locations;
+				} else if (input.phase === "continuity") {
+					const shotRows = await tx
+						.select({
+							id: directorShots.id,
+							sequence: directorShots.sequence,
+							sceneNumber: directorShots.sceneNumber,
+							slugline: directorShots.slugline,
+							narrative: directorShots.narrative,
+							camera: directorShots.cameraJson,
+							durationSeconds: directorShots.durationSeconds,
+							environmentPrompt: directorShots.environmentPrompt,
+							videoPrompt: directorShots.videoPrompt,
+							dialogue: directorShots.dialogueJson,
+							continuity: directorShots.continuityJson,
+						})
+						.from(directorShots)
+						.where(
+							and(
+								eq(directorShots.projectId, input.projectId),
+								isNull(directorShots.deletedAt),
+								isNull(directorShots.staleAt),
+							),
+						)
+						.orderBy(directorShots.sequence);
+					if (shotRows.length === 0) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A storyboard with at least one current shot is required before continuity review",
+						);
+					}
+					inputSnapshot.shots = shotRows;
 				} else if (input.phase === "videos") {
 					const shotConditions = [
 						eq(directorShots.projectId, input.projectId),

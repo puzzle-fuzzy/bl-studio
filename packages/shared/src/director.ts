@@ -168,6 +168,20 @@ export const DirectorStoryboardResultSchema = z.object({
   shots: z.array(DirectorShotDraftSchema).max(500),
 }).strict()
 
+export const DirectorContinuityIssueSchema = z.object({
+  shotId: z.string(),
+  sequence: z.number().int().positive(),
+  severity: z.enum(['info', 'warning', 'error']),
+  category: z.string().min(1).max(80),
+  issue: z.string().min(1).max(2_000),
+  suggestion: z.string().min(1).max(2_000),
+}).strict()
+
+export const DirectorContinuityResultSchema = z.object({
+  summary: z.string().min(1).max(4_000),
+  issues: z.array(DirectorContinuityIssueSchema).max(500),
+}).strict()
+
 export const DirectorAssetSchema = z.object({
   id: z.string(),
   projectId: z.string(),
@@ -425,5 +439,7 @@ export type AttachDirectorAssetInput = z.infer<typeof AttachDirectorAssetSchema>
 export type DirectorShot = z.infer<typeof DirectorShotSchema>
 export type DirectorShotDraft = z.infer<typeof DirectorShotDraftSchema>
 export type DirectorStoryboardResult = z.infer<typeof DirectorStoryboardResultSchema>
+export type DirectorContinuityIssue = z.infer<typeof DirectorContinuityIssueSchema>
+export type DirectorContinuityResult = z.infer<typeof DirectorContinuityResultSchema>
 export type UpdateDirectorShotInput = z.infer<typeof UpdateDirectorShotSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>
