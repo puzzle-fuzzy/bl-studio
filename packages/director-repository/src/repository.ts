@@ -301,32 +301,82 @@ export function createDirectorRepository({
 
 		async updateProject(input: UpdateDirectorProjectRepositoryInput) {
 			const patch = input.patch;
-			const values = {
-				...(patch.title !== undefined ? { title: patch.title } : {}),
-				...(patch.storyText !== undefined
-					? { storyText: patch.storyText }
-					: {}),
-				...(patch.synopsis !== undefined ? { synopsis: patch.synopsis } : {}),
-				updatedBy: input.userId,
-				updatedAt: new Date(),
-			};
-			const updated = await db
-				.update(directorProjects)
-				.set(values)
-				.where(
-					and(
-						eq(directorProjects.id, input.projectId),
-						eq(directorProjects.userId, input.userId),
-						isNull(directorProjects.deletedAt),
-					),
-				)
-				.returning({ id: directorProjects.id });
-			if (updated[0] === undefined) {
-				throw new DirectorRepositoryError(
-					"DIRECTOR_PROJECT_NOT_FOUND",
-					`Director project not found: ${input.projectId}`,
-				);
-			}
+			const now = new Date();
+			await db.transaction(async (tx) => {
+				const [current] = await tx
+					.select()
+					.from(directorProjects)
+					.where(
+						and(
+							eq(directorProjects.id, input.projectId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (current === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PROJECT_NOT_FOUND",
+						`Director project not found: ${input.projectId}`,
+					);
+				}
+
+				const contentChanged =
+					(patch.title !== undefined && patch.title !== current.title) ||
+					(patch.storyText !== undefined && patch.storyText !== current.storyText) ||
+					(patch.synopsis !== undefined && patch.synopsis !== current.synopsis);
+				if (contentChanged) {
+					const [activeRun] = await tx
+						.select({ id: directorPhaseRuns.id })
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								inArray(directorPhaseRuns.status, ["pending", "running"]),
+							),
+						)
+						.limit(1);
+					if (activeRun !== undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PROJECT_ACTIVE_RUN",
+							"Project content cannot change while a director phase is running",
+						);
+					}
+				}
+
+				await tx
+					.update(directorProjects)
+					.set({
+						...(patch.title !== undefined ? { title: patch.title } : {}),
+						...(patch.storyText !== undefined ? { storyText: patch.storyText } : {}),
+						...(patch.synopsis !== undefined ? { synopsis: patch.synopsis } : {}),
+						updatedBy: input.userId,
+						updatedAt: now,
+					})
+					.where(eq(directorProjects.id, input.projectId));
+
+				if (contentChanged) {
+					await tx
+						.update(directorPhaseStates)
+						.set({
+							status: "not_started",
+							activeRunId: null,
+							lastErrorJson: null,
+							updatedBy: input.userId,
+							updatedAt: now,
+						})
+						.where(eq(directorPhaseStates.projectId, input.projectId));
+					await tx
+						.update(directorPhaseStates)
+						.set({ status: "ready", updatedBy: input.userId, updatedAt: now })
+						.where(
+							and(
+								eq(directorPhaseStates.projectId, input.projectId),
+								eq(directorPhaseStates.phase, DIRECTOR_PHASES[0]),
+							),
+						);
+				}
+			});
 			const project = await this.getProject({
 				userId: input.userId,
 				projectId: input.projectId,
@@ -386,6 +436,38 @@ export function createDirectorRepository({
 					);
 				}
 
+				const inputSnapshot: Record<string, unknown> = {
+					phase: input.phase,
+					modelId: input.modelId,
+					title: project.title,
+					storyText: project.storyText,
+					synopsis: project.synopsis,
+					settings: project.settingsJson,
+				};
+				if (input.phase === "characters") {
+					const [sourceRun] = await tx
+						.select()
+						.from(directorPhaseRuns)
+						.where(
+							and(
+								eq(directorPhaseRuns.projectId, input.projectId),
+								eq(directorPhaseRuns.phase, "analyze"),
+								eq(directorPhaseRuns.status, "succeeded"),
+							),
+						)
+						.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id))
+						.limit(1);
+					const analysis = sourceRun?.outputSummaryJson?.analysis;
+					if (sourceRun === undefined || analysis === undefined) {
+						throw new DirectorRepositoryError(
+							"DIRECTOR_PHASE_INPUT_NOT_READY",
+							"A succeeded screenplay analysis is required before generating characters",
+						);
+					}
+					inputSnapshot.sourceRunId = sourceRun.id;
+					inputSnapshot.analysis = analysis;
+				}
+
 				const version = state.version + 1;
 				const [run] = await tx
 					.insert(directorPhaseRuns)
@@ -395,14 +477,7 @@ export function createDirectorRepository({
 						phase: input.phase,
 						status: "pending",
 						version,
-						inputSnapshotJson: {
-							phase: input.phase,
-							modelId: input.modelId,
-							title: project.title,
-							storyText: project.storyText,
-							synopsis: project.synopsis,
-							settings: project.settingsJson,
-						},
+						inputSnapshotJson: inputSnapshot,
 						taskId,
 						createdBy: input.userId,
 						updatedBy: input.userId,

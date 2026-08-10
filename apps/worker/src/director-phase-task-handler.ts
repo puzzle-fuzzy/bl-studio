@@ -1,9 +1,10 @@
 import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
-import type { Logger } from '@bailian-studio/shared'
+import { DirectorAnalysisResultSchema, type DirectorAnalysisResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { parseDirectorAnalysisOutput } from './director-analysis'
+import { parseDirectorCharactersOutput } from './director-characters'
 import type { TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 9_000
@@ -54,14 +55,6 @@ export async function processDirectorPhaseTask(
   const modelId = stringInput(task.input, 'modelId') ?? stringInput(run.outputSummary ?? {}, 'modelId')
   const snapshot = runInputSnapshot(run)
 
-  if (run.phase !== 'analyze') {
-    return failPhase(run.id, {
-      category: 'validation',
-      message: `Director phase is not implemented yet: ${run.phase}`,
-      retriable: false,
-      code: 'DIRECTOR_PHASE_NOT_IMPLEMENTED',
-    }, deps)
-  }
   if (modelId === undefined) {
     return failPhase(run.id, {
       category: 'validation',
@@ -76,6 +69,17 @@ export async function processDirectorPhaseTask(
       message: 'Director phase task is missing its owner',
       retriable: false,
       code: 'DIRECTOR_USER_ID_REQUIRED',
+    }, deps)
+  }
+  if (run.phase === 'characters') {
+    return processCharactersPhase(run, task, deps, modelId, task.userId, snapshot)
+  }
+  if (run.phase !== 'analyze') {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Director phase is not implemented yet: ${run.phase}`,
+      retriable: false,
+      code: 'DIRECTOR_PHASE_NOT_IMPLEMENTED',
     }, deps)
   }
   if (snapshot.storyText.length > MAX_ANALYSIS_STORY_LENGTH) {
@@ -151,7 +155,7 @@ export async function processDirectorPhaseTask(
         code: 'DIRECTOR_ANALYSIS_OUTPUT_INVALID',
       }, deps)
     }
-    return completePhase(run.id, { generationId, modelId, analysisText, analysis }, deps)
+    return completePhase(run.id, { generationId, modelId, analysisText, analysis }, deps, analysisText)
   }
   if (generation.status === 'failed' || generation.status === 'cancelled') {
     return failPhase(run.id, {
@@ -167,16 +171,126 @@ export async function processDirectorPhaseTask(
   return retryUntilGenerationCompletes(task, `Analysis generation is ${generation.status}`)
 }
 
-function runInputSnapshot(run: DirectorPhaseRunForWorker): {
+async function processCharactersPhase(
+  run: DirectorPhaseRunForWorker,
+  task: TaskRecord,
+  deps: DirectorPhaseTaskHandlerDeps,
+  modelId: string,
+  userId: string,
+  snapshot: RunInputSnapshot,
+): Promise<TaskProcessOutcome> {
+  const analysisResult = DirectorAnalysisResultSchema.safeParse(snapshot.analysis)
+  if (!analysisResult.success) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: 'A validated screenplay analysis is required before generating characters',
+      retriable: false,
+      code: 'DIRECTOR_CHARACTERS_INPUT_INVALID',
+    }, deps)
+  }
+  if (snapshot.storyText.length > MAX_ANALYSIS_STORY_LENGTH) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Screenplay is too long for the first characters executor (${MAX_ANALYSIS_STORY_LENGTH} characters maximum)`,
+      retriable: false,
+      code: 'DIRECTOR_CHARACTERS_INPUT_TOO_LONG',
+    }, deps)
+  }
+
+  const generationId = stringInput(run.outputSummary ?? {}, 'generationId')
+  if (generationId === undefined) {
+    try {
+      const generation = await deps.repository.createGeneration({
+        userId,
+        modelId,
+        params: {
+          prompt: charactersPrompt(snapshot, analysisResult.data),
+          maxTokens: 4_096,
+          temperature: 0.4,
+          topP: 0.8,
+        },
+        idempotencyKey: `director:${run.id}:characters`,
+        traceId: task.traceId,
+      })
+      await deps.directorRepository?.setPhaseRunProgress({
+        runId: run.id,
+        outputSummary: { generationId: generation.record.id, modelId },
+      })
+      deps.logger.info('director.phase_generation_queued', {
+        taskId: task.id,
+        phaseRunId: run.id,
+        generationId: generation.record.id,
+        phase: run.phase,
+      })
+      return retryUntilGenerationCompletes(task, 'Director character generation is queued', 'DIRECTOR_CHARACTERS')
+    } catch (error) {
+      return failPhase(run.id, {
+        category: 'validation',
+        message: error instanceof Error ? error.message : String(error),
+        retriable: false,
+        code: 'DIRECTOR_CHARACTERS_GENERATION_CREATE_FAILED',
+      }, deps)
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failPhase(run.id, {
+      category: 'validation',
+      message: `Character generation record not found: ${generationId}`,
+      retriable: false,
+      code: 'DIRECTOR_CHARACTERS_GENERATION_NOT_FOUND',
+    }, deps)
+  }
+  if (generation.status === 'succeeded') {
+    const charactersText = readTextOutput(generation.outputResult)
+    if (charactersText === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Character generation completed without text output',
+        retriable: false,
+        code: 'DIRECTOR_CHARACTERS_OUTPUT_MISSING',
+      }, deps)
+    }
+    const characters = parseDirectorCharactersOutput(charactersText)
+    if (characters === undefined) {
+      return failPhase(run.id, {
+        category: 'provider',
+        message: 'Character generation returned text that does not match the Director character contract',
+        retriable: false,
+        code: 'DIRECTOR_CHARACTERS_OUTPUT_INVALID',
+      }, deps)
+    }
+    return completePhase(run.id, { generationId, modelId, charactersText, characters }, deps, charactersText)
+  }
+  if (generation.status === 'failed' || generation.status === 'cancelled') {
+    return failPhase(run.id, {
+      category: 'provider',
+      message: generation.errorJson?.message === undefined
+        ? `Character generation ${generation.status}`
+        : String(generation.errorJson.message),
+      retriable: false,
+      code: 'DIRECTOR_CHARACTERS_GENERATION_FAILED',
+    }, deps)
+  }
+
+  return retryUntilGenerationCompletes(task, `Character generation is ${generation.status}`, 'DIRECTOR_CHARACTERS')
+}
+
+interface RunInputSnapshot {
   title: string
   synopsis: string | null
   storyText: string
-} {
+  analysis: unknown
+}
+
+function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
   const snapshot = run.inputSnapshot
   return {
     title: stringInput(snapshot, 'title') ?? 'Untitled screenplay',
     synopsis: typeof snapshot['synopsis'] === 'string' ? snapshot['synopsis'] : null,
     storyText: stringInput(snapshot, 'storyText') ?? '',
+    analysis: snapshot['analysis'],
   }
 }
 
@@ -193,6 +307,20 @@ function analysisPrompt(title: string, synopsis: string | null, storyText: strin
   ].filter(Boolean).join('\n\n')
 }
 
+function charactersPrompt(snapshot: RunInputSnapshot, analysis: DirectorAnalysisResult): string {
+  return [
+    '你是一名专业短剧编剧、导演和人物统筹顾问。请基于已确认的剧本分析，生成可供后续视觉资产和分镜阶段使用的角色卡。',
+    '只返回一个 JSON 对象，不要 Markdown、代码围栏、解释文字或额外字段。',
+    'JSON 必须符合以下结构：',
+    '{"characters":[{"name":"角色名","role":"角色功能","description":"外在身份与核心设定","traits":["特质"],"goal":"当前目标","conflict":"核心冲突","arc":"角色弧线","visualSignature":"可用于视觉统一的外观特征"}],"relationshipNotes":["角色关系与戏剧张力"]}',
+    '只使用剧本和分析中能够得到的事实；无法确认时要明确写出不确定性，不要凭空增加关键背景。',
+    `项目：${snapshot.title}`,
+    snapshot.synopsis === null ? '' : `简介：${snapshot.synopsis}`,
+    `已确认的剧本分析：\n${JSON.stringify(analysis)}`,
+    `剧本原文：\n${snapshot.storyText}`,
+  ].filter(Boolean).join('\n\n')
+}
+
 function readTextOutput(output: Record<string, unknown> | undefined): string | undefined {
   const artifacts = output?.['artifacts']
   if (!Array.isArray(artifacts)) return undefined
@@ -204,14 +332,14 @@ function readTextOutput(output: Record<string, unknown> | undefined): string | u
   return undefined
 }
 
-function retryUntilGenerationCompletes(task: TaskRecord, message: string): TaskProcessOutcome {
+function retryUntilGenerationCompletes(task: TaskRecord, message: string, codePrefix = 'DIRECTOR_ANALYSIS'): TaskProcessOutcome {
   if (task.attempts >= task.maxAttempts) {
-    return failed({ category: 'timeout', message: `${message}; retry limit reached`, retriable: false, code: 'DIRECTOR_ANALYSIS_RETRY_LIMIT' })
+    return failed({ category: 'timeout', message: `${message}; retry limit reached`, retriable: false, code: `${codePrefix}_RETRY_LIMIT` })
   }
   return {
     status: 'retry',
     nextRunAt: nextRunAt(new Date(Date.now() + PHASE_POLL_DELAY_MS).toISOString(), task.attempts),
-    error: { category: 'network', message, retriable: true, code: 'DIRECTOR_ANALYSIS_WAITING' },
+    error: { category: 'network', message, retriable: true, code: `${codePrefix}_WAITING` },
   }
 }
 
@@ -219,6 +347,7 @@ async function completePhase(
   runId: string,
   outputSummary: Record<string, unknown>,
   deps: DirectorPhaseTaskHandlerDeps,
+  outputText: string,
 ): Promise<TaskProcessOutcome> {
   const completed = await deps.directorRepository?.completePhaseRun({ runId, outputSummary })
   if (completed === undefined) {
@@ -229,7 +358,7 @@ async function completePhase(
       code: 'DIRECTOR_PHASE_COMPLETE_FAILED',
     })
   }
-  return { status: 'succeeded', output: { artifacts: [{ kind: 'text', text: outputSummary['analysisText'] }] } }
+  return { status: 'succeeded', output: { artifacts: [{ kind: 'text', text: outputText }] } }
 }
 
 async function failPhase(

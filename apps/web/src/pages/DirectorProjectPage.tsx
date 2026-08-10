@@ -1,9 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, Check, CircleDashed, FileText, Loader2, LockKeyhole, Save, Sparkles } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { DirectorAnalysisResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
+import type { DirectorAnalysisResult, DirectorCharactersResult, DirectorProjectDetail, ModelCatalogItem } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
-import { DirectorAnalysisResultSchema } from '@bailian-studio/api-client'
+import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,9 +66,13 @@ export function DirectorProjectPage() {
   const [synopsis, setSynopsis] = useState('')
   const [saving, setSaving] = useState(false)
   const [analysisModelId, setAnalysisModelId] = useState('')
+  const [charactersModelId, setCharactersModelId] = useState('')
   const [activeRunId, setActiveRunId] = useState<string>()
+  const [activePhase, setActivePhase] = useState<DirectorPhase>()
   const [analysisText, setAnalysisText] = useState<string>()
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
+  const [charactersText, setCharactersText] = useState<string>()
+  const [charactersResult, setCharactersResult] = useState<DirectorCharactersResult>()
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const textModels = useMemo(() => models.filter(model => model.category === 'text'), [models])
@@ -84,6 +88,12 @@ export function DirectorProjectPage() {
   }, [analysisModelId, textModels])
 
   useEffect(() => {
+    if (charactersModelId.length > 0 && textModels.some(model => model.id === charactersModelId)) return
+    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
+    if (preferred !== undefined) setCharactersModelId(preferred.id)
+  }, [charactersModelId, textModels])
+
+  useEffect(() => {
     if (id === undefined) return
     let cancelled = false
     setLoading(true)
@@ -94,11 +104,22 @@ export function DirectorProjectPage() {
         setTitle(next.title)
         setStoryText(next.storyText)
         setSynopsis(next.synopsis ?? '')
+        setActiveRunId(undefined)
+        setActivePhase(undefined)
+        setAnalysisText(undefined)
+        setAnalysisResult(undefined)
+        setCharactersText(undefined)
+        setCharactersResult(undefined)
         const analysisState = next.phases.find(state => state.phase === 'analyze')
+        const charactersState = next.phases.find(state => state.phase === 'characters')
         if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
           setActiveRunId(analysisState.activeRunId ?? undefined)
+          setActivePhase('analyze')
+        } else if (charactersState?.status === 'queued' || charactersState?.status === 'running') {
+          setActiveRunId(charactersState.activeRunId ?? undefined)
+          setActivePhase('characters')
         }
-        if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
+        if ((analysisState?.status === 'completed' || analysisState?.status === 'needs_review') && analysisState.lastRunId !== null && analysisState.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
             .then(run => {
               if (!cancelled && run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
@@ -106,6 +127,16 @@ export function DirectorProjectPage() {
                 const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
                 if (parsed.success) setAnalysisResult(parsed.data)
               }
+            })
+            .catch(() => {})
+        }
+        if ((charactersState?.status === 'completed' || charactersState?.status === 'needs_review') && charactersState.lastRunId !== null && charactersState.lastRunId !== undefined) {
+          void apiClient.getDirectorPhaseRun(id, 'characters', charactersState.lastRunId)
+            .then(run => {
+              if (cancelled || run.status !== 'succeeded') return
+              if (typeof run.outputSummary?.charactersText === 'string') setCharactersText(run.outputSummary.charactersText)
+              const parsed = DirectorCharactersResultSchema.safeParse(run.outputSummary?.characters)
+              if (parsed.success) setCharactersResult(parsed.data)
             })
             .catch(() => {})
         }
@@ -122,24 +153,32 @@ export function DirectorProjectPage() {
   }, [id])
 
   useEffect(() => {
-    if (id === undefined || activeRunId === undefined) return
+    if (id === undefined || activeRunId === undefined || activePhase === undefined) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
     const poll = async () => {
       try {
-        const run = await apiClient.getDirectorPhaseRun(id, 'analyze', activeRunId)
+        const run = await apiClient.getDirectorPhaseRun(id, activePhase, activeRunId)
         if (cancelled) return
         if (run.status === 'succeeded' || run.status === 'failed' || run.status === 'cancelled') {
           const next = await apiClient.getDirectorProject(id)
           if (cancelled) return
           setProject(next)
-          if (run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
-            setAnalysisText(run.outputSummary.analysisText)
-            const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
+          if (run.status === 'succeeded' && activePhase === 'analyze') {
+            if (typeof run.outputSummary?.analysisText === 'string') setAnalysisText(run.outputSummary.analysisText)
+            const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary?.analysis)
             if (parsed.success) setAnalysisResult(parsed.data)
           }
+          if (run.status === 'succeeded' && activePhase === 'characters') {
+            if (typeof run.outputSummary?.charactersText === 'string') setCharactersText(run.outputSummary.charactersText)
+            const parsed = DirectorCharactersResultSchema.safeParse(run.outputSummary?.characters)
+            if (parsed.success) setCharactersResult(parsed.data)
+          }
           setActiveRunId(undefined)
-          toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded' ? '剧本分析已完成' : '剧本分析未完成，请查看阶段状态')
+          setActivePhase(undefined)
+          toast[run.status === 'succeeded' ? 'success' : 'error'](run.status === 'succeeded'
+            ? activePhase === 'analyze' ? '剧本分析已完成' : '角色阶段已完成'
+            : activePhase === 'analyze' ? '剧本分析未完成，请查看阶段状态' : '角色阶段未完成，请查看阶段状态')
           return
         }
         timer = setTimeout(() => void poll(), 2_000)
@@ -152,7 +191,7 @@ export function DirectorProjectPage() {
       cancelled = true
       if (timer !== undefined) clearTimeout(timer)
     }
-  }, [activeRunId, id])
+  }, [activePhase, activeRunId, id])
 
   const progress = useMemo(() => {
     if (project === undefined) return { completed: 0, total: DIRECTOR_PHASES.length }
@@ -184,6 +223,27 @@ export function DirectorProjectPage() {
     }
   }
 
+  const runCharacters = async () => {
+    if (id === undefined || charactersModelId.length === 0 || dirty || activeRunId !== undefined) return
+    setSaving(true)
+    try {
+      const run = await apiClient.requestDirectorPhaseRun(id, 'characters', { modelId: charactersModelId })
+      setActiveRunId(run.id)
+      setActivePhase('characters')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'characters'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+      toast.success('角色阶段已加入执行队列')
+    } catch {
+      toast.error('无法启动角色阶段，请确认剧本分析已完成')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const saveProject = async () => {
     if (id === undefined || !dirty || title.trim().length === 0 || storyText.trim().length === 0) return
     setSaving(true)
@@ -197,6 +257,10 @@ export function DirectorProjectPage() {
       setTitle(next.title)
       setStoryText(next.storyText)
       setSynopsis(next.synopsis ?? '')
+      setAnalysisText(undefined)
+      setAnalysisResult(undefined)
+      setCharactersText(undefined)
+      setCharactersResult(undefined)
       toast.success('项目基础信息已保存')
     } catch {
       toast.error('保存失败，请稍后重试')
@@ -319,17 +383,49 @@ export function DirectorProjectPage() {
             <PhaseStatusPanel
               project={project}
               phases={['analyze']}
-              analysisModelId={analysisModelId}
+              modelId={analysisModelId}
               textModels={textModels}
               running={activeRunId !== undefined}
-              onAnalysisModelChange={setAnalysisModelId}
-              onRunAnalysis={() => void runAnalysis()}
+              onModelChange={setAnalysisModelId}
+              onRunPhase={() => void runAnalysis()}
+              runLabel="开始剧本分析"
               blockedByUnsavedChanges={dirty}
             />
           </div>
         </TabsContent>
 
-        {TAB_ITEMS.filter(tab => tab.value !== 'analyze').map(tab => (
+        <TabsContent value="characters" className="mt-6">
+          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+            <section className="flex flex-col gap-4">
+              <div className="flex flex-col gap-2">
+                <span className="text-xs uppercase tracking-[0.18em] text-muted-foreground">角色资产</span>
+                <h2 className="text-xl font-semibold">把分析里的角色变成可持续维护的角色卡</h2>
+                <p className="max-w-2xl text-sm leading-6 text-muted-foreground">本阶段只消费已确认的剧本分析，输出人物目标、冲突、弧线和视觉特征，供后续参考资产、分镜和对白阶段复用。</p>
+              </div>
+              {charactersText !== undefined && <CharactersReview result={charactersResult} rawText={charactersText} />}
+              {charactersText === undefined && charactersResult !== undefined && <CharactersReview result={charactersResult} />}
+              {charactersText === undefined && charactersResult === undefined && (
+                <div className="flex min-h-64 flex-col items-center justify-center gap-2 bg-muted/30 px-6 text-center">
+                  <p className="font-medium">角色阶段尚未生成结果</p>
+                  <p className="text-sm leading-6 text-muted-foreground">完成剧本分析后，在右侧选择模型并手动启动。</p>
+                </div>
+              )}
+            </section>
+            <PhaseStatusPanel
+              project={project}
+              phases={['characters']}
+              modelId={charactersModelId}
+              textModels={textModels}
+              running={activePhase === 'characters' && activeRunId !== undefined}
+              onModelChange={setCharactersModelId}
+              onRunPhase={() => void runCharacters()}
+              runLabel="生成角色卡"
+              blockedByUnsavedChanges={dirty}
+            />
+          </div>
+        </TabsContent>
+
+        {TAB_ITEMS.filter(tab => tab.value !== 'analyze' && tab.value !== 'characters').map(tab => (
           <TabsContent key={tab.value} value={tab.value} className="mt-6">
             <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
               <section className="flex min-h-80 flex-col items-center justify-center gap-4 rounded-xl bg-muted/30 px-6 text-center">
@@ -486,26 +582,99 @@ function AnalysisReview({ result, rawText }: { result?: DirectorAnalysisResult; 
   )
 }
 
+function CharactersReview({ result, rawText }: { result?: DirectorCharactersResult; rawText?: string }) {
+  if (result === undefined) {
+    return (
+      <section className="flex flex-col gap-3 bg-muted/30 px-4 py-4 sm:px-5">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="font-semibold">角色阶段输出</h2>
+          <span className="text-xs text-muted-foreground">原始模型输出</span>
+        </div>
+        <p className="whitespace-pre-wrap text-sm leading-7 text-muted-foreground">{rawText}</p>
+      </section>
+    )
+  }
+
+  return (
+    <section className="flex flex-col gap-5 bg-muted/30 px-4 py-4 sm:px-5">
+      <div className="flex items-center justify-between gap-3">
+        <h2 className="font-semibold">角色卡</h2>
+        <Badge variant="secondary">可供视觉与分镜消费</Badge>
+      </div>
+      <div className="grid gap-x-6 gap-y-6 sm:grid-cols-2">
+        {result.characters.map((character, index) => (
+          <article key={`${character.name}-${index}`} className="flex flex-col gap-3">
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-medium">{character.name}</h3>
+                <span className="text-xs text-muted-foreground">{character.role}</span>
+              </div>
+              <span className="text-xs tabular-nums text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">{character.description}</p>
+            <div className="grid gap-3 text-sm leading-6">
+              <div>
+                <span className="text-xs text-muted-foreground">目标</span>
+                <p>{character.goal}</p>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">冲突</span>
+                <p>{character.conflict}</p>
+              </div>
+              <div>
+                <span className="text-xs text-muted-foreground">弧线</span>
+                <p>{character.arc}</p>
+              </div>
+            </div>
+            {character.traits.length > 0 && <p className="text-xs leading-5 text-muted-foreground">特质：{character.traits.join(' · ')}</p>}
+            {character.visualSignature.length > 0 && <p className="text-xs leading-5 text-muted-foreground">视觉特征：{character.visualSignature}</p>}
+          </article>
+        ))}
+      </div>
+      {result.relationshipNotes.length > 0 && (
+        <>
+          <Separator />
+          <div className="flex flex-col gap-2">
+            <h3 className="text-sm font-semibold">关系与戏剧张力</h3>
+            <ul className="flex flex-col gap-1 text-sm leading-6 text-muted-foreground">
+              {result.relationshipNotes.map((note, index) => <li key={`${note}-${index}`}>· {note}</li>)}
+            </ul>
+          </div>
+        </>
+      )}
+      {rawText !== undefined && (
+        <details className="flex flex-col gap-2 text-sm">
+          <summary className="cursor-pointer text-muted-foreground">查看原始模型输出</summary>
+          <p className="whitespace-pre-wrap leading-7 text-muted-foreground">{rawText}</p>
+        </details>
+      )}
+    </section>
+  )
+}
+
 function PhaseStatusPanel({
   project,
   phases,
-  analysisModelId,
+  modelId,
   textModels,
   running,
-  onAnalysisModelChange,
-  onRunAnalysis,
+  onModelChange,
+  onRunPhase,
+  runLabel,
   blockedByUnsavedChanges,
 }: {
   project: DirectorProjectDetail
   phases: DirectorPhase[]
-  analysisModelId?: string
+  modelId?: string
   textModels?: ModelCatalogItem[]
   running?: boolean
-  onAnalysisModelChange?: (value: string) => void
-  onRunAnalysis?: () => void
+  onModelChange?: (value: string) => void
+  onRunPhase?: () => void
+  runLabel?: string
   blockedByUnsavedChanges?: boolean
 }) {
   const states = project.phases.filter(state => phases.includes(state.phase))
+  const primaryPhase = phases[0] ?? 'analyze'
   const status = states.find(state => state.status !== 'completed')?.status ?? states[0]?.status ?? 'not_started'
   return (
     <aside className="relative flex flex-col gap-4 lg:pl-6">
@@ -518,12 +687,12 @@ function PhaseStatusPanel({
         </div>
       </div>
       <Separator />
-      {phases.includes('analyze') && analysisModelId !== undefined && textModels !== undefined && onAnalysisModelChange !== undefined && onRunAnalysis !== undefined && (
+      {modelId !== undefined && textModels !== undefined && onModelChange !== undefined && onRunPhase !== undefined && runLabel !== undefined && (
         <div className="flex flex-col gap-3">
-          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor="director-analysis-model">
-            分析模型
-            <Select value={analysisModelId} onValueChange={onAnalysisModelChange} disabled={running || textModels.length === 0}>
-              <SelectTrigger id="director-analysis-model" className="w-full">
+          <label className="flex flex-col gap-2 text-sm font-medium" htmlFor={`director-${primaryPhase}-model`}>
+            执行模型
+            <Select value={modelId} onValueChange={onModelChange} disabled={running || textModels.length === 0}>
+              <SelectTrigger id={`director-${primaryPhase}-model`} className="w-full">
                 <SelectValue placeholder="选择文本模型" />
               </SelectTrigger>
               <SelectContent>
@@ -532,11 +701,11 @@ function PhaseStatusPanel({
             </Select>
           </label>
           <Button
-            onClick={onRunAnalysis}
+            onClick={onRunPhase}
             disabled={running || blockedByUnsavedChanges || (status !== 'ready' && status !== 'failed' && status !== 'needs_review') || textModels.length === 0}
           >
             {running ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Sparkles data-icon="inline-start" />}
-            {running ? '分析执行中' : '开始剧本分析'}
+            {running ? '阶段执行中' : runLabel}
           </Button>
           {blockedByUnsavedChanges && <p className="text-xs leading-5 text-muted-foreground">请先保存剧本修改，再启动分析。</p>}
         </div>

@@ -31,7 +31,7 @@ export {
 } from './generation-client'
 export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
-export { DirectorAnalysisResultSchema } from './schemas'
+export { DirectorAnalysisResultSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema } from './schemas'
 export {
   DIRECTOR_PHASE_LABELS,
   DIRECTOR_PHASES,
@@ -48,6 +48,8 @@ export type {
   CreateDirectorProjectInput,
   CreateDirectorPhaseRunInput,
   DirectorAnalysisResult,
+  DirectorCharacterDraft,
+  DirectorCharactersResult,
   DirectorPhaseRun,
   DirectorPhaseRunStatus,
   DirectorProjectDetail,
