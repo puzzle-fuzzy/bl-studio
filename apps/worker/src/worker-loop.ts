@@ -275,7 +275,7 @@ export class WorkerLoop {
     const repo = this.config.repository
     const listStuck = repo.listStuckGenerationRecords
     if (listStuck === undefined) return
-    let records
+    let records: Awaited<ReturnType<NonNullable<GenerationRepository['listStuckGenerationRecords']>>>
     try {
       records = await listStuck.call(repo, { now: currentIso() })
     } catch (error) {

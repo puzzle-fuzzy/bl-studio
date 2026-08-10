@@ -57,6 +57,7 @@ export function SharedGenerationPage() {
                       {src !== undefined && artifact.kind === 'image' ? (
                         <img src={resolveApiUrl(src)} alt="" className="size-full object-cover" loading="lazy" />
                       ) : src !== undefined ? (
+                        // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
                         <video src={resolveApiUrl(src)} controls className="size-full object-cover" />
                       ) : (
                         <div className="flex size-full items-center justify-center text-xs text-muted-foreground">暂无预览</div>

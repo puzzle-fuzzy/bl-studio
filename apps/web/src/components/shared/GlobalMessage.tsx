@@ -18,11 +18,11 @@ export function GlobalMessage() {
   if (message === null) return null
 
   return (
-    <div
-      role="status"
+    <button
+      type="button"
       aria-live="polite"
       className={cn(
-        'fixed top-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border px-4 py-2.5 text-sm shadow-sm',
+        'fixed top-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border bg-transparent px-4 py-2.5 text-left text-sm shadow-sm',
         TONE_CLASSES[message.tone] ?? TONE_CLASSES.info,
       )}
       onClick={dismiss}
@@ -31,6 +31,6 @@ export function GlobalMessage() {
       {message.description !== undefined && (
         <span className="ml-2 text-xs opacity-80">{message.description}</span>
       )}
-    </div>
+    </button>
   )
 }

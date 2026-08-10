@@ -40,7 +40,9 @@ export function GenerationListItem({
   const refEntries = useMemo(() => {
     const entries: Array<{ id: string; parameterName: string; position: number }> = []
     for (const [parameterName, ids] of Object.entries(assetRefs)) {
-      ids.forEach((id, position) => entries.push({ id, parameterName, position }))
+      ids.forEach((id, position) => {
+        entries.push({ id, parameterName, position })
+      })
     }
     return entries
   }, [assetRefs])
@@ -86,14 +88,18 @@ export function GenerationListItem({
   }
 
   return (
-    <button
-      type="button"
-      onClick={() => onOpen(record.id)}
+    <div
       className={cn(
-        'group flex w-full items-center gap-3 p-2 text-left transition-colors hover:bg-muted/40',
+        'relative flex w-full items-center',
         className,
       )}
     >
+      <button
+        type="button"
+        aria-label={`打开 ${record.modelId} 生成记录`}
+        onClick={() => onOpen(record.id)}
+        className="group flex min-w-0 flex-1 items-center gap-3 p-2 pr-10 text-left transition-colors hover:bg-muted/40"
+      >
       {stack.length <= 1 ? (
         <div className="relative size-12 shrink-0 overflow-hidden rounded-md border bg-muted/30">
           {stack[0] !== undefined ? (
@@ -162,22 +168,22 @@ export function GenerationListItem({
               '(无提示词)'
             )}
           </span>
-          {prompt !== '' && (
-            <span
-              role="button"
-              tabIndex={-1}
-              aria-label="复制提示词"
-              title="复制提示词"
-              onClick={handleCopyPrompt}
-              className="shrink-0 rounded p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
-            >
-              {copied ? <Check className="size-3 text-primary" /> : <Copy className="size-3" />}
-            </span>
-          )}
         </div>
         <div className="text-xs text-muted-foreground/70">{relativeTime(record.createdAt)}</div>
-      </div>
-    </button>
+        </div>
+      </button>
+      {prompt !== '' && (
+        <button
+          type="button"
+          aria-label="复制提示词"
+          title="复制提示词"
+          onClick={handleCopyPrompt}
+          className="absolute right-2 bottom-2 rounded border-0 bg-transparent p-0.5 text-muted-foreground/70 hover:bg-muted hover:text-foreground"
+        >
+          {copied ? <Check className="size-3 text-primary" /> : <Copy className="size-3" />}
+        </button>
+      )}
+    </div>
   )
 }
 

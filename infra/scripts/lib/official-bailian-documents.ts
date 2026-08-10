@@ -149,6 +149,11 @@ function safeDocumentPath(value: string): string {
   return path
 }
 
+function isAsciiControlCharacter(character: string): boolean {
+  const codePoint = character.codePointAt(0) ?? 0
+  return codePoint <= 0x1f
+}
+
 function sanitizeSegment(value: string, fallback: string): string {
   const replacements: Record<string, string> = {
     '<': '＜',
@@ -162,7 +167,7 @@ function sanitizeSegment(value: string, fallback: string): string {
     '*': '＊',
   }
   const sanitized = [...value.trim()]
-    .map(character => replacements[character] ?? (/^[\u0000-\u001f]$/.test(character) ? '' : character))
+    .map(character => replacements[character] ?? (isAsciiControlCharacter(character) ? '' : character))
     .join('')
     .replace(/[. ]+$/g, '')
     .trim()

@@ -56,11 +56,11 @@ export function CheckEmailPage() {
         <CardContent className="space-y-3">
           {message !== null && <p className="text-center text-sm text-emerald-600">{message}</p>}
           {error !== null && <p className="text-center text-sm text-destructive">{error}</p>}
-          <Button variant="outline" className="w-full" onClick={() => void handleResend()} disabled={cooldown > 0}>
+          <Button type="button" variant="outline" className="w-full" onClick={() => void handleResend()} disabled={cooldown > 0}>
             {cooldown > 0 ? `${cooldown}s 后可重发` : '重新发送验证邮件'}
           </Button>
           <div className="flex justify-center gap-4 text-sm text-muted-foreground">
-            <button className="hover:text-foreground" onClick={() => navigate('/login')}>
+            <button type="button" className="hover:text-foreground" onClick={() => navigate('/login')}>
               返回登录
             </button>
             <Link to="/auth/forgot-password" className="hover:text-foreground">

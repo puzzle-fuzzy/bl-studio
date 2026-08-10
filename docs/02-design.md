@@ -19,7 +19,7 @@
 | 密码哈希 | **@node-rs/argon2**（替换 Bun.password） | 跨运行时 argon2id 绑定，Bun/Node 均可用 |
 | 后端框架 | Elysia（保留） | Bun 原生性能路径，已验证 |
 | ORM | Drizzle（保留） | 已验证 |
-| 构建 | tsc --noEmit typecheck（保留原门禁哲学） | 无 ESLint/Prettier，typecheck 即 lint |
+| 代码质量 | Biome lint + tsc --noEmit typecheck | Biome 负责 TS/TSX/JS 规则；tsc 负责类型正确性 |
 | 前端测试 | **只测纯函数层，不测 UI/样式** | 用户要求；样式后续还会调整，UI 测试是噪音 |
 
 ## 二、目标目录结构

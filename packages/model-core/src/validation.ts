@@ -316,6 +316,7 @@ function validateRules(
         return []
       }
     }
+    return []
   })
 }
 

@@ -87,13 +87,16 @@ pnpm run deploy:rehearsal:up
 ## 常用命令
 
 ```bash
-pnpm run typecheck        # 全仓 typecheck（tsc --noEmit，无 ESLint）
+pnpm run lint             # Biome lint（TS/TSX/JS，跨平台）
+pnpm run typecheck        # 全仓 typecheck（tsc --noEmit）
 pnpm run typecheck:root   # 根 infra/scripts + tests 的 typecheck
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
 pnpm run test:coverage    # 覆盖率
-pnpm run verify           # boundaries + manifests + typecheck:root + typecheck + test
+pnpm run verify           # migrations + boundaries + manifests + lint + typecheck + test
 pnpm run check:boundaries # 包边界（import 规则）
 pnpm run check:manifests  # 模型 manifest 一致性
+pnpm run model:acceptance # 所有 enabled 模型的离线请求/响应矩阵
+pnpm run model:acceptance -- --live=<model-id> # 单模型真实供应商 canary（需 DASHSCOPE_API_KEY）
 pnpm run db:studio        # drizzle-kit studio
 pnpm run e2e              # Playwright（需 test DB）
 ```

@@ -251,6 +251,7 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
         contentEditable={!disabled}
         suppressContentEditableWarning
         role="combobox"
+        tabIndex={disabled ? -1 : 0}
         aria-expanded={pickerOpen}
         aria-haspopup="listbox"
         aria-controls={pickerOpen ? PICKER_ID : undefined}

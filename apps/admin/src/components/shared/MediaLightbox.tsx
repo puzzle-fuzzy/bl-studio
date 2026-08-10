@@ -49,14 +49,20 @@ export function MediaLightbox({
     return () => window.removeEventListener('keydown', onKeyDown)
   }, [index, count, onClose, onIndexChange])
 
-  const stop = (event: React.MouseEvent) => event.stopPropagation()
+  const handleDialogKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape') onClose()
+  }
 
   return (
     <div
       role="dialog"
       aria-modal="true"
+      tabIndex={-1}
       className="fixed inset-0 z-50 flex flex-col items-center bg-black/90 px-6 pt-8 pb-6"
-      onClick={onClose}
+      onClick={event => {
+        if (event.target === event.currentTarget) onClose()
+      }}
+      onKeyDown={handleDialogKeyDown}
     >
       {/* 标题 */}
       <div className="mb-2 flex max-w-full items-center gap-2 text-sm text-white/90">
@@ -65,14 +71,16 @@ export function MediaLightbox({
       </div>
 
       {/* 大图区域：媒体居中，下载按钮竖排在图片右侧（圆形纯图标）。 */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center gap-5" onClick={stop}>
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center gap-5">
         {current?.kind === 'image' && url !== undefined && (
           <img src={url} alt="" className="max-h-full max-w-[calc(100%-4rem)] object-contain" />
         )}
         {current?.kind === 'video' && url !== undefined && (
+          // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
           <video src={url} controls autoPlay className="max-h-full max-w-[calc(100%-4rem)]" />
         )}
         {current?.kind === 'audio' && url !== undefined && (
+          // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
           <audio src={url} controls autoPlay className="w-full max-w-lg" />
         )}
         {current?.kind === 'text' && (
@@ -86,7 +94,6 @@ export function MediaLightbox({
             target="_blank"
             rel="noreferrer"
             download
-            onClick={stop}
             aria-label="下载"
             title="下载"
             className="flex size-11 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
@@ -102,8 +109,7 @@ export function MediaLightbox({
           <button
             type="button"
             aria-label="上一张"
-            onClick={event => {
-              stop(event)
+            onClick={() => {
               onIndexChange((index - 1 + count) % count)
             }}
             className="absolute top-1/2 left-3 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
@@ -113,8 +119,7 @@ export function MediaLightbox({
           <button
             type="button"
             aria-label="下一张"
-            onClick={event => {
-              stop(event)
+            onClick={() => {
               onIndexChange((index + 1) % count)
             }}
             className="absolute top-1/2 right-3 flex size-10 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white/90 hover:bg-white/20"
@@ -126,7 +131,7 @@ export function MediaLightbox({
 
       {/* 缩略图行（多图时） */}
       {count > 1 && (
-        <div className="mt-4 flex max-w-full items-center gap-2 overflow-x-auto pb-1" onClick={stop}>
+        <div className="mt-4 flex max-w-full items-center gap-2 overflow-x-auto pb-1">
           {items.map((item, itemIndex) => (
             <button
               key={item.key}

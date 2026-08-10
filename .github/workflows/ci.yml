@@ -100,6 +100,7 @@ jobs:
           node-version: 24.12.0
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
       - run: pnpm run check:boundaries
       - run: pnpm run check:manifests
       - run: pnpm run typecheck:root

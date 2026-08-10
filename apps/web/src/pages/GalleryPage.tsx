@@ -627,10 +627,16 @@ function GalleryDetailView({
         {detail.artifacts.map(artifact => {
           const url = resolveApiUrl(artifact.readUrl ?? artifact.thumbnailUrl)
           if (artifact.kind === 'video') {
-            return <video key={artifact.id} src={url} controls className="aspect-video w-full rounded-lg bg-black" />
+            return (
+              // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
+              <video key={artifact.id} src={url} controls className="aspect-video w-full rounded-lg bg-black" />
+            )
           }
           if (artifact.kind === 'audio') {
-            return <audio key={artifact.id} src={url} controls className="w-full rounded-lg bg-muted" />
+            return (
+              // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
+              <audio key={artifact.id} src={url} controls className="w-full rounded-lg bg-muted" />
+            )
           }
           if (artifact.kind === 'text') {
             // 文本正文直接来自详情接口（generation_artifacts.text），无需再拉文件。

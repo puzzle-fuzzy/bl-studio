@@ -15,6 +15,8 @@
   "scripts": {
     "dev": "dotenv -e infra/env/.env -- turbo run dev",
     "build": "turbo run build",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.json --noEmit",
     "test": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts test",
@@ -86,6 +88,7 @@
   "devDependencies": {
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
+    "@biomejs/biome": "^2.5.7",
     "@node-rs/argon2": "catalog:",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.1.2",
