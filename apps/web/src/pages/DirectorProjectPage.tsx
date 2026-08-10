@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
+import { AssetVideoPlayer } from '@/components/assets/AssetVideoPlayer'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Separator } from '@/components/ui/separator'
@@ -411,7 +412,9 @@ export function DirectorProjectPage() {
           }
           setActiveRunId(undefined)
           setActivePhase(undefined)
-          const phaseLabel = activePhase === 'analyze'
+          const phaseLabel = activePhase === 'assemble'
+            ? DIRECTOR_PHASE_LABELS.assemble
+            : activePhase === 'analyze'
             ? '剧本分析'
             : activePhase === 'characters'
               ? '角色阶段'
@@ -1406,10 +1409,10 @@ export function DirectorProjectPage() {
                   <span className="font-medium">已有一版可用成片</span>
                   {latestFinalVideoAsset !== undefined && (
                     <div className="aspect-video max-w-xl overflow-hidden bg-muted/40">
-                      <AssetThumbnail
-                        kind="video"
+                      <AssetVideoPlayer
                         url={latestFinalVideoAsset.url}
                         thumbnailUrl={latestFinalVideoAsset.thumbnailUrl}
+                        mimeType={latestFinalVideoAsset.mimeType}
                         alt="当前成片预览"
                       />
                     </div>
