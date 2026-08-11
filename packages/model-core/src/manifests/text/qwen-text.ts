@@ -94,7 +94,8 @@ function qwenText(options: QwenTextOptions): ModelManifest {
         seed: { target: 'parameters.field' },
       },
     },
-    output: { kind: 'text', path: 'output.choices.0.message.content' },
+    // Native text-generation responses use output.text unless result_format=message is explicitly requested.
+    output: { kind: 'text', path: 'output.text' },
     pricing: {
       unit: 'per_token',
       quantityKey: 'maxTokens',

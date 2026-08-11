@@ -3,6 +3,7 @@ import {
   happyhorseT2V,
   kelingT2V,
   getModelById,
+  qwenPlus,
   qwenImage,
   wanxTextToVideo,
   type FrozenModelManifest,
@@ -230,6 +231,43 @@ describe('createDashScopeClient', () => {
       raw,
       output: {
         artifacts: [{ kind: 'text', text: '量子纠缠描述了粒子之间的关联。' }],
+        usage: raw.usage,
+        raw,
+      },
+    })
+  })
+
+  it('normalizes the native Qwen text-generation output.text response', async () => {
+    const raw = {
+      output: {
+        text: '{"summary":"analysis"}',
+        finish_reason: 'stop',
+      },
+      usage: { input_tokens: 10, output_tokens: 4, total_tokens: 14 },
+      request_id: 'request-qwen-text',
+    }
+    const { fetch, calls } = createFetch([jsonResponse(raw)])
+    const client = createDashScopeClient({ apiKey: 'test-key', fetch, workspaceId: 'ws-test' })
+
+    const result = await client.submit({
+      manifest: qwenPlus,
+      params: {
+        prompt: '分析剧本',
+        maxTokens: 4096,
+        temperature: 0.4,
+        topP: 0.8,
+      },
+    })
+
+    expect(calls[0]?.url).toBe(
+      'https://ws-test.cn-beijing.maas.aliyuncs.com/api/v1/services/aigc/text-generation/generation',
+    )
+    expect(result).toEqual({
+      mode: 'completed',
+      requestId: 'request-qwen-text',
+      raw,
+      output: {
+        artifacts: [{ kind: 'text', text: '{"summary":"analysis"}' }],
         usage: raw.usage,
         raw,
       },

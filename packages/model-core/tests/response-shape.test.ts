@@ -7,6 +7,8 @@ const wanx = getModelById('wanx-text-to-video')
 if (wanx === undefined) throw new Error('wanx-text-to-video fixture model is missing')
 const screenplay = getModelById('qwen-omni-screenplay')
 if (screenplay === undefined) throw new Error('qwen-omni-screenplay fixture model is missing')
+const qwenPlus = getModelById('qwen-plus')
+if (qwenPlus === undefined) throw new Error('qwen-plus fixture model is missing')
 
 describe('assertResponseShape — async submit', () => {
   it('accepts a well-formed async submit response', () => {
@@ -108,6 +110,17 @@ describe('assertResponseShape — sync final', () => {
     expect(assertResponseShape(qwenImage!, 'final', {
       request_id: 'req-sync-456',
     })).toMatchObject([{ path: 'output.choices' }])
+  })
+
+  it('accepts the native Qwen text-generation output.text response', () => {
+    expect(assertResponseShape(qwenPlus, 'final', {
+      output: { text: '{"summary":"ok"}' },
+      request_id: 'req-qwen-text',
+    })).toEqual([])
+    expect(assertResponseShape(qwenPlus, 'final', {
+      output: { choices: [{ message: { content: 'ok' } }] },
+      request_id: 'req-qwen-text',
+    })).toMatchObject([{ path: 'output.text' }])
   })
 })
 
