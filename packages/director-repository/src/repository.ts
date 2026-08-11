@@ -7,6 +7,7 @@ import {
 	directorPhaseRuns,
 	directorPhaseStates,
 	directorProjects,
+	directorScriptMessages,
 	directorScriptVersions,
 	directorShots,
 	taskRecords,
@@ -27,6 +28,7 @@ import {
 	type DirectorProjectDetail,
 	type DirectorProjectProgress,
 	type DirectorProjectStatus,
+	type DirectorScriptMessage,
 	type DirectorScriptVersion,
 } from "@bailian-studio/shared";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
@@ -128,6 +130,19 @@ function toScriptVersion(
 		version: row.version,
 		storyText: row.storyText,
 		synopsis: row.synopsis,
+		createdAt: row.createdAt.toISOString(),
+	};
+}
+
+function toScriptMessage(
+	row: typeof directorScriptMessages.$inferSelect,
+): DirectorScriptMessage {
+	return {
+		id: row.id,
+		role: row.role as DirectorScriptMessage["role"],
+		content: row.content,
+		scriptVersion: row.scriptVersion,
+		runId: row.runId,
 		createdAt: row.createdAt.toISOString(),
 	};
 }
@@ -655,6 +670,23 @@ export function createDirectorRepository({
 				.where(eq(directorPhaseRuns.projectId, row.id))
 				.orderBy(desc(directorPhaseRuns.createdAt), desc(directorPhaseRuns.id));
 			return toProjectDetail(row, phases, scriptVersion, characterRows, locationRows, assetRows, shotRows, runs);
+		},
+
+		async listScriptMessages(input) {
+			const rows = await db
+				.select({ message: directorScriptMessages })
+				.from(directorScriptMessages)
+				.innerJoin(directorProjects, eq(directorScriptMessages.projectId, directorProjects.id))
+				.where(
+					and(
+						eq(directorScriptMessages.projectId, input.projectId),
+						eq(directorProjects.userId, input.userId),
+						isNull(directorProjects.deletedAt),
+					),
+				)
+				.orderBy(desc(directorScriptMessages.createdAt), desc(directorScriptMessages.id))
+				.limit(input.limit ?? 100);
+			return rows.map(row => toScriptMessage(row.message)).reverse();
 		},
 
 		async getAssemblyPreflight(input: GetDirectorAssemblyPreflightRepositoryInput): Promise<DirectorAssemblyPreflight | undefined> {
@@ -1749,7 +1781,8 @@ export function createDirectorRepository({
 						&& musicState?.status !== "queued"
 						&& musicState?.status !== "running";
 				}
-				if (!optionalMusicAssembly && state.status !== "ready" && state.status !== "failed" && state.status !== "needs_review") {
+				const isScriptChat = input.phase === "analyze" && input.message !== undefined;
+				if (!optionalMusicAssembly && state.status !== "ready" && state.status !== "failed" && state.status !== "needs_review" && !(isScriptChat && state.status === "completed")) {
 					throw new DirectorRepositoryError(
 						"DIRECTOR_PHASE_NOT_READY",
 						`Director phase is not ready: ${input.phase}`,
@@ -1800,6 +1833,19 @@ export function createDirectorRepository({
 						);
 					}
 					inputSnapshot.assembly = preflight.plan;
+				}
+				if (isScriptChat) {
+					const historyRows = await tx
+						.select()
+						.from(directorScriptMessages)
+						.where(eq(directorScriptMessages.projectId, input.projectId))
+						.orderBy(desc(directorScriptMessages.createdAt), desc(directorScriptMessages.id))
+						.limit(20);
+					inputSnapshot.chatMessage = input.message;
+					inputSnapshot.chatHistory = historyRows.map(message => ({
+						role: message.role,
+						content: message.content,
+					})).reverse();
 				}
 				if (input.phase === "bgm") {
 					inputSnapshot.music = {
@@ -2096,6 +2142,20 @@ export function createDirectorRepository({
 					);
 				}
 
+				if (isScriptChat) {
+					await tx.insert(directorScriptMessages).values({
+						id: crypto.randomUUID(),
+						projectId: input.projectId,
+						runId,
+						scriptVersionId: scriptVersion.id,
+						scriptVersion: scriptVersion.version,
+						role: "user",
+						content: input.message as string,
+						createdBy: input.userId,
+						createdAt: now,
+					});
+				}
+
 				await tx.insert(taskRecords).values({
 					id: taskId,
 					type: "director.phase",
@@ -2137,6 +2197,123 @@ export function createDirectorRepository({
 				return run;
 			});
 			return toPhaseRun(createdRun);
+		},
+
+		async applyScriptChat(input) {
+			const now = new Date();
+			await db.transaction(async tx => {
+				const [run] = await tx
+					.select({ run: directorPhaseRuns, project: directorProjects })
+					.from(directorPhaseRuns)
+					.innerJoin(directorProjects, eq(directorPhaseRuns.projectId, directorProjects.id))
+					.where(
+						and(
+							eq(directorPhaseRuns.id, input.runId),
+							eq(directorPhaseRuns.projectId, input.projectId),
+							eq(directorPhaseRuns.phase, "analyze"),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+						),
+					)
+					.limit(1);
+				if (run === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_PHASE_RUN_NOT_FOUND",
+						`Director screenplay chat run not found: ${input.runId}`,
+					);
+				}
+				const [existingAssistant] = await tx
+					.select({ id: directorScriptMessages.id })
+					.from(directorScriptMessages)
+					.where(and(
+						eq(directorScriptMessages.runId, input.runId),
+						eq(directorScriptMessages.role, "assistant"),
+					))
+					.limit(1);
+				if (existingAssistant !== undefined) return;
+
+				const [currentVersion] = await tx
+					.select()
+					.from(directorScriptVersions)
+					.where(eq(directorScriptVersions.projectId, input.projectId))
+					.orderBy(desc(directorScriptVersions.version))
+					.limit(1);
+				if (currentVersion === undefined) {
+					throw new DirectorRepositoryError(
+						"DIRECTOR_DATABASE_ERROR",
+						`Director project has no screenplay version: ${input.projectId}`,
+					);
+				}
+
+				const screenplayChanged = input.screenplay !== run.project.storyText || input.synopsis !== run.project.synopsis;
+				let assistantVersion = currentVersion;
+				if (screenplayChanged) {
+					const nextVersionId = crypto.randomUUID();
+					const [createdVersion] = await tx.insert(directorScriptVersions).values({
+						id: nextVersionId,
+						projectId: input.projectId,
+						version: currentVersion.version + 1,
+						storyText: input.screenplay,
+						synopsis: input.synopsis,
+						createdBy: input.userId,
+						createdAt: now,
+						updatedAt: now,
+					}).returning();
+					if (createdVersion === undefined) {
+						throw new DirectorRepositoryError("DIRECTOR_DATABASE_ERROR", "Screenplay version could not be created");
+					}
+					assistantVersion = createdVersion;
+
+					await tx.update(directorProjects).set({
+						storyText: input.screenplay,
+						synopsis: input.synopsis,
+						status: "active",
+						updatedBy: input.userId,
+						updatedAt: now,
+					}).where(eq(directorProjects.id, input.projectId));
+					const stalePatch = {
+						staleAt: now,
+						staleReason: "project_content_changed",
+						updatedAt: now,
+					};
+					await tx.update(directorPhaseRuns).set(stalePatch).where(and(
+						eq(directorPhaseRuns.projectId, input.projectId),
+						ne(directorPhaseRuns.id, input.runId),
+						isNull(directorPhaseRuns.staleAt),
+					));
+					await tx.update(directorCharacters).set(stalePatch).where(and(eq(directorCharacters.projectId, input.projectId), isNull(directorCharacters.staleAt)));
+					await tx.update(directorLocations).set(stalePatch).where(and(eq(directorLocations.projectId, input.projectId), isNull(directorLocations.staleAt)));
+					await tx.update(directorAssets).set(stalePatch).where(and(
+						eq(directorAssets.projectId, input.projectId),
+						isNotNull(directorAssets.sourceRunId),
+						isNull(directorAssets.staleAt),
+					));
+					await tx.update(directorShots).set(stalePatch).where(and(eq(directorShots.projectId, input.projectId), isNull(directorShots.staleAt)));
+					await tx.update(directorPhaseStates).set({
+						status: "not_started",
+						activeRunId: null,
+						lastErrorJson: null,
+						updatedBy: input.userId,
+						updatedAt: now,
+					}).where(and(eq(directorPhaseStates.projectId, input.projectId), ne(directorPhaseStates.phase, "analyze")));
+				}
+
+				await tx.update(directorPhaseRuns).set({
+					scriptVersionId: assistantVersion.id,
+					updatedAt: now,
+				}).where(eq(directorPhaseRuns.id, input.runId));
+				await tx.insert(directorScriptMessages).values({
+					id: crypto.randomUUID(),
+					projectId: input.projectId,
+					runId: input.runId,
+					scriptVersionId: assistantVersion.id,
+					scriptVersion: assistantVersion.version,
+					role: "assistant",
+					content: input.reply,
+					createdBy: "worker",
+					createdAt: now,
+				});
+			});
 		},
 
 		async getPhaseRun(input) {

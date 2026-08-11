@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDirectorAnalysisOutput } from '../src/director-analysis'
+import { parseDirectorAnalysisOutput, parseDirectorScriptChatOutput } from '../src/director-analysis'
 
 const validAnalysis = {
   summary: '一名记者在旧车站等候失联的哥哥。',
@@ -23,5 +23,22 @@ describe('parseDirectorAnalysisOutput', () => {
 
   it('rejects incomplete downstream data instead of guessing', () => {
     expect(parseDirectorAnalysisOutput(JSON.stringify({ summary: validAnalysis.summary }))).toBeUndefined()
+  })
+})
+
+describe('parseDirectorScriptChatOutput', () => {
+  it('accepts a complete screenplay edit response', () => {
+    const output = {
+      reply: '已将结尾改成开放式。',
+      screenplay: '片名：雨夜便利店\n1. 内景｜便利店｜夜\n林默：你终于来了。',
+      synopsis: '一场发生在便利店的重逢。',
+      analysis: validAnalysis,
+      changes: ['结尾改为开放式'],
+    }
+    expect(parseDirectorScriptChatOutput(JSON.stringify(output))).toEqual(output)
+  })
+
+  it('rejects a response without a full screenplay', () => {
+    expect(parseDirectorScriptChatOutput(JSON.stringify({ reply: '已修改', analysis: validAnalysis, changes: [] }))).toBeUndefined()
   })
 })

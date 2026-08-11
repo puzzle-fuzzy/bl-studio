@@ -27,6 +27,7 @@ import {
   CreateGenerationResponseSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
+  DirectorScriptMessagesResponseSchema,
   DirectorAssetResponseSchema,
   DirectorShotResponseSchema,
   DirectorPhaseRunResponseSchema,
@@ -125,6 +126,8 @@ import type {
   DirectorAssemblyPreflight,
   DirectorProjectDetail,
   DirectorProjectListResult,
+  DirectorScriptMessage,
+  DirectorScriptChatInput,
   EmailActionAccepted,
   GenerationEstimate,
   GenerationDiagnostics,
@@ -320,6 +323,8 @@ export interface BailianStudioApiClient {
   createDirectorProject(input: CreateDirectorProjectInput): Promise<DirectorProjectDetail>
   /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
+  listDirectorScriptMessages(id: string): Promise<DirectorScriptMessage[]>
+  requestDirectorScriptChat(id: string, input: DirectorScriptChatInput): Promise<DirectorPhaseRun>
   /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
   updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
   /** `POST /api/director/projects/:id/assets` — 显式绑定一个已有图片资产。 */
@@ -674,6 +679,26 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorProjectResponseSchema,
       )
       return data.project
+    },
+
+    async listDirectorScriptMessages(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/messages`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptMessagesResponseSchema,
+      )
+      return data.messages
+    },
+
+    async requestDirectorScriptChat(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/chat`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
     },
 
     async updateDirectorProject(id, input) {

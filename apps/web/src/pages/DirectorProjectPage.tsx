@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, Plus, Save, Sparkles, Trash2, Video } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, MessageCircle, Plus, Save, Send, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorScriptMessage, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
@@ -12,7 +12,8 @@ import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { AssetVideoPlayer } from '@/components/assets/AssetVideoPlayer'
 import { Input } from '@/components/ui/input'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -22,6 +23,7 @@ import { modelNameZh } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
+import { cn } from '@/lib/utils'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
 type ReferenceOwnerType = 'character' | 'location'
@@ -89,6 +91,8 @@ export function DirectorProjectPage() {
   const [analysisText, setAnalysisText] = useState<string>()
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
   const [analysisStale, setAnalysisStale] = useState(false)
+  const [scriptMessages, setScriptMessages] = useState<DirectorScriptMessage[]>([])
+  const [scriptMessage, setScriptMessage] = useState('')
   const [charactersText, setCharactersText] = useState<string>()
   const [charactersResult, setCharactersResult] = useState<DirectorCharactersResult>()
   const [charactersStale, setCharactersStale] = useState(false)
@@ -222,6 +226,8 @@ export function DirectorProjectPage() {
         setAnalysisText(undefined)
         setAnalysisResult(undefined)
         setAnalysisStale(false)
+        setScriptMessages([])
+        setScriptMessage('')
         setCharactersText(undefined)
         setCharactersResult(undefined)
         setCharactersStale(false)
@@ -245,6 +251,11 @@ export function DirectorProjectPage() {
         setAssemblyConfirmOpen(false)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
+        void apiClient.listDirectorScriptMessages(id)
+          .then(messages => {
+            if (!cancelled) setScriptMessages(messages)
+          })
+          .catch(() => {})
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
@@ -372,6 +383,16 @@ export function DirectorProjectPage() {
           const next = await apiClient.getDirectorProject(id)
           if (cancelled) return
           setProject(next)
+          if (activePhase === 'analyze') {
+            setTitle(next.title)
+            setStoryText(next.storyText)
+            setSynopsis(next.synopsis ?? '')
+            void apiClient.listDirectorScriptMessages(id)
+              .then(messages => {
+                if (!cancelled) setScriptMessages(messages)
+              })
+              .catch(() => {})
+          }
           if (run.status === 'succeeded' && activePhase === 'analyze') {
             if (typeof run.outputSummary?.analysisText === 'string') setAnalysisText(run.outputSummary.analysisText)
             setAnalysisStale(false)
@@ -474,6 +495,28 @@ export function DirectorProjectPage() {
       toast.error('无法启动剧本分析，请确认阶段已准备好')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const sendScriptMessage = async () => {
+    const message = scriptMessage.trim()
+    if (id === undefined || analysisModelId.length === 0 || message.length === 0 || activeRunId !== undefined) return
+    try {
+      const run = await apiClient.requestDirectorScriptChat(id, { modelId: analysisModelId, message })
+      setScriptMessage('')
+      void apiClient.listDirectorScriptMessages(id)
+        .then(messages => setScriptMessages(messages))
+        .catch(() => {})
+      setActiveRunId(run.id)
+      setActivePhase('analyze')
+      setProject(current => current === undefined ? current : {
+        ...current,
+        phases: current.phases.map(state => state.phase === 'analyze'
+          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
+          : state),
+      })
+    } catch {
+      toast.error('无法发送剧本修改，请稍后重试')
     }
   }
 
@@ -939,7 +982,7 @@ export function DirectorProjectPage() {
             <Badge variant="outline">{project.status === 'draft' ? '草稿' : project.status}</Badge>
             <Badge variant="secondary">剧本 v{project.scriptVersion.version}</Badge>
             {dirty && <span className="text-xs text-muted-foreground">有未保存修改</span>}
-            <Button size="sm" onClick={() => void saveProject()} disabled={!dirty || saving}>
+            <Button className="hidden" size="sm" onClick={() => void saveProject()} disabled={!dirty || saving}>
               {saving ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Save data-icon="inline-start" />}
               保存
             </Button>
@@ -984,7 +1027,21 @@ export function DirectorProjectPage() {
         </TabsList>
 
         <TabsContent value="analyze" className="mt-6">
-          <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
+          <ScreenplayChatWorkspace
+            messages={scriptMessages}
+            screenplay={project.storyText}
+            scriptVersion={project.scriptVersion.version}
+            analysis={analysisResult}
+            analysisStale={analysisStale}
+            modelId={analysisModelId}
+            textModels={textModels}
+            message={scriptMessage}
+            running={activePhase === 'analyze' && activeRunId !== undefined}
+            onModelChange={setAnalysisModelId}
+            onMessageChange={setScriptMessage}
+            onSend={() => void sendScriptMessage()}
+          />
+          <div className="hidden grid gap-8 lg:grid-cols-[minmax(0,1fr)_18rem]">
             <section className="flex flex-col gap-4">
               <div className="flex items-start gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
@@ -2295,6 +2352,161 @@ function dialogueLinesFor(dialogue: DirectorShot['dialogue']): Array<{ speaker: 
     const candidate = line as { speaker?: unknown; text?: unknown }
     return typeof candidate.speaker === 'string' && typeof candidate.text === 'string'
   })
+}
+
+function ScreenplayChatWorkspace({
+  messages,
+  screenplay,
+  scriptVersion,
+  analysis,
+  analysisStale,
+  modelId,
+  textModels,
+  message,
+  running,
+  onModelChange,
+  onMessageChange,
+  onSend,
+}: {
+  messages: DirectorScriptMessage[]
+  screenplay: string
+  scriptVersion: number
+  analysis?: DirectorAnalysisResult
+  analysisStale: boolean
+  modelId: string
+  textModels: ModelCatalogItem[]
+  message: string
+  running: boolean
+  onModelChange: (value: string) => void
+  onMessageChange: (value: string) => void
+  onSend: () => void
+}) {
+  const canSend = message.trim().length > 0 && modelId.length > 0 && !running
+  return (
+    <div className="flex min-h-[min(78vh,860px)] flex-col gap-0 lg:flex-row">
+      <section className="flex min-w-0 flex-1 flex-col pb-8 lg:pr-8">
+        <div className="flex items-start justify-between gap-4 pb-4">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center bg-primary/10 text-primary">
+              <FileText className="size-5" />
+            </div>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg font-semibold">标准剧本</h2>
+                <Badge variant="secondary">v{scriptVersion}</Badge>
+              </div>
+              <p className="text-sm text-muted-foreground">每次对话都会生成一份完整剧本，不会只返回修改片段。</p>
+            </div>
+          </div>
+          {analysisStale && <Badge variant="outline">分析待更新</Badge>}
+        </div>
+        <ScrollArea className="min-h-0 flex-1 bg-muted/20">
+          <article className="mx-auto max-w-3xl whitespace-pre-wrap px-6 py-8 font-serif text-[15px] leading-8 text-foreground sm:px-10">
+            {screenplay.trim().length > 0
+              ? screenplay
+              : <div className="flex min-h-80 flex-col items-center justify-center gap-3 text-center font-sans">
+                <Sparkles className="size-8 text-primary/60" />
+                <p className="font-medium">还没有剧本</p>
+                <p className="max-w-sm text-sm leading-6 text-muted-foreground">在右侧告诉编剧你想创作什么，例如“写一个三分钟、发生在雨夜便利店的反转短剧”。</p>
+              </div>}
+          </article>
+        </ScrollArea>
+        {analysis !== undefined && (
+          <div className="flex flex-col gap-2 pt-4">
+            <div className="flex items-center gap-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              <span>当前分析摘要</span>
+              {analysisStale && <span className="normal-case tracking-normal text-amber-600">等待重新整理</span>}
+            </div>
+            <p className="text-sm leading-6 text-muted-foreground">{analysis.summary}</p>
+          </div>
+        )}
+      </section>
+
+      <Separator orientation="vertical" className="hidden h-auto lg:block" />
+
+      <section className="flex min-w-0 flex-1 flex-col pt-8 lg:pl-8 lg:pt-0">
+        <div className="flex items-start gap-3 pb-4">
+          <div className="flex size-10 shrink-0 items-center justify-center bg-primary text-primary-foreground">
+            <MessageCircle className="size-5" />
+          </div>
+          <div className="flex flex-col gap-1">
+            <h2 className="text-lg font-semibold">和编剧对话</h2>
+            <p className="text-sm text-muted-foreground">不用填写简介、原文或标题，直接说你想要什么。</p>
+          </div>
+        </div>
+
+        <ScrollArea className="min-h-0 flex-1 bg-muted/20 px-4 sm:px-5">
+          <div className="flex flex-col gap-4 py-5">
+            {messages.length === 0 && (
+              <div className="flex flex-col gap-3 py-6">
+                <p className="text-sm font-medium">可以这样开始：</p>
+                {['帮我写一个三分钟的都市反转短剧', '把结尾改成开放式，但保留人物关系', '把第二场改得更紧张，增加一个视觉动作'].map(prompt => (
+                  <button
+                    key={prompt}
+                    type="button"
+                    className="bg-background px-3 py-2 text-left text-sm text-muted-foreground transition-colors hover:bg-primary/5 hover:text-foreground"
+                    onClick={() => onMessageChange(prompt)}
+                  >
+                    {prompt}
+                  </button>
+                ))}
+              </div>
+            )}
+            {messages.map(item => (
+              <div key={item.id} className={cn('flex flex-col gap-1', item.role === 'user' ? 'items-end' : 'items-start')}>
+                <span className="px-1 text-[11px] text-muted-foreground">{item.role === 'user' ? '你' : '编剧'} · v{item.scriptVersion ?? scriptVersion}</span>
+                <div className={cn(
+                  'max-w-[92%] whitespace-pre-wrap px-4 py-3 text-sm leading-6',
+                  item.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-background text-foreground',
+                )}>
+                  {item.content}
+                </div>
+              </div>
+            ))}
+            {running && (
+              <div className="flex items-center gap-2 px-1 text-sm text-muted-foreground">
+                <Loader2 className="size-4 animate-spin" />
+                编剧正在整理完整剧本…
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+
+        <div className="sticky bottom-0 flex flex-col gap-3 bg-background/95 pt-4 backdrop-blur">
+          <Textarea
+            value={message}
+            onChange={event => onMessageChange(event.target.value)}
+            onKeyDown={event => {
+              if (event.key === 'Enter' && !event.shiftKey) {
+                event.preventDefault()
+                if (canSend) onSend()
+              }
+            }}
+            placeholder="告诉编剧你想创作或修改什么…（Enter 发送，Shift + Enter 换行）"
+            className="min-h-24 resize-none leading-6"
+            maxLength={8_000}
+            disabled={running}
+          />
+          <div className="flex items-center justify-between gap-3">
+            <Select value={modelId} onValueChange={onModelChange} disabled={running}>
+              <SelectTrigger className="w-44">
+                <SelectValue placeholder="选择编剧模型" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  {textModels.map(model => <SelectItem key={model.id} value={model.id}>{modelNameZh(model)}</SelectItem>)}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            <Button onClick={onSend} disabled={!canSend}>
+              {running ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Send data-icon="inline-start" />}
+              {running ? '整理中' : '发送修改'}
+            </Button>
+          </div>
+        </div>
+      </section>
+    </div>
+  )
 }
 
 function AnalysisReview({ result, rawText, stale = false }: { result?: DirectorAnalysisResult; rawText?: string; stale?: boolean }) {

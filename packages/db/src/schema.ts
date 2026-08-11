@@ -1043,6 +1043,37 @@ export const directorPhaseRuns = pgTable(
 	],
 );
 
+/** Persistent conversation turns for the screenplay editor. User and assistant
+ * messages are append-only so the editor can reconstruct the creative intent
+ * behind every screenplay version without coupling chat history to a phase run. */
+export const directorScriptMessages = pgTable(
+	"director_script_messages",
+	{
+		id: text("id").primaryKey(),
+		projectId: text("project_id")
+			.notNull()
+			.references(() => directorProjects.id, { onDelete: "cascade" }),
+		runId: text("run_id").references(() => directorPhaseRuns.id, {
+			onDelete: "set null",
+		}),
+		scriptVersionId: text("script_version_id").references(() => directorScriptVersions.id, {
+			onDelete: "set null",
+		}),
+		scriptVersion: integer("script_version"),
+		role: text("role").notNull(),
+		content: text("content").notNull(),
+		createdBy: text("created_by").notNull().default("system"),
+		createdAt: timestamp("created_at", { withTimezone: true }).notNull(),
+	},
+	(table) => [
+		check("director_script_messages_role_check", sql`${table.role} in ('user', 'assistant')`),
+		index("director_script_messages_project_created_idx").on(
+			table.projectId,
+			table.createdAt,
+		),
+	],
+);
+
 export const directorCharacters = pgTable(
 	"director_characters",
 	{

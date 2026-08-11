@@ -14,10 +14,8 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
-import { Input } from '@/components/ui/input'
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
-import { Textarea } from '@/components/ui/textarea'
 import { apiClient } from '@/lib/api'
 
 const STATUS_LABELS: Record<DirectorProjectSummary['status'], string> = {
@@ -33,9 +31,6 @@ export function DirectorPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string>()
   const [dialogOpen, setDialogOpen] = useState(false)
-  const [title, setTitle] = useState('')
-  const [storyText, setStoryText] = useState('')
-  const [synopsis, setSynopsis] = useState('')
   const [creating, setCreating] = useState(false)
 
   const loadProjects = async () => {
@@ -57,19 +52,14 @@ export function DirectorPage() {
 
   const createProject = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (title.trim().length === 0 || storyText.trim().length === 0) return
     setCreating(true)
     try {
       const project = await apiClient.createDirectorProject({
-        title: title.trim(),
-        storyText: storyText.trim(),
-        ...(synopsis.trim().length > 0 ? { synopsis: synopsis.trim() } : {}),
+        title: '未命名短剧',
+        storyText: '',
       })
       toast.success('导演台项目已创建')
       setDialogOpen(false)
-      setTitle('')
-      setStoryText('')
-      setSynopsis('')
       navigate(`/director/${project.id}`)
     } catch {
       toast.error('项目创建失败，请稍后重试')
@@ -101,31 +91,16 @@ export function DirectorPage() {
           <DialogContent className="max-w-2xl">
             <DialogHeader>
               <DialogTitle>新建导演台项目</DialogTitle>
-              <DialogDescription>先录入原始故事，后续阶段会围绕这份内容逐步生成和确认。</DialogDescription>
+              <DialogDescription>先创建一个空白项目，进入后直接和编剧对话，剧本会在每次对话后自动整理为标准格式。</DialogDescription>
             </DialogHeader>
             <form className="flex flex-col gap-4" onSubmit={createProject}>
-              <label htmlFor="director-new-title" className="flex flex-col gap-2 text-sm font-medium">
-                项目名称
-                <Input id="director-new-title" value={title} onChange={event => setTitle(event.target.value)} placeholder="例如：雨夜便利店" maxLength={120} autoFocus />
-              </label>
-              <label htmlFor="director-new-story" className="flex flex-col gap-2 text-sm font-medium">
-                故事原文
-                <Textarea
-                  id="director-new-story"
-                  value={storyText}
-                  onChange={event => setStoryText(event.target.value)}
-                  placeholder="粘贴故事梗概、小说片段或剧本原文……"
-                  className="min-h-40 resize-y"
-                  maxLength={500_000}
-                />
-              </label>
-              <label htmlFor="director-new-synopsis" className="flex flex-col gap-2 text-sm font-medium">
-                一句话简介 <span className="font-normal text-muted-foreground">可选</span>
-                <Input id="director-new-synopsis" value={synopsis} onChange={event => setSynopsis(event.target.value)} placeholder="用于项目列表和后续分析上下文" maxLength={2_000} />
-              </label>
+              <div className="flex flex-col gap-2 bg-muted/40 px-4 py-5">
+                <p className="font-medium">从一句话开始，剩下的交给对话</p>
+                <p className="text-sm leading-6 text-muted-foreground">项目会自动创建一个空白剧本。进入后，你只需要在聊天框里告诉编剧想写什么、改什么，标准剧本会随着每次对话更新。</p>
+              </div>
               <DialogFooter>
                 <Button type="button" variant="outline" onClick={() => setDialogOpen(false)}>取消</Button>
-                <Button type="submit" disabled={creating || title.trim().length === 0 || storyText.trim().length === 0}>
+                <Button type="submit" disabled={creating}>
                   {creating ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <ArrowRight data-icon="inline-start" />}
                   创建并进入
                 </Button>

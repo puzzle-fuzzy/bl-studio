@@ -14,6 +14,7 @@ import type {
   DirectorProjectStatus,
 	DirectorProjectSummary,
 	DirectorScriptVersion,
+	DirectorScriptMessage,
   UpdateDirectorProjectInput,
   UpdateDirectorShotInput,
   DirectorAssemblyPreflight,
@@ -36,6 +37,21 @@ export interface ListDirectorProjectsRepositoryInput {
 export interface GetDirectorProjectRepositoryInput {
   userId: string
   projectId: string
+}
+
+export interface ListDirectorScriptMessagesRepositoryInput {
+	userId: string
+	projectId: string
+	limit?: number
+}
+
+export interface ApplyDirectorScriptChatRepositoryInput {
+	userId: string
+	projectId: string
+	runId: string
+	screenplay: string
+	synopsis: string | null
+	reply: string
 }
 
 export interface UpdateDirectorProjectRepositoryInput {
@@ -158,7 +174,8 @@ export interface ListDirectorProjectsResult {
 export interface DirectorRepository {
   createProject(input: CreateDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   listProjects(input: ListDirectorProjectsRepositoryInput): Promise<ListDirectorProjectsResult>
-  getProject(input: GetDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail | undefined>
+	getProject(input: GetDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail | undefined>
+	listScriptMessages(input: ListDirectorScriptMessagesRepositoryInput): Promise<DirectorScriptMessage[]>
   updateProject(input: UpdateDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
   detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>
@@ -169,7 +186,8 @@ export interface DirectorRepository {
   finalizeShotVideo(input: FinalizeDirectorShotVideoRepositoryInput): Promise<boolean>
   finalizeDirectorMusic(input: FinalizeDirectorMusicRepositoryInput): Promise<DirectorAsset | undefined>
   finalizeDirectorAssembly(input: FinalizeDirectorAssemblyRepositoryInput): Promise<DirectorAsset | undefined>
-  requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
+	requestPhaseRun(input: RequestDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun>
+	applyScriptChat(input: ApplyDirectorScriptChatRepositoryInput): Promise<void>
   getPhaseRun(input: GetDirectorPhaseRunRepositoryInput): Promise<DirectorPhaseRun | undefined>
   getPhaseRunForWorker(runId: string): Promise<DirectorPhaseRunForWorker | undefined>
   markPhaseRunRunning(input: { runId: string; now?: string }): Promise<DirectorPhaseRun | undefined>

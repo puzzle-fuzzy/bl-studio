@@ -4,6 +4,7 @@ import {
   CreateDirectorPhaseRunSchema,
   DirectorPhaseSchema,
   CreateDirectorProjectSchema,
+  DirectorScriptChatInputSchema,
   ListDirectorProjectsSchema,
   UpdateDirectorProjectSchema,
   UpdateDirectorShotSchema,
@@ -44,6 +45,22 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const patch = validateInput(UpdateDirectorProjectSchema, body)
       const project = await repository.updateProject({ userId: user.id, projectId: params.id, patch })
       return { success: true, data: { project } }
+    })
+    .get('/projects/:id/script/messages', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const messages = await repository.listScriptMessages({ userId: user.id, projectId: params.id, limit: 100 })
+      return { success: true, data: { messages } }
+    })
+    .post('/projects/:id/script/chat', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(DirectorScriptChatInputSchema, body)
+      const run = await repository.requestPhaseRun({
+        userId: user.id,
+        projectId: params.id,
+        phase: 'analyze',
+        ...input,
+      })
+      return { success: true, data: { run } }
     })
     .post('/projects/:id/assets', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)

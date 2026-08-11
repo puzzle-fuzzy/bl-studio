@@ -91,6 +91,27 @@ export const DirectorScriptVersionSchema = z.object({
   createdAt: z.string(),
 }).strict()
 
+export const DIRECTOR_SCRIPT_MESSAGE_ROLES = ['user', 'assistant'] as const
+export const DirectorScriptMessageRoleSchema = z.enum(DIRECTOR_SCRIPT_MESSAGE_ROLES)
+
+export const DirectorScriptMessageSchema = z.object({
+  id: z.string(),
+  role: DirectorScriptMessageRoleSchema,
+  content: z.string(),
+  scriptVersion: z.number().int().positive().nullable(),
+  runId: z.string().nullable(),
+  createdAt: z.string(),
+}).strict()
+
+export const DirectorScriptMessagesResponseSchema = z.object({
+  messages: z.array(DirectorScriptMessageSchema),
+}).strict()
+
+export const DirectorScriptChatInputSchema = z.object({
+  modelId: z.string().trim().min(1).max(256),
+  message: z.string().trim().min(1).max(8_000),
+}).strict()
+
 const DirectorStaleFields = {
   staleAt: z.string().nullable(),
   staleReason: z.string().nullable(),
@@ -278,8 +299,8 @@ export const AttachDirectorAssetSchema = z.object({
 }).strict()
 
 export const CreateDirectorProjectSchema = z.object({
-  title: z.string().trim().min(1).max(120),
-  storyText: z.string().trim().min(1).max(500_000),
+  title: z.string().trim().min(1).max(120).default('未命名短剧'),
+  storyText: z.string().trim().max(500_000).default(''),
   synopsis: z.string().trim().max(2_000).optional(),
 }).strict()
 
@@ -359,6 +380,7 @@ export const DirectorShotResponseSchema = z.object({
 
 export const CreateDirectorPhaseRunSchema = z.object({
   modelId: z.string().trim().min(1).max(256).optional(),
+  message: z.string().trim().min(1).max(8_000).optional(),
   prompt: z.string().trim().max(2_000).optional(),
   lyrics: z.string().trim().max(2_000).optional(),
   isInstrumental: z.boolean().optional(),
@@ -473,6 +495,14 @@ export const DirectorAnalysisResultSchema = z.object({
   visualMotifs: z.array(z.string().min(1).max(500)).max(30),
 }).strict()
 
+export const DirectorScriptChatOutputSchema = z.object({
+  reply: z.string().min(1).max(4_000),
+  screenplay: z.string().trim().min(1).max(500_000),
+  synopsis: z.string().trim().max(2_000).nullable(),
+  analysis: DirectorAnalysisResultSchema,
+  changes: z.array(z.string().min(1).max(500)).max(20),
+}).strict()
+
 export type CreateDirectorProjectInput = z.infer<typeof CreateDirectorProjectSchema>
 export type UpdateDirectorProjectInput = z.infer<typeof UpdateDirectorProjectSchema>
 export type CreateDirectorPhaseRunInput = z.infer<typeof CreateDirectorPhaseRunSchema>
@@ -490,6 +520,9 @@ export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSche
 export type DirectorProjectSummary = z.infer<typeof DirectorProjectSummarySchema>
 export type DirectorProjectDetail = z.infer<typeof DirectorProjectDetailSchema>
 export type DirectorScriptVersion = z.infer<typeof DirectorScriptVersionSchema>
+export type DirectorScriptMessage = z.infer<typeof DirectorScriptMessageSchema>
+export type DirectorScriptChatInput = z.infer<typeof DirectorScriptChatInputSchema>
+export type DirectorScriptChatOutput = z.infer<typeof DirectorScriptChatOutputSchema>
 export type DirectorCharacter = z.infer<typeof DirectorCharacterSchema>
 export type DirectorLocation = z.infer<typeof DirectorLocationSchema>
 export type DirectorAsset = z.infer<typeof DirectorAssetSchema>

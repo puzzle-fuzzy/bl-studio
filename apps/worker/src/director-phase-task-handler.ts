@@ -5,7 +5,7 @@ import { getBailianOperationCapability, validateModelParams } from '@bailian-stu
 import { DirectorAnalysisResultSchema, DirectorAssemblyPlanSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
-import { parseDirectorAnalysisOutput } from './director-analysis'
+import { parseDirectorAnalysisOutput, parseDirectorScriptChatOutput } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
@@ -15,7 +15,7 @@ import { dialoguePrompt, parseDirectorDialogueOutput, type DirectorDialogueShotI
 import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary, type DirectorVideoGenerationProgress, type DirectorVideoShotSnapshot } from './director-video'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
-const MAX_ANALYSIS_STORY_LENGTH = 9_000
+const MAX_ANALYSIS_STORY_LENGTH = 30_000
 const PHASE_POLL_DELAY_MS = 5_000
 
 export interface DirectorPhaseTaskHandlerDeps {
@@ -64,6 +64,7 @@ export async function processDirectorPhaseTask(
   await deps.directorRepository.markPhaseRunRunning({ runId: phaseRunId })
   const modelId = stringInput(task.input, 'modelId') ?? stringInput(run.outputSummary ?? {}, 'modelId')
   const snapshot = runInputSnapshot(run)
+  const chatMessage = snapshot.chatMessage
 
   if (run.phase === 'assemble') {
     if (task.userId === undefined) {
@@ -143,12 +144,16 @@ export async function processDirectorPhaseTask(
         userId: task.userId,
         modelId,
         params: {
-          prompt: analysisPrompt(snapshot.title, snapshot.synopsis, snapshot.storyText),
-          maxTokens: 4_096,
+          prompt: chatMessage === undefined
+            ? analysisPrompt(snapshot.title, snapshot.synopsis, snapshot.storyText)
+            : scriptChatPrompt(snapshot, chatMessage),
+          maxTokens: chatMessage === undefined ? 4_096 : 8_192,
           temperature: 0.4,
           topP: 0.8,
         },
-        idempotencyKey: `director:${run.id}:analysis`,
+        idempotencyKey: chatMessage === undefined
+          ? `director:${run.id}:analysis`
+          : `director:${run.id}:script-chat`,
         traceId: task.traceId,
       })
       await deps.directorRepository?.setPhaseRunProgress({
@@ -190,6 +195,35 @@ export async function processDirectorPhaseTask(
         retriable: false,
         code: 'DIRECTOR_ANALYSIS_OUTPUT_MISSING',
       }, deps)
+    }
+    if (chatMessage !== undefined) {
+      const chat = parseDirectorScriptChatOutput(analysisText)
+      if (chat === undefined) {
+        return failPhase(run.id, {
+          category: 'provider',
+          message: 'Screenplay chat generation returned text that does not match the screenplay editor contract',
+          retriable: false,
+          code: 'DIRECTOR_SCRIPT_CHAT_OUTPUT_INVALID',
+        }, deps)
+      }
+      await deps.directorRepository.applyScriptChat({
+        userId: task.userId,
+        projectId: run.projectId,
+        runId: run.id,
+        screenplay: chat.screenplay,
+        synopsis: chat.synopsis,
+        reply: chat.reply,
+      })
+      return completePhase(run.id, {
+        generationId,
+        modelId,
+        analysisText: JSON.stringify(chat.analysis),
+        analysis: chat.analysis,
+        screenplay: chat.screenplay,
+        synopsis: chat.synopsis,
+        reply: chat.reply,
+        changes: chat.changes,
+      }, deps, JSON.stringify(chat.analysis))
     }
     const analysis = parseDirectorAnalysisOutput(analysisText)
     if (analysis === undefined) {
@@ -1397,6 +1431,8 @@ interface RunInputSnapshot {
   title: string
   synopsis: string | null
   storyText: string
+  chatMessage?: string
+  chatHistory?: Array<{ role: string; content: string }>
   analysis: unknown
   characters: unknown
   locations: unknown
@@ -1412,6 +1448,15 @@ function runInputSnapshot(run: DirectorPhaseRunForWorker): RunInputSnapshot {
     title: stringInput(snapshot, 'title') ?? 'Untitled screenplay',
     synopsis: typeof snapshot['synopsis'] === 'string' ? snapshot['synopsis'] : null,
     storyText: stringInput(snapshot, 'storyText') ?? '',
+    chatMessage: typeof snapshot['chatMessage'] === 'string' ? snapshot['chatMessage'] : undefined,
+    chatHistory: Array.isArray(snapshot['chatHistory'])
+      ? snapshot['chatHistory'].filter((entry): entry is { role: string; content: string } => (
+        typeof entry === 'object'
+        && entry !== null
+        && typeof (entry as Record<string, unknown>).role === 'string'
+        && typeof (entry as Record<string, unknown>).content === 'string'
+      ))
+      : undefined,
     analysis: snapshot['analysis'],
     characters: snapshot['characters'],
     locations: snapshot['locations'],
@@ -1444,6 +1489,24 @@ function analysisPrompt(title: string, synopsis: string | null, storyText: strin
     `项目：${title}`,
     synopsis === null ? '' : `简介：${synopsis}`,
     `剧本：\n${storyText}`,
+  ].filter(Boolean).join('\n\n')
+}
+
+function scriptChatPrompt(snapshot: RunInputSnapshot, message: string): string {
+  const history = snapshot.chatHistory?.map(entry => `${entry.role === 'user' ? '用户' : '编剧'}：${entry.content}`).join('\n') ?? '暂无历史对话'
+  return [
+    '你是一名专业短剧编剧、剧本医生和导演台编辑。用户正在通过聊天修改一部短剧。',
+    '请根据用户本次要求，直接修改当前剧本，并返回一个 JSON 对象，不要返回 Markdown、代码围栏或 JSON 以外的解释。',
+    'screenplay 必须是修改后的完整标准剧本全文，不是 diff，不是提纲，不是修改建议。即使用户只修改一个细节，也必须保留未修改部分。',
+    '标准剧本至少应包含：片名、人物表、场次编号、内/外景与地点、时间、动作描述、角色名、情绪/表演提示和对白。场次使用清晰的场景标题，例如“1. 内景｜出租屋｜夜”。',
+    '不要臆造用户没有提供的关键事实；信息不足时保留原内容或使用中性表达。对话中的修改优先于旧剧本，但不能破坏已经建立的故事因果、人物关系和场景连续性。',
+    'analysis 必须严格符合现有剧本分析结构，供后续角色、场景和分镜阶段使用。reply 是给用户看的简短说明，changes 是本次实际修改点。',
+    '{"reply":"已完成本次修改","screenplay":"完整标准剧本","synopsis":"一句话简介或 null","analysis":{"summary":"","theme":"","audience":"","structure":[],"characters":[],"locations":[],"continuityRisks":[],"visualMotifs":[]},"changes":["修改点"]}',
+    `项目：${snapshot.title}`,
+    snapshot.synopsis === null ? '' : `当前简介：${snapshot.synopsis}`,
+    `历史对话：\n${history}`,
+    `当前剧本：\n${snapshot.storyText || '（当前还没有剧本，请根据用户要求从零开始创作标准剧本）'}`,
+    `用户本次要求：\n${message}`,
   ].filter(Boolean).join('\n\n')
 }
 

@@ -113,6 +113,9 @@ const fakeDirectorRepository: DirectorRepository = {
   async getProject(input) {
     return projects.find(item => item.userId === input.userId && item.project.id === input.projectId)?.project
   },
+  async listScriptMessages() {
+    return []
+  },
   async updateProject(input) {
     const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
     if (record === undefined) throw new Error('project not found')
@@ -124,6 +127,7 @@ const fakeDirectorRepository: DirectorRepository = {
     }
     return record.project
   },
+  async applyScriptChat() {},
   async attachAsset(input) {
     const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
     if (record === undefined) throw new Error('project not found')
@@ -350,6 +354,30 @@ describe('director routes', () => {
     const readBody = await readResponse.json() as { data: { run: DirectorPhaseRun } }
     expect(readResponse.status).toBe(200)
     expect(readBody.data.run.id).toBe(runBody.data.run.id)
+  })
+
+  it('queues a screenplay chat request and exposes its message history endpoint', async () => {
+    const createResponse = await app.handle(authed('/api/director/projects', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ title: '聊天剧本', storyText: '' }),
+    }))
+    const created = await createResponse.json() as { data: { project: DirectorProjectDetail } }
+    const projectId = created.data.project.id
+
+    const chatResponse = await app.handle(authed(`/api/director/projects/${projectId}/script/chat`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ modelId: 'qwen-plus', message: '写一个雨夜便利店的三分钟反转短剧' }),
+    }))
+    const chatBody = await chatResponse.json() as { data: { run: DirectorPhaseRun } }
+    expect(chatResponse.status).toBe(200)
+    expect(chatBody.data.run.phase).toBe('analyze')
+
+    const messagesResponse = await app.handle(authed(`/api/director/projects/${projectId}/script/messages`))
+    const messagesBody = await messagesResponse.json() as { data: { messages: unknown[] } }
+    expect(messagesResponse.status).toBe(200)
+    expect(messagesBody.data.messages).toEqual([])
   })
 
   it('does not queue the assemble phase without a complete media preflight', async () => {
