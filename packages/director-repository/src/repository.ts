@@ -2173,6 +2173,7 @@ export function createDirectorRepository({
 					nextRunAt: now,
 					recordId: runId,
 					userId: input.userId,
+					traceId: input.traceId ?? null,
 					createdBy: input.userId,
 					updatedBy: input.userId,
 					createdAt: now,

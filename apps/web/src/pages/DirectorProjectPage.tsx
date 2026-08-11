@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, MessageCircle, Plus, Save, Send, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
 import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorScriptMessage, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
-import { DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
+import { ApiClientError, DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
@@ -28,6 +28,32 @@ import { cn } from '@/lib/utils'
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
 type ReferenceOwnerType = 'character' | 'location'
 type ReferenceTarget = { ownerType: ReferenceOwnerType; ownerId: string }
+type ScriptMessageDeliveryStatus = 'queued' | 'failed'
+type ScriptMessageView = DirectorScriptMessage & { deliveryStatus?: ScriptMessageDeliveryStatus }
+
+function directorClientErrorMeta(error: unknown): Record<string, unknown> {
+  if (error instanceof ApiClientError) {
+    return {
+      errorType: error.name,
+      errorCode: error.code,
+      status: error.status,
+      traceId: error.traceId,
+    }
+  }
+  return {
+    errorType: error instanceof Error ? error.name : 'unknown',
+    errorMessage: error instanceof Error ? error.message : String(error),
+  }
+}
+
+function logDirectorClientEvent(event: string, meta: Record<string, unknown> = {}): void {
+  const payload = { event, scope: 'director-client', ...meta }
+  if (event.endsWith('.failed')) {
+    console.error('[director-client]', payload)
+  } else {
+    console.info('[director-client]', payload)
+  }
+}
 
 const TAB_ITEMS: Array<{ value: string; label: string; phases: DirectorPhase[] }> = [
   { value: 'analyze', label: '剧本分析', phases: ['analyze'] },
@@ -92,7 +118,10 @@ export function DirectorProjectPage() {
   const [analysisResult, setAnalysisResult] = useState<DirectorAnalysisResult>()
   const [analysisStale, setAnalysisStale] = useState(false)
   const [scriptMessages, setScriptMessages] = useState<DirectorScriptMessage[]>([])
+  const [pendingScriptMessage, setPendingScriptMessage] = useState<ScriptMessageView>()
+  const [scriptMessagesError, setScriptMessagesError] = useState<string>()
   const [scriptMessage, setScriptMessage] = useState('')
+  const scriptMessagesRequestRef = useRef(0)
   const [charactersText, setCharactersText] = useState<string>()
   const [charactersResult, setCharactersResult] = useState<DirectorCharactersResult>()
   const [charactersStale, setCharactersStale] = useState(false)
@@ -148,6 +177,36 @@ export function DirectorProjectPage() {
     if (project === undefined) return []
     return [...new Set(project.assets.map(asset => asset.assetId).filter((assetId): assetId is string => assetId !== null))]
   }, [project])
+
+  const reloadScriptMessages = (projectId: string, reason: string) => {
+    const requestSequence = scriptMessagesRequestRef.current + 1
+    scriptMessagesRequestRef.current = requestSequence
+    logDirectorClientEvent('script_messages.load.started', { projectId, reason, requestSequence })
+    return apiClient.listDirectorScriptMessages(projectId)
+      .then(messages => {
+        if (requestSequence !== scriptMessagesRequestRef.current) {
+          logDirectorClientEvent('script_messages.load.stale_response', { projectId, reason, requestSequence })
+          return
+        }
+        setScriptMessages(messages)
+        setScriptMessagesError(undefined)
+        setPendingScriptMessage(current => {
+          if (current === undefined || current.runId === null) return current
+          return messages.some(message => message.runId === current.runId && message.role === 'user') ? undefined : current
+        })
+        logDirectorClientEvent('script_messages.load.succeeded', { projectId, reason, requestSequence, messageCount: messages.length })
+      })
+      .catch(error => {
+        if (requestSequence !== scriptMessagesRequestRef.current) return
+        setScriptMessagesError('对话记录暂时无法加载，现有内容仍会保留。')
+        logDirectorClientEvent('script_messages.load.failed', {
+          projectId,
+          reason,
+          requestSequence,
+          ...directorClientErrorMeta(error),
+        })
+      })
+  }
 
   useEffect(() => {
     if (boundReferenceAssetIds.length > 0) void loadReferenceAssets(boundReferenceAssetIds)
@@ -227,6 +286,9 @@ export function DirectorProjectPage() {
         setAnalysisResult(undefined)
         setAnalysisStale(false)
         setScriptMessages([])
+        setPendingScriptMessage(undefined)
+        setScriptMessagesError(undefined)
+        scriptMessagesRequestRef.current += 1
         setScriptMessage('')
         setCharactersText(undefined)
         setCharactersResult(undefined)
@@ -251,11 +313,7 @@ export function DirectorProjectPage() {
         setAssemblyConfirmOpen(false)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
-        void apiClient.listDirectorScriptMessages(id)
-          .then(messages => {
-            if (!cancelled) setScriptMessages(messages)
-          })
-          .catch(() => {})
+        void reloadScriptMessages(id, 'project-load')
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
@@ -365,6 +423,7 @@ export function DirectorProjectPage() {
       })
     return () => {
       cancelled = true
+      scriptMessagesRequestRef.current += 1
     }
   }, [id])
 
@@ -372,10 +431,15 @@ export function DirectorProjectPage() {
     if (id === undefined || activeRunId === undefined || activePhase === undefined) return
     let cancelled = false
     let timer: ReturnType<typeof setTimeout> | undefined
+    let pollErrorLogged = false
     const poll = async () => {
       try {
         const run = await apiClient.getDirectorPhaseRun(id, activePhase, activeRunId)
         if (cancelled) return
+        if (pollErrorLogged) {
+          logDirectorClientEvent('phase.poll.recovered', { projectId: id, phase: activePhase, phaseRunId: activeRunId })
+          pollErrorLogged = false
+        }
         if (activePhase === 'videos') {
           setProject(current => current === undefined ? current : applyDirectorVideoProgress(current, run.outputSummary))
         }
@@ -387,11 +451,11 @@ export function DirectorProjectPage() {
             setTitle(next.title)
             setStoryText(next.storyText)
             setSynopsis(next.synopsis ?? '')
-            void apiClient.listDirectorScriptMessages(id)
-              .then(messages => {
-                if (!cancelled) setScriptMessages(messages)
-              })
-              .catch(() => {})
+            void reloadScriptMessages(id, 'analysis-terminal')
+            setPendingScriptMessage(current => {
+              if (current?.runId !== activeRunId || run.status === 'succeeded') return current
+              return { ...current, deliveryStatus: 'failed' }
+            })
           }
           if (run.status === 'succeeded' && activePhase === 'analyze') {
             if (typeof run.outputSummary?.analysisText === 'string') setAnalysisText(run.outputSummary.analysisText)
@@ -433,6 +497,14 @@ export function DirectorProjectPage() {
           }
           setActiveRunId(undefined)
           setActivePhase(undefined)
+          logDirectorClientEvent('phase.poll.terminal', {
+            projectId: id,
+            phase: activePhase,
+            phaseRunId: activeRunId,
+            status: run.status,
+            errorCode: typeof run.error?.code === 'string' ? run.error.code : undefined,
+            errorMessage: typeof run.error?.message === 'string' ? run.error.message : undefined,
+          })
           const phaseLabel = activePhase === 'assemble'
             ? DIRECTOR_PHASE_LABELS.assemble
             : activePhase === 'analyze'
@@ -456,7 +528,16 @@ export function DirectorProjectPage() {
           return
         }
         timer = setTimeout(() => void poll(), 2_000)
-      } catch {
+      } catch (error) {
+        if (!pollErrorLogged) {
+          logDirectorClientEvent('phase.poll.failed', {
+            projectId: id,
+            phase: activePhase,
+            phaseRunId: activeRunId,
+            ...directorClientErrorMeta(error),
+          })
+          pollErrorLogged = true
+        }
         if (!cancelled) timer = setTimeout(() => void poll(), 4_000)
       }
     }
@@ -501,12 +582,27 @@ export function DirectorProjectPage() {
   const sendScriptMessage = async () => {
     const message = scriptMessage.trim()
     if (id === undefined || analysisModelId.length === 0 || message.length === 0 || activeRunId !== undefined) return
+    const clientMessageId = `client-${crypto.randomUUID()}`
+    setPendingScriptMessage({
+      id: clientMessageId,
+      role: 'user',
+      content: message,
+      scriptVersion: project?.scriptVersion.version ?? 1,
+      runId: null,
+      createdAt: new Date().toISOString(),
+      deliveryStatus: 'queued',
+    })
+    setScriptMessage('')
+    logDirectorClientEvent('script_chat.send.started', {
+      projectId: id,
+      modelId: analysisModelId,
+      messageLength: message.length,
+      clientMessageId,
+    })
     try {
       const run = await apiClient.requestDirectorScriptChat(id, { modelId: analysisModelId, message })
-      setScriptMessage('')
-      void apiClient.listDirectorScriptMessages(id)
-        .then(messages => setScriptMessages(messages))
-        .catch(() => {})
+      setPendingScriptMessage(current => current?.id === clientMessageId ? { ...current, runId: run.id } : current)
+      void reloadScriptMessages(id, 'chat-queued')
       setActiveRunId(run.id)
       setActivePhase('analyze')
       setProject(current => current === undefined ? current : {
@@ -515,7 +611,22 @@ export function DirectorProjectPage() {
           ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
           : state),
       })
-    } catch {
+      logDirectorClientEvent('script_chat.send.queued', {
+        projectId: id,
+        phaseRunId: run.id,
+        taskId: run.taskId,
+        clientMessageId,
+      })
+    } catch (error) {
+      setPendingScriptMessage(current => current?.id === clientMessageId ? { ...current, deliveryStatus: 'failed' } : current)
+      setScriptMessage(message)
+      logDirectorClientEvent('script_chat.send.failed', {
+        projectId: id,
+        modelId: analysisModelId,
+        messageLength: message.length,
+        clientMessageId,
+        ...directorClientErrorMeta(error),
+      })
       toast.error('无法发送剧本修改，请稍后重试')
     }
   }
@@ -1029,6 +1140,9 @@ export function DirectorProjectPage() {
         <TabsContent value="analyze" className="mt-6">
           <ScreenplayChatWorkspace
             messages={scriptMessages}
+            pendingMessage={pendingScriptMessage}
+            historyError={scriptMessagesError}
+            onRetryHistory={() => { if (id !== undefined) void reloadScriptMessages(id, 'manual-retry') }}
             screenplay={project.storyText}
             scriptVersion={project.scriptVersion.version}
             analysis={analysisResult}
@@ -2356,6 +2470,9 @@ function dialogueLinesFor(dialogue: DirectorShot['dialogue']): Array<{ speaker: 
 
 function ScreenplayChatWorkspace({
   messages,
+  pendingMessage,
+  historyError,
+  onRetryHistory,
   screenplay,
   scriptVersion,
   analysis,
@@ -2369,6 +2486,9 @@ function ScreenplayChatWorkspace({
   onSend,
 }: {
   messages: DirectorScriptMessage[]
+  pendingMessage?: ScriptMessageView
+  historyError?: string
+  onRetryHistory: () => void
   screenplay: string
   scriptVersion: number
   analysis?: DirectorAnalysisResult
@@ -2382,6 +2502,7 @@ function ScreenplayChatWorkspace({
   onSend: () => void
 }) {
   const canSend = message.trim().length > 0 && modelId.length > 0 && !running
+  const visibleMessages: ScriptMessageView[] = pendingMessage === undefined ? messages : [...messages, pendingMessage]
   return (
     <div className="flex min-h-[min(78vh,860px)] flex-col gap-0 lg:flex-row">
       <section className="flex min-w-0 flex-1 flex-col pb-8 lg:pr-8">
@@ -2437,7 +2558,13 @@ function ScreenplayChatWorkspace({
 
         <ScrollArea className="min-h-0 flex-1 bg-muted/20 px-4 sm:px-5">
           <div className="flex flex-col gap-4 py-5">
-            {messages.length === 0 && (
+            {historyError !== undefined && (
+              <div className="flex items-center justify-between gap-3 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                <span>{historyError}</span>
+                <Button type="button" variant="ghost" size="sm" onClick={onRetryHistory}>重试</Button>
+              </div>
+            )}
+            {visibleMessages.length === 0 && (
               <div className="flex flex-col gap-3 py-6">
                 <p className="text-sm font-medium">可以这样开始：</p>
                 {['帮我写一个三分钟的都市反转短剧', '把结尾改成开放式，但保留人物关系', '把第二场改得更紧张，增加一个视觉动作'].map(prompt => (
@@ -2452,8 +2579,10 @@ function ScreenplayChatWorkspace({
                 ))}
               </div>
             )}
-            {messages.map(item => (
+            {visibleMessages.map(item => (
               <div key={item.id} className={cn('flex flex-col gap-1', item.role === 'user' ? 'items-end' : 'items-start')}>
+                {item.deliveryStatus === 'queued' && <span className="px-1 text-[11px] text-muted-foreground">消息已保存，正在分析</span>}
+                {item.deliveryStatus === 'failed' && <span className="px-1 text-[11px] text-destructive">分析失败，消息已保留，可直接重试</span>}
                 <span className="px-1 text-[11px] text-muted-foreground">{item.role === 'user' ? '你' : '编剧'} · v{item.scriptVersion ?? scriptVersion}</span>
                 <div className={cn(
                   'max-w-[92%] whitespace-pre-wrap px-4 py-3 text-sm leading-6',

@@ -5,7 +5,7 @@ import { getBailianOperationCapability, validateModelParams } from '@bailian-stu
 import { DirectorAnalysisResultSchema, DirectorAssemblyPlanSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema, type DirectorAnalysisResult, type DirectorCharactersResult, type DirectorLocationsResult, type Logger } from '@bailian-studio/shared'
 import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
-import { parseDirectorAnalysisOutput, parseDirectorScriptChatOutput } from './director-analysis'
+import { parseDirectorAnalysisOutput, parseDirectorScriptChatOutputDetailed } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
 import { parseDirectorLocationsOutput } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
@@ -65,6 +65,17 @@ export async function processDirectorPhaseTask(
   const modelId = stringInput(task.input, 'modelId') ?? stringInput(run.outputSummary ?? {}, 'modelId')
   const snapshot = runInputSnapshot(run)
   const chatMessage = snapshot.chatMessage
+
+  deps.logger.info('director.phase.started', {
+    taskId: task.id,
+    traceId: task.traceId,
+    phaseRunId: run.id,
+    projectId: run.projectId,
+    phase: run.phase,
+    modelId,
+    isScriptChat: chatMessage !== undefined,
+    ...(chatMessage === undefined ? {} : { messageLength: chatMessage.length }),
+  })
 
   if (run.phase === 'assemble') {
     if (task.userId === undefined) {
@@ -197,8 +208,19 @@ export async function processDirectorPhaseTask(
       }, deps)
     }
     if (chatMessage !== undefined) {
-      const chat = parseDirectorScriptChatOutput(analysisText)
-      if (chat === undefined) {
+      const parsedChat = parseDirectorScriptChatOutputDetailed(analysisText)
+      if (parsedChat.output === undefined) {
+        deps.logger.error('director.script_chat.output_invalid', {
+          taskId: task.id,
+          traceId: task.traceId,
+          phaseRunId: run.id,
+          projectId: run.projectId,
+          generationId,
+          outputLength: analysisText.length,
+          parseMode: parsedChat.mode,
+          topLevelKeys: parsedChat.topLevelKeys,
+          issuePaths: parsedChat.issuePaths,
+        })
         return failPhase(run.id, {
           category: 'provider',
           message: 'Screenplay chat generation returned text that does not match the screenplay editor contract',
@@ -206,6 +228,19 @@ export async function processDirectorPhaseTask(
           code: 'DIRECTOR_SCRIPT_CHAT_OUTPUT_INVALID',
         }, deps)
       }
+      if (parsedChat.mode === 'normalized-json') {
+        deps.logger.warn('director.script_chat.output_normalized', {
+          taskId: task.id,
+          traceId: task.traceId,
+          phaseRunId: run.id,
+          projectId: run.projectId,
+          generationId,
+          outputLength: analysisText.length,
+          topLevelKeys: parsedChat.topLevelKeys,
+          normalizedIssuePaths: parsedChat.issuePaths,
+        })
+      }
+      const chat = parsedChat.output
       await deps.directorRepository.applyScriptChat({
         userId: task.userId,
         projectId: run.projectId,
@@ -1493,6 +1528,8 @@ function analysisPrompt(title: string, synopsis: string | null, storyText: strin
 }
 
 function scriptChatPrompt(snapshot: RunInputSnapshot, message: string): string {
+  const contractReminder = 'analysis must use only structure.name/purpose/beats, characters.name/role/description/traits, and locations.name/description/atmosphere; do not use scene, function, keyProps, or details aliases.'
+  message = `${contractReminder}\n\n${message}`
   const history = snapshot.chatHistory?.map(entry => `${entry.role === 'user' ? '用户' : '编剧'}：${entry.content}`).join('\n') ?? '暂无历史对话'
   return [
     '你是一名专业短剧编剧、剧本医生和导演台编辑。用户正在通过聊天修改一部短剧。',
@@ -1598,6 +1635,10 @@ async function completePhase(
       code: 'DIRECTOR_PHASE_COMPLETE_FAILED',
     })
   }
+  deps.logger.info('director.phase.succeeded', {
+    phaseRunId: runId,
+    outputKeys: Object.keys(outputSummary).sort(),
+  })
   return { status: 'succeeded', output: { artifacts: [{ kind: 'text', text: outputText }] } }
 }
 
@@ -1613,6 +1654,13 @@ async function failPhase(
       message: error.message,
       ...(error.retriable === undefined ? {} : { retriable: error.retriable }),
     },
+  })
+  deps.logger.error('director.phase.failed', {
+    phaseRunId: runId,
+    category: error.category,
+    code: error.code,
+    retriable: error.retriable,
+    errorMessage: error.message,
   })
   return failed(error)
 }

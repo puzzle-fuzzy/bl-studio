@@ -9,12 +9,16 @@ import {
   UpdateDirectorProjectSchema,
   UpdateDirectorShotSchema,
   ValidationError,
+  createLogger,
   validateInput,
 } from '@bailian-studio/shared'
 import { estimatePriceCents, getBailianOperationCapability, getModelById, validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
+import { getRequestTrace } from '../../lib/middleware'
+
+const directorLogger = createLogger('director-api')
 
 export function createDirectorRoutes(deps: ApiDependencies) {
   const repository = deps.directorRepository
@@ -48,19 +52,66 @@ export function createDirectorRoutes(deps: ApiDependencies) {
     })
     .get('/projects/:id/script/messages', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const messages = await repository.listScriptMessages({ userId: user.id, projectId: params.id, limit: 100 })
-      return { success: true, data: { messages } }
+      const traceId = getRequestTrace(request)?.requestId
+      try {
+        const messages = await repository.listScriptMessages({ userId: user.id, projectId: params.id, limit: 100 })
+        directorLogger.info('script_messages.listed', {
+          requestId: traceId,
+          projectId: params.id,
+          messageCount: messages.length,
+        })
+        return { success: true, data: { messages } }
+      } catch (error) {
+        directorLogger.error('script_messages.list_failed', {
+          requestId: traceId,
+          projectId: params.id,
+          errorName: error instanceof Error ? error.name : 'unknown',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     })
     .post('/projects/:id/script/chat', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(DirectorScriptChatInputSchema, body)
-      const run = await repository.requestPhaseRun({
-        userId: user.id,
+      const requestId = getRequestTrace(request)?.requestId
+      const startedAt = Date.now()
+      directorLogger.info('script_chat.requested', {
+        requestId,
         projectId: params.id,
-        phase: 'analyze',
-        ...input,
+        modelId: input.modelId,
+        messageLength: input.message.length,
       })
-      return { success: true, data: { run } }
+      try {
+        const run = await repository.requestPhaseRun({
+          userId: user.id,
+          projectId: params.id,
+          phase: 'analyze',
+          traceId: requestId,
+          ...input,
+        })
+        directorLogger.info('script_chat.queued', {
+          requestId,
+          projectId: params.id,
+          phaseRunId: run.id,
+          taskId: run.taskId,
+          version: run.version,
+          durationMs: Date.now() - startedAt,
+        })
+        return { success: true, data: { run } }
+      } catch (error) {
+        directorLogger.error('script_chat.queue_failed', {
+          requestId,
+          projectId: params.id,
+          modelId: input.modelId,
+          messageLength: input.message.length,
+          durationMs: Date.now() - startedAt,
+          errorName: error instanceof Error ? error.name : 'unknown',
+          errorCode: error instanceof DirectorRepositoryError ? error.code : 'UNKNOWN',
+          errorMessage: error instanceof Error ? error.message : String(error),
+        })
+        throw error
+      }
     })
     .post('/projects/:id/assets', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
