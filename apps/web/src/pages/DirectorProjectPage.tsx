@@ -24,6 +24,7 @@ import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { cn } from '@/lib/utils'
+import { ScreenplayDocument } from '@/components/director/ScreenplayDocument'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
 type ReferenceOwnerType = 'character' | 'location'
@@ -2522,15 +2523,13 @@ function ScreenplayChatWorkspace({
           {analysisStale && <Badge variant="outline">分析待更新</Badge>}
         </div>
         <ScrollArea className="min-h-0 flex-1 bg-muted/20">
-          <article className="mx-auto max-w-3xl whitespace-pre-wrap px-6 py-8 font-serif text-[15px] leading-8 text-foreground sm:px-10">
-            {screenplay.trim().length > 0
-              ? screenplay
-              : <div className="flex min-h-80 flex-col items-center justify-center gap-3 text-center font-sans">
-                <Sparkles className="size-8 text-primary/60" />
-                <p className="font-medium">还没有剧本</p>
-                <p className="max-w-sm text-sm leading-6 text-muted-foreground">在右侧告诉编剧你想创作什么，例如“写一个三分钟、发生在雨夜便利店的反转短剧”。</p>
-              </div>}
-          </article>
+          {screenplay.trim().length > 0
+            ? <ScreenplayDocument text={screenplay} />
+            : <div className="flex min-h-80 flex-col items-center justify-center gap-3 px-6 text-center font-sans sm:px-10">
+              <Sparkles className="size-8 text-primary/60" />
+              <p className="font-medium">还没有剧本</p>
+              <p className="max-w-sm text-sm leading-6 text-muted-foreground">在右侧告诉编剧你想创作什么，例如“写一个三分钟、发生在雨夜便利店的反转短剧”。</p>
+            </div>}
         </ScrollArea>
         {analysis !== undefined && (
           <div className="flex flex-col gap-2 pt-4">
