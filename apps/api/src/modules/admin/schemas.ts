@@ -84,6 +84,13 @@ export const ListAdminTasksQuerySchema = z.object({
 
 export type ListAdminTasksQueryInput = z.infer<typeof ListAdminTasksQuerySchema>
 
+/** admin 任务请求上下文读取目标。 */
+export const AdminTaskParamsSchema = z.object({
+  id: z.string().trim().min(1).max(256),
+}).strict()
+
+export type AdminTaskParamsInput = z.infer<typeof AdminTaskParamsSchema>
+
 /** admin 画廊产物读取的目标（recordId + artifactId）。 */
 export const AdminGalleryArtifactParamsSchema = z.object({
   id: z.string().trim().min(1).max(256),

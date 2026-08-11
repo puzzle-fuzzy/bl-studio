@@ -58,6 +58,38 @@ const fakeGenerationRepository = {
       })),
     }
   },
+  getTask: async (id: string) => id === 'task-1'
+    ? { id, recordId: 'generation-1' }
+    : undefined,
+  getGenerationRecord: async (id: string) => id === 'generation-1'
+    ? {
+        id,
+        modelId: 'wanx2.1-t2i-turbo',
+        category: 'image' as const,
+        inputParams: { prompt: '一只戴墨镜的柴犬', size: '1024*1024' },
+      }
+    : undefined,
+  getGenerationInputAssets: async (id: string) => id === 'generation-1'
+    ? [{
+        generationId: id,
+        parameterName: 'reference_images',
+        position: 0,
+        assetId: 'asset-reference-1',
+        userId: 'user-1',
+        kind: 'image' as const,
+        source: 'upload' as const,
+      }]
+    : [],
+  getUserAsset: async ({ assetId }: { assetId: string }) => assetId === 'asset-reference-1'
+    ? {
+        id: assetId,
+        kind: 'image' as const,
+        source: 'upload' as const,
+        storageKey: 'inputs/reference-1.png',
+        fileName: 'reference-1.png',
+        createdAt: new Date().toISOString(),
+      }
+    : undefined,
   countGenerationCallsBetween: async () => ({
     total: 5,
     byModel: [
@@ -111,6 +143,7 @@ describe('admin routes', () => {
       ['GET', '/api/admin/stats/analytics'],
       ['GET', '/api/metrics'],
       ['GET', '/api/admin/gallery'],
+      ['GET', '/api/admin/tasks/task-1/request-context'],
       ['POST', '/api/admin/gallery/g1/hide'],
       ['POST', '/api/admin/gallery/g1/unhide'],
       ['GET', '/api/admin/gallery/generations/g1/artifacts/a1'],
@@ -224,6 +257,25 @@ describe('admin routes', () => {
     expect(response.status).toBe(200)
     const body = await response.json() as { data: { items: Array<{ url: string }> } }
     expect(body.data.items[0]?.url).toContain('/signed/')
+  })
+
+  it('returns generation request parameters and signed reference assets for administrators', async () => {
+    const response = await app.handle(adminRequest('/api/admin/tasks/task-1/request-context'))
+    expect(response.status).toBe(200)
+    const body = await response.json() as {
+      data: {
+        context: {
+          modelId: string
+          inputParams: { prompt: string }
+          inputAssets: Array<{ asset: { url?: string } }>
+        } | null
+      }
+    }
+    expect(body.data.context).toMatchObject({
+      modelId: 'wanx2.1-t2i-turbo',
+      inputParams: { prompt: '一只戴墨镜的柴犬' },
+    })
+    expect(body.data.context?.inputAssets[0]?.asset.url).toContain('/signed/inputs/reference-1.png')
   })
 
   it('bans and unbans a user via admin endpoints with audit', async () => {

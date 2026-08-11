@@ -1114,6 +1114,33 @@ export const ListAdminTasksResponseSchema = z.object({
   nextCursor: z.string().optional(),
 })
 
+/** 管理员任务详情中的单个输入资产；仅返回可展示字段，不暴露存储坐标。 */
+export const AdminTaskInputAssetSchema = z.object({
+  parameterName: z.string(),
+  position: z.number().int().nonnegative(),
+  asset: z.object({
+    id: z.string(),
+    kind: z.string(),
+    source: z.string(),
+    url: z.string().optional(),
+    thumbnailUrl: z.string().optional(),
+    fileName: z.string().optional(),
+  }),
+})
+
+/** 生成型任务的原始请求快照，供管理员排障；非生成任务返回 null。 */
+export const AdminTaskRequestContextSchema = z.object({
+  recordId: z.string(),
+  modelId: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  inputParams: z.record(z.string(), z.unknown()),
+  inputAssets: z.array(AdminTaskInputAssetSchema),
+})
+
+export const AdminTaskRequestContextResponseSchema = z.object({
+  context: AdminTaskRequestContextSchema.nullable(),
+})
+
 /** admin 画廊预览产物项（text 内联正文；媒体项带 readUrl/thumbnailUrl）。 */
 export const AdminGalleryArtifactSchema = z.object({
   id: z.string(),
@@ -1300,6 +1327,8 @@ export type AdminGalleryHideResult = z.infer<typeof AdminGalleryHideResultSchema
 export type AdminTaskItem = z.infer<typeof AdminTaskItemSchema>
 export type AdminTaskError = z.infer<typeof AdminTaskErrorSchema>
 export type ListAdminTasksResult = z.infer<typeof ListAdminTasksResponseSchema>
+export type AdminTaskInputAsset = z.infer<typeof AdminTaskInputAssetSchema>
+export type AdminTaskRequestContext = z.infer<typeof AdminTaskRequestContextSchema>
 export type AdminGalleryArtifact = z.infer<typeof AdminGalleryArtifactSchema>
 export type AdminGalleryArtifactsResult = z.infer<typeof AdminGalleryArtifactsResponseSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>

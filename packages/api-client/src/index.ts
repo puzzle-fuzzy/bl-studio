@@ -112,6 +112,8 @@ export type {
   AdminTaskItem,
   AdminTaskError,
   ListAdminTasksResult,
+  AdminTaskInputAsset,
+  AdminTaskRequestContext,
   AdminGalleryArtifact,
   AdminGalleryArtifactsResult,
   GalleryItem,

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
-import type { AdminTaskItem } from '@bailian-studio/api-client'
+import type { AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { Badge } from '@/components/ui/badge'
@@ -66,10 +66,124 @@ function DetailField({ label, value, mono = false }: { label: string; value: str
   )
 }
 
-function TaskDetailDialog({ task, onOpenChange }: { task: AdminTaskItem | null; onOpenChange: (open: boolean) => void }) {
+function TaskRequestContextSection({
+  context,
+  loading,
+  error,
+}: {
+  context: AdminTaskRequestContext | null
+  loading: boolean
+  error: string | null
+}) {
+  const inputEntries = context === null ? [] : Object.entries(context.inputParams)
+  const promptEntries = inputEntries.filter(([key, value]) => (
+    typeof value === 'string' && /prompt|text|description/i.test(key)
+  ))
+  const otherParams = Object.fromEntries(inputEntries.filter(([key]) => (
+    !promptEntries.some(([promptKey]) => promptKey === key)
+  )))
+
+  return (
+    <section className="mt-8 flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-medium">请求内容</h3>
+        <p className="mt-1 text-sm text-muted-foreground">本次任务提交给模型的参数和参考素材。</p>
+      </div>
+
+      {loading && (
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      )}
+
+      {!loading && error !== null && <p className="text-sm text-destructive">{error}</p>}
+
+      {!loading && error === null && context === null && (
+        <p className="text-sm text-muted-foreground">该任务没有关联可读取的生成请求。</p>
+      )}
+
+      {!loading && error === null && context !== null && (
+        <>
+          <dl className="flex flex-col gap-4">
+            <DetailField label="生成记录" value={context.recordId} mono />
+            <DetailField label="模型" value={context.modelId} mono />
+            <DetailField label="类型" value={context.category} />
+          </dl>
+
+          {promptEntries.map(([key, value]) => (
+            <div key={key} className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium">{key}</h4>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-5">
+                {String(value)}
+              </pre>
+            </div>
+          ))}
+
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium">其他请求参数</h4>
+            <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs leading-5">
+              {JSON.stringify(otherParams, null, 2)}
+            </pre>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium">参考素材</h4>
+            {context.inputAssets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">本次请求未使用参考素材。</p>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {context.inputAssets.map(inputAsset => {
+                  const previewUrl = inputAsset.asset.thumbnailUrl ?? inputAsset.asset.url
+                  const content = previewUrl === undefined ? (
+                    <div className="flex aspect-square w-36 items-center justify-center rounded-lg bg-muted p-3 text-center text-xs text-muted-foreground">
+                      {inputAsset.asset.kind}
+                    </div>
+                  ) : (
+                    <img
+                      src={previewUrl}
+                      alt={`${inputAsset.parameterName} ${inputAsset.position + 1}`}
+                      className="aspect-square w-36 rounded-lg object-cover"
+                    />
+                  )
+                  return (
+                    <figure key={`${inputAsset.parameterName}:${inputAsset.position}:${inputAsset.asset.id}`} className="flex w-36 flex-col gap-1">
+                      {inputAsset.asset.url === undefined ? content : (
+                        <a href={inputAsset.asset.url} target="_blank" rel="noreferrer" className="transition-opacity hover:opacity-80">
+                          {content}
+                        </a>
+                      )}
+                      <figcaption className="truncate text-xs text-muted-foreground" title={inputAsset.asset.fileName ?? inputAsset.parameterName}>
+                        {inputAsset.parameterName}{context.inputAssets.filter(item => item.parameterName === inputAsset.parameterName).length > 1 ? ` #${inputAsset.position + 1}` : ''}
+                      </figcaption>
+                    </figure>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </section>
+  )
+}
+
+function TaskDetailDialog({
+  task,
+  context,
+  requestLoading,
+  requestError,
+  onOpenChange,
+}: {
+  task: AdminTaskItem | null
+  context: AdminTaskRequestContext | null
+  requestLoading: boolean
+  requestError: string | null
+  onOpenChange: (open: boolean) => void
+}) {
   return (
     <Dialog open={task !== null} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[calc(100vh-2rem)] w-[calc(100vw-2rem)] max-w-5xl overflow-y-auto">
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[min(96vw,1440px)]">
         {task !== null && (
           <>
             <DialogHeader>
@@ -99,6 +213,12 @@ function TaskDetailDialog({ task, onOpenChange }: { task: AdminTaskItem | null; 
                   <DetailField label="下次调度" value={formatTime(task.nextRunAt)} />
                   <DetailField label="耗时" value={task.durationMs !== undefined ? `${(task.durationMs / 1000).toFixed(1)} 秒` : '—'} />
                 </dl>
+
+                <TaskRequestContextSection
+                  context={context}
+                  loading={requestLoading}
+                  error={requestError}
+                />
 
                 {task.error !== undefined && (
                   <section className="mt-6 rounded-lg bg-destructive/5 p-3">
@@ -140,10 +260,14 @@ export function TasksPage() {
   const [pageCursors, setPageCursors] = useState<Array<string | undefined>>([undefined])
   const [hasNextPage, setHasNextPage] = useState(false)
   const [selectedTask, setSelectedTask] = useState<AdminTaskItem | null>(null)
+  const [taskRequestContext, setTaskRequestContext] = useState<AdminTaskRequestContext | null>(null)
+  const [taskRequestLoading, setTaskRequestLoading] = useState(false)
+  const [taskRequestError, setTaskRequestError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const requestSeq = useRef(0)
+  const taskRequestSeq = useRef(0)
 
   const loadPage = useCallback(async (targetPage: number, cursor?: string) => {
     const seq = ++requestSeq.current
@@ -178,7 +302,11 @@ export function TasksPage() {
     setPageIndex(0)
     setPageCursors([undefined])
     setHasNextPage(false)
+    taskRequestSeq.current += 1
     setSelectedTask(null)
+    setTaskRequestContext(null)
+    setTaskRequestLoading(false)
+    setTaskRequestError(null)
     void loadPage(0)
   }, [loadPage])
 
@@ -193,7 +321,35 @@ export function TasksPage() {
     void loadPage(pageIndex - 1, pageCursors[pageIndex - 1])
   }
 
-  const openTask = (task: AdminTaskItem) => setSelectedTask(task)
+  const openTask = (task: AdminTaskItem) => {
+    const seq = ++taskRequestSeq.current
+    setSelectedTask(task)
+    setTaskRequestContext(null)
+    setTaskRequestError(null)
+    setTaskRequestLoading(true)
+
+    void apiClient.adminGetTaskRequestContext(task.id)
+      .then(context => {
+        if (seq !== taskRequestSeq.current) return
+        setTaskRequestContext(context)
+      })
+      .catch(err => {
+        if (seq !== taskRequestSeq.current) return
+        setTaskRequestError(userErrorMessage(err))
+      })
+      .finally(() => {
+        if (seq === taskRequestSeq.current) setTaskRequestLoading(false)
+      })
+  }
+
+  const handleTaskDetailOpenChange = (open: boolean) => {
+    if (open) return
+    taskRequestSeq.current += 1
+    setSelectedTask(null)
+    setTaskRequestContext(null)
+    setTaskRequestLoading(false)
+    setTaskRequestError(null)
+  }
 
   const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, task: AdminTaskItem) => {
     if (event.key !== 'Enter' && event.key !== ' ') return
@@ -325,7 +481,13 @@ export function TasksPage() {
         </div>
       )}
 
-      <TaskDetailDialog task={selectedTask} onOpenChange={open => !open && setSelectedTask(null)} />
+      <TaskDetailDialog
+        task={selectedTask}
+        context={taskRequestContext}
+        requestLoading={taskRequestLoading}
+        requestError={taskRequestError}
+        onOpenChange={handleTaskDetailOpenChange}
+      />
     </div>
   )
 }

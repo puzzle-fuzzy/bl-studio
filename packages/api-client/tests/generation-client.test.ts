@@ -274,6 +274,40 @@ describe('createApiClient', () => {
     expect(calls[0]?.credentials).toBe('include')
   })
 
+  it('reads request parameters and signed input assets for an admin task', async () => {
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          context: {
+            recordId: 'record-1',
+            modelId: 'wanx2.1-t2i-turbo',
+            category: 'image',
+            inputParams: { prompt: '一只戴墨镜的柴犬' },
+            inputAssets: [{
+              parameterName: 'reference_images',
+              position: 0,
+              asset: {
+                id: 'asset-reference-1',
+                kind: 'image',
+                source: 'upload',
+                url: 'https://signed.example/reference-1.png',
+              },
+            }],
+          },
+        },
+      }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    const context = await client.adminGetTaskRequestContext('task-1')
+
+    expect(context?.inputParams).toEqual({ prompt: '一只戴墨镜的柴犬' })
+    expect(context?.inputAssets[0]?.asset.url).toContain('signed.example')
+    expect(calls[0]?.url).toBe('http://api.test/api/admin/tasks/task-1/request-context')
+    expect(calls[0]?.credentials).toBe('include')
+  })
+
   it('creates a generation with stable asset references and no client-supplied userId', async () => {
     const { fetch, calls } = queuedFetch([
       jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),

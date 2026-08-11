@@ -51,6 +51,7 @@ import {
   AdminGalleryArtifactsResponseSchema,
   ListAdminGalleryResponseSchema,
   ListAdminTasksResponseSchema,
+  AdminTaskRequestContextResponseSchema,
   ListFeedbackResponseSchema,
   ListNotificationsResponseSchema,
   NotificationReadAllSchema,
@@ -98,6 +99,7 @@ import type {
   AdminModelCostsResult,
   ListAdminGalleryResult,
   ListAdminTasksResult,
+  AdminTaskRequestContext,
   ListFeedbackResult,
   ListNotificationsResult,
   NotificationUnreadCount,
@@ -539,6 +541,8 @@ export interface BailianStudioApiClient {
     userId?: string
     recordId?: string
   }): Promise<ListAdminTasksResult>
+  /** `GET /api/admin/tasks/:id/request-context` —— 生成请求参数及已签名的输入资产预览。 */
+  adminGetTaskRequestContext(taskId: string): Promise<AdminTaskRequestContext | null>
 
   // 管理后台 · 社区画廊治理（需 admin）
   // ---------------------------------------------------------------------------
@@ -1687,6 +1691,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         fetchImpl,
         ListAdminTasksResponseSchema,
       )
+    },
+
+    async adminGetTaskRequestContext(taskId) {
+      const data = await unwrapData(
+        `${base}/api/admin/tasks/${encodeURIComponent(taskId)}/request-context`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminTaskRequestContextResponseSchema,
+      )
+      return data.context
     },
 
     async adminListGallery(params = {}) {
