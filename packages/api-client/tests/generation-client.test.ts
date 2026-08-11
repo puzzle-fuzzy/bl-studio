@@ -242,6 +242,38 @@ describe('createApiClient', () => {
     expect(calls[0]?.credentials).toBe('include')
   })
 
+  it('accepts director tasks returned by the admin task center', async () => {
+    const task = {
+      id: 'director-task-1',
+      type: 'director.phase',
+      domain: 'director',
+      status: 'failed',
+      priority: 0,
+      attempts: 1,
+      maxAttempts: 1,
+      nextRunAt: '2026-08-11T00:00:00.000Z',
+      createdAt: '2026-08-11T00:00:00.000Z',
+      updatedAt: '2026-08-11T00:00:01.000Z',
+      recordId: 'record-1',
+      userId: 'user_1',
+      traceId: 'trace-1',
+      author: { id: 'user_1', displayName: null },
+      recordContext: { modelId: 'qwen-plus', category: 'text' },
+      error: { category: 'provider', message: 'provider failed', retriable: false, code: 'PROVIDER_ERROR' },
+      durationMs: 1000,
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [task] } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    const result = await client.adminListTasks({ limit: 20 })
+
+    expect(result.items[0]?.domain).toBe('director')
+    expect(calls[0]?.url).toBe('http://api.test/api/admin/tasks?limit=20')
+    expect(calls[0]?.credentials).toBe('include')
+  })
+
   it('creates a generation with stable asset references and no client-supplied userId', async () => {
     const { fetch, calls } = queuedFetch([
       jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),

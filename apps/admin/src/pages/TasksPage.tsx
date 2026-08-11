@@ -33,6 +33,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   generation: '生成',
   artifact: '产物',
   media: '媒体',
+  director: '导演',
   system: '系统',
 }
 
