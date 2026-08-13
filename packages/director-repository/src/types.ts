@@ -14,6 +14,7 @@ import type {
   DirectorProjectStatus,
 	DirectorProjectSummary,
 	DirectorScriptVersion,
+	DirectorScriptVersionSummary,
 	DirectorScriptMessage,
   UpdateDirectorProjectInput,
   UpdateDirectorShotInput,
@@ -43,6 +44,17 @@ export interface ListDirectorScriptMessagesRepositoryInput {
 	userId: string
 	projectId: string
 	limit?: number
+}
+
+export interface ListDirectorScriptVersionsRepositoryInput {
+	userId: string
+	projectId: string
+}
+
+export interface GetDirectorScriptVersionRepositoryInput {
+	userId: string
+	projectId: string
+	versionId: string
 }
 
 export interface ApplyDirectorScriptChatRepositoryInput {
@@ -177,6 +189,8 @@ export interface DirectorRepository {
   listProjects(input: ListDirectorProjectsRepositoryInput): Promise<ListDirectorProjectsResult>
 	getProject(input: GetDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail | undefined>
 	listScriptMessages(input: ListDirectorScriptMessagesRepositoryInput): Promise<DirectorScriptMessage[]>
+	listScriptVersions(input: ListDirectorScriptVersionsRepositoryInput): Promise<DirectorScriptVersionSummary[]>
+	getScriptVersion(input: GetDirectorScriptVersionRepositoryInput): Promise<DirectorScriptVersion | undefined>
   updateProject(input: UpdateDirectorProjectRepositoryInput): Promise<DirectorProjectRepositoryDetail>
   attachAsset(input: AttachDirectorAssetRepositoryInput): Promise<DirectorAsset>
   detachAsset(input: DetachDirectorAssetRepositoryInput): Promise<DirectorProjectRepositoryDetail>

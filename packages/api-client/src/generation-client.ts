@@ -28,6 +28,8 @@ import {
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
   DirectorScriptMessagesResponseSchema,
+  DirectorScriptVersionResponseSchema,
+  DirectorScriptVersionsResponseSchema,
   DirectorAssetResponseSchema,
   DirectorShotResponseSchema,
   DirectorPhaseRunResponseSchema,
@@ -128,6 +130,8 @@ import type {
   DirectorAssemblyPreflight,
   DirectorProjectDetail,
   DirectorProjectListResult,
+  DirectorScriptVersion,
+  DirectorScriptVersionSummary,
   DirectorScriptMessage,
   DirectorScriptChatInput,
   EmailActionAccepted,
@@ -326,6 +330,8 @@ export interface BailianStudioApiClient {
   /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
   listDirectorScriptMessages(id: string): Promise<DirectorScriptMessage[]>
+  listDirectorScriptVersions(id: string): Promise<DirectorScriptVersionSummary[]>
+  getDirectorScriptVersion(id: string, versionId: string): Promise<DirectorScriptVersion>
   requestDirectorScriptChat(id: string, input: DirectorScriptChatInput): Promise<DirectorPhaseRun>
   /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
   updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
@@ -693,6 +699,26 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorScriptMessagesResponseSchema,
       )
       return data.messages
+    },
+
+    async listDirectorScriptVersions(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/versions`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptVersionsResponseSchema,
+      )
+      return data.versions
+    },
+
+    async getDirectorScriptVersion(id, versionId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/versions/${encodeURIComponent(versionId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptVersionResponseSchema,
+      )
+      return data.version
     },
 
     async requestDirectorScriptChat(id, input) {

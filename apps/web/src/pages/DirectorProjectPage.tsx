@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, Image as ImageIcon, Loader2, LockKeyhole, MessageCircle, Plus, Save, Send, Sparkles, Trash2, Video } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Check, CircleDashed, FileText, History, Image as ImageIcon, Loader2, LockKeyhole, MessageCircle, Plus, Save, Send, Sparkles, Trash2, Video } from 'lucide-react'
 import { useNavigate, useParams } from 'react-router'
-import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorScriptMessage, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
+import type { AssetItem, DirectorAnalysisResult, DirectorAsset, DirectorAssemblyPreflight, DirectorCharactersResult, DirectorContinuityResult, DirectorDialogueResult, DirectorLocationsResult, DirectorMusicEstimate, DirectorProjectDetail, DirectorPromptRebuildResult, DirectorScriptMessage, DirectorScriptVersion, DirectorScriptVersionSummary, DirectorShot, DirectorVideoEstimate, ModelCatalogItem, UpdateDirectorShotInput } from '@bailian-studio/api-client'
 import { ApiClientError, DIRECTOR_PHASE_LABELS, DIRECTOR_PHASES } from '@bailian-studio/api-client'
 import { DirectorAnalysisResultSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationsResultSchema, DirectorPromptRebuildResultSchema } from '@bailian-studio/api-client'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { AssetVideoPlayer } from '@/components/assets/AssetVideoPlayer'
@@ -54,6 +55,17 @@ function logDirectorClientEvent(event: string, meta: Record<string, unknown> = {
   } else {
     console.info('[director-client]', payload)
   }
+}
+
+function formatScriptVersionDate(value: string): string {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return '时间未知'
+  return date.toLocaleString('zh-CN', {
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+  })
 }
 
 const TAB_ITEMS: Array<{ value: string; label: string; phases: DirectorPhase[] }> = [
@@ -122,7 +134,15 @@ export function DirectorProjectPage() {
   const [pendingScriptMessage, setPendingScriptMessage] = useState<ScriptMessageView>()
   const [scriptMessagesError, setScriptMessagesError] = useState<string>()
   const [scriptMessage, setScriptMessage] = useState('')
+  const [scriptVersions, setScriptVersions] = useState<DirectorScriptVersionSummary[]>([])
+  const [selectedScriptVersion, setSelectedScriptVersion] = useState<DirectorScriptVersion>()
+  const [scriptVersionsLoading, setScriptVersionsLoading] = useState(false)
+  const [scriptVersionLoading, setScriptVersionLoading] = useState(false)
+  const [scriptVersionsError, setScriptVersionsError] = useState<string>()
   const scriptMessagesRequestRef = useRef(0)
+  const scriptVersionsRequestRef = useRef(0)
+  const scriptVersionRequestRef = useRef(0)
+  const scriptVersionCacheRef = useRef(new Map<string, DirectorScriptVersion>())
   const [charactersText, setCharactersText] = useState<string>()
   const [charactersResult, setCharactersResult] = useState<DirectorCharactersResult>()
   const [charactersStale, setCharactersStale] = useState(false)
@@ -209,6 +229,71 @@ export function DirectorProjectPage() {
       })
   }
 
+  const reloadScriptVersions = (projectId: string, reason: string) => {
+    const requestSequence = scriptVersionsRequestRef.current + 1
+    scriptVersionsRequestRef.current = requestSequence
+    setScriptVersionsLoading(true)
+    logDirectorClientEvent('script_versions.load.started', { projectId, reason, requestSequence })
+    return apiClient.listDirectorScriptVersions(projectId)
+      .then(versions => {
+        if (requestSequence !== scriptVersionsRequestRef.current) {
+          logDirectorClientEvent('script_versions.load.stale_response', { projectId, reason, requestSequence })
+          return
+        }
+        setScriptVersions(versions)
+        setScriptVersionsError(undefined)
+        logDirectorClientEvent('script_versions.load.succeeded', { projectId, reason, requestSequence, versionCount: versions.length })
+      })
+      .catch(error => {
+        if (requestSequence !== scriptVersionsRequestRef.current) return
+        setScriptVersionsError('历史版本暂时无法加载，请稍后重试。')
+        logDirectorClientEvent('script_versions.load.failed', {
+          projectId,
+          reason,
+          requestSequence,
+          ...directorClientErrorMeta(error),
+        })
+      })
+      .finally(() => {
+        if (requestSequence === scriptVersionsRequestRef.current) setScriptVersionsLoading(false)
+      })
+  }
+
+  const selectScriptVersion = async (projectId: string, versionId: string) => {
+    const requestSequence = scriptVersionRequestRef.current + 1
+    scriptVersionRequestRef.current = requestSequence
+    const cached = scriptVersionCacheRef.current.get(versionId)
+    if (cached !== undefined) {
+      setSelectedScriptVersion(cached)
+      setScriptVersionLoading(false)
+      return
+    }
+    setScriptVersionLoading(true)
+    logDirectorClientEvent('script_version.load.started', { projectId, versionId, requestSequence })
+    try {
+      const version = await apiClient.getDirectorScriptVersion(projectId, versionId)
+      scriptVersionCacheRef.current.set(version.id, version)
+      if (requestSequence !== scriptVersionRequestRef.current) {
+        logDirectorClientEvent('script_version.load.stale_response', { projectId, versionId, requestSequence })
+        return
+      }
+      setSelectedScriptVersion(version)
+      setScriptVersionsError(undefined)
+      logDirectorClientEvent('script_version.load.succeeded', { projectId, versionId, requestSequence, version: version.version })
+    } catch (error) {
+      if (requestSequence !== scriptVersionRequestRef.current) return
+      setScriptVersionsError('该历史版本暂时无法加载，请稍后重试。')
+      logDirectorClientEvent('script_version.load.failed', {
+        projectId,
+        versionId,
+        requestSequence,
+        ...directorClientErrorMeta(error),
+      })
+    } finally {
+      if (requestSequence === scriptVersionRequestRef.current) setScriptVersionLoading(false)
+    }
+  }
+
   useEffect(() => {
     if (boundReferenceAssetIds.length > 0) void loadReferenceAssets(boundReferenceAssetIds)
   }, [boundReferenceAssetIds.join('|'), loadReferenceAssets])
@@ -278,6 +363,11 @@ export function DirectorProjectPage() {
       .then(next => {
         if (cancelled) return
         setProject(next)
+        scriptVersionCacheRef.current = new Map([[next.scriptVersion.id, next.scriptVersion]])
+        setSelectedScriptVersion(next.scriptVersion)
+        setScriptVersions([])
+        setScriptVersionsError(undefined)
+        scriptVersionRequestRef.current += 1
         setTitle(next.title)
         setStoryText(next.storyText)
         setSynopsis(next.synopsis ?? '')
@@ -315,6 +405,7 @@ export function DirectorProjectPage() {
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
         void reloadScriptMessages(id, 'project-load')
+        void reloadScriptVersions(id, 'project-load')
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
@@ -425,6 +516,8 @@ export function DirectorProjectPage() {
     return () => {
       cancelled = true
       scriptMessagesRequestRef.current += 1
+      scriptVersionsRequestRef.current += 1
+      scriptVersionRequestRef.current += 1
     }
   }, [id])
 
@@ -449,6 +542,9 @@ export function DirectorProjectPage() {
           if (cancelled) return
           setProject(next)
           if (activePhase === 'analyze') {
+            scriptVersionCacheRef.current.set(next.scriptVersion.id, next.scriptVersion)
+            setSelectedScriptVersion(next.scriptVersion)
+            void reloadScriptVersions(id, 'analysis-terminal')
             setTitle(next.title)
             setStoryText(next.storyText)
             setSynopsis(next.synopsis ?? '')
@@ -558,6 +654,9 @@ export function DirectorProjectPage() {
   }, [project])
 
   const dirty = project !== undefined && (title !== project.title || storyText !== project.storyText || synopsis !== (project.synopsis ?? ''))
+  const isHistoricalScriptVersion = project !== undefined
+    && selectedScriptVersion !== undefined
+    && selectedScriptVersion.id !== project.scriptVersion.id
 
   const runAnalysis = async () => {
     if (id === undefined || analysisModelId.length === 0 || dirty || activeRunId !== undefined) return
@@ -582,7 +681,7 @@ export function DirectorProjectPage() {
 
   const sendScriptMessage = async () => {
     const message = scriptMessage.trim()
-    if (id === undefined || analysisModelId.length === 0 || message.length === 0 || activeRunId !== undefined) return
+    if (id === undefined || analysisModelId.length === 0 || message.length === 0 || activeRunId !== undefined || isHistoricalScriptVersion) return
     const clientMessageId = `client-${crypto.randomUUID()}`
     setPendingScriptMessage({
       id: clientMessageId,
@@ -1077,6 +1176,7 @@ export function DirectorProjectPage() {
   }
 
   const assemblyState = phaseStateFor(project, ['assemble'])
+  const displayedScriptVersion = selectedScriptVersion ?? project.scriptVersion
   const latestFinalVideo = project.assets.find(asset => asset.kind === 'final_video' && asset.staleAt === null)
   const latestFinalVideoAsset = latestFinalVideo?.assetId === null || latestFinalVideo?.assetId === undefined
     ? undefined
@@ -1144,8 +1244,15 @@ export function DirectorProjectPage() {
             pendingMessage={pendingScriptMessage}
             historyError={scriptMessagesError}
             onRetryHistory={() => { if (id !== undefined) void reloadScriptMessages(id, 'manual-retry') }}
-            screenplay={project.storyText}
-            scriptVersion={project.scriptVersion.version}
+            screenplay={displayedScriptVersion.storyText}
+            scriptVersion={displayedScriptVersion.version}
+            scriptVersionId={displayedScriptVersion.id}
+            currentScriptVersionId={project.scriptVersion.id}
+            scriptVersions={scriptVersions}
+            scriptVersionsLoading={scriptVersionsLoading}
+            scriptVersionLoading={scriptVersionLoading}
+            scriptVersionsError={scriptVersionsError}
+            onSelectScriptVersion={versionId => { if (id !== undefined) void selectScriptVersion(id, versionId) }}
             analysis={analysisResult}
             analysisStale={analysisStale}
             modelId={analysisModelId}
@@ -2476,6 +2583,13 @@ function ScreenplayChatWorkspace({
   onRetryHistory,
   screenplay,
   scriptVersion,
+  scriptVersionId,
+  currentScriptVersionId,
+  scriptVersions,
+  scriptVersionsLoading,
+  scriptVersionLoading,
+  scriptVersionsError,
+  onSelectScriptVersion,
   analysis,
   analysisStale,
   modelId,
@@ -2492,6 +2606,13 @@ function ScreenplayChatWorkspace({
   onRetryHistory: () => void
   screenplay: string
   scriptVersion: number
+  scriptVersionId: string
+  currentScriptVersionId: string
+  scriptVersions: DirectorScriptVersionSummary[]
+  scriptVersionsLoading: boolean
+  scriptVersionLoading: boolean
+  scriptVersionsError?: string
+  onSelectScriptVersion: (versionId: string) => void
   analysis?: DirectorAnalysisResult
   analysisStale: boolean
   modelId: string
@@ -2502,7 +2623,8 @@ function ScreenplayChatWorkspace({
   onMessageChange: (value: string) => void
   onSend: () => void
 }) {
-  const canSend = message.trim().length > 0 && modelId.length > 0 && !running
+  const isHistorical = scriptVersionId !== currentScriptVersionId
+  const canSend = message.trim().length > 0 && modelId.length > 0 && !running && !isHistorical
   const visibleMessages: ScriptMessageView[] = pendingMessage === undefined ? messages : [...messages, pendingMessage]
   return (
     <div className="flex min-h-[min(78vh,860px)] flex-col gap-0 lg:flex-row">
@@ -2516,8 +2638,52 @@ function ScreenplayChatWorkspace({
               <div className="flex items-center gap-2">
                 <h2 className="text-lg font-semibold">标准剧本</h2>
                 <Badge variant="secondary">v{scriptVersion}</Badge>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      aria-label="查看剧本历史版本"
+                      title="查看历史版本"
+                      disabled={scriptVersionsLoading && scriptVersions.length === 0}
+                    >
+                      {scriptVersionLoading ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <History data-icon="inline-start" />}
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-80">
+                    <DropdownMenuLabel>剧本历史版本</DropdownMenuLabel>
+                    <DropdownMenuSeparator />
+                    {scriptVersionsLoading && <DropdownMenuItem disabled>加载历史版本…</DropdownMenuItem>}
+                    {scriptVersionsError !== undefined && <DropdownMenuItem disabled>{scriptVersionsError}</DropdownMenuItem>}
+                    {!scriptVersionsLoading && scriptVersionsError === undefined && scriptVersions.length === 0 && (
+                      <DropdownMenuItem disabled>暂无历史版本</DropdownMenuItem>
+                    )}
+                    {scriptVersions.map(version => (
+                      <DropdownMenuItem
+                        key={version.id}
+                        onSelect={() => onSelectScriptVersion(version.id)}
+                        className="items-start gap-3 py-2.5"
+                      >
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-medium">剧本 v{version.version}</span>
+                            {version.id === scriptVersionId && <Check data-icon="inline-end" className="text-primary" />}
+                          </div>
+                          <span className="block text-xs text-muted-foreground">
+                            {formatScriptVersionDate(version.createdAt)} · {version.id === currentScriptVersionId ? '最新版本' : '历史版本'}
+                          </span>
+                          {version.synopsis && <span className="mt-1 line-clamp-2 block text-xs text-muted-foreground">{version.synopsis}</span>}
+                        </div>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
               <p className="text-sm text-muted-foreground">每次对话都会生成一份完整剧本，不会只返回修改片段。</p>
+              {isHistorical && (
+                <p className="text-xs text-muted-foreground">当前正在查看历史版本，只读；切换回最新版本后可以继续对话。</p>
+              )}
             </div>
           </div>
           {analysisStale && <Badge variant="outline">分析待更新</Badge>}
@@ -2613,7 +2779,7 @@ function ScreenplayChatWorkspace({
             placeholder="告诉编剧你想创作或修改什么…（Enter 发送，Shift + Enter 换行）"
             className="min-h-24 resize-none leading-6"
             maxLength={8_000}
-            disabled={running}
+            disabled={running || isHistorical}
           />
           <div className="flex items-center justify-between gap-3">
             <Select value={modelId} onValueChange={onModelChange} disabled={running}>
@@ -2628,7 +2794,7 @@ function ScreenplayChatWorkspace({
             </Select>
             <Button onClick={onSend} disabled={!canSend}>
               {running ? <Loader2 data-icon="inline-start" className="animate-spin" /> : <Send data-icon="inline-start" />}
-              {running ? '整理中' : '发送修改'}
+              {running ? '整理中' : isHistorical ? '切回最新版本后编辑' : '发送修改'}
             </Button>
           </div>
         </div>

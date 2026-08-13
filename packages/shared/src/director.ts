@@ -91,6 +91,21 @@ export const DirectorScriptVersionSchema = z.object({
   createdAt: z.string(),
 }).strict()
 
+export const DirectorScriptVersionSummarySchema = z.object({
+  id: z.string(),
+  version: z.number().int().positive(),
+  synopsis: z.string().nullable(),
+  createdAt: z.string(),
+}).strict()
+
+export const DirectorScriptVersionsResponseSchema = z.object({
+  versions: z.array(DirectorScriptVersionSummarySchema),
+}).strict()
+
+export const DirectorScriptVersionResponseSchema = z.object({
+  version: DirectorScriptVersionSchema,
+}).strict()
+
 export const DIRECTOR_SCRIPT_MESSAGE_ROLES = ['user', 'assistant'] as const
 export const DirectorScriptMessageRoleSchema = z.enum(DIRECTOR_SCRIPT_MESSAGE_ROLES)
 
@@ -520,6 +535,7 @@ export type DirectorProjectProgress = z.infer<typeof DirectorProjectProgressSche
 export type DirectorProjectSummary = z.infer<typeof DirectorProjectSummarySchema>
 export type DirectorProjectDetail = z.infer<typeof DirectorProjectDetailSchema>
 export type DirectorScriptVersion = z.infer<typeof DirectorScriptVersionSchema>
+export type DirectorScriptVersionSummary = z.infer<typeof DirectorScriptVersionSummarySchema>
 export type DirectorScriptMessage = z.infer<typeof DirectorScriptMessageSchema>
 export type DirectorScriptChatInput = z.infer<typeof DirectorScriptChatInputSchema>
 export type DirectorScriptChatOutput = z.infer<typeof DirectorScriptChatOutputSchema>

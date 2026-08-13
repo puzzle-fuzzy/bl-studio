@@ -3,7 +3,7 @@ import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
-import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorShot } from '@bailian-studio/shared'
+import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorScriptVersion, type DirectorShot } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -115,6 +115,20 @@ const fakeDirectorRepository: DirectorRepository = {
   },
   async listScriptMessages() {
     return []
+  },
+  async listScriptVersions(input) {
+    const project = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)?.project
+    if (project === undefined) return []
+    return [{
+      id: project.scriptVersion.id,
+      version: project.scriptVersion.version,
+      synopsis: project.scriptVersion.synopsis,
+      createdAt: project.scriptVersion.createdAt,
+    }]
+  },
+  async getScriptVersion(input): Promise<DirectorScriptVersion | undefined> {
+    const project = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)?.project
+    return project?.scriptVersion.id === input.versionId ? project.scriptVersion : undefined
   },
   async updateProject(input) {
     const record = projects.find(item => item.userId === input.userId && item.project.id === input.projectId)
@@ -378,6 +392,19 @@ describe('director routes', () => {
     const messagesBody = await messagesResponse.json() as { data: { messages: unknown[] } }
     expect(messagesResponse.status).toBe(200)
     expect(messagesBody.data.messages).toEqual([])
+
+    const versionsResponse = await app.handle(authed(`/api/director/projects/${projectId}/script/versions`))
+    const versionsBody = await versionsResponse.json() as { data: { versions: Array<{ id: string; version: number }> } }
+    expect(versionsResponse.status).toBe(200)
+    expect(versionsBody.data.versions).toMatchObject([{ id: `${projectId}-script-1`, version: 1 }])
+
+    const versionResponse = await app.handle(authed(`/api/director/projects/${projectId}/script/versions/${projectId}-script-1`))
+    const versionBody = await versionResponse.json() as { data: { version: DirectorScriptVersion } }
+    expect(versionResponse.status).toBe(200)
+    expect(versionBody.data.version.id).toBe(`${projectId}-script-1`)
+
+    const missingVersionResponse = await app.handle(authed(`/api/director/projects/${projectId}/script/versions/missing-version`))
+    expect(missingVersionResponse.status).toBe(404)
   })
 
   it('does not queue the assemble phase without a complete media preflight', async () => {

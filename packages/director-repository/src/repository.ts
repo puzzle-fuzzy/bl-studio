@@ -30,6 +30,7 @@ import {
 	type DirectorProjectStatus,
 	type DirectorScriptMessage,
 	type DirectorScriptVersion,
+	type DirectorScriptVersionSummary,
 } from "@bailian-studio/shared";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { DirectorRepositoryError } from "./errors";
@@ -132,6 +133,17 @@ function toScriptVersion(
 		synopsis: row.synopsis,
 		createdAt: row.createdAt.toISOString(),
 	};
+}
+
+function toScriptVersionSummary(
+	row: typeof directorScriptVersions.$inferSelect,
+): DirectorScriptVersionSummary {
+	return {
+		id: row.id,
+		version: row.version,
+		synopsis: row.synopsis,
+		createdAt: row.createdAt.toISOString(),
+	}
 }
 
 function toScriptMessage(
@@ -687,6 +699,40 @@ export function createDirectorRepository({
 				.orderBy(desc(directorScriptMessages.createdAt), desc(directorScriptMessages.id))
 				.limit(input.limit ?? 100);
 			return rows.map(row => toScriptMessage(row.message)).reverse();
+		},
+
+		async listScriptVersions(input) {
+			const rows = await db
+				.select({ version: directorScriptVersions })
+				.from(directorScriptVersions)
+				.innerJoin(directorProjects, eq(directorScriptVersions.projectId, directorProjects.id))
+				.where(
+					and(
+						eq(directorScriptVersions.projectId, input.projectId),
+						eq(directorProjects.userId, input.userId),
+						isNull(directorProjects.deletedAt),
+					),
+				)
+				.orderBy(desc(directorScriptVersions.version), desc(directorScriptVersions.id));
+			return rows.map(row => toScriptVersionSummary(row.version));
+		},
+
+		async getScriptVersion(input) {
+			const rows = await db
+				.select({ version: directorScriptVersions })
+				.from(directorScriptVersions)
+				.innerJoin(directorProjects, eq(directorScriptVersions.projectId, directorProjects.id))
+				.where(
+					and(
+						eq(directorScriptVersions.id, input.versionId),
+						eq(directorScriptVersions.projectId, input.projectId),
+						eq(directorProjects.userId, input.userId),
+						isNull(directorProjects.deletedAt),
+					),
+				)
+				.limit(1);
+			const row = rows[0];
+			return row === undefined ? undefined : toScriptVersion(row.version);
 		},
 
 		async getAssemblyPreflight(input: GetDirectorAssemblyPreflightRepositoryInput): Promise<DirectorAssemblyPreflight | undefined> {

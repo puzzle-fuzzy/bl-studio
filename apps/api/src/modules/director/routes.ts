@@ -71,6 +71,19 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         throw error
       }
     })
+    .get('/projects/:id/script/versions', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const versions = await repository.listScriptVersions({ userId: user.id, projectId: params.id })
+      return { success: true, data: { versions } }
+    })
+    .get('/projects/:id/script/versions/:versionId', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const version = await repository.getScriptVersion({ userId: user.id, projectId: params.id, versionId: params.versionId })
+      if (version === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_SCRIPT_VERSION_NOT_FOUND', `Director screenplay version not found: ${params.versionId}`)
+      }
+      return { success: true, data: { version } }
+    })
     .post('/projects/:id/script/chat', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(DirectorScriptChatInputSchema, body)
