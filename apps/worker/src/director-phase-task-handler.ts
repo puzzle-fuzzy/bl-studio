@@ -7,7 +7,7 @@ import { nextRunAt } from '@bailian-studio/task-engine'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import { parseDirectorAnalysisOutput, parseDirectorScriptChatOutputDetailed } from './director-analysis'
 import { parseDirectorCharactersOutput } from './director-characters'
-import { parseDirectorLocationsOutput } from './director-locations'
+import { parseDirectorLocationsOutputDetailed } from './director-locations'
 import { parseDirectorStoryboardOutput } from './director-storyboard'
 import { continuityPrompt, parseDirectorContinuityOutput, type DirectorContinuityShotInput } from './director-continuity'
 import { parseDirectorPromptRebuildOutput, promptRebuildPrompt, type DirectorPromptRebuildShotInput } from './director-prompts'
@@ -472,8 +472,17 @@ async function processLocationsPhase(
         code: 'DIRECTOR_LOCATIONS_OUTPUT_MISSING',
       }, deps)
     }
-    const locations = parseDirectorLocationsOutput(locationsText)
-    if (locations === undefined) {
+    const parsedLocations = parseDirectorLocationsOutputDetailed(locationsText)
+    if (parsedLocations.locations === undefined) {
+      deps.logger.error('director.locations.output_invalid', {
+        taskId: task.id,
+        traceId: task.traceId,
+        phaseRunId: run.id,
+        projectId: run.projectId,
+        generationId,
+        outputLength: locationsText.length,
+        parseMode: parsedLocations.mode,
+      })
       return failPhase(run.id, {
         category: 'provider',
         message: 'Location generation returned text that does not match the Director location contract',
@@ -481,7 +490,17 @@ async function processLocationsPhase(
         code: 'DIRECTOR_LOCATIONS_OUTPUT_INVALID',
       }, deps)
     }
-    return completePhase(run.id, { generationId, modelId, locationsText, locations }, deps, locationsText)
+    if (parsedLocations.mode === 'repaired-json') {
+      deps.logger.warn('director.locations.output_repaired', {
+        taskId: task.id,
+        traceId: task.traceId,
+        phaseRunId: run.id,
+        projectId: run.projectId,
+        generationId,
+        outputLength: locationsText.length,
+      })
+    }
+    return completePhase(run.id, { generationId, modelId, locationsText, locations: parsedLocations.locations }, deps, locationsText)
   }
   if (generation.status === 'failed' || generation.status === 'cancelled') {
     return failPhase(run.id, {

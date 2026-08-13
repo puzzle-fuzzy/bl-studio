@@ -83,7 +83,7 @@ const TAB_ITEMS: Array<{ value: string; label: string; phases: DirectorPhase[] }
 ]
 
 const STATUS_LABELS: Record<DirectorProjectDetail['phases'][number]['status'], string> = {
-  queued: '绛夊緟鎵ц',
+  queued: '等待执行',
   not_started: '未开始',
   ready: '待确认',
   running: '执行中',
@@ -3108,6 +3108,7 @@ function PhaseStatusPanel({
   const states = project.phases.filter(state => phases.includes(state.phase))
   const primaryPhase = phases[0] ?? 'analyze'
   const status = states.find(state => state.status !== 'completed')?.status ?? states[0]?.status ?? 'not_started'
+  const failedState = states.find(state => state.status === 'failed' && state.lastError !== null && state.lastError !== undefined)
   return (
     <aside className="relative flex flex-col gap-4 lg:pl-6">
       <Separator orientation="vertical" className="absolute inset-y-0 left-0 hidden h-auto lg:block" />
@@ -3142,8 +3143,8 @@ function PhaseStatusPanel({
           {blockedByUnsavedChanges && <p className="text-xs leading-5 text-muted-foreground">请先保存剧本修改，再启动分析。</p>}
         </div>
       )}
-      {phases.includes('analyze') && status === 'failed' && states[0]?.lastError !== null && states[0]?.lastError !== undefined && (
-        <p className="text-xs leading-5 text-destructive">{states[0].lastError.message}</p>
+      {failedState?.lastError !== null && failedState?.lastError !== undefined && (
+        <p className="text-xs leading-5 text-destructive">{failedState.lastError.message}</p>
       )}
       <Separator />
       <div className="flex flex-col gap-3 text-sm">

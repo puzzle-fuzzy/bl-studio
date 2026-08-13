@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { parseDirectorLocationsOutput } from '../src/director-locations'
+import { parseDirectorLocationsOutput, parseDirectorLocationsOutputDetailed } from '../src/director-locations'
 
 const validLocations = {
   locations: [{
@@ -27,5 +27,12 @@ describe('parseDirectorLocationsOutput', () => {
   it('rejects a location without narrative function', () => {
     const incomplete = { ...validLocations, locations: [{ ...validLocations.locations[0], narrativeFunction: '' }] }
     expect(parseDirectorLocationsOutput(JSON.stringify(incomplete))).toBeUndefined()
+  })
+
+  it('repairs a missing object brace before the locations array closes', () => {
+    const malformed = JSON.stringify(validLocations).replace('}],"continuityNotes"', '],"continuityNotes"')
+    const parsed = parseDirectorLocationsOutputDetailed(malformed)
+    expect(parsed.mode).toBe('repaired-json')
+    expect(parsed.locations).toEqual(validLocations)
   })
 })
