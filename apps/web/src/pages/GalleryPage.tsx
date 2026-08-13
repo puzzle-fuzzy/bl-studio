@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Bookmark, BookmarkCheck, Check, Copy, Flag, Heart, Loader2, Search, Sparkles, X } from 'lucide-react'
+import { Bookmark, BookmarkCheck, Check, Copy, FileText, Flag, Heart, Image as ImageIcon, Loader2, Music, Search, Sparkles, X } from 'lucide-react'
 import type { GalleryDetail, GalleryItem } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -17,6 +17,7 @@ import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { modelNameZh } from '@/lib/model-modes'
 import { encodeDeepLinkParams } from '@/lib/deeplink-params'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 
 type GalleryTab = 'community' | 'favorites'
 type GalleryCategory = 'image' | 'video' | 'audio' | 'text'
@@ -560,7 +561,16 @@ function GalleryDetailView({
   onReport: () => void
 }) {
   const [copied, setCopied] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const prompt = typeof detail.record.inputParams.prompt === 'string' ? detail.record.inputParams.prompt : ''
+  const lightboxItems: LightboxMedia[] = detail.artifacts.map(artifact => ({
+    key: artifact.id,
+    kind: isLightboxKind(artifact.kind) ? artifact.kind : 'text',
+    url: artifact.readUrl,
+    thumbnailUrl: artifact.thumbnailUrl ?? artifact.readUrl,
+    fileName: `${artifact.kind}作品`,
+    text: artifact.text ?? (artifact.kind === 'archive' ? '归档文件暂不支持网页内展开预览。' : undefined),
+  }))
 
   const handleCopyPrompt = async () => {
     await navigator.clipboard?.writeText(prompt).catch(() => undefined)
@@ -624,31 +634,54 @@ function GalleryDetailView({
         )}
       </DialogHeader>
       <div className="grid gap-3 sm:grid-cols-2">
-        {detail.artifacts.map(artifact => {
-          const url = resolveApiUrl(artifact.readUrl ?? artifact.thumbnailUrl)
-          if (artifact.kind === 'video') {
-            return (
-              // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
-              <video key={artifact.id} src={url} controls className="aspect-video w-full rounded-lg bg-black" />
-            )
-          }
-          if (artifact.kind === 'audio') {
-            return (
-              // biome-ignore lint/a11y/useMediaCaption: Generated media does not provide caption tracks.
-              <audio key={artifact.id} src={url} controls className="w-full rounded-lg bg-muted" />
-            )
-          }
-          if (artifact.kind === 'text') {
-            // 文本正文直接来自详情接口（generation_artifacts.text），无需再拉文件。
-            return (
-              <pre key={artifact.id} className="max-h-72 w-full overflow-auto rounded-lg bg-muted p-4 text-sm whitespace-pre-wrap">
-                {artifact.text ?? ''}
-              </pre>
-            )
-          }
-          return <img key={artifact.id} src={url} alt="" className="w-full rounded-lg object-contain" loading="lazy" />
+        {detail.artifacts.map((artifact, index) => {
+          const url = artifact.readUrl ?? artifact.thumbnailUrl
+          return (
+            <button
+              key={artifact.id}
+              type="button"
+              onClick={() => setPreviewIndex(index)}
+              aria-label={`预览${artifact.kind}作品`}
+              className="group relative flex min-h-40 w-full items-center justify-center overflow-hidden rounded-lg bg-muted text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {artifact.kind === 'video' && url !== undefined ? (
+                <video src={resolveApiUrl(url)} muted playsInline preload="metadata" className="aspect-video w-full object-contain" />
+              ) : artifact.kind === 'audio' ? (
+                <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+                  <Music className="size-8" />
+                  <span className="text-xs">点击播放音频</span>
+                </div>
+              ) : artifact.kind === 'text' ? (
+                <div className="flex w-full items-start gap-2 p-4 text-sm">
+                  <FileText className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+                  <span className="line-clamp-8 whitespace-pre-wrap">{artifact.text ?? '文本作品'}</span>
+                </div>
+              ) : url !== undefined ? (
+                <img src={resolveApiUrl(url)} alt="" className="max-h-72 w-full object-contain" loading="lazy" />
+              ) : (
+                <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+                  <ImageIcon className="size-8" />
+                  <span className="text-xs">暂无预览</span>
+                </div>
+              )}
+              <span className="pointer-events-none absolute right-2 bottom-2 rounded bg-black/65 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                点击预览
+              </span>
+            </button>
+          )
         })}
       </div>
+      {previewIndex !== null && lightboxItems.length > 0 && (
+        <MediaLightbox
+          items={lightboxItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          downloadUrl={lightboxItems[previewIndex]?.url !== undefined
+            ? resolveApiUrl(lightboxItems[previewIndex]?.url ?? '')
+            : undefined}
+        />
+      )}
     </>
   )
 }

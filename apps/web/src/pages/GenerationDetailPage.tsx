@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Eye, ExternalLink, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
+import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Download, Eye, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
@@ -530,6 +530,9 @@ function ArtifactsSection({ recordId }: { recordId: string }) {
           index={previewIndex}
           onIndexChange={setPreviewIndex}
           onClose={() => setPreviewIndex(null)}
+          downloadUrl={lightboxItems[previewIndex]?.url !== undefined
+            ? resolveApiUrl(lightboxItems[previewIndex]?.url ?? '')
+            : undefined}
         />
       )}
     </>
@@ -582,15 +585,17 @@ function ArtifactCard({
       ) : (
         <div className="flex size-full items-center justify-center text-xs text-muted-foreground">暂无文件</div>
       )}
-      <a
-        href={resolveApiUrl(src ?? '')}
-        target="_blank"
-        rel="noreferrer"
-        className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
-        aria-label="在新窗口打开"
-      >
-        <ExternalLink className="size-3.5" />
-      </a>
+      {src !== undefined && (
+        <a
+          href={resolveApiUrl(src)}
+          download
+          className="absolute top-2 right-2 flex size-7 items-center justify-center rounded-md bg-background/80 opacity-0 transition-opacity group-hover:opacity-100"
+          aria-label="下载"
+          title="下载"
+        >
+          <Download className="size-3.5" />
+        </a>
+      )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

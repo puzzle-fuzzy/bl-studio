@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
-import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileArchive, FileText, Film, Image as ImageIcon, Loader2, Music } from 'lucide-react'
 import type { AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
-import { apiClient } from '@/lib/api'
+import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -55,6 +56,14 @@ function shortId(id: string | undefined, len = 8): string {
   return id.length <= len ? id : id.slice(0, len)
 }
 
+function assetKindIcon(kind: string) {
+  return kind === 'video' ? Film
+    : kind === 'audio' ? Music
+      : kind === 'text' ? FileText
+        : kind === 'archive' ? FileArchive
+          : ImageIcon
+}
+
 function DetailField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
   return (
     <div className="flex flex-col gap-1 py-1 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
@@ -75,6 +84,7 @@ function TaskRequestContextSection({
   loading: boolean
   error: string | null
 }) {
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
   const inputEntries = context === null ? [] : Object.entries(context.inputParams)
   const promptEntries = inputEntries.filter(([key, value]) => (
     typeof value === 'string' && /prompt|text|description/i.test(key)
@@ -82,9 +92,22 @@ function TaskRequestContextSection({
   const otherParams = Object.fromEntries(inputEntries.filter(([key]) => (
     !promptEntries.some(([promptKey]) => promptKey === key)
   )))
+  const previewItems: LightboxMedia[] = (context?.inputAssets ?? []).map(inputAsset => ({
+    key: `${inputAsset.parameterName}:${inputAsset.position}:${inputAsset.asset.id}`,
+    kind: isLightboxKind(inputAsset.asset.kind) ? inputAsset.asset.kind : 'text',
+    url: inputAsset.asset.url,
+    thumbnailUrl: inputAsset.asset.thumbnailUrl ?? inputAsset.asset.url,
+    fileName: inputAsset.asset.fileName ?? inputAsset.parameterName,
+    text: inputAsset.asset.kind === 'text'
+      ? `文本参考素材：${inputAsset.asset.fileName ?? inputAsset.parameterName}`
+      : inputAsset.asset.kind === 'archive'
+        ? `归档文件：${inputAsset.asset.fileName ?? inputAsset.parameterName}`
+        : undefined,
+  }))
 
   return (
-    <section className="mt-8 flex flex-col gap-4">
+    <>
+      <section className="mt-8 flex flex-col gap-4">
       <div>
         <h3 className="text-sm font-medium">请求内容</h3>
         <p className="mt-1 text-sm text-muted-foreground">本次任务提交给模型的参数和参考素材。</p>
@@ -133,26 +156,35 @@ function TaskRequestContextSection({
               <p className="text-sm text-muted-foreground">本次请求未使用参考素材。</p>
             ) : (
               <div className="flex flex-wrap gap-3">
-                {context.inputAssets.map(inputAsset => {
-                  const previewUrl = inputAsset.asset.thumbnailUrl ?? inputAsset.asset.url
-                  const content = previewUrl === undefined ? (
-                    <div className="flex aspect-square w-36 items-center justify-center rounded-lg bg-muted p-3 text-center text-xs text-muted-foreground">
-                      {inputAsset.asset.kind}
+                {context.inputAssets.map((inputAsset, index) => {
+                  const previewUrl = inputAsset.asset.thumbnailUrl ?? (inputAsset.asset.kind === 'image' ? inputAsset.asset.url : undefined)
+                  const KindIcon = assetKindIcon(inputAsset.asset.kind)
+                  const content = previewUrl !== undefined ? (
+                    <img
+                      src={resolveApiUrl(previewUrl)}
+                      alt={`${inputAsset.parameterName} ${inputAsset.position + 1}`}
+                      className="aspect-square w-36 object-cover"
+                    />
+                  ) : inputAsset.asset.kind === 'text' ? (
+                    <div className="flex aspect-square w-36 items-center justify-center overflow-hidden bg-muted p-3 text-left text-xs text-muted-foreground">
+                      <span className="line-clamp-6 whitespace-pre-wrap">文本参考素材</span>
                     </div>
                   ) : (
-                    <img
-                      src={previewUrl}
-                      alt={`${inputAsset.parameterName} ${inputAsset.position + 1}`}
-                      className="aspect-square w-36 rounded-lg object-cover"
-                    />
+                    <div className="flex aspect-square w-36 flex-col items-center justify-center gap-2 bg-muted p-3 text-center text-xs text-muted-foreground">
+                      <KindIcon className="size-6" />
+                      {inputAsset.asset.kind}
+                    </div>
                   )
                   return (
                     <figure key={`${inputAsset.parameterName}:${inputAsset.position}:${inputAsset.asset.id}`} className="flex w-36 flex-col gap-1">
-                      {inputAsset.asset.url === undefined ? content : (
-                        <a href={inputAsset.asset.url} target="_blank" rel="noreferrer" className="transition-opacity hover:opacity-80">
-                          {content}
-                        </a>
-                      )}
+                      <button
+                        type="button"
+                        onClick={() => setPreviewIndex(index)}
+                        className="overflow-hidden rounded-lg text-left transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`预览参考素材 ${inputAsset.asset.fileName ?? inputAsset.parameterName}`}
+                      >
+                        {content}
+                      </button>
                       <figcaption className="truncate text-xs text-muted-foreground" title={inputAsset.asset.fileName ?? inputAsset.parameterName}>
                         {inputAsset.parameterName}{context.inputAssets.filter(item => item.parameterName === inputAsset.parameterName).length > 1 ? ` #${inputAsset.position + 1}` : ''}
                       </figcaption>
@@ -164,7 +196,19 @@ function TaskRequestContextSection({
           </div>
         </>
       )}
-    </section>
+      </section>
+      {previewIndex !== null && previewItems.length > 0 && (
+        <MediaLightbox
+          items={previewItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          downloadUrl={previewItems[previewIndex]?.url !== undefined
+            ? resolveApiUrl(previewItems[previewIndex]?.url ?? '')
+            : undefined}
+        />
+      )}
+    </>
   )
 }
 

@@ -13,9 +13,21 @@ import { Label } from '@/components/ui/label'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 
 function formatDate(iso: string): string {
   return new Date(iso).toLocaleString('zh-CN', { hour12: false })
+}
+
+function assetToLightboxMedia(asset: AssetItem): LightboxMedia {
+  return {
+    key: asset.id,
+    kind: isLightboxKind(asset.kind) ? asset.kind : 'text',
+    url: asset.url ?? asset.downloadUrl,
+    thumbnailUrl: asset.thumbnailUrl ?? asset.url ?? asset.downloadUrl,
+    fileName: asset.fileName ?? asset.id,
+    text: asset.text ?? (asset.kind === 'archive' ? `文件类型：${asset.mimeType ?? '归档文件'}` : undefined),
+  }
 }
 
 export function UserDetailPage() {
@@ -25,6 +37,7 @@ export function UserDetailPage() {
   const [assets, setAssets] = useState<AssetItem[]>([])
   const [assetCursor, setAssetCursor] = useState<string | undefined>(undefined)
   const [assetsLoadingMore, setAssetsLoadingMore] = useState(false)
+  const [preview, setPreview] = useState<{ index: number } | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -164,6 +177,9 @@ export function UserDetailPage() {
     )
   }
 
+  const previewItems = assets.map(assetToLightboxMedia)
+  const currentPreviewAsset = preview === null ? undefined : assets[preview.index]
+
   return (
     <div className="space-y-4">
       <Button asChild variant="ghost" size="sm">
@@ -252,18 +268,18 @@ export function UserDetailPage() {
           ) : (
             <>
               <div className="grid grid-cols-3 gap-2 sm:grid-cols-5 md:grid-cols-8">
-                {assets.map(asset => (
-                  <a
+                {assets.map((asset, index) => (
+                  <button
+                    type="button"
                     key={asset.id}
-                    href={resolveApiUrl(asset.url)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="group relative aspect-square overflow-hidden rounded-md border"
+                    onClick={() => setPreview({ index })}
+                    className="group relative aspect-square overflow-hidden rounded-md border text-left transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                     title={asset.fileName ?? asset.id}
+                    aria-label={`预览资产 ${asset.fileName ?? asset.id}`}
                   >
-                    {(asset.kind === 'image' || asset.kind === 'video') && (asset.thumbnailUrl ?? asset.url) ? (
+                    {(asset.kind === 'image' || asset.kind === 'video') && (asset.thumbnailUrl ?? asset.url ?? asset.downloadUrl) ? (
                       <img
-                        src={resolveApiUrl(asset.thumbnailUrl ?? asset.url)}
+                        src={resolveApiUrl(asset.thumbnailUrl ?? asset.url ?? asset.downloadUrl)}
                         alt={asset.fileName ?? asset.id}
                         loading="lazy"
                         className="size-full object-cover"
@@ -273,7 +289,7 @@ export function UserDetailPage() {
                         {asset.kind}
                       </div>
                     )}
-                  </a>
+                  </button>
                 ))}
               </div>
               {assetCursor !== undefined && (
@@ -287,6 +303,18 @@ export function UserDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {preview !== null && previewItems.length > 0 && (
+        <MediaLightbox
+          items={previewItems}
+          index={preview.index}
+          onIndexChange={index => setPreview({ index })}
+          onClose={() => setPreview(null)}
+          downloadUrl={currentPreviewAsset?.downloadUrl !== undefined || currentPreviewAsset?.url !== undefined
+            ? resolveApiUrl(currentPreviewAsset.downloadUrl ?? currentPreviewAsset.url ?? '')
+            : undefined}
+        />
+      )}
 
       <Dialog open={grantOpen} onOpenChange={setGrantOpen}>
         <DialogContent className="sm:max-w-sm">
