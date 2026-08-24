@@ -13,6 +13,11 @@ describe('userErrorMessage', () => {
     expect(userErrorMessage(error)).toBe('操作过于频繁，请稍后再试')
   })
 
+  it('maps storage upload failures to actionable copy', () => {
+    const error = new ApiClientError('STORAGE_UPLOAD_TIMEOUT', 'internal', 504, undefined, 'trace-1')
+    expect(userErrorMessage(error)).toBe('图片上传耗时较长，请检查文件大小后重试')
+  })
+
   it('never leaks provider raw messages', () => {
     const error = new ApiClientError('UNKNOWN_CODE', 'msg', 500, { internal: 'secret provider detail' }, 'trace-1')
     expect(userErrorMessage(error)).toBe('服务暂时不可用，请稍后再试')

@@ -37,7 +37,7 @@ describe('API audit events', () => {
       metadata: { modelId: 'qwen-image' },
     })
     expect(received?.metadata?.['prompt']).toBeUndefined()
-    expect((received?.metadata?.['longValue'] as string).length).toBe(256)
+    expect(received?.metadata?.['longValue']).toHaveLength(256)
   })
 
   it('does not fail the business path when audit persistence fails', async () => {

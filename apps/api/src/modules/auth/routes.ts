@@ -217,7 +217,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         throw error
       }
     })
-    .post('/reset-password', async ({ request, body, set }) => {
+    .post('/reset-password', async ({ request, body }) => {
       try {
         const input = validateInput(ResetPasswordSchema, body)
         await deps.authService.resetPassword(input.token, input.newPassword)
@@ -372,7 +372,12 @@ export function createAuthRoutes(deps: ApiDependencies) {
         const ext = AVATAR_MIME_TO_EXT[file.type]
         const key = `avatars/${user.id}/${crypto.randomUUID()}.${ext}`
         const stored = deps.storage.writeObjectStream !== undefined
-          ? await deps.storage.writeObjectStream({ key, stream: file.stream(), contentType: file.type })
+          ? await deps.storage.writeObjectStream({
+              key,
+              stream: file.stream(),
+              contentType: file.type,
+              contentLength: file.size,
+            })
           : await deps.storage.writeObject({ key, body: Buffer.from(await file.arrayBuffer()), contentType: file.type })
 
         // 先记旧 key（updateAvatar 成功后旧值就丢了），再落库新头像。

@@ -15,7 +15,6 @@ import type { GenerationEvent, GenerationRepository } from '@bailian-studio/gene
 let iso!: IsolatedGenerationRepository
 let testCreditLedger!: CreditLedger
 let app: ReturnType<typeof createTestApp>['app']
-let generationSseHub: ReturnType<typeof createTestApp>['generationSseHub']
 
 class FakeStorageAdapter implements StorageAdapter {
   constructor(readonly provider: 'local' | 'oss' = 'local') {}
@@ -127,7 +126,6 @@ describe('generation routes', () => {
       storage: new FakeStorageAdapter(),
     })
     app = context.app
-    generationSseHub = context.generationSseHub
   })
 
   afterAll(async () => {
@@ -285,7 +283,6 @@ describe('generation routes', () => {
       generationLimits: { dailyTaskLimit: 1, dailyQuotaMode: 'attempts' },
     })
     app = context.app
-    generationSseHub = context.generationSseHub
     const first = await postGeneration({ modelId: 'qwen-image', params: { prompt: 'first', n: 1, size: '1328*1328' } })
     expect(first.status).toBe(200)
 

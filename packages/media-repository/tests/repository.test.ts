@@ -6,6 +6,7 @@ import {
   createIsolatedMediaRepository,
   createMediaRepositoryFromUrl,
   createMediaTestUser,
+  createMediaTestAsset,
   resetMediaRepositoryTestDb,
   type IsolatedMediaRepository,
 } from '../src'
@@ -100,6 +101,44 @@ describe('media repository', () => {
       operation: 'video.extract_audio',
       source: { assetId: 'missing', kind: 'video' },
     }), 'MEDIA_SOURCE_ASSET_NOT_FOUND')
+  })
+
+  it('creates an idempotent multi-source assembly job and preserves source order', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'assembly-owner' })
+    await createMediaTestAsset(iso.db, { id: 'assembly-video-1', userId: user.id, fileName: 'first.mp4', storageKey: 'videos/first.mp4' })
+    await createMediaTestAsset(iso.db, { id: 'assembly-video-2', userId: user.id, fileName: 'second.mp4', storageKey: 'videos/second.mp4' })
+    await createMediaTestAsset(iso.db, { id: 'assembly-music', userId: user.id, kind: 'audio', fileName: 'music.mp3', mimeType: 'audio/mpeg', storageKey: 'audio/music.mp3' })
+
+    const input = {
+      userId: user.id,
+      operation: 'video.assemble' as const,
+      source: { assetId: 'assembly-video-1', kind: 'video' as const, fileName: 'first.mp4' },
+      assembly: {
+        videoSources: [
+          { assetId: 'assembly-video-1', kind: 'video' as const, fileName: 'first.mp4' },
+          { assetId: 'assembly-video-2', kind: 'video' as const, fileName: 'second.mp4' },
+        ],
+        musicSource: { assetId: 'assembly-music', kind: 'audio' as const, fileName: 'music.mp3' },
+      },
+      options: { width: 720, height: 1280, fps: 24, audioVolume: 0.8 },
+      idempotencyKey: 'director:run-1:assemble',
+    }
+    const first = await iso.repository.createMediaJob(input)
+    const second = await iso.repository.createMediaJob(input)
+
+    expect(second.job.id).toBe(first.job.id)
+    expect(second.task.id).toBe(first.task.id)
+    expect(first.job.input).toMatchObject({
+      assembly: input.assembly,
+      options: input.options,
+      idempotencyKey: input.idempotencyKey,
+    })
+    expect(first.task.input).toMatchObject({ operation: 'video.assemble', options: input.options })
+    await expect(iso.repository.getMediaSources(first.job.id)).resolves.toEqual([
+      expect.objectContaining({ assetId: 'assembly-video-1', kind: 'video', fileName: 'first.mp4' }),
+      expect.objectContaining({ assetId: 'assembly-video-2', kind: 'video', fileName: 'second.mp4' }),
+      expect.objectContaining({ assetId: 'assembly-music', kind: 'audio', fileName: 'music.mp3' }),
+    ])
   })
 
   it('does not accept an asset id belonging to another user', async () => {

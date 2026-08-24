@@ -55,10 +55,10 @@ export type {
   AuditOutcome,
   RecordAuditEventInput,
 } from './audit-types'
-export {
-  type GenerationListView,
-  type ListGenerationRecordsOptions,
-  type ListGenerationRecordsResult,
+export type {
+  GenerationListView,
+  ListGenerationRecordsOptions,
+  ListGenerationRecordsResult,
 } from './cursor'
 export { createGenerationEventListener, type GenerationEventNotification } from './event-listener'
 export { ensureGenerationEventsTrigger } from './notify'

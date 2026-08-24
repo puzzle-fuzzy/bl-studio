@@ -1,0 +1,1 @@
+ALTER TABLE "director_shots" ADD COLUMN "video_generation_id" text;

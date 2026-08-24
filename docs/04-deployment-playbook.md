@@ -61,6 +61,20 @@ git status --porcelain   # 必须无输出
 > `deploy:prod` 现在会在「上一次提交只改前端」时打印 web-only 提示（非阻断）。日常前端热修
 > 一律走 web-only，只有后端变更才全量重传 runtime 镜像。
 
+### Windows 开发与生产发布边界
+
+Windows PowerShell 支持本地安装、dev/test 数据库、typecheck、测试和 rehearsal。
+rehearsal 使用 Linux 容器，首次运行前执行：
+
+```powershell
+pnpm run fetch:static-ffmpeg:windows
+pnpm run deploy:rehearsal:up
+```
+
+`deploy:prod`、`deploy:prod:web`、备份、回滚和观测脚本依赖 Bash、rsync、awk 及
+Linux 远程命令，必须在 Linux/WSL 或 Linux CI 执行；不要在普通 Windows PowerShell
+中直接执行生产发布脚本。
+
 ### 2.2 一键发布
 
 ```bash
@@ -78,6 +92,8 @@ pnpm run verify && pnpm run deploy:prod
 8. **冒烟**：等 api healthy + 公网 `https://create.yxswy.com/api/health/ready` 返回 `status: ok`。
 
 ### 2.3 部署后验证（都应通过）
+
+除健康检查外，`deploy:prod` 会校验公网 API 返回的完整 `BAILIAN_STUDIO_RELEASE_TAG`，并校验公网首页实际加载的 `index` bundle 是否来自本次构建的 web 镜像。`deploy:prod:web` 只执行后者；任一版本不一致都会让部署失败，避免健康但旧版本继续对外服务。
 
 ```bash
 # 在服务器上
@@ -101,6 +117,10 @@ docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra \
 ```
 
 ---
+
+### Windows / WSL 发布说明
+
+在 Windows clone 上执行 `pnpm run deploy:prod` 时，脚本会使用仓库相对路径调用 Node/tsx，避免 WSL 路径被 Windows Node 错误转换。`DEPLOY_SSH_KEY` 可以填写 Windows 风格的 `C:/...` 路径；脚本会自动解析挂载路径、复用同目录的 `known_hosts`，并在 WSL 中调用 Windows OpenSSH，避免私钥权限和主机指纹不一致导致发布挂起。
 
 ## 3. 分步手动流程（一键失败时用）
 

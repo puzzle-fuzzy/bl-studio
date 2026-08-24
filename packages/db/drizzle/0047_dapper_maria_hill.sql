@@ -1,0 +1,2 @@
+ALTER TABLE "director_phase_states" DROP CONSTRAINT "director_phase_states_status_check";--> statement-breakpoint
+ALTER TABLE "director_phase_states" ADD CONSTRAINT "director_phase_states_status_check" CHECK ("director_phase_states"."status" in ('not_started', 'ready', 'queued', 'running', 'needs_review', 'failed', 'completed', 'cancelled'));

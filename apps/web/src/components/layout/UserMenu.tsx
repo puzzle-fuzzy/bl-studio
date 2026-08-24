@@ -47,9 +47,13 @@ export function UserMenu() {
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <SidebarMenuButton className="h-auto w-full min-w-0">
-            <UserAvatar userId={user.id} name={user.displayName} className="size-7 shrink-0" />
-            <span className="min-w-0 flex-1 text-left leading-tight">
+          <SidebarMenuButton
+            aria-label={`账户：${user.displayName ?? user.email}`}
+            className="h-auto w-full min-w-0 group-data-[collapsible=icon]:size-12! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0!"
+            title="账户"
+          >
+            <UserAvatar userId={user.id} name={user.displayName} className="size-7 shrink-0 group-data-[collapsible=icon]:size-8!" />
+            <span className="min-w-0 flex-1 text-left leading-tight group-data-[collapsible=icon]:hidden">
               <span className="block truncate text-sm font-medium">{user.displayName ?? user.email}</span>
               <span className="block truncate text-xs text-muted-foreground">{user.email}</span>
             </span>

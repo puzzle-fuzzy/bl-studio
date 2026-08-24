@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest'
+import { expect, test } from 'vitest'
 import { DashScopeProviderRunner } from '../../src/providers/dashscope-runner'
 import type { DashScopeClient } from '@bailian-studio/provider-dashscope'
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
@@ -81,7 +81,7 @@ function mockFetch(): typeof fetch {
 
 test('runChat 成功调用并返回剧本文本', async () => {
   const runner = new DashScopeProviderRunner({ apiKey: 'test-key', fetch: mockFetch() })
-  ;(runner as any).client = createMockClient()
+  ;(runner as unknown as { client: DashScopeClient }).client = createMockClient()
 
   const result = await runner.execute({
     manifest: streamManifest,
@@ -116,7 +116,7 @@ test('chat 失败时返回带错误的 ProviderExecuteOutput', async () => {
   })
 
   const runner = new DashScopeProviderRunner({ apiKey: 'test-key', fetch: mockFetch() })
-  ;(runner as any).client = mockClient
+  ;(runner as unknown as { client: DashScopeClient }).client = mockClient
 
   const result = await runner.execute({
     manifest: streamManifest,

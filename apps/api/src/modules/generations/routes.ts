@@ -10,7 +10,6 @@ import {
 } from '@bailian-studio/shared'
 import {
   estimateGenerationRequest,
-  GenerationRepositoryError,
   type DailyGenerationUsage,
   type GenerationEstimate,
   type GenerationEvent,

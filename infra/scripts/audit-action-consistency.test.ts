@@ -29,14 +29,14 @@ function actionsFromInList(match: string): string[] {
 
 /** 从 schema.ts 的 check('audit_logs_action_check', ...) 提取动作集合。 */
 function schemaAuditActions(): string[] {
-  const check = schemaSource.match(/check\('audit_logs_action_check',[^]*?\)`\)/)
+  const check = schemaSource.match(/check\('audit_logs_action_check',[\s\S]*?\)`\)/)
   if (check === null) throw new Error('schema.ts 缺少 audit_logs_action_check CHECK 定义')
   return actionsFromInList(check[0]!)
 }
 
 /** 从某个迁移 SQL 文件里提取该 CHECK 的动作集合（只取 ADD 那份，忽略 DROP）。 */
 function migrationAuditActions(migrationSql: string): string[] {
-  const add = migrationSql.match(/ADD CONSTRAINT "audit_logs_action_check"[^]*?in \(([^)]*)\)/)
+  const add = migrationSql.match(/ADD CONSTRAINT "audit_logs_action_check"[\s\S]*?in \(([^)]*)\)/)
   if (add === null) throw new Error('迁移缺少 ADD CONSTRAINT audit_logs_action_check')
   return actionsFromInList(add[0])
 }

@@ -28,9 +28,16 @@ DEPLOY_REMOTE_DIR="${DEPLOY_REMOTE_DIR:-/opt/bailian-studio}"
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 [[ -n "$DEPLOY_HOST" ]] || { echo "缺少 DEPLOY_HOST" >&2; exit 1; }
 
+source "$REPO_ROOT/infra/scripts/resolve-deploy-ssh-key.sh"
+DEPLOY_SSH_KEY="$(resolve_deploy_ssh_key "$DEPLOY_SSH_KEY")"
+if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
+  echo "DEPLOY_SSH_KEY 不存在或无法从当前 Bash 环境访问" >&2
+  exit 1
+fi
+DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
+
 ssh_cmd() {
-  if [[ -n "$DEPLOY_SSH_KEY" ]]; then ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
-  else ssh "$DEPLOY_HOST" "$1"; fi
+  deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
 }
 
 # 1) 取 dev 里的百炼 key（绝不打印值）
@@ -47,7 +54,7 @@ chmod 600 "$ENV_PROD"
 
 # 3) 同步到服务器
 echo "==> 同步 .env.production 到服务器"
-rsync -az "$ENV_PROD" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$ENV_PROD" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production"
 
 # 4) 重启 api/worker 应用新 key

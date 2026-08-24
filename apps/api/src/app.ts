@@ -36,6 +36,7 @@ import { createShareRoutes } from './modules/shares'
 import { createUsageRoutes } from './modules/usage'
 import { createPointsRoutes } from './modules/points'
 import { createAdminRoutes } from './modules/admin'
+import { createDirectorRoutes } from './modules/director/routes'
 import { appMetrics } from './lib/metrics'
 import { requireAdminUser } from './modules/auth/session'
 
@@ -160,11 +161,12 @@ export function createApp(options: ApiAppOptions) {
   .use(createUsageRoutes(dependencies))
   .use(createPointsRoutes(dependencies))
   .use(createAdminRoutes(dependencies))
+  .use(createDirectorRoutes(dependencies))
   .get('/api/metrics', async ({ request }) => {
     await requireAdminUser(request, dependencies.authService)
     return { success: true, data: appMetrics.snapshot() }
   })
-  .get('/api/health/live', () => ({ success: true, data: { status: 'ok' } }))
+  .get('/api/health/live', () => ({ success: true, data: { status: 'ok', ...releaseMetadata() } }))
   .get('/api/health/ready', async ({ set }) => {
     const checks: {
       database: 'ok' | 'failed'
@@ -218,8 +220,13 @@ export function createApp(options: ApiAppOptions) {
     const apiReady = checks.database === 'ok' && checks.storage === 'ok'
     const status = !apiReady ? 'not_ready' : checks.worker === 'ok' ? 'ok' : 'degraded'
     if (!apiReady) set.status = 503
-    return { success: apiReady, data: { status, checks } }
+    return { success: apiReady, data: { status, checks, ...releaseMetadata() } }
   })
+}
+
+function releaseMetadata(): { release?: string } {
+  const release = process.env.BAILIAN_STUDIO_RELEASE_TAG?.trim()
+  return release === undefined || release.length === 0 ? {} : { release }
 }
 
 export type App = ReturnType<typeof createApp>

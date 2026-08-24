@@ -1,16 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
-import { Loader2 } from 'lucide-react'
-import type { AdminTaskItem } from '@bailian-studio/api-client'
-import { apiClient } from '@/lib/api'
+import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { ChevronLeft, ChevronRight, FileArchive, FileText, Film, Image as ImageIcon, Loader2, Music } from 'lucide-react'
+import type { AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
+import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
-import { Button } from '@/components/ui/button'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Skeleton } from '@/components/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 
 type TaskStatusFilter = 'all' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+
+const PAGE_SIZE = 20
 
 const STATUS_LABELS: Record<string, string> = {
   queued: '排队中',
@@ -24,6 +34,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   generation: '生成',
   artifact: '产物',
   media: '媒体',
+  director: '导演',
   system: '系统',
 }
 
@@ -45,33 +56,285 @@ function shortId(id: string | undefined, len = 8): string {
   return id.length <= len ? id : id.slice(0, len)
 }
 
-/**
- * 管理后台 · 任务中心：全量 task_records（含进行中 + 已完成），keyset 分页 +
- * 状态过滤。只读排障视角：展示作者/记录上下文/错误摘要/耗时，不提供变更操作。
- */
+function assetKindIcon(kind: string) {
+  return kind === 'video' ? Film
+    : kind === 'audio' ? Music
+      : kind === 'text' ? FileText
+        : kind === 'archive' ? FileArchive
+          : ImageIcon
+}
+
+function DetailField({ label, value, mono = false }: { label: string; value: string; mono?: boolean }) {
+  return (
+    <div className="flex flex-col gap-1 py-1 sm:flex-row sm:items-start sm:justify-between sm:gap-6">
+      <dt className="shrink-0 text-sm text-muted-foreground">{label}</dt>
+      <dd className={mono
+        ? 'min-w-0 flex-1 break-all text-left font-mono text-xs sm:text-right'
+        : 'min-w-0 flex-1 break-words text-left text-sm sm:text-right'}>{value}</dd>
+    </div>
+  )
+}
+
+function TaskRequestContextSection({
+  context,
+  loading,
+  error,
+}: {
+  context: AdminTaskRequestContext | null
+  loading: boolean
+  error: string | null
+}) {
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  const inputEntries = context === null ? [] : Object.entries(context.inputParams)
+  const promptEntries = inputEntries.filter(([key, value]) => (
+    typeof value === 'string' && /prompt|text|description/i.test(key)
+  ))
+  const otherParams = Object.fromEntries(inputEntries.filter(([key]) => (
+    !promptEntries.some(([promptKey]) => promptKey === key)
+  )))
+  const previewItems: LightboxMedia[] = (context?.inputAssets ?? []).map(inputAsset => ({
+    key: `${inputAsset.parameterName}:${inputAsset.position}:${inputAsset.asset.id}`,
+    kind: isLightboxKind(inputAsset.asset.kind) ? inputAsset.asset.kind : 'text',
+    url: inputAsset.asset.url,
+    thumbnailUrl: inputAsset.asset.thumbnailUrl ?? inputAsset.asset.url,
+    fileName: inputAsset.asset.fileName ?? inputAsset.parameterName,
+    text: inputAsset.asset.kind === 'text'
+      ? `文本参考素材：${inputAsset.asset.fileName ?? inputAsset.parameterName}`
+      : inputAsset.asset.kind === 'archive'
+        ? `归档文件：${inputAsset.asset.fileName ?? inputAsset.parameterName}`
+        : undefined,
+  }))
+
+  return (
+    <>
+      <section className="mt-8 flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-medium">请求内容</h3>
+        <p className="mt-1 text-sm text-muted-foreground">本次任务提交给模型的参数和参考素材。</p>
+      </div>
+
+      {loading && (
+        <div className="flex flex-col gap-3">
+          <Skeleton className="h-20 w-full" />
+          <Skeleton className="h-24 w-full" />
+        </div>
+      )}
+
+      {!loading && error !== null && <p className="text-sm text-destructive">{error}</p>}
+
+      {!loading && error === null && context === null && (
+        <p className="text-sm text-muted-foreground">该任务没有关联可读取的生成请求。</p>
+      )}
+
+      {!loading && error === null && context !== null && (
+        <>
+          <dl className="flex flex-col gap-4">
+            <DetailField label="生成记录" value={context.recordId} mono />
+            <DetailField label="模型" value={context.modelId} mono />
+            <DetailField label="类型" value={context.category} />
+          </dl>
+
+          {promptEntries.map(([key, value]) => (
+            <div key={key} className="flex flex-col gap-2">
+              <h4 className="text-sm font-medium">{key}</h4>
+              <pre className="max-h-64 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs leading-5">
+                {String(value)}
+              </pre>
+            </div>
+          ))}
+
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium">其他请求参数</h4>
+            <pre className="max-h-64 overflow-auto rounded-lg bg-muted p-3 text-xs leading-5">
+              {JSON.stringify(otherParams, null, 2)}
+            </pre>
+          </div>
+
+          <div className="flex flex-col gap-2">
+            <h4 className="text-sm font-medium">参考素材</h4>
+            {context.inputAssets.length === 0 ? (
+              <p className="text-sm text-muted-foreground">本次请求未使用参考素材。</p>
+            ) : (
+              <div className="flex flex-wrap gap-3">
+                {context.inputAssets.map((inputAsset, index) => {
+                  const previewUrl = inputAsset.asset.thumbnailUrl ?? (inputAsset.asset.kind === 'image' ? inputAsset.asset.url : undefined)
+                  const KindIcon = assetKindIcon(inputAsset.asset.kind)
+                  const content = previewUrl !== undefined ? (
+                    <img
+                      src={resolveApiUrl(previewUrl)}
+                      alt={`${inputAsset.parameterName} ${inputAsset.position + 1}`}
+                      className="aspect-square w-36 object-cover"
+                    />
+                  ) : inputAsset.asset.kind === 'text' ? (
+                    <div className="flex aspect-square w-36 items-center justify-center overflow-hidden bg-muted p-3 text-left text-xs text-muted-foreground">
+                      <span className="line-clamp-6 whitespace-pre-wrap">文本参考素材</span>
+                    </div>
+                  ) : (
+                    <div className="flex aspect-square w-36 flex-col items-center justify-center gap-2 bg-muted p-3 text-center text-xs text-muted-foreground">
+                      <KindIcon className="size-6" />
+                      {inputAsset.asset.kind}
+                    </div>
+                  )
+                  return (
+                    <figure key={`${inputAsset.parameterName}:${inputAsset.position}:${inputAsset.asset.id}`} className="flex w-36 flex-col gap-1">
+                      <button
+                        type="button"
+                        onClick={() => setPreviewIndex(index)}
+                        className="overflow-hidden rounded-lg text-left transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                        aria-label={`预览参考素材 ${inputAsset.asset.fileName ?? inputAsset.parameterName}`}
+                      >
+                        {content}
+                      </button>
+                      <figcaption className="truncate text-xs text-muted-foreground" title={inputAsset.asset.fileName ?? inputAsset.parameterName}>
+                        {inputAsset.parameterName}{context.inputAssets.filter(item => item.parameterName === inputAsset.parameterName).length > 1 ? ` #${inputAsset.position + 1}` : ''}
+                      </figcaption>
+                    </figure>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+        </>
+      )}
+      </section>
+      {previewIndex !== null && previewItems.length > 0 && (
+        <MediaLightbox
+          items={previewItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          downloadUrl={previewItems[previewIndex]?.url !== undefined
+            ? resolveApiUrl(previewItems[previewIndex]?.url ?? '')
+            : undefined}
+        />
+      )}
+    </>
+  )
+}
+
+function TaskDetailDialog({
+  task,
+  context,
+  requestLoading,
+  requestError,
+  onOpenChange,
+}: {
+  task: AdminTaskItem | null
+  context: AdminTaskRequestContext | null
+  requestLoading: boolean
+  requestError: string | null
+  onOpenChange: (open: boolean) => void
+}) {
+  return (
+    <Dialog open={task !== null} onOpenChange={onOpenChange}>
+      <DialogContent className="max-h-[calc(100dvh-2rem)] w-[calc(100vw-2rem)] overflow-y-auto sm:max-w-[min(96vw,1440px)]">
+        {task !== null && (
+          <>
+            <DialogHeader>
+              <DialogTitle>任务详情</DialogTitle>
+              <DialogDescription>
+                {task.type} · {STATUS_LABELS[task.status] ?? task.status} · 创建于 {formatTime(task.createdAt)}
+              </DialogDescription>
+            </DialogHeader>
+
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">任务属性</CardTitle>
+                <CardDescription>完整展示任务标识、执行状态和调度信息。</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <dl className="flex flex-col gap-4">
+                  <DetailField label="任务 ID" value={task.id} mono />
+                  <DetailField label="任务域" value={DOMAIN_LABELS[task.domain] ?? task.domain} />
+                  <DetailField label="作者" value={task.author?.displayName ?? (task.userId !== undefined ? task.userId : '—')} />
+                  <DetailField label="关联记录" value={task.recordId ?? '—'} mono />
+                  <DetailField label="尝试次数" value={`${task.attempts} / ${task.maxAttempts}`} />
+                  <DetailField label="优先级" value={String(task.priority)} />
+                  <DetailField label="开始时间" value={task.startedAt !== undefined ? formatTime(task.startedAt) : '—'} />
+                  <DetailField label="结束时间" value={task.completedAt !== undefined ? formatTime(task.completedAt) : '—'} />
+                  <DetailField label="创建时间" value={formatTime(task.createdAt)} />
+                  <DetailField label="更新时间" value={formatTime(task.updatedAt)} />
+                  <DetailField label="下次调度" value={formatTime(task.nextRunAt)} />
+                  <DetailField label="耗时" value={task.durationMs !== undefined ? `${(task.durationMs / 1000).toFixed(1)} 秒` : '—'} />
+                </dl>
+
+                <TaskRequestContextSection
+                  context={context}
+                  loading={requestLoading}
+                  error={requestError}
+                />
+
+                {task.error !== undefined && (
+                  <section className="mt-6 rounded-lg bg-destructive/5 p-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-sm font-medium text-destructive">错误信息</h3>
+                      <Badge variant="destructive">{task.error.code ?? task.error.category}</Badge>
+                      {task.error.retriable && <Badge variant="outline">可重试</Badge>}
+                    </div>
+                    <p className="mt-2 break-words text-sm text-muted-foreground">{task.error.message}</p>
+                  </section>
+                )}
+
+                <section className="mt-6">
+                  <h3 className="text-sm font-medium">诊断上下文</h3>
+                  <pre className="mt-2 max-h-48 overflow-auto rounded-lg bg-muted p-3 text-xs leading-5">
+                    {JSON.stringify({
+                      traceId: task.traceId,
+                      recordContext: task.recordContext,
+                      type: task.type,
+                      domain: task.domain,
+                      status: task.status,
+                    }, null, 2)}
+                  </pre>
+                </section>
+              </CardContent>
+            </Card>
+          </>
+        )}
+      </DialogContent>
+    </Dialog>
+  )
+}
+
+/** 管理后台任务中心：状态筛选、游标分页和只读任务详情。 */
 export function TasksPage() {
   const [status, setStatus] = useState<TaskStatusFilter>('all')
   const [items, setItems] = useState<AdminTaskItem[]>([])
-  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
+  const [pageIndex, setPageIndex] = useState(0)
+  const [pageCursors, setPageCursors] = useState<Array<string | undefined>>([undefined])
+  const [hasNextPage, setHasNextPage] = useState(false)
+  const [selectedTask, setSelectedTask] = useState<AdminTaskItem | null>(null)
+  const [taskRequestContext, setTaskRequestContext] = useState<AdminTaskRequestContext | null>(null)
+  const [taskRequestLoading, setTaskRequestLoading] = useState(false)
+  const [taskRequestError, setTaskRequestError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const requestSeq = useRef(0)
+  const taskRequestSeq = useRef(0)
 
-  const loadFirst = useCallback(async () => {
+  const loadPage = useCallback(async (targetPage: number, cursor?: string) => {
     const seq = ++requestSeq.current
     setLoading(true)
     setError(null)
     setItems([])
-    setNextCursor(undefined)
+
     try {
       const page = await apiClient.adminListTasks({
+        limit: PAGE_SIZE,
+        ...(cursor !== undefined ? { cursor } : {}),
         ...(status !== 'all' ? { status } : {}),
       })
       if (seq !== requestSeq.current) return
+
       setItems(page.items)
-      setNextCursor(page.nextCursor)
+      setPageIndex(targetPage)
+      setHasNextPage(page.nextCursor !== undefined)
+      setPageCursors(current => {
+        const next = current.slice(0, targetPage + 1)
+        if (page.nextCursor !== undefined) next[targetPage + 1] = page.nextCursor
+        return next
+      })
     } catch (err) {
       if (seq === requestSeq.current) setError(userErrorMessage(err))
     } finally {
@@ -80,27 +343,63 @@ export function TasksPage() {
   }, [status])
 
   useEffect(() => {
-    void loadFirst()
-  }, [loadFirst])
+    setPageIndex(0)
+    setPageCursors([undefined])
+    setHasNextPage(false)
+    taskRequestSeq.current += 1
+    setSelectedTask(null)
+    setTaskRequestContext(null)
+    setTaskRequestLoading(false)
+    setTaskRequestError(null)
+    void loadPage(0)
+  }, [loadPage])
 
-  const loadMore = useCallback(async () => {
-    if (nextCursor === undefined) return
-    const seq = requestSeq.current
-    setLoadingMore(true)
-    try {
-      const page = await apiClient.adminListTasks({
-        cursor: nextCursor,
-        ...(status !== 'all' ? { status } : {}),
+  const handleNextPage = () => {
+    const nextCursor = pageCursors[pageIndex + 1]
+    if (!hasNextPage || nextCursor === undefined || loading) return
+    void loadPage(pageIndex + 1, nextCursor)
+  }
+
+  const handlePreviousPage = () => {
+    if (pageIndex === 0 || loading) return
+    void loadPage(pageIndex - 1, pageCursors[pageIndex - 1])
+  }
+
+  const openTask = (task: AdminTaskItem) => {
+    const seq = ++taskRequestSeq.current
+    setSelectedTask(task)
+    setTaskRequestContext(null)
+    setTaskRequestError(null)
+    setTaskRequestLoading(true)
+
+    void apiClient.adminGetTaskRequestContext(task.id)
+      .then(context => {
+        if (seq !== taskRequestSeq.current) return
+        setTaskRequestContext(context)
       })
-      if (seq !== requestSeq.current) return
-      setItems(current => [...current, ...page.items])
-      setNextCursor(page.nextCursor)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoadingMore(false)
-    }
-  }, [nextCursor, status])
+      .catch(err => {
+        if (seq !== taskRequestSeq.current) return
+        setTaskRequestError(userErrorMessage(err))
+      })
+      .finally(() => {
+        if (seq === taskRequestSeq.current) setTaskRequestLoading(false)
+      })
+  }
+
+  const handleTaskDetailOpenChange = (open: boolean) => {
+    if (open) return
+    taskRequestSeq.current += 1
+    setSelectedTask(null)
+    setTaskRequestContext(null)
+    setTaskRequestLoading(false)
+    setTaskRequestError(null)
+  }
+
+  const handleRowKeyDown = (event: KeyboardEvent<HTMLTableRowElement>, task: AdminTaskItem) => {
+    if (event.key !== 'Enter' && event.key !== ' ') return
+    event.preventDefault()
+    openTask(task)
+  }
 
   return (
     <div className="space-y-4">
@@ -120,7 +419,7 @@ export function TasksPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        全量任务（含进行中与已完成），按创建时间倒序；error 列为失败时的安全摘要。
+        全量任务（含进行中与已完成），按创建时间倒序；点击任意行查看完整诊断信息。
       </p>
 
       {error !== null && <p className="text-sm text-destructive">{error}</p>}
@@ -136,29 +435,37 @@ export function TasksPage() {
             <p className="p-6 text-center text-sm text-muted-foreground">暂无任务</p>
           ) : (
             <div className="overflow-x-auto">
-              <Table>
+              <Table className="min-w-[1480px]">
                 <TableHeader>
                   <TableRow>
-                    <TableHead className="w-28">任务 ID</TableHead>
-                    <TableHead>类型 / 域</TableHead>
+                    <TableHead className="w-80">任务 ID</TableHead>
+                    <TableHead className="w-44">类型 / 域</TableHead>
                     <TableHead className="w-24">状态</TableHead>
-                    <TableHead className="w-24">重试</TableHead>
-                    <TableHead className="w-32">作者</TableHead>
-                    <TableHead className="w-32">关联记录</TableHead>
-                    <TableHead className="w-40">开始时间</TableHead>
-                    <TableHead className="w-40">结束时间</TableHead>
-                    <TableHead className="w-28">耗时</TableHead>
-                    <TableHead>错误</TableHead>
-                    <TableHead className="w-40">创建时间</TableHead>
+                    <TableHead className="w-20">重试</TableHead>
+                    <TableHead className="w-36">作者</TableHead>
+                    <TableHead className="w-36">关联记录</TableHead>
+                    <TableHead className="w-44">开始时间</TableHead>
+                    <TableHead className="w-44">结束时间</TableHead>
+                    <TableHead className="w-24">耗时</TableHead>
+                    <TableHead className="w-64">错误</TableHead>
+                    <TableHead className="w-56">创建时间</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {items.map(item => (
-                    <TableRow key={item.id}>
-                      <TableCell className="font-mono text-xs">{shortId(item.id)}</TableCell>
+                    <TableRow
+                      key={item.id}
+                      className="cursor-pointer focus-visible:bg-muted/60"
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`查看任务 ${item.id}`}
+                      onClick={() => openTask(item)}
+                      onKeyDown={event => handleRowKeyDown(event, item)}
+                    >
+                      <TableCell className="whitespace-nowrap font-mono text-xs">{item.id}</TableCell>
                       <TableCell>
                         <div className="flex items-center gap-2">
-                          <span className="text-xs">{item.type}</span>
+                          <span className="truncate text-xs">{item.type}</span>
                           <Badge variant="outline">{DOMAIN_LABELS[item.domain] ?? item.domain}</Badge>
                         </div>
                       </TableCell>
@@ -170,7 +477,7 @@ export function TasksPage() {
                       <TableCell className="text-xs">
                         {item.attempts}<span className="text-muted-foreground">/{item.maxAttempts}</span>
                       </TableCell>
-                      <TableCell className="text-xs text-muted-foreground">
+                      <TableCell className="truncate text-xs text-muted-foreground">
                         {item.author?.displayName ?? (item.userId !== undefined ? shortId(item.userId) : '—')}
                       </TableCell>
                       <TableCell className="font-mono text-xs text-muted-foreground">
@@ -204,13 +511,27 @@ export function TasksPage() {
         </CardContent>
       </Card>
 
-      {nextCursor !== undefined && items.length > 0 && (
-        <div className="flex justify-center">
-          <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
-            {loadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}
+      {!loading && items.length > 0 && (pageIndex > 0 || hasNextPage) && (
+        <div className="flex items-center justify-center gap-3 border-t pt-4">
+          <Button variant="outline" size="sm" disabled={loading || pageIndex === 0} onClick={handlePreviousPage}>
+            <ChevronLeft className="size-4" />
+            上一页
+          </Button>
+          <span className="min-w-16 text-center text-sm text-muted-foreground">第 {pageIndex + 1} 页</span>
+          <Button variant="outline" size="sm" disabled={loading || !hasNextPage} onClick={handleNextPage}>
+            下一页
+            {loading ? <Loader2 className="size-4 animate-spin" /> : <ChevronRight className="size-4" />}
           </Button>
         </div>
       )}
+
+      <TaskDetailDialog
+        task={selectedTask}
+        context={taskRequestContext}
+        requestLoading={taskRequestLoading}
+        requestError={taskRequestError}
+        onOpenChange={handleTaskDetailOpenChange}
+      />
     </div>
   )
 }

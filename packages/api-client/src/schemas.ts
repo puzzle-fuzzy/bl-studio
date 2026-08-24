@@ -9,6 +9,141 @@
  * api-client 是一个纯粹的传输层，仅依赖 @bailian-studio/shared + zod。
  */
 import { z } from 'zod'
+import {
+  CreateDirectorProjectSchema,
+  CreateDirectorPhaseRunSchema,
+  DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
+  DirectorMusicEstimateSchema,
+  DirectorAssemblyPreflightResponseSchema,
+  AttachDirectorAssetSchema,
+  DirectorAnalysisResultSchema,
+  DirectorAssetResponseSchema,
+  DirectorAssetSchema,
+  DirectorShotDraftSchema,
+  DirectorShotSchema,
+  DirectorShotResponseSchema,
+  DirectorStoryboardResultSchema,
+  DirectorContinuityResultSchema,
+  DirectorPromptRebuildResultSchema,
+  DirectorDialogueResultSchema,
+  UpdateDirectorShotSchema,
+  DirectorCharacterDraftSchema,
+  DirectorCharactersResultSchema,
+  DirectorLocationDraftSchema,
+  DirectorLocationsResultSchema,
+  DirectorPhaseRunResponseSchema,
+  DirectorPhaseRunSchema,
+  DirectorProjectDetailSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
+  DirectorScriptChatInputSchema,
+  DirectorScriptMessageSchema,
+  DirectorScriptMessagesResponseSchema,
+  DirectorScriptVersionResponseSchema,
+  DirectorScriptVersionsResponseSchema,
+  UpdateDirectorProjectSchema,
+  type CreateDirectorProjectInput,
+  type CreateDirectorPhaseRunInput,
+  type DirectorVideoEstimate,
+  type DirectorMusicEstimate,
+  type DirectorAssemblyPreflight,
+  type AttachDirectorAssetInput,
+  type DirectorAsset,
+  type DirectorShot,
+  type DirectorShotDraft,
+  type DirectorStoryboardResult,
+  type DirectorContinuityResult,
+  type DirectorPromptRebuildResult,
+  type DirectorDialogueResult,
+  type UpdateDirectorShotInput,
+  type DirectorPhaseRun,
+  type DirectorPhaseRunStatus,
+  type DirectorAnalysisResult,
+  type DirectorCharacterDraft,
+  type DirectorCharacter,
+  type DirectorCharactersResult,
+  type DirectorLocationDraft,
+  type DirectorLocation,
+  type DirectorLocationsResult,
+  type DirectorProjectDetail,
+  type DirectorProjectListResult,
+  type DirectorProjectSummary,
+  type DirectorScriptVersion,
+  type DirectorScriptVersionSummary,
+  type DirectorScriptMessage,
+  type DirectorScriptChatInput,
+  type UpdateDirectorProjectInput,
+} from '@bailian-studio/shared'
+
+export {
+  CreateDirectorPhaseRunSchema,
+  DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
+  DirectorMusicEstimateSchema,
+  DirectorAssemblyPreflightResponseSchema,
+  AttachDirectorAssetSchema,
+  DirectorAnalysisResultSchema,
+  DirectorAssetResponseSchema,
+  DirectorAssetSchema,
+  DirectorShotDraftSchema,
+  DirectorShotSchema,
+  DirectorShotResponseSchema,
+  DirectorStoryboardResultSchema,
+  DirectorContinuityResultSchema,
+  DirectorPromptRebuildResultSchema,
+  DirectorDialogueResultSchema,
+  UpdateDirectorShotSchema,
+  DirectorCharacterDraftSchema,
+  DirectorCharactersResultSchema,
+  DirectorLocationDraftSchema,
+  DirectorLocationsResultSchema,
+  CreateDirectorProjectSchema,
+  DirectorProjectDetailSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
+  DirectorScriptChatInputSchema,
+  DirectorScriptMessageSchema,
+  DirectorScriptMessagesResponseSchema,
+  DirectorScriptVersionResponseSchema,
+  DirectorScriptVersionsResponseSchema,
+  DirectorPhaseRunResponseSchema,
+  DirectorPhaseRunSchema,
+  UpdateDirectorProjectSchema,
+}
+export type {
+  CreateDirectorPhaseRunInput,
+  DirectorVideoEstimate,
+  DirectorMusicEstimate,
+  DirectorAssemblyPreflight,
+  AttachDirectorAssetInput,
+  DirectorAnalysisResult,
+  DirectorAsset,
+  DirectorShot,
+  DirectorShotDraft,
+  DirectorStoryboardResult,
+  DirectorContinuityResult,
+  DirectorPromptRebuildResult,
+  DirectorDialogueResult,
+  UpdateDirectorShotInput,
+  DirectorCharacterDraft,
+  DirectorCharacter,
+  DirectorCharactersResult,
+  DirectorLocationDraft,
+  DirectorLocation,
+  DirectorLocationsResult,
+  CreateDirectorProjectInput,
+  DirectorProjectDetail,
+  DirectorProjectListResult,
+  DirectorProjectSummary,
+  DirectorScriptVersion,
+  DirectorScriptVersionSummary,
+  DirectorScriptMessage,
+  DirectorScriptChatInput,
+  DirectorPhaseRun,
+  DirectorPhaseRunStatus,
+  UpdateDirectorProjectInput,
+}
 
 export const ModelOperationSchema = z.enum([
   'text.chat',
@@ -546,7 +681,7 @@ export const MediaJobErrorSchema = z.object({
 export const MediaJobSchema = z.object({
   id: z.string(),
   userId: z.string(),
-  operation: z.enum(['video.extract_audio']),
+  operation: z.enum(['video.extract_audio', 'video.assemble']),
   status: z.enum(['queued', 'processing', 'succeeded', 'failed', 'cancelled']),
   sourceAssetId: z.string().optional(),
   sourceKind: z.enum(['image', 'video', 'audio']),
@@ -961,7 +1096,7 @@ export const AdminTaskErrorSchema = z.object({
 export const AdminTaskItemSchema = z.object({
   id: z.string(),
   type: z.string(),
-  domain: z.enum(['generation', 'artifact', 'media', 'system']),
+  domain: z.enum(['generation', 'artifact', 'media', 'director', 'system']),
   status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
   priority: z.number(),
   attempts: z.number(),
@@ -983,6 +1118,33 @@ export const AdminTaskItemSchema = z.object({
 export const ListAdminTasksResponseSchema = z.object({
   items: z.array(AdminTaskItemSchema),
   nextCursor: z.string().optional(),
+})
+
+/** 管理员任务详情中的单个输入资产；仅返回可展示字段，不暴露存储坐标。 */
+export const AdminTaskInputAssetSchema = z.object({
+  parameterName: z.string(),
+  position: z.number().int().nonnegative(),
+  asset: z.object({
+    id: z.string(),
+    kind: z.string(),
+    source: z.string(),
+    url: z.string().optional(),
+    thumbnailUrl: z.string().optional(),
+    fileName: z.string().optional(),
+  }),
+})
+
+/** 生成型任务的原始请求快照，供管理员排障；非生成任务返回 null。 */
+export const AdminTaskRequestContextSchema = z.object({
+  recordId: z.string(),
+  modelId: z.string(),
+  category: z.enum(['image', 'video', 'audio', 'text']),
+  inputParams: z.record(z.string(), z.unknown()),
+  inputAssets: z.array(AdminTaskInputAssetSchema),
+})
+
+export const AdminTaskRequestContextResponseSchema = z.object({
+  context: AdminTaskRequestContextSchema.nullable(),
 })
 
 /** admin 画廊预览产物项（text 内联正文；媒体项带 readUrl/thumbnailUrl）。 */
@@ -1171,6 +1333,8 @@ export type AdminGalleryHideResult = z.infer<typeof AdminGalleryHideResultSchema
 export type AdminTaskItem = z.infer<typeof AdminTaskItemSchema>
 export type AdminTaskError = z.infer<typeof AdminTaskErrorSchema>
 export type ListAdminTasksResult = z.infer<typeof ListAdminTasksResponseSchema>
+export type AdminTaskInputAsset = z.infer<typeof AdminTaskInputAssetSchema>
+export type AdminTaskRequestContext = z.infer<typeof AdminTaskRequestContextSchema>
 export type AdminGalleryArtifact = z.infer<typeof AdminGalleryArtifactSchema>
 export type AdminGalleryArtifactsResult = z.infer<typeof AdminGalleryArtifactsResponseSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>

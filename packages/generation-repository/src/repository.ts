@@ -71,7 +71,6 @@ import {
   type TaskRecordRow,
 } from './mappers'
 import type {
-  AdminGalleryItem,
   CostMarginRow,
   ContentReport,
   ContentReportReason,
@@ -501,7 +500,9 @@ function refsFromRows(
   }
   const refs: GenerationAssetRefs = {}
   for (const parameterName of [...grouped.keys()].sort()) {
-    const ids = grouped.get(parameterName)!
+    const entries = grouped.get(parameterName)
+    if (entries === undefined) continue
+    const ids = entries
       .sort((left, right) => left.position - right.position)
       .map(({ assetId }) => assetId)
     refs[parameterName] = ids
@@ -2290,6 +2291,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             eq(taskRecords.recordId, updatedRecord.id),
             eq(taskRecords.type, 'generation.poll'),
             inArray(taskRecords.status, ['queued', 'running']),
+            ...(input.excludeTaskId === undefined ? [] : [sql`${taskRecords.id} <> ${input.excludeTaskId}`]),
           ))
           .limit(1)
 

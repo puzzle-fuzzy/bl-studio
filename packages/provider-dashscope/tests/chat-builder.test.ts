@@ -1,14 +1,15 @@
-import { describe, expect, test } from 'vitest'
+import { expect, test } from 'vitest'
+import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import { buildChatRequest } from '../src/chat-builder'
 
 // 测试用的 manifest stub（P1-37：必须带 screenplay capability 才能进入剧本流传输）
-const stubManifest = {
+const stubManifest: Pick<FrozenModelManifest, 'providerModel' | 'capabilities'> = {
   providerModel: 'qwen3.5-omni-plus',
   capabilities: ['screenplay', 'video_input', 'streaming'],
-} as const
+}
 
 test('buildChatRequest 生成正确的 messages 结构', () => {
-  const result = buildChatRequest(stubManifest as any, {
+  const result = buildChatRequest(stubManifest, {
     videoUrl: 'https://example.com/video.mp4',
     language: 'zh',
     detailLevel: 'standard',
@@ -44,7 +45,7 @@ test('buildChatRequest 生成正确的 messages 结构', () => {
 })
 
 test('buildChatRequest 使用英文 prompt', () => {
-  const result = buildChatRequest(stubManifest as any, {
+  const result = buildChatRequest(stubManifest, {
     videoUrl: 'https://example.com/video.mp4',
     language: 'en',
     detailLevel: 'standard',
@@ -62,7 +63,7 @@ test('buildChatRequest 使用英文 prompt', () => {
 })
 
 test('buildChatRequest 双语模式包含中英对白要求', () => {
-  const result = buildChatRequest(stubManifest as any, {
+  const result = buildChatRequest(stubManifest, {
     videoUrl: 'https://example.com/video.mp4',
     language: 'zh_en',
     detailLevel: 'standard',
@@ -81,13 +82,16 @@ test('buildChatRequest 双语模式包含中英对白要求', () => {
 })
 
 test('拒绝无 screenplay capability 的 manifest（P1-37 改错即红）', () => {
-  const nonScreenplay = { providerModel: 'some-chat-model', capabilities: ['text_prompt'] }
-  expect(() => buildChatRequest(nonScreenplay as any, { videoUrl: 'https://example.com/v.mp4' }))
+  const nonScreenplay: Pick<FrozenModelManifest, 'providerModel' | 'capabilities'> = {
+    providerModel: 'some-chat-model',
+    capabilities: ['text_prompt'],
+  }
+  expect(() => buildChatRequest(nonScreenplay, { videoUrl: 'https://example.com/v.mp4' }))
     .toThrow(/requires the 'screenplay' capability/)
 })
 
 test('detailed 模式包含更细致的描述要求', () => {
-  const result = buildChatRequest(stubManifest as any, {
+  const result = buildChatRequest(stubManifest, {
     videoUrl: 'https://example.com/video.mp4',
     language: 'zh',
     detailLevel: 'detailed',

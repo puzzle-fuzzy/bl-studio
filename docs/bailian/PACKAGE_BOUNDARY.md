@@ -16,6 +16,8 @@
 
 ## 2. 各包 import 禁令（check-package-boundaries.ts 的 rules 表）
 
+`packages/api-client` 是传输契约层，允许依赖 `@bailian-studio/shared` 与 `zod`；它不得依赖执行层、数据库、应用层或其他运行时包。共享契约只保留一份，避免 API、Worker 与前端各自维护不同的 wire schema。
+
 | 包 | 禁止 import |
 |---|---|
 | `packages/shared` | 任何其它 `@bailian-studio/*`（叶子包） |

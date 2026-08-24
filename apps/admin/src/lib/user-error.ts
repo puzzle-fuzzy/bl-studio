@@ -49,6 +49,8 @@ const CODE_MESSAGES: Record<string, string> = {
   NETWORK_ERROR: '网络连接异常，请检查网络后重试',
   DATABASE_ERROR: '服务暂时不可用，请稍后再试',
   INTERNAL_ERROR: '服务出现异常，请稍后再试',
+  STORAGE_UPLOAD_TIMEOUT: '图片上传耗时较长，请检查文件大小后重试',
+  STORAGE_UPLOAD_NETWORK_ERROR: '图片存储连接异常，请稍后重试',
 }
 
 const STATUS_FALLBACK: Record<number, string> = {

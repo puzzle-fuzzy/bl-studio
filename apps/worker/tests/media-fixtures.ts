@@ -5,6 +5,7 @@ import type {
   FailMediaJobInput,
   GetMediaJobInput,
   MediaJob,
+  MediaCompositeSource,
   MediaRepository,
   MediaSource,
 } from '@bailian-studio/media-repository'
@@ -12,6 +13,8 @@ import type { TaskRecord } from '@bailian-studio/task-engine'
 import type {
   ExtractAudioInput,
   ExtractAudioOutput,
+  AssembleVideoInput,
+  AssembleVideoOutput,
   GenerateThumbnailInput,
   GenerateThumbnailOutput,
   MediaProcessor,
@@ -31,6 +34,7 @@ export class FakeMediaRepository implements MediaRepository {
     mimeType: 'video/mp4',
     byteSize: 10,
   }
+  compositeSources: MediaCompositeSource[] = []
 
   createMediaJob(_input: CreateMediaJobInput): Promise<CreateMediaJobResult> {
     return Promise.reject(new Error('FakeMediaRepository.createMediaJob is not used'))
@@ -46,6 +50,10 @@ export class FakeMediaRepository implements MediaRepository {
 
   getMediaSource(jobId: string): Promise<MediaSource | undefined> {
     return Promise.resolve(jobId === this.job.id ? this.source : undefined)
+  }
+
+  getMediaSources(jobId: string): Promise<MediaCompositeSource[]> {
+    return Promise.resolve(jobId === this.job.id ? this.compositeSources : [])
   }
 
   markMediaJobProcessing(jobId: string): Promise<MediaJob> {
@@ -67,6 +75,7 @@ export class FakeMediaRepository implements MediaRepository {
 
 export class FakeMediaProcessor implements MediaProcessor {
   readonly inputs: ExtractAudioInput[] = []
+  readonly assemblyInputs: AssembleVideoInput[] = []
   readonly thumbnailInputs: GenerateThumbnailInput[] = []
   throwError: Error | null = null
 
@@ -78,6 +87,17 @@ export class FakeMediaProcessor implements MediaProcessor {
       fileName: 'video.mp3',
       mimeType: 'audio/mpeg',
       metadata: { durationSeconds: 1 },
+    })
+  }
+
+  assembleVideo(input: AssembleVideoInput): Promise<AssembleVideoOutput> {
+    this.assemblyInputs.push(input)
+    if (this.throwError !== null) return Promise.reject(this.throwError)
+    return Promise.resolve({
+      body: new TextEncoder().encode('assembled video bytes'),
+      fileName: 'assembled.mp4',
+      mimeType: 'video/mp4',
+      metadata: { width: input.width, height: input.height, fps: input.fps, hasMusic: input.musicSource !== undefined },
     })
   }
 

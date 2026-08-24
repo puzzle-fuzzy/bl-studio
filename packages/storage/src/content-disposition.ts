@@ -1,4 +1,5 @@
 const MAX_DOWNLOAD_FILE_NAME_CODE_POINTS = 180
+// biome-ignore lint/suspicious/noControlCharactersInRegex: HTTP header sanitization must remove control and bidi characters.
 const UNSAFE_HEADER_CHARACTERS = /[\u0000-\u001F\u007F-\u009F\u061C\u200E\u200F\u2028\u2029\u202A-\u202E\u2066-\u2069]/g
 const MIME_TYPE_EXTENSIONS: Readonly<Record<string, string>> = {
   'application/gzip': '.gz',

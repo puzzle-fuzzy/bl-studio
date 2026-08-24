@@ -19,6 +19,7 @@ export type {
   GetMediaJobInput,
   MediaJob,
   MediaJobStatus,
+  MediaCompositeSource,
   MediaOperation,
   MediaOutputKind,
   MediaSourceKind,

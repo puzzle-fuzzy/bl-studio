@@ -1,6 +1,7 @@
 import type { AuthService } from '@bailian-studio/auth'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import type { GenerationLimits } from './lib/limits'
@@ -31,6 +32,7 @@ export interface ApiDependencies {
   readonly githubOAuth?: GithubOAuthConfig
   readonly creditLedger: CreditLedger
   readonly generationRepository: GenerationRepository
+  readonly directorRepository: DirectorRepository
   readonly mediaRepository: MediaRepository
   readonly storage: StorageAdapter
   readonly generationSseHub: GenerationSseHub

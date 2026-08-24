@@ -6,7 +6,7 @@
  * 全部由 manifest 声明（本仓库即唯一数据源），不再有外部 SDK 归属。
  */
 
-import { MODEL_REGISTRY, listModels } from './registry'
+import { MODEL_REGISTRY } from './registry'
 import type { FrozenModelManifest, ModelTaskMode } from './types'
 
 export type BailianOperationCapability =

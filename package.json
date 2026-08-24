@@ -15,12 +15,14 @@
   "scripts": {
     "dev": "dotenv -e infra/env/.env -- turbo run dev",
     "build": "turbo run build",
+    "lint": "biome lint .",
+    "lint:fix": "biome lint --write .",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.json --noEmit",
-    "test": "dotenv -e infra/env/.env.test -- sh -c 'pnpm run test:root && turbo run test --concurrency=1'",
-    "test:root": "dotenv -e infra/env/.env.test -- vitest run tests infra/scripts",
-    "test:coverage": "dotenv -e infra/env/.env.test -- sh -c 'turbo run test:coverage --concurrency=1'",
-    "verify": "dotenv -e infra/env/.env.test -- sh -c 'pnpm run check:db-migrations && pnpm run check:boundaries && pnpm run check:manifests && pnpm run typecheck:root && pnpm run typecheck && pnpm run test && pnpm run test:coverage'",
+    "test": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts test",
+    "test:root": "dotenv -e infra/env/.env.test -- vitest run tests infra/scripts --hookTimeout=30000",
+    "test:coverage": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts coverage",
+    "verify": "dotenv -e infra/env/.env.test -- tsx infra/scripts/run-workflow.ts verify",
     "check:boundaries": "tsx infra/scripts/check-package-boundaries.ts",
     "check:manifests": "tsx infra/scripts/check-model-manifests.ts",
     "check:db-migrations": "tsx infra/scripts/check-db-migrations.ts",
@@ -40,17 +42,18 @@
     "e2e:install": "node infra/scripts/playwright-cli.cjs install chromium",
     "db:up": "docker compose -f infra/docker/docker-compose.yml up -d",
     "db:down": "docker compose -f infra/docker/docker-compose.yml down",
-    "db:push": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55431/bailian-studio_dev pnpm exec drizzle-kit push --config packages/db/drizzle.config.ts && DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55431/bailian-studio_dev tsx infra/scripts/ensure-audit-action-constraint.ts",
-    "db:migrate": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55431/bailian-studio_dev pnpm exec drizzle-kit migrate --config packages/db/drizzle.config.ts",
+    "db:reset": "docker compose -f infra/docker/docker-compose.yml down -v",
+    "db:push": "dotenv -e infra/env/.env -- pnpm exec drizzle-kit push --config packages/db/drizzle.config.ts && dotenv -e infra/env/.env -- tsx infra/scripts/ensure-audit-action-constraint.ts",
+    "db:migrate": "dotenv -e infra/env/.env -- pnpm exec drizzle-kit migrate --config packages/db/drizzle.config.ts",
     "db:migrate:production": "pnpm exec drizzle-kit migrate --config packages/db/drizzle.config.ts",
-    "db:baseline": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55431/bailian-studio_dev tsx infra/scripts/db-baseline.ts",
-    "db:studio": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55431/bailian-studio_dev pnpm exec drizzle-kit studio --config packages/db/drizzle.config.ts",
+    "db:baseline": "dotenv -e infra/env/.env -- tsx infra/scripts/db-baseline.ts",
+    "db:studio": "dotenv -e infra/env/.env -- pnpm exec drizzle-kit studio --config packages/db/drizzle.config.ts",
     "db:test:up": "docker compose -f infra/docker/docker-compose.test.yml up -d",
     "db:test:down": "docker compose -f infra/docker/docker-compose.test.yml down -v",
-    "db:push:test": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test pnpm exec drizzle-kit push --config packages/db/drizzle.config.ts && DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test tsx infra/scripts/ensure-audit-action-constraint.ts",
-    "db:migrate:test": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test pnpm exec drizzle-kit migrate --config packages/db/drizzle.config.ts",
-    "db:baseline:test": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test tsx infra/scripts/db-baseline.ts",
-    "db:studio:test": "DATABASE_URL=postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test pnpm exec drizzle-kit studio --config packages/db/drizzle.config.ts",
+    "db:push:test": "dotenv -e infra/env/.env.test -- pnpm exec drizzle-kit push --config packages/db/drizzle.config.ts && dotenv -e infra/env/.env.test -- tsx infra/scripts/ensure-audit-action-constraint.ts",
+    "db:migrate:test": "dotenv -e infra/env/.env.test -- pnpm exec drizzle-kit migrate --config packages/db/drizzle.config.ts",
+    "db:baseline:test": "dotenv -e infra/env/.env.test -- tsx infra/scripts/db-baseline.ts",
+    "db:studio:test": "dotenv -e infra/env/.env.test -- pnpm exec drizzle-kit studio --config packages/db/drizzle.config.ts",
     "db:backfill:credits": "dotenv -e infra/env/.env -- tsx infra/scripts/backfill-credit-accounts.ts",
     "deploy:rehearsal:up": "docker compose -f infra/docker/docker-compose.rehearsal.yml build api web && docker compose -f infra/docker/docker-compose.rehearsal.yml up -d --no-build --pull never",
     "deploy:rehearsal:down": "docker compose -f infra/docker/docker-compose.rehearsal.yml down",
@@ -71,10 +74,11 @@
     "logs:api": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f api",
     "logs:worker": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml logs -f worker",
     "logs:prune": "bash infra/scripts/prune-loki-logs.sh",
-    "prod:mem": "ssh -o ConnectTimeout=10 $(awk -F= '$1==\"DEPLOY_HOST\"{sub(/^[^=]*=/,\"\");print;exit}' infra/env/.env.prod-infra) 'free -h && docker stats --no-stream'",
+    "prod:mem": "dotenv -e infra/env/.env.prod-infra -- tsx infra/scripts/prod-mem.ts",
     "db:backup:production": "docker compose --env-file infra/env/.env.prod-infra -f infra/docker/docker-compose.prod.yml exec -T backup /bin/sh /usr/local/bin/backup-postgres.sh",
     "prod:restore:rehearsal": "bash infra/scripts/restore-rehearsal.sh",
-    "db:seed:model-costs": "dotenv -e infra/env/.env -- tsx infra/scripts/seed-model-costs.ts"
+    "db:seed:model-costs": "dotenv -e infra/env/.env -- tsx infra/scripts/seed-model-costs.ts",
+    "fetch:static-ffmpeg:windows": "powershell -NoProfile -ExecutionPolicy Bypass -File infra/scripts/fetch-static-ffmpeg.ps1"
   },
   "dependencies": {
     "drizzle-kit": "catalog:",
@@ -84,6 +88,7 @@
   "devDependencies": {
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
+    "@biomejs/biome": "^2.5.7",
     "@node-rs/argon2": "catalog:",
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.1.2",
@@ -95,11 +100,6 @@
     "turndown-plugin-gfm": "1.0.2",
     "typescript": "catalog:",
     "vitest": "catalog:"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   },
   "repository": {
     "type": "git",

@@ -4,7 +4,7 @@
  * 上层（apps/worker 写入、apps/api 读取）只依赖这里的类型与工厂，
  * 不感知底层是本地文件系统还是阿里云 OSS。
  */
-export { createStorageFromEnv, type CreateStorageFromEnvOptions } from './env'
+export { createStorageFromEnv, DEFAULT_OSS_TIMEOUT_MS, type CreateStorageFromEnvOptions } from './env'
 export { assetDownloadFileName, attachmentContentDisposition } from './content-disposition'
 export { findRepoRoot, resolveArtifactLocalRoot, looksLikeForeignAbsolute, type ExistsChecker } from './paths'
 export { LocalStorageAdapter, resolveLocalStoragePath, type LocalStorageAdapterOptions } from './local'
@@ -15,8 +15,12 @@ export {
   OSS_VIDEO_SNAPSHOT_PROCESS,
   OSS_MIN_EXPIRES_SECONDS,
   OSS_MAX_EXPIRES_SECONDS,
+  DEFAULT_OSS_MULTIPART_PART_SIZE_BYTES,
+  DEFAULT_OSS_MULTIPART_PARALLEL,
+  DEFAULT_OSS_RETRY_MAX,
   type CreateOssClientOptions,
   type OssClientLike,
   type OssStorageAdapterOptions,
 } from './oss'
-export type { StorageAdapter, StorageDeleteInput, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
+export { StorageError } from './types'
+export type { StorageAdapter, StorageDeleteInput, StorageErrorCode, StorageProvider, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteFileInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'

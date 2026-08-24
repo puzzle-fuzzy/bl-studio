@@ -3,6 +3,7 @@ import { AuthError } from '@bailian-studio/auth'
 import { CreditLedgerError } from '@bailian-studio/credit-ledger'
 import { GenerationRepositoryError } from '@bailian-studio/generation-repository'
 import { ValidationError } from '@bailian-studio/shared'
+import { StorageError } from '@bailian-studio/storage'
 import { z } from 'zod'
 import { errorResponseBody, httpStatusForError } from '../src/lib/http-errors'
 
@@ -46,6 +47,11 @@ describe('httpStatusForError', () => {
     expect(httpStatusForError(new ValidationError('bad'))).toBe(400)
     expect(httpStatusForError(new Error('boom'))).toBe(500)
     expect(httpStatusForError('not even an error')).toBe(500)
+  })
+
+  it('maps storage upload failures to retryable gateway statuses', () => {
+    expect(httpStatusForError(new StorageError('STORAGE_UPLOAD_TIMEOUT', 'upload timed out'))).toBe(504)
+    expect(httpStatusForError(new StorageError('STORAGE_UPLOAD_NETWORK_ERROR', 'upload failed'))).toBe(503)
   })
 })
 
@@ -144,6 +150,13 @@ describe('errorResponseBody', () => {
     expect(errorResponseBody('something odd')).toEqual({
       success: false,
       error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
+    })
+  })
+
+  it('returns stable storage upload codes without exposing provider details', () => {
+    expect(errorResponseBody(new StorageError('STORAGE_UPLOAD_TIMEOUT', 'Object storage upload timed out'))).toEqual({
+      success: false,
+      error: { code: 'STORAGE_UPLOAD_TIMEOUT', message: 'Object storage upload timed out' },
     })
   })
 

@@ -1,7 +1,13 @@
 import OSS from 'ali-oss'
+import { createWriteStream } from 'node:fs'
+import { mkdtemp, rm } from 'node:fs/promises'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
 import type { ReadableStream as NodeReadableStream } from 'node:stream/web'
-import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
+import type { StorageAdapter, StorageDeleteInput, StorageReadInput, StorageReadResult, StorageReadUrlInput, StorageWriteFileInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from './types'
+import { StorageError } from './types'
 import { attachmentContentDisposition } from './content-disposition'
 import { sanitizeKey as sanitizeStorageKey } from './local'
 
@@ -14,7 +20,23 @@ import { sanitizeKey as sanitizeStorageKey } from './local'
 export interface OssClientLike {
   put(key: string, body: Uint8Array, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
   /** P1-16：流式上传（ali-oss `putStream`）。未实现时 OSS 适配器退化为缓冲写。 */
-  putStream?(key: string, stream: Readable, options?: { headers?: Record<string, string> }): Promise<{ url?: string }>
+  putStream?(
+    key: string,
+    stream: Readable,
+    options?: { headers?: Record<string, string>; contentLength?: number; timeout?: number },
+  ): Promise<{ url?: string }>
+  multipartUpload?(
+    key: string,
+    filePath: string,
+    options?: {
+      headers?: Record<string, string>
+      mime?: string
+      partSize?: number
+      parallel?: number
+      progress?: (percentage: number, checkpoint?: { uploadId?: string }) => Promise<void> | void
+    },
+  ): Promise<{ url?: string }>
+  abortMultipartUpload?(key: string, uploadId: string): Promise<unknown>
   delete?(key: string): Promise<unknown>
   head?(key: string): Promise<unknown>
   signatureUrl(key: string, options: {
@@ -39,6 +61,8 @@ export const OSS_IMAGE_THUMBNAIL_PROCESS = 'image/resize,m_lfit,w_640,h_640/form
 export interface OssStorageAdapterOptions {
   client: OssClientLike
   keyPrefix?: string
+  multipartPartSizeBytes?: number
+  multipartParallel?: number
 }
 
 export interface CreateOssClientOptions {
@@ -47,7 +71,15 @@ export interface CreateOssClientOptions {
   accessKeyId: string
   accessKeySecret: string
   endpoint?: string
+  /** ali-oss operation timeout in milliseconds; the SDK default is 60 seconds. */
+  timeoutMs?: number
+  /** ali-oss per-part retry count for multipart uploads. */
+  retryMax?: number
 }
+
+export const DEFAULT_OSS_MULTIPART_PART_SIZE_BYTES = 1 * 1024 * 1024
+export const DEFAULT_OSS_MULTIPART_PARALLEL = 4
+export const DEFAULT_OSS_RETRY_MAX = 2
 
 /**
  * 基于 OssClientLike 的存储适配器。写入直接 put 字节；读 URL 用 OSS 的签名 URL
@@ -90,8 +122,8 @@ export class OssStorageAdapter implements StorageAdapter {
   }
 
   async writeObjectStream(input: StorageWriteStreamInput): Promise<StorageWriteResult> {
-    // P1-16：流式上传。ali-oss `putStream` 对未知长度的流走 chunked 分片上传，
-    // 单遍消费入参流。字节数边流边计，不依赖服务端返回。
+    // P1-16：流式上传。已知长度时传给 ali-oss，避免生产环境的 chunked PUT；
+    // 未知长度的通用流仍允许退回 SDK 的 chunked 行为。字节数边流边计，不依赖服务端返回。
     const putStream = this.options.client.putStream
     if (putStream === undefined) throw new Error('OSS storage stream write is not configured')
     const fullKey = this.resolveWriteKey(input.key)
@@ -100,17 +132,68 @@ export class OssStorageAdapter implements StorageAdapter {
     source.on('data', (chunk: Uint8Array) => {
       byteSize += chunk.byteLength
     })
-    const result = await putStream.call(
-      this.options.client,
-      fullKey,
-      source,
-      { ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}) },
-    )
+    let result: { url?: string }
+    try {
+      result = await putStream.call(
+        this.options.client,
+        fullKey,
+        source,
+        {
+          ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}),
+          ...(input.contentLength !== undefined ? { contentLength: input.contentLength } : {}),
+        },
+      )
+    } catch (error) {
+      throw toStorageUploadError(error)
+    }
     return {
       provider: this.provider,
       key: fullKey,
       ...(result.url !== undefined ? { url: result.url } : {}),
       byteSize,
+    }
+  }
+
+  async writeObjectMultipart(input: StorageWriteFileInput): Promise<StorageWriteResult> {
+    const multipartUpload = this.options.client.multipartUpload
+    if (multipartUpload === undefined) throw new Error('OSS storage multipart upload is not configured')
+
+    const fullKey = this.resolveWriteKey(input.key)
+    const workDir = await mkdtemp(join(tmpdir(), 'bailian-studio-oss-upload-'))
+    const filePath = join(workDir, 'source.bin')
+    let uploadId: string | undefined
+
+    try {
+      await pipeline(
+        Readable.fromWeb(input.file.stream() as unknown as NodeReadableStream),
+        createWriteStream(filePath),
+      )
+      const result = await multipartUpload.call(this.options.client, fullKey, filePath, {
+        ...(input.contentType !== undefined ? { headers: { 'Content-Type': input.contentType } } : {}),
+        ...(input.contentType !== undefined ? { mime: input.contentType } : {}),
+        partSize: this.options.multipartPartSizeBytes ?? DEFAULT_OSS_MULTIPART_PART_SIZE_BYTES,
+        parallel: this.options.multipartParallel ?? DEFAULT_OSS_MULTIPART_PARALLEL,
+        progress: async (_percentage, checkpoint) => {
+          uploadId = checkpoint?.uploadId ?? uploadId
+        },
+      })
+      return {
+        provider: this.provider,
+        key: fullKey,
+        ...(result.url !== undefined ? { url: result.url } : {}),
+        byteSize: input.byteSize,
+      }
+    } catch (error) {
+      if (uploadId !== undefined && this.options.client.abortMultipartUpload !== undefined) {
+        try {
+          await this.options.client.abortMultipartUpload.call(this.options.client, fullKey, uploadId)
+        } catch {
+          // 保留原始上传错误；未完成的 multipart 由 OSS 生命周期规则兜底清理。
+        }
+      }
+      throw toStorageUploadError(error)
+    } finally {
+      await rm(workDir, { recursive: true, force: true })
     }
   }
 
@@ -187,7 +270,20 @@ export function createOssClient(options: CreateOssClientOptions): OssClientLike 
     accessKeySecret: options.accessKeySecret,
     authorizationV4: true,
     ...(options.endpoint !== undefined ? { endpoint: options.endpoint } : {}),
+    ...(options.timeoutMs !== undefined ? { timeout: options.timeoutMs } : {}),
+    ...(options.retryMax !== undefined ? { retryMax: options.retryMax } : {}),
   }) as OssClientLike
+}
+
+function toStorageUploadError(error: unknown): StorageError {
+  const name = error instanceof Error ? error.name : ''
+  const message = error instanceof Error ? error.message : String(error)
+  const isTimeout = name === 'ResponseTimeoutError' || /timeout/i.test(message)
+  return new StorageError(
+    isTimeout ? 'STORAGE_UPLOAD_TIMEOUT' : 'STORAGE_UPLOAD_NETWORK_ERROR',
+    isTimeout ? 'Object storage upload timed out' : 'Object storage upload failed',
+    { cause: error },
+  )
 }
 
 function readStorageErrorStatus(error: unknown): number | undefined {

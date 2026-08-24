@@ -42,6 +42,7 @@ export function AssetPickerDialog({
   const assetsState = useAssetsStore(state => state.queries[queryKey])
 
   const [selected, setSelected] = useState<AssetItem[]>([])
+  const [uploadedAssets, setUploadedAssets] = useState<AssetItem[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
   const [uploadError, setUploadError] = useState<string | null>(null)
@@ -53,6 +54,7 @@ export function AssetPickerDialog({
   useEffect(() => {
     if (open) {
       setSelected([])
+      setUploadedAssets([])
       void load(query)
     }
   }, [open, load, query.kind])
@@ -102,6 +104,7 @@ export function AssetPickerDialog({
         onProgress: (loaded, total) => setUploadProgress(total > 0 ? loaded / total : 0),
       })
       setSelected(current => (multiple ? [...current, asset] : [asset]))
+      setUploadedAssets(current => (multiple ? [...current, asset] : [asset]))
       void load(query, true)
     } catch (error) {
       // R2-P1-06：用户主动取消不展示错误文案。
@@ -212,6 +215,45 @@ export function AssetPickerDialog({
               <Button variant="outline" size="sm" className="w-full" onClick={abortUpload}>
                 取消上传
               </Button>
+            )}
+            {uploadedAssets.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-xs text-muted-foreground">已上传，点击预览图即可选中</p>
+                <div className="flex flex-wrap gap-3">
+                  {uploadedAssets.map(asset => {
+                    const selectedIndex = selected.findIndex(item => item.id === asset.id)
+                    const isSelected = selectedIndex >= 0
+                    return (
+                      <button
+                        key={asset.id}
+                        type="button"
+                        onClick={() => toggleAsset(asset)}
+                        className={cn(
+                          'group relative size-28 overflow-hidden rounded-lg bg-muted/40 ring-1 ring-border transition hover:ring-primary/60',
+                          isSelected && 'ring-2 ring-primary',
+                        )}
+                        aria-pressed={isSelected}
+                        aria-label={asset.fileName ?? '已上传素材'}
+                      >
+                        <AssetThumbnail
+                          kind={asset.kind}
+                          url={asset.url}
+                          thumbnailUrl={asset.thumbnailUrl}
+                          alt={asset.fileName ?? '已上传素材'}
+                        />
+                        <span className="absolute inset-x-0 bottom-0 truncate bg-black/55 px-2 py-1 text-left text-[11px] text-white">
+                          {asset.fileName ?? '已上传素材'}
+                        </span>
+                        {isSelected && (
+                          <span className="absolute top-1 right-1 flex size-5 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            {multiple ? selectedIndex + 1 : <Check className="size-3" />}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
             )}
             {uploadError !== null && <p className="text-sm text-destructive">{uploadError}</p>}
           </TabsContent>

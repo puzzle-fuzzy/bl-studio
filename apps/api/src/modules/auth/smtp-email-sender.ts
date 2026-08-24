@@ -146,11 +146,12 @@ function isLoopbackHost(host: string): boolean {
 }
 
 function escapeHtml(value: string): string {
-  return value.replace(/[&<>"']/g, character => ({
+  const entities: Record<string, string> = {
     '&': '&amp;',
     '<': '&lt;',
     '>': '&gt;',
     '"': '&quot;',
     "'": '&#39;',
-  })[character]!)
+  }
+  return value.replace(/[&<>"']/g, character => entities[character] ?? character)
 }

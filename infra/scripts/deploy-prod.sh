@@ -57,7 +57,7 @@ inject_release_tag "$ENV_INFRA"
 
 # 只把 OSS 灾备所需的五项变量投影给 backup 容器，避免把 API/Worker/SMTP 等
 # 应用机密通过 env_file 扩散到备份服务。
-pnpm exec tsx "$REPO_ROOT/infra/scripts/prepare-backup-env.ts" \
+pnpm exec tsx infra/scripts/prepare-backup-env.ts \
   || fail "prepare-backup-env 未通过"
 [[ -f "$ENV_BACKUP" ]] || fail "缺少 ${ENV_BACKUP}"
 
@@ -69,7 +69,7 @@ pnpm exec tsx "$REPO_ROOT/infra/scripts/prepare-backup-env.ts" \
 if [[ "${DEPLOY_SKIP_VERIFY:-0}" != "1" ]]; then
   if [[ -f "$REPO_ROOT/infra/env/.env.test" ]]; then
     echo "==> 前置 verify 门禁（test DB 环境，全绿才继续）"
-    pnpm exec dotenv -e "$REPO_ROOT/infra/env/.env.test" -- pnpm run verify \
+    pnpm exec dotenv -e infra/env/.env.test -- pnpm run verify \
       || fail "verify 未通过；修好后重新部署（紧急时可 DEPLOY_SKIP_VERIFY=1 绕过，需自行评估）"
   else
     fail "缺少 infra/env/.env.test：verify 门禁需要 test DB 连接串（参考 infra/env/.env.test.example）"
@@ -79,9 +79,9 @@ else
 fi
 
 # ── 预检 3：生产预检（不联网、不打印值）──────────────────────────
-pnpm exec dotenv -e "$ENV_APP" -- tsx infra/scripts/check-production-env.ts \
+pnpm exec dotenv -e infra/env/.env.production -- tsx infra/scripts/check-production-env.ts \
   || fail "check:production-env 未通过"
-pnpm exec dotenv -e "$ENV_INFRA" -- tsx infra/scripts/check-production-env.ts infra \
+pnpm exec dotenv -e infra/env/.env.prod-infra -- tsx infra/scripts/check-production-env.ts infra \
   || fail "check:production-env infra 未通过"
 
 # ── 读取部署参数（仅读取，不打印值）──────────────────────────────
@@ -101,6 +101,13 @@ DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM "$ENV_INFRA")"
 [[ -n "$SITE_DOMAIN" ]] || fail "缺少 SITE_DOMAIN"
 DEPLOY_PLATFORM="${DEPLOY_PLATFORM:-linux/amd64}"
 
+source "$REPO_ROOT/infra/scripts/resolve-deploy-ssh-key.sh"
+DEPLOY_SSH_KEY="$(resolve_deploy_ssh_key "$DEPLOY_SSH_KEY")"
+if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
+  fail "DEPLOY_SSH_KEY 不存在或无法从当前 Bash 环境访问"
+fi
+DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
+
 # P1-41：本机 Clash fake-ip 劫持 DNS，本地 dig/curl 解析不可信（CLAUDE.md 已注明，
 # 查 DNS 要在服务器上 getent hosts）。公网冒烟直接按服务器 IP 连接（curl --resolve
 # 仍保留 SNI 与证书校验，功能等价于走域名），避免被 fake-ip 解析到 127.0.0.1。
@@ -114,11 +121,7 @@ SERVER_HOST="${SSH_RESOLVED_HOST:-$SERVER_HOST}"
 
 # 不用数组（macOS bash 3.2 下 set -u + 空数组展开会误报 unbound variable）。
 ssh_cmd() {
-  if [[ -n "$DEPLOY_SSH_KEY" ]]; then
-    ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
-  else
-    ssh "$DEPLOY_HOST" "$1"
-  fi
+  deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
 }
 
 echo "==> 部署目标：${DEPLOY_HOST}（镜像 tag: ${SHA:0:12}）"
@@ -156,6 +159,8 @@ docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile --target w
   --build-arg VITE_LEGAL_CONTACT_EMAIL="$LEGAL_CONTACT_EMAIL" \
   --build-arg VITE_LEGAL_EFFECTIVE_DATE="$LEGAL_EFFECTIVE_DATE" \
   -t "bailian-studio-web:$SHA" .
+EXPECTED_INDEX_ASSET="$(docker run --rm --entrypoint sh "bailian-studio-web:$SHA" -c "grep -oE '/assets/index-[A-Za-z0-9_-]+\\.js' /usr/share/nginx/html/index.html | head -n 1")"
+[[ -n "$EXPECTED_INDEX_ASSET" ]] || fail "无法从 web 镜像读取 index bundle"
 docker build --platform "$DEPLOY_PLATFORM" -f infra/docker/Dockerfile.backup \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$SHA" \
   -t "bailian-studio-backup:$SHA" .
@@ -168,17 +173,17 @@ docker save -o "images-$SHA.tar" \
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 ssh_cmd "mkdir -p $REMOTE_INFRA/docker $REMOTE_INFRA/env $REMOTE_INFRA/loki $REMOTE_INFRA/alloy $REMOTE_INFRA/grafana $REMOTE_INFRA/nginx $REMOTE_INFRA/scripts"
 
-rsync -az "images-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
-rsync -az infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docker/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "images-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/docker/docker-compose.prod.yml "$DEPLOY_HOST:$REMOTE_INFRA/docker/"
 # 三个目录分别同步到自己的目标目录；多源 rsync 指向同一目标会在服务器
 # 已存在错误路径时把应为单文件的 config.alloy/loki.yaml 留成目录，破坏单文件挂载。
-rsync -az infra/loki/ "$DEPLOY_HOST:$REMOTE_INFRA/loki/"
-rsync -az infra/alloy/ "$DEPLOY_HOST:$REMOTE_INFRA/alloy/"
-rsync -az infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/grafana/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/loki/ "$DEPLOY_HOST:$REMOTE_INFRA/loki/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/alloy/ "$DEPLOY_HOST:$REMOTE_INFRA/alloy/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/grafana/ "$DEPLOY_HOST:$REMOTE_INFRA/grafana/"
 # 宿主机 nginx 边缘：容器内 nginx 配置（烘焙进镜像）+ 两个站点模板 + 边缘接入脚本。
-rsync -az infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
-rsync -az infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh infra/scripts/production-monitor.sh infra/scripts/restore-rehearsal.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
-rsync -az "$ENV_APP" "$ENV_INFRA" "$ENV_BACKUP" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/nginx/ "$DEPLOY_HOST:$REMOTE_INFRA/nginx/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" infra/scripts/setup-host-edge.sh infra/scripts/fetch-static-ffmpeg.sh infra/scripts/production-monitor.sh infra/scripts/restore-rehearsal.sh "$DEPLOY_HOST:$REMOTE_INFRA/scripts/"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$ENV_APP" "$ENV_INFRA" "$ENV_BACKUP" "$DEPLOY_HOST:$REMOTE_INFRA/env/"
 
 # 服务器侧收紧 env 文件权限（含真实凭据）。
 ssh_cmd "chmod 600 $REMOTE_INFRA/env/.env.production $REMOTE_INFRA/env/.env.prod-infra $REMOTE_INFRA/env/.env.prod-backup"
@@ -230,6 +235,8 @@ done
 [[ -n "$smoke_ok" ]] || fail "公网冒烟未通过（检查 DNS / 80/443 开放 / 宿主机 nginx 日志）"
 
 # ── 清理 ─────────────────────────────────────────────────────────
+bash "$REPO_ROOT/infra/scripts/verify-web-release.sh" "$EXPECTED_INDEX_ASSET" "$SITE_DOMAIN" "$SERVER_HOST"
+bash "$REPO_ROOT/infra/scripts/verify-api-release.sh" "$SHA" "$SITE_DOMAIN" "$SERVER_HOST"
 rm -f "images-$SHA.tar"
 ssh_cmd "rm -f $DEPLOY_REMOTE_DIR/images-$SHA.tar; docker image prune -f >/dev/null 2>&1 || true"
 

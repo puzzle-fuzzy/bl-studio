@@ -1439,6 +1439,39 @@ describe('generation repository', () => {
     await expect(repository.getTask(result.task.id)).resolves.toEqual(result.task)
   })
 
+  it('enqueues the next poll when the currently running poll asks to continue', async () => {
+    const created = await repository.createGeneration({
+      userId: 'user_1',
+      modelId: 'wanx-text-to-video',
+      params: { prompt: 'running poll continuation', size: '1280*720', duration: 5 },
+    })
+    const first = await repository.scheduleGenerationPoll({
+      recordId: created.record.id,
+      providerTaskId: 'provider_task_1',
+      nextRunAt: '2026-06-28T00:05:00.000Z',
+      now: '2026-06-28T00:00:00.000Z',
+    })
+    const running = await repository.claimNextQueuedTask({
+      workerId: 'worker-a',
+      now: '2026-06-28T00:05:00.000Z',
+      lockedUntil: '2026-06-28T00:05:30.000Z',
+    })
+    if (running === undefined) throw new Error('expected poll task to be claimed')
+
+    const next = await repository.scheduleGenerationPoll({
+      recordId: created.record.id,
+      providerTaskId: 'provider_task_1',
+      excludeTaskId: running.id,
+      nextRunAt: '2026-06-28T00:05:10.000Z',
+      now: '2026-06-28T00:05:01.000Z',
+    })
+
+    expect(running.id).toBe(first.task.id)
+    expect(next.task.id).not.toBe(running.id)
+    expect(next.task.status).toBe('queued')
+    expect(next.task.nextRunAt).toBe('2026-06-28T00:05:10.000Z')
+  })
+
   it('completes a generation and optionally queues artifact persistence', async () => {
     const created = await repository.createGeneration({
       userId: 'user_1',

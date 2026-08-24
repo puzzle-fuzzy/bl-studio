@@ -5,7 +5,7 @@
  */
 
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { createLogger, MetricsCollector, type Logger, type MetricsSnapshot } from '@bailian-studio/shared'
@@ -19,6 +19,7 @@ import type { ArtifactFetchPolicy } from './artifact-persist'
 export interface WorkerLoopConfig {
   workerId: string
   repository: GenerationRepository
+  directorRepository?: DirectorRepository
   providerRegistry: ProviderRegistry
   modelRegistry: ModelRegistryLookup
   storage: StorageAdapter
@@ -85,6 +86,7 @@ export class WorkerLoop {
     const metrics = config.metrics ?? new MetricsCollector()
     this.executor = createTaskExecutor({
       repository: config.repository,
+      ...(config.directorRepository === undefined ? {} : { directorRepository: config.directorRepository }),
       providerRegistry: config.providerRegistry,
       modelRegistry: config.modelRegistry,
       storage: config.storage,
@@ -275,7 +277,7 @@ export class WorkerLoop {
     const repo = this.config.repository
     const listStuck = repo.listStuckGenerationRecords
     if (listStuck === undefined) return
-    let records
+    let records: Awaited<ReturnType<NonNullable<GenerationRepository['listStuckGenerationRecords']>>>
     try {
       records = await listStuck.call(repo, { now: currentIso() })
     } catch (error) {
@@ -402,6 +404,7 @@ export class WorkerLoop {
       }
     }
 
+    const workerId = task.lockedBy
     let lost = false
     let activeRenewal: Promise<void> | undefined
     let stopped = false
@@ -414,7 +417,7 @@ export class WorkerLoop {
         try {
           const renewed = await this.config.repository.renewTaskLock({
             taskId: task.id,
-            workerId: task.lockedBy!,
+            workerId,
             now: now.toISOString(),
             lockedUntil: new Date(now.getTime() + this.lockDurationMs).toISOString(),
           })

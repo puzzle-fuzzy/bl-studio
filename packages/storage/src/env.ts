@@ -1,8 +1,11 @@
 import { createLogger, type Logger } from '@bailian-studio/shared'
 import { LocalStorageAdapter } from './local'
 import { looksLikeForeignAbsolute, resolveArtifactLocalRoot } from './paths'
-import { createOssClient, OssStorageAdapter } from './oss'
+import { createOssClient, DEFAULT_OSS_RETRY_MAX, OssStorageAdapter } from './oss'
 import type { StorageAdapter } from './types'
+
+/** ali-oss 默认仅等待 60 秒；生产上传允许更大的对象和较慢的跨地域链路。 */
+export const DEFAULT_OSS_TIMEOUT_MS = 180_000
 
 export interface CreateStorageFromEnvOptions {
   env?: Record<string, string | undefined>
@@ -43,12 +46,15 @@ export function createStorageFromEnv(options: CreateStorageFromEnvOptions = {}):
   const keyPrefix = env['OSS_KEY_PREFIX'] ?? 'bailian-studio'
 
   if (region !== undefined && bucket !== undefined && accessKeyId !== undefined && accessKeySecret !== undefined) {
+    const timeoutMs = readOssTimeoutMs(env['OSS_TIMEOUT_MS'])
     return new OssStorageAdapter({
       client: createOssClient({
         region,
         bucket,
         accessKeyId,
         accessKeySecret,
+        timeoutMs,
+        retryMax: readOssRetryMax(env['OSS_RETRY_MAX']),
         ...(env['OSS_ENDPOINT'] !== undefined ? { endpoint: env['OSS_ENDPOINT'] } : {}),
       }),
       keyPrefix,
@@ -80,4 +86,22 @@ export function createStorageFromEnv(options: CreateStorageFromEnvOptions = {}):
 function nonEmpty(value: string | undefined): string | undefined {
   const trimmed = value?.trim()
   return trimmed === '' ? undefined : trimmed
+}
+
+function readOssTimeoutMs(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_OSS_TIMEOUT_MS
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new Error('OSS_TIMEOUT_MS must be a positive integer in milliseconds')
+  }
+  return parsed
+}
+
+function readOssRetryMax(value: string | undefined): number {
+  if (value === undefined || value.trim() === '') return DEFAULT_OSS_RETRY_MAX
+  const parsed = Number(value)
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new Error('OSS_RETRY_MAX must be a non-negative integer')
+  }
+  return parsed
 }

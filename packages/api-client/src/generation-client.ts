@@ -11,18 +11,13 @@
 import { z } from 'zod'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
-  AdminCreateUserInputSchema,
   AdminListUsersResponseSchema,
   AdminStatsOverviewSchema,
-  AdminUpdateUserInputSchema,
   AdminUserDetailResponseSchema,
   AdminUserResponseSchema,
-  AdjustPointsInputSchema,
   AssetCapabilitiesSchema,
   BatchAffectedResponseSchema,
-  BatchGrantPointsRequestSchema,
   BatchGrantPointsResponseSchema,
-  BatchUsersRequestSchema,
   AssetItemSchema,
   AssetResponseSchema,
   ApiErrorSchema,
@@ -30,6 +25,17 @@ import {
   CancelGenerationResponseSchema,
   CreditBalanceResponseSchema,
   CreateGenerationResponseSchema,
+  DirectorProjectListResponseSchema,
+  DirectorProjectResponseSchema,
+  DirectorScriptMessagesResponseSchema,
+  DirectorScriptVersionResponseSchema,
+  DirectorScriptVersionsResponseSchema,
+  DirectorAssetResponseSchema,
+  DirectorShotResponseSchema,
+  DirectorPhaseRunResponseSchema,
+  DirectorVideoEstimateResponseSchema,
+  DirectorMusicEstimateResponseSchema,
+  DirectorAssemblyPreflightResponseSchema,
   EmailActionAcceptedSchema,
   GenerationRecordUpdateResponseSchema,
   GenerationEstimateResponseSchema,
@@ -39,7 +45,6 @@ import {
   GenerationShareResponseSchema,
   AdminAnalyticsSchema,
   AdminModelCostsResponseSchema,
-  AdminModelCostsUpdateInputSchema,
   AdminModelCostsUpdateResponseSchema,
   AdminGalleryHideResultSchema,
   FeedbackItemResponseSchema,
@@ -48,24 +53,19 @@ import {
   AdminGalleryArtifactsResponseSchema,
   ListAdminGalleryResponseSchema,
   ListAdminTasksResponseSchema,
+  AdminTaskRequestContextResponseSchema,
   ListFeedbackResponseSchema,
   ListNotificationsResponseSchema,
   NotificationReadAllSchema,
   NotificationReadSchema,
   NotificationUnreadCountSchema,
-  SubmitFeedbackInputSchema,
-  UpdateFeedbackStatusInputSchema,
-  CreatePromptLibraryInputSchema,
   FavoriteMutationResponseSchema,
   GalleryDetailSchema,
-  GrantPointsInputSchema,
   ListPromptLibraryResponseSchema,
   PromptLibraryItemResponseSchema,
-  UpdatePromptLibraryInputSchema,
   LikeMutationResponseSchema,
   ListArtifactsResponseSchema,
   ListGalleryResponseSchema,
-  SetVisibilityInputSchema,
   SetVisibilityResponseSchema,
   ListAssetsResponseSchema,
   ListGenerationArtifactsResponseSchema,
@@ -101,6 +101,7 @@ import type {
   AdminModelCostsResult,
   ListAdminGalleryResult,
   ListAdminTasksResult,
+  AdminTaskRequestContext,
   ListFeedbackResult,
   ListNotificationsResult,
   NotificationUnreadCount,
@@ -111,7 +112,6 @@ import type {
   UserFeedback,
   CreatePromptLibraryInput,
   ListPromptLibraryResult,
-  ModelCost,
   PromptLibraryItem,
   UpdatePromptLibraryInput,
   AssetCapabilities,
@@ -119,6 +119,21 @@ import type {
   CancelGenerationResult,
   CreditBalance,
   CreateGenerationResponse,
+  CreateDirectorProjectInput,
+  CreateDirectorPhaseRunInput,
+  AttachDirectorAssetInput,
+  DirectorAsset,
+  DirectorShot,
+  DirectorPhaseRun,
+  DirectorVideoEstimate,
+  DirectorMusicEstimate,
+  DirectorAssemblyPreflight,
+  DirectorProjectDetail,
+  DirectorProjectListResult,
+  DirectorScriptVersion,
+  DirectorScriptVersionSummary,
+  DirectorScriptMessage,
+  DirectorScriptChatInput,
   EmailActionAccepted,
   GenerationEstimate,
   GenerationDiagnostics,
@@ -144,6 +159,8 @@ import type {
   RegistrationResult,
   RetryGenerationResult,
   UsageSummary,
+  UpdateDirectorProjectInput,
+  UpdateDirectorShotInput,
 } from './schemas'
 
 /** 带 JSON content-type 的请求头常量，供带 body 的 POST 复用。 */
@@ -306,6 +323,38 @@ export interface BailianStudioApiClient {
   getUsage(): Promise<UsageSummary>
   /** `GET /api/account/points` — 获取当前用户的可用、冻结和总积分。 */
   getCreditBalance(): Promise<CreditBalance>
+  /** `GET /api/director/projects` — 当前用户的导演台项目列表。 */
+  listDirectorProjects(params?: { limit?: number; cursor?: string }): Promise<DirectorProjectListResult>
+  /** `POST /api/director/projects` — 创建一个手动短剧制作项目。 */
+  createDirectorProject(input: CreateDirectorProjectInput): Promise<DirectorProjectDetail>
+  /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
+  getDirectorProject(id: string): Promise<DirectorProjectDetail>
+  listDirectorScriptMessages(id: string): Promise<DirectorScriptMessage[]>
+  listDirectorScriptVersions(id: string): Promise<DirectorScriptVersionSummary[]>
+  getDirectorScriptVersion(id: string, versionId: string): Promise<DirectorScriptVersion>
+  requestDirectorScriptChat(id: string, input: DirectorScriptChatInput): Promise<DirectorPhaseRun>
+  /** `PATCH /api/director/projects/:id` — 编辑项目基础输入。 */
+  updateDirectorProject(id: string, input: UpdateDirectorProjectInput): Promise<DirectorProjectDetail>
+  /** `POST /api/director/projects/:id/assets` — 显式绑定一个已有图片资产。 */
+  attachDirectorAsset(id: string, input: AttachDirectorAssetInput): Promise<DirectorAsset>
+  /** `DELETE /api/director/projects/:id/assets/:assetId` — 移除导演台绑定，不删除原始用户资产。 */
+  detachDirectorAsset(id: string, directorAssetId: string): Promise<DirectorProjectDetail>
+  /** `PATCH /api/director/projects/:id/shots/:shotId` — 保存单镜头修改或状态。 */
+  updateDirectorShot(id: string, shotId: string, input: UpdateDirectorShotInput): Promise<DirectorShot>
+  /** `POST /api/director/projects/:id/phases/:phase/runs` — 手动排队一个阶段。 */
+  requestDirectorPhaseRun(id: string, phase: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
+  /** `POST /api/director/projects/:id/phases/videos/estimate` — 估算视频阶段即将提交的镜头成本。 */
+  estimateDirectorVideoPhase(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  /** `POST /api/director/projects/:id/phases/bgm/estimate` */
+  estimateDirectorMusic(id: string, input: CreateDirectorPhaseRunInput): Promise<DirectorMusicEstimate>
+  /** `POST /api/director/projects/:id/phases/assemble/preflight` */
+  getDirectorAssemblyPreflight(id: string, input?: CreateDirectorPhaseRunInput): Promise<DirectorAssemblyPreflight>
+  /** `POST /api/director/projects/:id/shots/:shotId/video-runs/estimate` — 估算单镜重试成本。 */
+  estimateDirectorShotVideo(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  /** `POST /api/director/projects/:id/shots/:shotId/video-runs` — 为单个失败镜头创建视频任务。 */
+  requestDirectorShotVideoRun(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
+  /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
+  getDirectorPhaseRun(id: string, phase: string, runId: string): Promise<DirectorPhaseRun>
   /** `GET /api/generations/:id` —— 获取一条生成记录（含状态、输出、错误等）。 */
   getGeneration(id: string): Promise<GenerationRecord>
   /** `GET /api/generations/:id/diagnostics` —— 当前用户可见的安全链路诊断。 */
@@ -498,6 +547,8 @@ export interface BailianStudioApiClient {
     userId?: string
     recordId?: string
   }): Promise<ListAdminTasksResult>
+  /** `GET /api/admin/tasks/:id/request-context` —— 生成请求参数及已签名的输入资产预览。 */
+  adminGetTaskRequestContext(taskId: string): Promise<AdminTaskRequestContext | null>
 
   // 管理后台 · 社区画廊治理（需 admin）
   // ---------------------------------------------------------------------------
@@ -605,6 +656,189 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         CreditBalanceResponseSchema,
       )
       return data.balance
+    },
+
+    async listDirectorProjects(params = {}) {
+      const search = new URLSearchParams()
+      if (params.limit !== undefined) search.set('limit', String(params.limit))
+      if (params.cursor !== undefined) search.set('cursor', params.cursor)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/director/projects${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorProjectListResponseSchema,
+      )
+    },
+
+    async createDirectorProject(input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async getDirectorProject(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async listDirectorScriptMessages(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/messages`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptMessagesResponseSchema,
+      )
+      return data.messages
+    },
+
+    async listDirectorScriptVersions(id) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/versions`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptVersionsResponseSchema,
+      )
+      return data.versions
+    },
+
+    async getDirectorScriptVersion(id, versionId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/versions/${encodeURIComponent(versionId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorScriptVersionResponseSchema,
+      )
+      return data.version
+    },
+
+    async requestDirectorScriptChat(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/script/chat`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
+    },
+
+    async updateDirectorProject(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async attachDirectorAsset(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/assets`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorAssetResponseSchema,
+      )
+      return data.asset
+    },
+
+    async detachDirectorAsset(id, directorAssetId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/assets/${encodeURIComponent(directorAssetId)}`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+        DirectorProjectResponseSchema,
+      )
+      return data.project
+    },
+
+    async updateDirectorShot(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorShotResponseSchema,
+      )
+      return data.shot
+    },
+
+    async requestDirectorPhaseRun(id, phase, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/${encodeURIComponent(phase)}/runs`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
+    },
+
+    async estimateDirectorVideoPhase(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/videos/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorVideoEstimateResponseSchema,
+      )
+      return data.estimate
+    },
+
+    async estimateDirectorMusic(id, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/bgm/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorMusicEstimateResponseSchema,
+      )
+      return data.estimate
+    },
+
+    async getDirectorAssemblyPreflight(id, input = {}) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/assemble/preflight`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorAssemblyPreflightResponseSchema,
+      )
+      return data.preflight
+    },
+
+    async estimateDirectorShotVideo(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs/estimate`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorVideoEstimateResponseSchema,
+      )
+      return data.estimate
+    },
+
+    async requestDirectorShotVideoRun(id, shotId, input) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
+    },
+
+    async getDirectorPhaseRun(id, phase, runId) {
+      const data = await unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/phases/${encodeURIComponent(phase)}/runs/${encodeURIComponent(runId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorPhaseRunResponseSchema,
+      )
+      return data.run
     },
 
     async getGeneration(id) {
@@ -746,14 +980,15 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
 
     async retryGeneration(id, input) {
       // 仅当显式带 idempotencyKey 时才发 JSON body，否则发空 POST。
-      const hasBody = input?.idempotencyKey !== undefined
+      const idempotencyKey = input?.idempotencyKey
+      const hasBody = idempotencyKey !== undefined
       return unwrapData(
         `${base}/api/generations/${encodeURIComponent(id)}/retry`,
         hasBody
           ? {
             method: 'POST',
             headers: JSON_HEADERS,
-            body: JSON.stringify({ idempotencyKey: input!.idempotencyKey }),
+            body: JSON.stringify({ idempotencyKey }),
             credentials: 'include',
           }
           : { method: 'POST', credentials: 'include' },
@@ -1482,6 +1717,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         fetchImpl,
         ListAdminTasksResponseSchema,
       )
+    },
+
+    async adminGetTaskRequestContext(taskId) {
+      const data = await unwrapData(
+        `${base}/api/admin/tasks/${encodeURIComponent(taskId)}/request-context`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        AdminTaskRequestContextResponseSchema,
+      )
+      return data.context
     },
 
     async adminListGallery(params = {}) {

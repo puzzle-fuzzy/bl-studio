@@ -1,0 +1,31 @@
+{
+  "name": "@bailian-studio/director-repository",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests --passWithNoTests",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@bailian-studio/db": "workspace:*",
+    "@bailian-studio/shared": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "typescript": "catalog:"
+  },
+  "author": {
+    "name": "烟灼三文鱼",
+    "email": "18267094443@163.com",
+    "url": "https://github.com/puzzle-fuzzy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/puzzle-fuzzy/bl-studio"
+  }
+}

@@ -17,11 +17,18 @@ DEPLOY_REMOTE_DIR="${DEPLOY_REMOTE_DIR:-/opt/bailian-studio}"
 REMOTE_INFRA="$DEPLOY_REMOTE_DIR/infra"
 [[ -n "$DEPLOY_HOST" ]] || { echo "缺少 DEPLOY_HOST" >&2; exit 1; }
 
+source "$REPO_ROOT/infra/scripts/resolve-deploy-ssh-key.sh"
+DEPLOY_SSH_KEY="$(resolve_deploy_ssh_key "$DEPLOY_SSH_KEY")"
+if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
+  echo "DEPLOY_SSH_KEY 不存在或无法从当前 Bash 环境访问" >&2
+  exit 1
+fi
+DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
+
 COMPOSE="docker compose --env-file $REMOTE_INFRA/env/.env.prod-infra -f $REMOTE_INFRA/docker/docker-compose.prod.yml"
 
 ssh_cmd() {
-  if [[ -n "$DEPLOY_SSH_KEY" ]]; then ssh -i "$DEPLOY_SSH_KEY" "$DEPLOY_HOST" "$1"
-  else ssh "$DEPLOY_HOST" "$1"; fi
+  deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
 }
 
 ssh_cmd "$COMPOSE ps --format 'table {{.Name}}\t{{.Status}}'; echo '--- 内存 ---'; free -h | head -2; echo '--- 磁盘 ---'; df -h / | tail -1; echo '--- api 最近 3 条 ---'; $COMPOSE logs --tail 3 api 2>&1 | tail -3; echo '--- worker 最近 3 条 ---'; $COMPOSE logs --tail 3 worker 2>&1 | tail -3"

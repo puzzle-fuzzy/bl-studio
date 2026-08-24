@@ -8,6 +8,7 @@
 import { createCreditLedgerFromUrl } from '@bailian-studio/credit-ledger'
 import { getModelById } from '@bailian-studio/model-core'
 import { createGenerationRepositoryFromUrl } from '@bailian-studio/generation-repository'
+import { createDirectorRepositoryFromUrl } from '@bailian-studio/director-repository'
 import { createMediaRepositoryFromUrl } from '@bailian-studio/media-repository'
 import { createStorageFromEnv } from '@bailian-studio/storage'
 import { WorkerLoop, type WorkerLoopConfig } from './worker-loop'
@@ -39,10 +40,13 @@ export {
   FfmpegMediaProcessor,
   createFfmpegMediaProcessor,
   ffmpegThumbnailArgs,
+  ffmpegAssemblyArgs,
   type ExtractAudioInput,
   type ExtractAudioOutput,
   type GenerateThumbnailInput,
   type GenerateThumbnailOutput,
+  type AssembleVideoInput,
+  type AssembleVideoOutput,
   type MediaProcessor,
 } from './media-processor'
 export {
@@ -66,6 +70,7 @@ async function main(): Promise<void> {
   const bailianRuntime = verifyBailianRuntime()
 
   const generationHandle = createGenerationRepositoryFromUrl(env.databaseUrl)
+  const directorHandle = createDirectorRepositoryFromUrl(env.databaseUrl)
   const mediaHandle = createMediaRepositoryFromUrl(env.databaseUrl)
   const creditHandle = createCreditLedgerFromUrl(env.databaseUrl)
 
@@ -82,6 +87,7 @@ async function main(): Promise<void> {
   const config: WorkerLoopConfig = {
     workerId: env.workerId,
     repository: generationHandle.repository,
+    directorRepository: directorHandle.repository,
     mediaRepository: mediaHandle.repository,
     providerRegistry,
     modelRegistry: { getModelById },
@@ -132,7 +138,7 @@ async function main(): Promise<void> {
     await loop.run()
     console.log(`[${env.workerId}] stopped`)
   } finally {
-    await Promise.all([generationHandle.close(), mediaHandle.close(), creditHandle.close()])
+    await Promise.all([generationHandle.close(), directorHandle.close(), mediaHandle.close(), creditHandle.close()])
   }
 }
 

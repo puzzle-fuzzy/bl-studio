@@ -8,7 +8,7 @@
 
 import { resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { spawnSyncResult } from '@bailian-studio/shared'
+import { spawnSyncResult } from '@bailian-studio/shared/server'
 
 export interface ProductionPreflightIssue {
   readonly key: string
@@ -191,7 +191,8 @@ export function checkProductionInfrastructure(
     addIssue('LE_EMAIL', '不能为空，且必须是合法邮箱（Let’s Encrypt 证书通知用）')
   }
 
-  if (value('GRAFANA_ADMIN_USER') === undefined || looksLikePlaceholder(value('GRAFANA_ADMIN_USER')!)) {
+  const grafanaAdminUser = value('GRAFANA_ADMIN_USER')
+  if (grafanaAdminUser === undefined || looksLikePlaceholder(grafanaAdminUser)) {
     addIssue('GRAFANA_ADMIN_USER', '不能为空或使用模板占位值')
   }
   const grafanaPassword = value('GRAFANA_ADMIN_PASSWORD')
@@ -202,7 +203,8 @@ export function checkProductionInfrastructure(
   }
 
   for (const key of ['POSTGRES_USER', 'POSTGRES_DB'] as const) {
-    if (value(key) === undefined || looksLikePlaceholder(value(key)!)) {
+    const currentValue = value(key)
+    if (currentValue === undefined || looksLikePlaceholder(currentValue)) {
       addIssue(key, '不能为空或使用模板占位值')
     }
   }
@@ -259,7 +261,8 @@ export function checkProductionInfrastructure(
     )
   }
 
-  if (value('DEPLOY_HOST') === undefined || looksLikePlaceholder(value('DEPLOY_HOST')!)) {
+  const deployHost = value('DEPLOY_HOST')
+  if (deployHost === undefined || looksLikePlaceholder(deployHost)) {
     addIssue('DEPLOY_HOST', '不能为空或使用模板占位值（格式 user@host）')
   }
 

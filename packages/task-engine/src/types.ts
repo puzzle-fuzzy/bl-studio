@@ -11,10 +11,16 @@
 export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
 /** task 所属的顶层业务域。用于按域隔离路由与统计。 */
-export type TaskDomain = 'generation' | 'artifact' | 'media' | 'system'
+export type TaskDomain = 'generation' | 'artifact' | 'media' | 'director' | 'system'
 
 /** task 的具体类型。每个 type 必须配对固定的 domain（见 state-machine 的校验）。 */
-export type TaskType = 'generation.submit' | 'generation.poll' | 'artifact.persist' | 'media.process' | 'media.thumbnail'
+export type TaskType =
+  | 'generation.submit'
+  | 'generation.poll'
+  | 'artifact.persist'
+  | 'media.process'
+  | 'media.thumbnail'
+  | 'director.phase'
 
 /**
  * 错误分类。用于 worker 侧的统一错误归类与可重试判定，

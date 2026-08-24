@@ -1,0 +1,2 @@
+ALTER TABLE "director_characters" ADD COLUMN "metadata_json" jsonb DEFAULT '{}'::jsonb NOT NULL;--> statement-breakpoint
+ALTER TABLE "director_locations" ADD COLUMN "metadata_json" jsonb DEFAULT '{}'::jsonb NOT NULL;

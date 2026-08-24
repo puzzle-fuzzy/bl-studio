@@ -17,6 +17,7 @@ import { ListAssetsQuerySchema } from '../assets/service'
 import { assetWithReadUrl } from '../assets/routes'
 import {
   AdminGalleryArtifactParamsSchema,
+  AdminTaskParamsSchema,
   AnalyticsQuerySchema,
   BatchGallerySchema,
   BatchGrantPointsSchema,
@@ -466,6 +467,74 @@ export function createAdminRoutes(deps: ApiDependencies) {
         },
       }
     })
+    // 任务详情请求上下文：按需读取，避免在任务列表中泄露私有提示词或放大分页负载。
+    .get('/api/admin/tasks/:id/request-context', async ({ request, params, set }) => {
+      await requireAdminUser(request, deps.authService)
+      const { id } = validateInput(AdminTaskParamsSchema, params)
+      const task = await deps.generationRepository.getTask(id)
+      if (task === undefined) {
+        set.status = 404
+        return requestErrorResponseBody(request, 'TASK_NOT_FOUND', `Task not found: ${id}`, set)
+      }
+
+      if (task.recordId === undefined) {
+        return { success: true, data: { context: null } }
+      }
+
+      const record = await deps.generationRepository.getGenerationRecord(task.recordId)
+      if (record === undefined) {
+        return { success: true, data: { context: null } }
+      }
+
+      const inputAssets = await Promise.all((await deps.generationRepository.getGenerationInputAssets(record.id))
+        .map(async inputAsset => {
+          const asset = await deps.generationRepository.getUserAsset({
+            userId: inputAsset.userId,
+            assetId: inputAsset.assetId,
+            includeDeleted: true,
+          })
+          if (asset === undefined) {
+            return {
+              parameterName: inputAsset.parameterName,
+              position: inputAsset.position,
+              asset: {
+                id: inputAsset.assetId,
+                kind: inputAsset.kind,
+                source: inputAsset.source,
+              },
+            }
+          }
+
+          const readable = await assetWithReadUrl(asset, deps.storage)
+          return {
+            parameterName: inputAsset.parameterName,
+            position: inputAsset.position,
+            asset: {
+              id: readable.id,
+              kind: readable.kind,
+              source: readable.source,
+              ...(readable.url !== undefined ? { url: readable.url } : {}),
+              ...('thumbnailUrl' in readable && readable.thumbnailUrl !== undefined
+                ? { thumbnailUrl: readable.thumbnailUrl }
+                : {}),
+              ...(readable.fileName !== undefined ? { fileName: readable.fileName } : {}),
+            },
+          }
+        }))
+
+      return {
+        success: true,
+        data: {
+          context: {
+            recordId: record.id,
+            modelId: record.modelId,
+            category: record.category,
+            inputParams: record.inputParams,
+            inputAssets,
+          },
+        },
+      }
+    })
     // -----------------------------------------------------------------------
     // 社区画廊治理：含隐藏作品的列表 + 下架/恢复 + 产物预览（admin 专属，绕过 hiddenAt）。
     // -----------------------------------------------------------------------
@@ -638,7 +707,7 @@ export function createAdminRoutes(deps: ApiDependencies) {
       }
     })
     .get('/api/admin/gallery/generations/:id/artifacts/:artifactId', async ({ request, params, set }) => {
-      const actor = await requireAdminUser(request, deps.authService)
+      await requireAdminUser(request, deps.authService)
       const { id, artifactId } = validateInput(AdminGalleryArtifactParamsSchema, params)
 
       const artifact = await deps.generationRepository.getAdminGalleryArtifact({ recordId: id, artifactId })

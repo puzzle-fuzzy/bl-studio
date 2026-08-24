@@ -2,13 +2,14 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'react-router'
 import type { PublicSharedGeneration } from '@bailian-studio/api-client'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
 import { BrandMark } from '@/components/shared/BrandMark'
+import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { apiClient } from '@/lib/api'
 import { resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { generationStatusLabel } from '@/lib/labels'
+import { FileText, Image as ImageIcon, Music } from 'lucide-react'
 
 /** 公开分享页（匿名只读）：展示模型/状态/产物/输入参数。 */
 export function SharedGenerationPage() {
@@ -16,6 +17,16 @@ export function SharedGenerationPage() {
   const [data, setData] = useState<PublicSharedGeneration | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+
+  const lightboxItems: LightboxMedia[] = (data?.artifacts ?? []).map(artifact => ({
+    key: artifact.id,
+    kind: isLightboxKind(artifact.kind) ? artifact.kind : 'text',
+    url: artifact.readUrl,
+    thumbnailUrl: artifact.thumbnailUrl ?? artifact.readUrl,
+    fileName: `${artifact.kind}作品`,
+    text: artifact.kind === 'archive' ? '归档文件暂不支持网页内展开预览。' : undefined,
+  }))
 
   useEffect(() => {
     if (shareId === undefined) return
@@ -50,22 +61,55 @@ export function SharedGenerationPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent className="grid gap-3 sm:grid-cols-2">
-                {data.artifacts.map(artifact => {
+                {data.artifacts.map((artifact, index) => {
                   const src = artifact.readUrl ?? artifact.thumbnailUrl
                   return (
-                    <div key={artifact.id} className="aspect-video overflow-hidden rounded-lg border">
+                    <button
+                      key={artifact.id}
+                      type="button"
+                      onClick={() => setPreviewIndex(index)}
+                      aria-label={`预览${artifact.kind}作品`}
+                      className="group relative flex aspect-video w-full items-center justify-center overflow-hidden rounded-lg border bg-muted text-left transition-opacity hover:opacity-90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    >
                       {src !== undefined && artifact.kind === 'image' ? (
                         <img src={resolveApiUrl(src)} alt="" className="size-full object-cover" loading="lazy" />
-                      ) : src !== undefined ? (
-                        <video src={resolveApiUrl(src)} controls className="size-full object-cover" />
+                      ) : artifact.kind === 'video' && src !== undefined ? (
+                        <video src={resolveApiUrl(src)} muted playsInline preload="metadata" className="size-full object-cover" />
+                      ) : artifact.kind === 'audio' ? (
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <Music className="size-8" />
+                          <span className="text-xs">点击播放音频</span>
+                        </div>
+                      ) : artifact.kind === 'text' ? (
+                        <div className="flex items-center gap-2 p-4 text-sm text-muted-foreground">
+                          <FileText className="size-4 shrink-0" />
+                          文本作品
+                        </div>
                       ) : (
-                        <div className="flex size-full items-center justify-center text-xs text-muted-foreground">暂无预览</div>
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
+                          <ImageIcon className="size-8" />
+                          <span className="text-xs">暂无预览</span>
+                        </div>
                       )}
-                    </div>
+                      <span className="pointer-events-none absolute right-2 bottom-2 rounded bg-black/65 px-2 py-1 text-[11px] text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        点击预览
+                      </span>
+                    </button>
                   )
                 })}
               </CardContent>
             </Card>
+            {previewIndex !== null && lightboxItems.length > 0 && (
+              <MediaLightbox
+                items={lightboxItems}
+                index={previewIndex}
+                onIndexChange={setPreviewIndex}
+                onClose={() => setPreviewIndex(null)}
+                downloadUrl={lightboxItems[previewIndex]?.url !== undefined
+                  ? resolveApiUrl(lightboxItems[previewIndex]?.url ?? '')
+                  : undefined}
+              />
+            )}
             {data.record.inputParams !== undefined && (
               <Card>
                 <CardHeader>

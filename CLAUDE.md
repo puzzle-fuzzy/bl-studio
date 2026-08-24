@@ -18,17 +18,24 @@ AI 媒体生成平台（文生图/文生视频等），由原 bailian-studio（V
 ```bash
 pnpm install
 pnpm run dev              # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
-pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行；这就是 lint，无 ESLint）
+pnpm run lint             # Biome lint（TS/TSX/JS，跨平台）
+pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行）
 pnpm run typecheck:root   # 根作用域 tsc --noEmit：infra/scripts/ + 根 tests/（per-package typecheck 不含这两处）
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
-pnpm run verify           # check:db-migrations + boundaries + manifests + typecheck:root + typecheck + test
+pnpm run verify           # check:db-migrations + boundaries + manifests + lint + typecheck + test
 pnpm run check:boundaries # 包边界
 pnpm run check:manifests  # manifest 一致性
+pnpm run model:acceptance # 所有 enabled 模型的离线请求/响应矩阵
+pnpm run model:acceptance -- --live=<model-id> # 单模型真实供应商 canary（需 DASHSCOPE_API_KEY）
 pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 infra/scripts/check-db-migrations.ts）
-# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库）：
+# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库；
+# 脚本通过 dotenv-cli 注入连接串，兼容 Windows，不要在命令行内联 DATABASE_URL）：
 # 改了 schema.ts 后正式流程是 `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 提交迁移，
 # 生产/CI 一律走 `db:migrate`（db:migrate:test / db:migrate:production）——push 掩盖漂移正是 P0-06 要堵的。
 ```
+
+Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和测试命令；生产
+`deploy:*`、备份与观测脚本仍要求 Linux/WSL（Bash、rsync、Linux 远程命令）。
 
 ## 生产部署（做部署前必读）
 

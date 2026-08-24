@@ -115,6 +115,9 @@ async function runMediaOperation(
   deps: MediaTaskHandlerDeps,
 ): Promise<{ outputAssetId: string }> {
   if (job.operation !== 'video.extract_audio') {
+    if (job.operation === 'video.assemble') {
+      return runAssemblyVideoOperation(task, job, mediaRepository, deps)
+    }
     throw taskErrorCarrier({
       category: 'validation',
       message: `Unsupported media operation: ${job.operation}`,
@@ -211,6 +214,131 @@ async function runMediaOperation(
   return { outputAssetId }
 }
 
+async function runAssemblyVideoOperation(
+  task: TaskRecord,
+  job: MediaJob,
+  mediaRepository: MediaRepository,
+  deps: MediaTaskHandlerDeps,
+): Promise<{ outputAssetId: string }> {
+  const processor = deps.mediaProcessor ?? createFfmpegMediaProcessor()
+  if (processor.assembleVideo === undefined) {
+    throw taskErrorCarrier({
+      category: 'system',
+      message: 'Media processor does not support video assembly',
+      retriable: false,
+      code: 'MEDIA_ASSEMBLY_UNSUPPORTED',
+    })
+  }
+  const sources = await mediaRepository.getMediaSources(job.id)
+  const videoSources = sources.filter(source => source.kind === 'video')
+  const musicSource = sources.find(source => source.kind === 'audio')
+  const planVideoCount = readAssemblyVideoCount(job)
+  const planHasMusic = readAssemblyMusicExpected(job)
+  if (videoSources.length === 0 || planVideoCount === undefined || videoSources.length !== planVideoCount || (planHasMusic && musicSource === undefined)) {
+    throw taskErrorCarrier({
+      category: 'validation',
+      message: `Assembly media sources are incomplete for job: ${job.id}`,
+      retriable: false,
+      code: 'MEDIA_ASSEMBLY_INPUT_INVALID',
+    })
+  }
+  const readObject = deps.storage.readObject
+  if (readObject === undefined) {
+    throw taskErrorCarrier({
+      category: 'system',
+      message: 'Media source storage does not support bounded reads',
+      retriable: false,
+      code: 'MEDIA_SOURCE_STORAGE_READ_UNAVAILABLE',
+    })
+  }
+  const readSource = async (source: typeof sources[number]) => {
+    if (source.storageProvider !== deps.storage.provider) {
+      throw taskErrorCarrier({
+        category: 'system',
+        message: `Media source storage provider mismatch: ${source.storageProvider} != ${deps.storage.provider}`,
+        retriable: false,
+        code: 'MEDIA_SOURCE_STORAGE_MISMATCH',
+      })
+    }
+    return readObject.call(deps.storage, { key: source.storageKey, maxBytes: source.byteSize })
+  }
+  const videoObjects = await Promise.all(videoSources.map(readSource))
+  const musicObject = musicSource === undefined ? undefined : await readSource(musicSource)
+  const options = readRecord(job.input['options'])
+  const settings = assemblySettings(options)
+  const processed = await processor.assembleVideo({
+    jobId: job.id,
+    videoSources: videoSources.map((source, index) => {
+      const videoObject = videoObjects[index]
+      if (videoObject === undefined) throw taskErrorCarrier({
+        category: 'validation',
+        message: `Assembly video source is missing for job: ${job.id}`,
+        retriable: false,
+        code: 'MEDIA_ASSEMBLY_INPUT_INVALID',
+      })
+      return {
+        sourceBody: videoObject.body,
+        sourceFileName: source.fileName,
+        sourceMimeType: source.mimeType,
+      }
+    }),
+    ...(musicSource === undefined || musicObject === undefined ? {} : {
+      musicSource: {
+        sourceBody: musicObject.body,
+        sourceFileName: musicSource.fileName,
+        sourceMimeType: musicSource.mimeType,
+      },
+    }),
+    ...settings,
+  })
+  const outputAssetId = createMediaOutputAssetId(job.id, 'video')
+  const storageResult = await deps.storage.writeObject({
+    key: `media-jobs/${job.id}/${outputAssetId}.mp4`,
+    body: processed.body,
+    contentType: processed.mimeType,
+  })
+  try {
+    await mediaRepository.completeMediaJob({
+      jobId: job.id,
+      outputAsset: {
+        id: outputAssetId,
+        kind: 'video',
+        fileName: processed.fileName,
+        mimeType: processed.mimeType,
+        byteSize: storageResult.byteSize,
+        storageProvider: storageResult.provider,
+        storageKey: storageResult.key,
+        ...(storageResult.url !== undefined ? { storageUrl: storageResult.url } : {}),
+        metadata: processed.metadata,
+      },
+      output: {
+        ...processed.metadata,
+        fileName: processed.fileName,
+        byteSize: storageResult.byteSize,
+        storageKey: storageResult.key,
+        ...(storageResult.url !== undefined ? { storageUrl: storageResult.url } : {}),
+      },
+      now: currentIso(),
+    })
+  } catch (error) {
+    const deleteObject = deps.storage.deleteObject
+    if (deleteObject !== undefined) {
+      try {
+        await deleteObject.call(deps.storage, { key: storageResult.key })
+      } catch (cleanupError) {
+        deps.logger.warn('media.output_cleanup_failed', {
+          jobId: job.id,
+          storageKey: storageResult.key,
+          message: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+        })
+      }
+    }
+    throw error
+  }
+  deps.logger.info('media.assembly.succeeded', { taskId: task.id, traceId: task.traceId, jobId: job.id, outputAssetId })
+  return { outputAssetId }
+}
+
 function readJobId(task: TaskRecord): string {
   const value = task.input['jobId'] ?? task.recordId
   if (typeof value !== 'string' || value.length === 0) {
@@ -238,6 +366,34 @@ function readAudioFormat(value: unknown): AudioFormat {
     retriable: false,
     code: 'MEDIA_TASK_INVALID_FORMAT',
   })
+}
+
+function assemblySettings(options: Record<string, unknown>): {
+  width: number
+  height: number
+  fps: number
+  audioVolume: number
+} {
+  const width = readIntegerOption(options.width, 1080)
+  const height = readIntegerOption(options.height, 1920)
+  const fps = readIntegerOption(options.fps, 30)
+  const audioVolume = typeof options.audioVolume === 'number' ? options.audioVolume : 1
+  return { width, height, fps, audioVolume }
+}
+
+function readAssemblyVideoCount(job: MediaJob): number | undefined {
+  const assembly = readRecord(job.input['assembly'])
+  const videoSources = assembly['videoSources']
+  return Array.isArray(videoSources) ? videoSources.length : undefined
+}
+
+function readAssemblyMusicExpected(job: MediaJob): boolean {
+  const assembly = readRecord(job.input['assembly'])
+  return assembly['musicSource'] !== undefined
+}
+
+function readIntegerOption(value: unknown, fallback: number): number {
+  return typeof value === 'number' && Number.isInteger(value) ? value : fallback
 }
 
 function readOptionalSourceFileName(job: MediaJob): string | undefined {

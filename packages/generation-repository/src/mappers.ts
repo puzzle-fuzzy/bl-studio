@@ -10,7 +10,7 @@
  * 以及对 errorJson 做结构化判定后再返回（避免把任意 JSON 当成 TaskError 用）。
  */
 import type { InferSelectModel } from 'drizzle-orm'
-import { auditLogs, generationArtifacts, generationEvents, generationRecords, generationShares, providerRequestAudits, taskRecords, workerHeartbeats } from '@bailian-studio/db'
+import type { auditLogs, generationArtifacts, generationEvents, generationRecords, generationShares, providerRequestAudits, taskRecords, workerHeartbeats } from '@bailian-studio/db'
 import type { TaskRecord, TaskError } from '@bailian-studio/task-engine'
 import type { AuditLog, AuditEventMetadata } from './audit-types'
 import type { ProviderRequestAudit } from './provider-request-types'

@@ -51,6 +51,7 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
@@ -81,6 +82,7 @@ COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
@@ -122,6 +124,7 @@ USER bun
 EXPOSE 5003
 
 ARG BAILIAN_STUDIO_RELEASE_TAG=unknown
+ENV BAILIAN_STUDIO_RELEASE_TAG=${BAILIAN_STUDIO_RELEASE_TAG}
 LABEL org.opencontainers.image.revision="${BAILIAN_STUDIO_RELEASE_TAG}"
 
 # ── web-build：基于 workspace（有 typescript/vite）构建前端 ──────────────────

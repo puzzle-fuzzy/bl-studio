@@ -50,7 +50,7 @@ const CREDENTIAL_VALUE_PATTERNS = [
   /\bBearer\s+[A-Za-z0-9._~+/=-]{8,}\b/gi, // Bearer token（真实 token 远比 8 位长）
   /\b[A-Za-z][A-Za-z0-9+.-]*:\/\/[^\s/@]+:[^\s/@]+@/g, // scheme://user:pass@host（DB/URL 内嵌凭据）
   /\b(?:password|passwd|pwd|secret|token|apikey|api[-_]?key)=[^\s&]+/gi, // key=value 凭据
-  /\b[A-Z][A-Z0-9_\-]{19,}\b/g, // 长连续大写/数字 token（≥20，首字符为字母）
+  /\b[A-Z][A-Z0-9_-]{19,}\b/g, // 长连续大写/数字 token（≥20，首字符为字母）
 ] as const
 
 /** 把字符串值里出现的凭据形态替换为 [Redacted]，剩余上下文保留以便排查。 */

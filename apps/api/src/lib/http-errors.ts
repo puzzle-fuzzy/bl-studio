@@ -6,9 +6,11 @@
  */
 
 import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
+import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bailian-studio/director-repository'
 import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
 import { CreditLedgerError, type CreditLedgerErrorCode } from '@bailian-studio/credit-ledger'
 import { ValidationError } from '@bailian-studio/shared'
+import { StorageError } from '@bailian-studio/storage'
 import { ZodError } from 'zod'
 import { getRequestTrace } from './middleware'
 import { RequestBodyTooLargeError } from './request-guards'
@@ -46,6 +48,29 @@ const REPOSITORY_STATUS: Record<GenerationRepositoryErrorCode, number> = {
   POINTS_SETTLEMENT_ANOMALY: 500,
 }
 
+const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> = {
+  DIRECTOR_PROJECT_NOT_FOUND: 404,
+  DIRECTOR_SCRIPT_VERSION_NOT_FOUND: 404,
+  DIRECTOR_PHASE_NOT_FOUND: 404,
+  DIRECTOR_PHASE_RUN_NOT_FOUND: 404,
+  DIRECTOR_ASSET_NOT_FOUND: 404,
+  DIRECTOR_ASSET_OWNER_NOT_FOUND: 404,
+  DIRECTOR_ASSET_KIND_NOT_SUPPORTED: 400,
+  DIRECTOR_ASSET_OWNER_INVALID: 400,
+  DIRECTOR_ASSET_ALREADY_ATTACHED: 409,
+  DIRECTOR_SHOT_NOT_FOUND: 404,
+  DIRECTOR_SHOT_LOCKED: 409,
+  DIRECTOR_SHOT_VERSION_CONFLICT: 409,
+  DIRECTOR_SHOT_GENERATING: 409,
+  DIRECTOR_SHOT_REFERENCE_INVALID: 409,
+  DIRECTOR_PHASE_NOT_READY: 409,
+  DIRECTOR_PHASE_INPUT_NOT_READY: 409,
+  DIRECTOR_PHASE_ALREADY_RUNNING: 409,
+  DIRECTOR_PROJECT_ACTIVE_RUN: 409,
+  DIRECTOR_INVALID_CURSOR: 400,
+  DIRECTOR_DATABASE_ERROR: 500,
+}
+
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_EMAIL_TAKEN: 409,
@@ -77,12 +102,20 @@ const CREDIT_LEDGER_STATUS: Record<CreditLedgerErrorCode, number> = {
   POINTS_DATABASE_ERROR: 500,
 }
 
+const STORAGE_STATUS = {
+  STORAGE_UPLOAD_TIMEOUT: 504,
+  STORAGE_UPLOAD_NETWORK_ERROR: 503,
+} as const
+
 export function httpStatusForError(error: unknown): number {
   if (requestBodyTooLargeError(error) !== undefined) {
     return 413
   }
   if (error instanceof GenerationRepositoryError) {
     return REPOSITORY_STATUS[error.code]
+  }
+  if (error instanceof DirectorRepositoryError) {
+    return DIRECTOR_REPOSITORY_STATUS[error.code]
   }
   if (error instanceof CreditLedgerError) {
     return CREDIT_LEDGER_STATUS[error.code]
@@ -92,6 +125,9 @@ export function httpStatusForError(error: unknown): number {
   }
   if (error instanceof ValidationError) {
     return 400
+  }
+  if (error instanceof StorageError) {
+    return STORAGE_STATUS[error.code]
   }
   if (error instanceof ZodError) {
     return 400
@@ -154,6 +190,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
     }
   }
 
+  if (error instanceof DirectorRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
   if (error instanceof CreditLedgerError) {
     return {
       success: false,
@@ -179,6 +226,10 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   if (error instanceof ValidationError) {
     const message = error.field !== undefined ? `${error.field}: ${error.message}` : error.message
     return { success: false, error: { code: 'VALIDATION_ERROR', message } }
+  }
+
+  if (error instanceof StorageError) {
+    return { success: false, error: { code: error.code, message: error.message } }
   }
 
   if (error instanceof ZodError) {

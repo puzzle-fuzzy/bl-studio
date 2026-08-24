@@ -308,7 +308,7 @@ describe('TaskExecutor.processTask', () => {
   })
 
   it('fails an overdue artifact persistence task before touching storage', async () => {
-    const { repo, storage, processTask } = setup({ artifactPersistTimeoutMs: 1 })
+    const { storage, processTask } = setup({ artifactPersistTimeoutMs: 1 })
 
     const outcome = await processTask(makeTask({ type: 'artifact.persist', domain: 'artifact' }))
 
@@ -415,6 +415,26 @@ describe('TaskExecutor.processTask', () => {
     })
     expect(repo.providerRequests[0]?.billedCostCents).toBeUndefined()
     expect(logger.entries.some(e => e.message === 'task.polling')).toBe(true)
+  })
+
+  it('excludes the current running poll task when scheduling its continuation', async () => {
+    const { repo, runner, processTask } = setup({
+      record: makeRecord({ providerTaskId: 'provider-task-1' }),
+    })
+    runner.outputs.push({
+      success: true,
+      costCents: 0,
+      requiresPoll: true,
+      providerTaskId: 'provider-task-1',
+      nextPollAt: '2026-06-28T00:00:10.000Z',
+    })
+
+    await expect(processTask(makeTask({ type: 'generation.poll' }))).resolves.toMatchObject({ status: 'polling' })
+
+    expect(repo.mutations[0]).toMatchObject({
+      kind: 'schedulePoll',
+      input: { excludeTaskId: 'task_1' },
+    })
   })
 
   it('fails when the provider requests polling without a providerTaskId', async () => {

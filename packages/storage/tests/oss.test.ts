@@ -1,3 +1,5 @@
+import type { Readable } from 'node:stream'
+import { readFile } from 'node:fs/promises'
 import { describe, expect, it } from 'vitest'
 import {
   OSS_IMAGE_THUMBNAIL_PROCESS,
@@ -18,10 +20,60 @@ class FakeOssClient implements OssClientLike {
   deleteCalls: string[] = []
   getCalls: string[] = []
   headCalls: string[] = []
+  putStreamCalls: Array<{ key: string; contentLength?: number; headers?: Record<string, string> }> = []
+  multipartUploadCalls: Array<{ key: string; filePath: string; mime?: string; partSize?: number; parallel?: number; body: string }> = []
+  abortMultipartUploadCalls: Array<{ key: string; uploadId: string }> = []
+  failMultipartUpload = false
 
   async put(key: string, body: Uint8Array, options?: { headers?: Record<string, string> }): Promise<{ url?: string }> {
     this.putCalls.push({ key, body, headers: options?.headers })
     return { url: `oss://bucket/${key}` }
+  }
+
+  async putStream(
+    key: string,
+    stream: Readable,
+    options?: { headers?: Record<string, string>; contentLength?: number },
+  ): Promise<{ url?: string }> {
+    this.putStreamCalls.push({
+      key,
+      ...(options?.contentLength !== undefined ? { contentLength: options.contentLength } : {}),
+      ...(options?.headers !== undefined ? { headers: options.headers } : {}),
+    })
+    for await (const _chunk of stream) {
+      // Consume the stream as the real SDK does.
+    }
+    return { url: `oss://bucket/${key}` }
+  }
+
+  async multipartUpload(
+    key: string,
+    filePath: string,
+    options?: {
+      headers?: Record<string, string>
+      mime?: string
+      partSize?: number
+      parallel?: number
+      progress?: (percentage: number, checkpoint?: { uploadId?: string }) => Promise<void> | void
+    },
+  ): Promise<{ url?: string }> {
+    await options?.progress?.(0, { uploadId: 'upload-test' })
+    if (this.failMultipartUpload) {
+      throw Object.assign(new Error('Response timeout for 180000ms'), { name: 'ResponseTimeoutError' })
+    }
+    this.multipartUploadCalls.push({
+      key,
+      filePath,
+      ...(options?.mime !== undefined ? { mime: options.mime } : {}),
+      ...(options?.partSize !== undefined ? { partSize: options.partSize } : {}),
+      ...(options?.parallel !== undefined ? { parallel: options.parallel } : {}),
+      body: (await readFile(filePath)).toString(),
+    })
+    return { url: `oss://bucket/${key}` }
+  }
+
+  async abortMultipartUpload(key: string, uploadId: string): Promise<void> {
+    this.abortMultipartUploadCalls.push({ key, uploadId })
   }
 
   signatureUrl(key: string, options: {
@@ -73,6 +125,73 @@ describe('OssStorageAdapter', () => {
     expect(await adapter.createReadUrl({ key: result.key, expiresInSeconds: 60 })).toBe(
       'https://signed.test/generations/gen_1/art_1.png?expires=60',
     )
+  })
+
+  it('passes a known stream length to ali-oss to avoid chunked uploads', async () => {
+    const client = new FakeOssClient()
+    const adapter = new OssStorageAdapter({ client })
+
+    await expect(adapter.writeObjectStream({
+      key: 'user_uploads/user_1/image.png',
+      stream: new Blob(['hello']).stream(),
+      contentType: 'image/png',
+      contentLength: 5,
+    })).resolves.toMatchObject({
+      provider: 'oss',
+      key: 'user_uploads/user_1/image.png',
+      byteSize: 5,
+    })
+
+    expect(client.putStreamCalls).toEqual([{
+      key: 'user_uploads/user_1/image.png',
+      contentLength: 5,
+      headers: { 'Content-Type': 'image/png' },
+    }])
+  })
+
+  it('uploads replayable files through multipart upload and removes its temporary file', async () => {
+    const client = new FakeOssClient()
+    const adapter = new OssStorageAdapter({ client })
+
+    const result = await adapter.writeObjectMultipart({
+      key: 'user_uploads/user_1/image.png',
+      file: new Blob(['hello']),
+      contentType: 'image/png',
+      byteSize: 5,
+    })
+
+    expect(result).toMatchObject({
+      provider: 'oss',
+      key: 'user_uploads/user_1/image.png',
+      url: 'oss://bucket/user_uploads/user_1/image.png',
+      byteSize: 5,
+    })
+    expect(client.multipartUploadCalls).toHaveLength(1)
+    expect(client.multipartUploadCalls[0]).toMatchObject({
+      key: 'user_uploads/user_1/image.png',
+      mime: 'image/png',
+      partSize: 1 * 1024 * 1024,
+      parallel: 4,
+      body: 'hello',
+    })
+  })
+
+  it('classifies multipart timeout and aborts the unfinished upload', async () => {
+    const client = new FakeOssClient()
+    client.failMultipartUpload = true
+    const adapter = new OssStorageAdapter({ client })
+
+    await expect(adapter.writeObjectMultipart({
+      key: 'user_uploads/user_1/image.png',
+      file: new Blob(['hello']),
+      contentType: 'image/png',
+      byteSize: 5,
+    })).rejects.toMatchObject({ code: 'STORAGE_UPLOAD_TIMEOUT', name: 'StorageError' })
+
+    expect(client.abortMultipartUploadCalls).toEqual([{
+      key: 'user_uploads/user_1/image.png',
+      uploadId: 'upload-test',
+    }])
   })
 
   it('probes OSS access without downloading an object', async () => {
@@ -254,5 +373,19 @@ describe('OssStorageAdapter', () => {
     expect(parsedUrl.searchParams.get('response-content-disposition')).toBe(
       `attachment; filename="2026.png"; filename*=UTF-8''%E6%8A%A5%E5%91%8A%202026.png`,
     )
+  })
+
+  it('configures the ali-oss operation timeout instead of using the 60 second SDK default', () => {
+    const client = createOssClient({
+      region: 'oss-cn-hangzhou',
+      bucket: 'bailian-studio-test',
+      accessKeyId: 'test-access-key',
+      accessKeySecret: 'test-secret',
+      timeoutMs: 180_000,
+      retryMax: 2,
+    }) as unknown as { options?: { timeout?: number } }
+
+    expect(client.options?.timeout).toBe(180_000)
+    expect((client as unknown as { options?: { retryMax?: number } }).options?.retryMax).toBe(2)
   })
 })

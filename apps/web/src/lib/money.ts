@@ -14,3 +14,20 @@ export function formatCentsWithGrouping(cents: number | undefined | null): strin
   if (cents === undefined || cents === null || !Number.isFinite(cents)) return '¥0'
   return `¥${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(cents / 100)}`
 }
+
+/**
+ * 分 → 适合紧凑空间的积分数额，不带货币符号。
+ * 例如 123456 分 → "1.2k"，1234567 分 → "1.2w"。
+ */
+export function formatCentsCompact(cents: number | undefined | null): string {
+  if (cents === undefined || cents === null || !Number.isFinite(cents)) return '0'
+
+  const amount = cents / 100
+  if (amount < 1_000) {
+    return new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 2 }).format(amount)
+  }
+
+  const unit = amount >= 10_000 ? 'w' : 'k'
+  const divisor = unit === 'w' ? 10_000 : 1_000
+  return `${new Intl.NumberFormat('zh-CN', { maximumFractionDigits: 1 }).format(amount / divisor)}${unit}`
+}

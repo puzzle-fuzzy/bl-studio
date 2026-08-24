@@ -1,5 +1,5 @@
 import type { InferSelectModel } from 'drizzle-orm'
-import { mediaJobs, taskRecords } from '@bailian-studio/db'
+import type { mediaJobs, taskRecords } from '@bailian-studio/db'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import type { MediaJob } from './types'
 

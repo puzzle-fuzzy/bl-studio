@@ -4,6 +4,7 @@ import { processMediaTask } from '../src/media-task-handler'
 import { createRecordingLogger, FakeStorageAdapter } from './fixtures'
 import {
   FakeMediaRepository,
+  FakeMediaProcessor,
   makeMediaJob,
   makeMediaTask,
 } from './media-fixtures'
@@ -92,6 +93,45 @@ describe('media task handler boundary', () => {
       status: 'failed',
       error: { code: 'MEDIA_OPERATION_UNSUPPORTED', category: 'validation' },
     })
+  })
+
+  it('assembles ordered video sources and optional music into a derived video asset', async () => {
+    const repository = new FakeMediaRepository()
+    repository.job = makeMediaJob({
+      operation: 'video.assemble',
+      sourceKind: 'video',
+      input: {
+        source: { assetId: 'asset_video_1', kind: 'video', fileName: 'shot-1.mp4' },
+        assembly: {
+          videoSources: [
+            { assetId: 'asset_video_1', kind: 'video', fileName: 'shot-1.mp4' },
+            { assetId: 'asset_video_2', kind: 'video', fileName: 'shot-2.mp4' },
+          ],
+          musicSource: { assetId: 'asset_music', kind: 'audio', fileName: 'music.mp3' },
+        },
+        options: { width: 1080, height: 1920, fps: 30, audioVolume: 0.8 },
+      },
+    })
+    repository.compositeSources = [
+      { assetId: 'asset_video_1', kind: 'video', storageProvider: 'local', storageKey: 'shot-1.mp4', fileName: 'shot-1.mp4', mimeType: 'video/mp4', byteSize: 10 },
+      { assetId: 'asset_video_2', kind: 'video', storageProvider: 'local', storageKey: 'shot-2.mp4', fileName: 'shot-2.mp4', mimeType: 'video/mp4', byteSize: 10 },
+      { assetId: 'asset_music', kind: 'audio', storageProvider: 'local', storageKey: 'music.mp3', fileName: 'music.mp3', mimeType: 'audio/mpeg', byteSize: 10 },
+    ]
+    const processor = new FakeMediaProcessor()
+
+    const outcome = await processMediaTask(makeMediaTask({
+      input: { jobId: 'media_job_1', operation: 'video.assemble', options: { width: 1080, height: 1920, fps: 30, audioVolume: 0.8 } },
+    }), {
+      mediaRepository: repository,
+      mediaProcessor: processor,
+      storage: new FakeStorageAdapter(),
+      logger: createRecordingLogger(),
+    })
+
+    expect(outcome).toMatchObject({ status: 'succeeded' })
+    expect(processor.assemblyInputs[0]?.videoSources).toHaveLength(2)
+    expect(processor.assemblyInputs[0]?.musicSource).toBeDefined()
+    expect(repository.completed[0]).toMatchObject({ outputAsset: { kind: 'video', mimeType: 'video/mp4' } })
   })
 
   it('compensates the stored output when completion persistence fails', async () => {
