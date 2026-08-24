@@ -41,7 +41,7 @@
 
 ### 审计动作（3 处同步 + 1 处手工迁移）
 
-`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`infra/scripts/ensure-audit-action-constraint.ts` 三处同步新增：
+`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`scripts/db/ensure-audit-action-constraint.ts` 三处同步新增：
 `admin.user.ban` / `admin.user.unban` / `gallery.like` / `gallery.favorite` / `feedback.submit` / `feedback.update` / `prompt-library.create` / `prompt-library.delete`。
 
 **陷阱**：`drizzle-kit push/generate` 检测不到已命名 CHECK 表达式变更 —— 提交的迁移里必须**手工编写** `ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_action_check; ADD CONSTRAINT ... 新列表`。
@@ -117,7 +117,7 @@
 `apps/web/src/lib/deeplink-params.ts`（纯函数 + 单测）：`encodeParams(manifest, textParams)` / `decodeParams(manifest, base64)`，按 manifest 校验、丢弃未知字段与媒体值、默认值兜底。CreatePage 统一处理 `?select=&params=` / `?edit=` / `?ref=` / 已有 `?reuse=`。
 
 ### E5. admin 成本毛利 + 留存漏斗
-`model_costs` 表 + `infra/scripts/seed-model-costs.ts`（从 `infra/seed/model-costs.json` 播种）。API：`GET/PUT /api/admin/model-costs`；`GET /api/admin/stats/analytics`：按 modelId 分组成本毛利（收入 = Σ costFinal/costEstimate，成本 = 调用数 × unitCostCents）+ 留存漏斗（注册 → 首生成 → 成功生成 → 活跃 ≥2 日）。admin 新页 `/analytics`（recharts，成本毛利 + 留存漏斗两个 Tab）。
+`model_costs` 表 + `scripts/db/seed-model-costs.ts`（从 `data/fixtures/model-costs.json` 播种）。API：`GET/PUT /api/admin/model-costs`；`GET /api/admin/stats/analytics`：按 modelId 分组成本毛利（收入 = Σ costFinal/costEstimate，成本 = 调用数 × unitCostCents）+ 留存漏斗（注册 → 首生成 → 成功生成 → 活跃 ≥2 日）。admin 新页 `/analytics`（recharts，成本毛利 + 留存漏斗两个 Tab）。
 
 ---
 

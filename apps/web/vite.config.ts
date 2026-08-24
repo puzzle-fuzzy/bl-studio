@@ -8,7 +8,7 @@ const workspaceRoot = fileURLToPath(new URL('../..', import.meta.url))
 const webRoot = fileURLToPath(new URL('.', import.meta.url))
 
 // 开发端口 5002；/api 代理到 API(5003)，使会话 cookie 同源，规避 CORS。
-// 生产环境由 nginx 反代 /api（见 infra/nginx）。
+// 生产环境由 nginx 反代 /api（见 deploy/nginx）。
 export default defineConfig({
   server: {
     port: 5002,

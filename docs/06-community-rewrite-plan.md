@@ -187,7 +187,7 @@
 
 1. [schema.ts](packages/db/src/schema.ts)：新增 `notifications` 表；`audit_logs_action_check` 追加 `gallery.visibility-change` / `admin.gallery.hide` / `admin.gallery.unhide`。
 2. `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 生成 `0036_*.sql`；**手工**在迁移里加 `ALTER TABLE audit_logs DROP CONSTRAINT audit_logs_action_check; --> statement-breakpoint --> ALTER TABLE audit_logs ADD CONSTRAINT ... CHECK (... 新列表)`（drizzle 检测不到已命名 CHECK 表达式变更，参照 `0035_lying_wiccan.sql` 写法）。
-3. [audit-types.ts](packages/generation-repository/src/audit-types.ts) 与 [ensure-audit-action-constraint.ts](infra/scripts/ensure-audit-action-constraint.ts) 同步追加 3 个动作。
+3. [audit-types.ts](packages/generation-repository/src/audit-types.ts) 与 [ensure-audit-action-constraint.ts](scripts/db/ensure-audit-action-constraint.ts) 同步追加 3 个动作。
 4. dev/test 库：`pnpm run db:push` + `pnpm run db:push:test`（内含 ensure 脚本，自动更新约束）。
 
 ### 6.2 测试
@@ -203,7 +203,7 @@
 ### 6.3 验证流程
 
 ```
-pnpm exec dotenv -e infra/env/.env.test -- pnpm run verify   # 需 test DB: pnpm run db:test:up
+pnpm exec dotenv -e .env.test -- pnpm run verify   # 需 test DB: pnpm run db:test:up
 ```
 
 含：baseline + boundaries + manifests + typecheck + 全仓测试。改跨包 import 后 `pnpm run check:boundaries` 必跑。schema 变更后 dev/test 两库各 `db:push`。

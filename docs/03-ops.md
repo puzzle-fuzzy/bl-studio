@@ -26,11 +26,11 @@ Grafana (127.0.0.1:5300) ◄── Loki ◄── Alloy ◄── docker.sock �
   状态变化写结构化日志，并在配置 webhook 时发送恢复/故障告警。
 - **数据**：postgres 命名卷持久化；每日 pg_dump 备份；Loki/Grafana/monitor 状态各自命名卷。
 - 关键配置来源：
-  - `infra/docker/docker-compose.prod.yml` 生产编排（核心 = postgres/migrate/api/worker/web/backup；观测 = loki/alloy/grafana/monitor）
-  - `infra/nginx/create.yxswy.com.conf`、`infra/nginx/logs.yxswy.com.conf` 宿主机 nginx 站点模板
-  - `infra/scripts/setup-host-edge.sh` 宿主机边缘接入（证书 + conf.d，幂等）
-  - `infra/loki/loki.yaml`、`infra/alloy/config.alloy`、`infra/grafana/provisioning/` 日志栈
-  - `infra/env/.env.production`（应用机密）、`infra/env/.env.prod-infra`（基础设施变量）——均 gitignored
+  - `deploy/docker/compose.prod.yaml` 生产编排（核心 = postgres/migrate/api/worker/web/backup；观测 = loki/alloy/grafana/monitor）
+  - `deploy/nginx/create.yxswy.com.conf`、`deploy/nginx/logs.yxswy.com.conf` 宿主机 nginx 站点模板
+  - `scripts/deploy/setup-host-edge.sh` 宿主机边缘接入（证书 + conf.d，幂等）
+  - `deploy/observability/loki/loki.yaml`、`deploy/observability/alloy/config.alloy`、`deploy/observability/grafana/provisioning/` 日志栈
+  - `.env.production`（应用机密）、`.env.prod-infra`（基础设施变量）——均 gitignored
 
 ## 2. 服务器首次初始化
 
@@ -42,10 +42,10 @@ Grafana (127.0.0.1:5300) ◄── Loki ◄── Alloy ◄── docker.sock �
    ```
 2. 域名 DNS：把 `create.yxswy.com` 与 `logs.yxswy.com` 的 A 记录指向服务器公网 IP。
 3. 放行防火墙 80/443（Let's Encrypt 签发与访问需要）。
-4. 本地配置 `infra/env/.env.production` 与 `infra/env/.env.prod-infra`（复制对应 `.example` 填写）：
+4. 本地配置 `.env.production` 与 `.env.prod-infra`（复制对应 `.example` 填写）：
    ```bash
-   cp infra/env/.env.production.example infra/env/.env.production
-   cp infra/env/.env.prod-infra.example infra/env/.env.prod-infra
+   cp .env.production.example .env.production
+   cp .env.prod-infra.example .env.prod-infra
    ```
    - `LE_EMAIL` 填你的邮箱（Let's Encrypt 证书通知用）。
    - `POSTGRES_PASSWORD` 必须与 `.env.production` 的 `DATABASE_URL` 内嵌密码一致。
@@ -61,7 +61,7 @@ Grafana (127.0.0.1:5300) ◄── Loki ◄── Alloy ◄── docker.sock �
 pnpm run deploy:prod
 ```
 
-脚本流程（`infra/scripts/deploy-prod.sh`）：
+脚本流程（`scripts/deploy/deploy-prod.sh`）：
 1. 预检：干净工作区、`check:production-env`（应用）+ `check:production-env infra`（基础设施），并自动把当前 commit SHA 写入两个 env 的 `BAILIAN_STUDIO_RELEASE_TAG`。
 2. 本机构镜像（`bailian-studio-runtime:<sha>` / `bailian-studio-web:<sha>`，不可变 tag）。
 3. `docker save` → rsync 镜像与全部配置到服务器（env 文件服务器侧 `chmod 600`）。
@@ -173,7 +173,7 @@ filesystem delete request store。日志默认保留 31 天，磁盘吃紧时用
 - **查看备份**：`docker compose ... exec backup ls -lh /backups`。
 - **OSS 灾备（强制二选一，P0-07）**：deploy 预检（`check-production-env infra`）要求显式选择——
   - `BACKUP_OSS_UPLOAD=true`：deploy 从 `.env.production` 只投影 `OSS_REGION`、`OSS_BUCKET`、`OSS_ACCESS_KEY_ID`、`OSS_ACCESS_KEY_SECRET`、可选 `OSS_ENDPOINT` 到 gitignored 的 `.env.prod-backup`，并设置 `BACKUP_OSS_PREFIX`。**上传失败会让备份任务以非零退出**（compose 循环 5 分钟后重试），日志里 `[backup] OSS 上传失败` 即为标红信号。
-    手动使用 `prod:up` 前先运行 `pnpm exec tsx infra/scripts/prepare-backup-env.ts`。
+    手动使用 `prod:up` 前先运行 `pnpm exec tsx scripts/backup/prepare-backup-env.ts`。
   - `BACKUP_OSS_UPLOAD=false` + `BACKUP_OSS_DISABLED_ACK=confirmed`：显式接受「备份与 DB 同宿主，整机故障即丢数据」的风险。
   - 缺省/非法值会让 `deploy:prod` 预检直接失败。
 - **部署验证**：`deploy:prod` 启动核心栈后会执行一次真实的 `pg_dump + gzip + OSS 上传` 冒烟；该步骤失败时不会报告部署成功。

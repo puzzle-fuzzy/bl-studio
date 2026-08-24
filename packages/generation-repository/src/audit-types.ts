@@ -6,7 +6,7 @@
  *
  * P1-44：AUDIT_ACTIONS 是本仓库动作集合的唯一运行时事实源。类型由它派生；
  * schema.ts 的 CHECK 内联列表、ensure-audit-action-constraint.ts、迁移内嵌 CHECK
- * 均由 infra/scripts/audit-action-consistency.test.ts 与它逐项比对（进 verify）。
+ * 均由 scripts/verify/audit-action-consistency.test.ts 与它逐项比对（进 verify）。
  */
 export const AUDIT_ACTIONS = [
   'auth.register',

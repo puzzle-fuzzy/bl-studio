@@ -7,7 +7,7 @@
  * 「Failed to fetch dynamically imported module: …/assets/GenerationDetailPage-*.js」，
  * 且应用内「重试」若只 setState 不刷新，会反复重试同一个缺失 chunk。
  *
- * index.html 已是 no-cache（见 infra/nginx/bailian-studio.conf），重新加载必然
+ * index.html 已是 no-cache（见 deploy/nginx/bailian-studio.conf），重新加载必然
  * revalidate 取到新 shell、引用新哈希 chunk——因此「失败后 reload 一次」即可自愈。
  * 用 sessionStorage 守卫「本会话最多自动 reload 一次」，避免服务端真出问题时无限
  * 重载；之后由错误边界 / errorElement 的「刷新页面」（真 reload）兜底。

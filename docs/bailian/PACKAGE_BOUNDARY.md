@@ -1,6 +1,6 @@
 # 模型知识边界规范（PACKAGE_BOUNDARY）
 
-> 本文件是模型知识归属与包边界的**唯一规范**。`infra/scripts/check-package-boundaries.ts`（`pnpm run check:boundaries`，进 `verify`）是它的可执行版本：**改包边界必须先改这里，再同步脚本与对应测试。** 各 owner 包与相关路由的 AGENTS.md 均指向本文件。
+> 本文件是模型知识归属与包边界的**唯一规范**。`scripts/verify/check-package-boundaries.ts`（`pnpm run check:boundaries`，进 `verify`）是它的可执行版本：**改包边界必须先改这里，再同步脚本与对应测试。** 各 owner 包与相关路由的 AGENTS.md 均指向本文件。
 >
 > **背景**：bailian-hub 与外部 SDK（`@puzzle-fuzzy/bailian-sdk`）已并入本仓库。模型知识（transport / rules / pricing / parameters）全部收进 `@bailian-studio/model-core` 的 manifest，校验统一为纯函数。**git 即版本**——不再有 npm 发布、精确版本钉死或 coverage hash 对账仪式。
 

@@ -7,7 +7,7 @@
       "!**/dist",
       "!**/coverage",
       "!**/.turbo",
-      "!infra/ffmpeg"
+      "!var/ffmpeg"
     ]
   },
   "linter": {
@@ -24,7 +24,7 @@
       "includes": [
         "**/*.test.{js,jsx,mjs,cjs,ts,tsx}",
         "**/tests/**",
-        "e2e/**"
+        "tests/e2e/**"
       ],
       "linter": {
         "rules": {
@@ -35,7 +35,7 @@
       }
     },
     {
-      "includes": ["infra/scripts/**", "e2e/**"],
+      "includes": ["scripts/**", "tests/e2e/**"],
       "linter": {
         "rules": {
           "suspicious": {

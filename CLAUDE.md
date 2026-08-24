@@ -20,14 +20,14 @@ pnpm install
 pnpm run dev              # turbo 并行：api(bun,5003) / worker(tsx) / web(vite,5002)
 pnpm run lint             # Biome lint（TS/TSX/JS，跨平台）
 pnpm run typecheck        # 各包 tsc --noEmit（turbo 并行）
-pnpm run typecheck:root   # 根作用域 tsc --noEmit：infra/scripts/ + 根 tests/（per-package typecheck 不含这两处）
+pnpm run typecheck:root   # 根作用域 tsc --noEmit：scripts/ + 根 tests/（per-package typecheck 不含这两处）
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
 pnpm run verify           # check:db-migrations + boundaries + manifests + lint + typecheck + test
 pnpm run check:boundaries # 包边界
 pnpm run check:manifests  # manifest 一致性
 pnpm run model:acceptance # 所有 enabled 模型的离线请求/响应矩阵
 pnpm run model:acceptance -- --live=<model-id> # 单模型真实供应商 canary（需 DASHSCOPE_API_KEY）
-pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 infra/scripts/check-db-migrations.ts）
+pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 scripts/verify/check-db-migrations.ts）
 # db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库；
 # 脚本通过 dotenv-cli 注入连接串，兼容 Windows，不要在命令行内联 DATABASE_URL）：
 # 改了 schema.ts 后正式流程是 `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 提交迁移，
@@ -52,11 +52,11 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 
 测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后 `db:push` + `db:push:test`。
 
-社区化特性（封禁/画廊/提示词库/反馈/成本分析）设计见 `docs/05-community-features.md`。其中**审计动作新增必须在三处同步**：`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`infra/scripts/ensure-audit-action-constraint.ts`；drizzle 检测不到已命名 CHECK 表达式变更，迁移里要**手工 DROP/ADD** 该约束。
+社区化特性（封禁/画廊/提示词库/反馈/成本分析）设计见 `docs/05-community-features.md`。其中**审计动作新增必须在三处同步**：`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`scripts/db/ensure-audit-action-constraint.ts`；drizzle 检测不到已命名 CHECK 表达式变更，迁移里要**手工 DROP/ADD** 该约束。
 
 ## 架构与边界
 
-包边界是**可执行的架构**（`infra/scripts/check-package-boundaries.ts`，进 `verify`）：
+包边界是**可执行的架构**（`scripts/verify/check-package-boundaries.ts`，进 `verify`）：
 
 - **`@bailian-studio/model-core` 是唯一数据源**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 manifest，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
 - **模型可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`。`notActivated`（如 vidu 全家「暂未开通」——key 已授权但百炼产品卡未开通）必须配 `enabled: false`（registry-check 断言），模型仍投影进前端 catalog 置灰 + 打 tag，但提交/worker 解析经 `getModelById` 一律拒绝。
@@ -122,7 +122,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 ## 测试约定
 
 - 后端包测试放 `tests/`（与 `src/` 同级），vitest。曾经是 `bun:test`，已全部迁移。
-- 根测试 `tests/` + `infra/scripts/*.test.ts` 由 `pnpm run test:root` 跑。
+- 根测试 `tests/` + `scripts/**/*.test.ts` 由 `pnpm run test:root` 跑。
 - 改代码后跑 `pnpm run typecheck` + 对应包测试 + `pnpm run check:boundaries`。
 
 ## 运行时迁移备忘（Bun → Node，除了 API）

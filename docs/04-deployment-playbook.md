@@ -27,8 +27,8 @@
 
 ```bash
 # 1) 两个 gitignored env 已填真实值
-cp infra/env/.env.production.example infra/env/.env.production
-cp infra/env/.env.prod-infra.example infra/env/.env.prod-infra
+cp .env.production.example .env.production
+cp .env.prod-infra.example .env.prod-infra
 #    - .env.production 的 DATABASE_URL 内嵌密码必须与 .env.prod-infra 的 POSTGRES_PASSWORD 一致
 #    - .env.prod-infra 填 LE_EMAIL、GRAFANA_ADMIN_USER/PASSWORD、DEPLOY_HOST=yxswy-server
 #    - 服务器上的 .env 文件权限已被部署脚本 chmod 600
@@ -45,8 +45,10 @@ ssh yxswy-server 'docker --version && getent hosts create.yxswy.com'
 git status --porcelain   # 必须无输出
 
 # 5) 宿主机静态 ffmpeg/ffprobe 已就绪（runtime 镜像不再打包它们）
-#    在服务器上执行（见 infra/scripts/fetch-static-ffmpeg.sh）：
-#    ssh yxswy-server 'bash /opt/bailian-studio/scripts/fetch-static-ffmpeg.sh'
+#    首次部署前把脚本临时上传到服务器执行；后续脚本会同步到 deploy/scripts/：
+#    rsync -az scripts/dev/fetch-static-ffmpeg.sh yxswy-server:/tmp/fetch-static-ffmpeg.sh
+#    ssh yxswy-server 'bash /tmp/fetch-static-ffmpeg.sh /opt/bailian-studio/ffmpeg && rm -f /tmp/fetch-static-ffmpeg.sh'
+#    后续可直接执行：bash /opt/bailian-studio/deploy/scripts/fetch-static-ffmpeg.sh
 #    → 产物 /opt/bailian-studio/ffmpeg/{ffmpeg,ffprobe}（自包含静态二进制）
 #    deploy:prod 会预检这两文件存在，缺失则拒绝部署。
 ```
@@ -110,9 +112,9 @@ curl -sS -o /dev/null -w "%{http_code}\n" --resolve logs.yxswy.com:443:101.35.24
 **首次部署 / 新库（或 model_costs 表为空）时，追加一次性播种模型成本**（幂等，`on conflict do nothing`，不会覆盖 admin 已调成本）：
 
 ```bash
-docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra \
-  -f /opt/bailian-studio/infra/docker/docker-compose.prod.yml \
-  run --rm migrate pnpm exec tsx infra/scripts/seed-model-costs.ts
+docker compose --env-file /opt/bailian-studio/.env.prod-infra \
+  -f /opt/bailian-studio/deploy/docker/compose.prod.yaml \
+  run --rm migrate pnpm exec tsx scripts/db/seed-model-costs.ts
 #   输出：Seeded N model cost rows.（admin「分析 → 维护模型成本」可再调）
 ```
 
@@ -128,12 +130,12 @@ docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra \
 
 ```bash
 # 在服务器上（/opt/bailian-studio 下）
-COMPOSE="docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra -f /opt/bailian-studio/infra/docker/docker-compose.prod.yml"
+COMPOSE="docker compose --env-file /opt/bailian-studio/.env.prod-infra -f /opt/bailian-studio/deploy/docker/compose.prod.yaml"
 
 $COMPOSE pull postgres            # 核心基础镜像（观测栈启用时另 pull loki alloy grafana）
 $COMPOSE run --rm migrate         # 迁移（幂等）
 $COMPOSE up -d --no-build --pull never   # 启动核心栈
-bash /opt/bailian-studio/infra/scripts/setup-host-edge.sh /opt/bailian-studio/infra  # 边缘（幂等）
+bash /opt/bailian-studio/scripts/deploy/setup-host-edge.sh /opt/bailian-studio/deploy  # 边缘（幂等）
 $COMPOSE ps                       # 看状态
 $COMPOSE logs api --tail 50       # 看日志
 ```
@@ -156,19 +158,19 @@ $COMPOSE logs api --tail 50       # 看日志
 
 ### 4.1 web-only 快速发版（只改前端时用，传输 ~20MB、不动 api/worker）
 
-> 已有脚本封装 `pnpm run deploy:prod:web`（`infra/scripts/deploy-prod-web.sh`，含工作区
+> 已有脚本封装 `pnpm run deploy:prod:web`（`scripts/deploy/deploy-prod-web.sh`，含工作区
 > 预检/镜像构建/rsync/服务器 load/仅重建 web 容器，行为与下方手抄命令等价）。以下为
 > 手抄路径（脚本不可用或想逐步入肉时参考）：
 
 ```bash
 NEWSHA=$(git rev-parse HEAD)
-docker build --platform linux/amd64 -f infra/docker/Dockerfile --target web \
+docker build --platform linux/amd64 -f deploy/docker/Dockerfile --target web \
   --build-arg BAILIAN_STUDIO_RELEASE_TAG="$NEWSHA" \
   --build-arg VITE_API_ORIGIN= --build-arg VITE_WEB_ORIGIN="https://create.yxswy.com" \
   -t "bailian-studio-web:$NEWSHA" .
 docker save -o "web-$NEWSHA.tar" "bailian-studio-web:$NEWSHA"
 rsync -az "web-$NEWSHA.tar" yxswy-server:/opt/bailian-studio/
-ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /opt/bailian-studio/web-$NEWSHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$NEWSHA docker compose --env-file /opt/bailian-studio/infra/env/.env.prod-infra -f /opt/bailian-studio/infra/docker/docker-compose.prod.yml up -d --no-deps web"
+ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /opt/bailian-studio/web-$NEWSHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$NEWSHA docker compose --env-file /opt/bailian-studio/.env.prod-infra -f /opt/bailian-studio/deploy/docker/compose.prod.yaml up -d --no-deps web"
 ```
 
 > 注意：这只把 web 容器切到新 SHA，`BAILIAN_STUDIO_RELEASE_TAG` 仍是旧 SHA（api/worker
@@ -233,7 +235,7 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
 9. **本地 `dig` 返回 198.18.0.x**
    → Mac 上 Clash fake-ip 劫持 DNS。规避：**DNS 一律在服务器上查**（`getent hosts`）。
 10. **Caddy 容器起不来 / 端口冲突**
-    → 80/443 被宿主机 nginx 独占。规避：**本仓库不用 Caddy**，接入宿主机 nginx（模板在 `infra/nginx/*.yxswy.com.conf`）。
+    → 80/443 被宿主机 nginx 独占。规避：**本仓库不用 Caddy**，接入宿主机 nginx（模板在 `deploy/nginx/*.yxswy.com.conf`）。
 11. **`nginx -t` 报 `cannot load certificate /etc/letsencrypt/live/logs.yxswy.com/...`**
     → certbot 一次签发的 SAN 证书只存在 `live/create.yxswy.com/`。规避：logs 站点引用 create 的证书路径。
 12. **`docker inspect bailian-studio-prod-api` 找不到容器**
@@ -249,17 +251,17 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
 
 ### E. 本地开发
 16. **`pnpm run verify` 大量测试报 `DATABASE_URL is required`**
-    → 缺 gitignored 的 `.env.test`。规避：`cp infra/env/.env.test.example infra/env/.env.test`；`db:test:up` 起 test DB。
+    → 缺 gitignored 的 `.env.test`。规避：`cp .env.test.example .env.test`；`db:test:up` 起 test DB。
 
 ### F. rsync / 文件传输
-17. **`rsync -az infra/nginx/ server:/opt/.../infra/` 后服务器上文件位置不对**
-    → 源目录尾斜杠 = 拷"内容"而非"目录本身"。规避：目标路径写全子目录，如 `server:/opt/.../infra/nginx/`。
+17. **`rsync -az deploy/nginx/ server:/opt/.../deploy/` 后服务器上文件位置不对**
+    → 源目录尾斜杠 = 拷"内容"而非"目录本身"。规避：目标路径写全子目录，如 `server:/opt/.../deploy/nginx/`。
 
 ### G. 前端缓存 / chunk 加载（2026-08-07 事故实录）
 18. **用户报 `Failed to fetch dynamically imported module: https://create.yxswy.com/assets/GenerationDetailPage-C1HjH_VR.js`，刷新没用**
     → 懒加载路由 chunk 按内容哈希命名；部署重建后旧 chunk 被**物理删除**（dist 烤进镜像、容器替换即删旧文件，无版本目录/保留方案）。仍持有旧 shell 的客户端（缓存旧 index.html、tab 跨部署未关、bfcache/内存旧模块图）对动态 import 命中 404。应用内「重试」若只 setState 不 reload，会反复重试同一缺失 chunk，观感即「刷新没用」。
     → **根因在客户端恢复缺失，不在缓存头**：线上 index.html 已 `no-cache`（每次加载 revalidate 取新哈希），真正 F5 本应自愈。
-    → 规避/已落地：① 客户端守卫式自愈（`vite:preloadError` + 动态 import 失败 → sessionStorage 守卫下 reload 一次，`apps/web/src/lib/chunk-recovery.ts`，admin 同款）；② 错误边界「重试」对 chunk 错误改真 reload；③ 懒路由根布局 `errorElement` 恢复 UI；④ 资产头加 `immutable`、admin HTML 补 `no-cache`（`infra/nginx/bailian-studio.conf`，注意 location 内 add_header 不继承 server 级头、需重复声明）。
+    → 规避/已落地：① 客户端守卫式自愈（`vite:preloadError` + 动态 import 失败 → sessionStorage 守卫下 reload 一次，`apps/web/src/lib/chunk-recovery.ts`，admin 同款）；② 错误边界「重试」对 chunk 错误改真 reload；③ 懒路由根布局 `errorElement` 恢复 UI；④ 资产头加 `immutable`、admin HTML 补 `no-cache`（`deploy/nginx/bailian-studio.conf`，注意 location 内 add_header 不继承 server 级头、需重复声明）。
     → 排查第一手：`curl -sI https://create.yxswy.com/` 看 index.html 的 Cache-Control；部署后对比 `apps/web/dist/assets/*.js` 与线上哈希。
 
 ---

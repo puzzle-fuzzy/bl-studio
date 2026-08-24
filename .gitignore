@@ -6,13 +6,14 @@ coverage/
 *.log
 .DS_Store
 
-# 本地环境文件（绝不提交）
-infra/env/.env
-infra/env/.env.test
-infra/env/.env.production
-infra/env/.env.prod-infra
-infra/env/.env.prod-backup
+# 本地环境文件（绝不提交；模板例外）
 .env
+.env.*
+!.env.example
+!.env.test.example
+!.env.production.example
+!.env.prod-infra.example
+!.env.prod-backup.example
 .env.local
 .env.*.local
 
@@ -27,7 +28,4 @@ web-*.tar
 # Playwright
 playwright-report/
 test-results/
-e2e/.playwright
-
-# 本地 rehearsal 用的静态 ffmpeg/ffprobe（fetch-static-ffmpeg.sh 下载，不入库）
-infra/ffmpeg/
+tests/e2e/.playwright

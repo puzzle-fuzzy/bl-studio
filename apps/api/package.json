@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "bun --env-file=../../infra/env/.env src/index.ts",
+    "dev": "bun --env-file=../../.env src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run tests",
     "build": "tsc -p tsconfig.json --noEmit"

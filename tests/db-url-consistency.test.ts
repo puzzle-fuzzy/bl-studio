@@ -41,8 +41,8 @@ describe('数据库连接串三处来源一致（P2-33）', () => {
 
   it('.env.example / .env.test.example 的 DATABASE_URL 与 defaults.ts 一致', () => {
     const expected: ReadonlyArray<readonly [string, string]> = [
-      ['infra/env/.env.example', DEV_DATABASE_URL],
-      ['infra/env/.env.test.example', TEST_DATABASE_URL],
+      ['.env.example', DEV_DATABASE_URL],
+      ['.env.test.example', TEST_DATABASE_URL],
     ]
     for (const [file, expectedUrl] of expected) {
       const url = envFileDatabaseUrl(`${repoRoot}${file}`)

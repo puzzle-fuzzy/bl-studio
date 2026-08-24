@@ -36,18 +36,18 @@ pnpm run db:push:test   # 推送 schema 到 test DB
 
 # 本地环境文件（gitignored）
 # macOS/Linux:
-cp infra/env/.env.example infra/env/.env
-cp infra/env/.env.test.example infra/env/.env.test
+cp .env.example .env
+cp .env.test.example .env.test
 # Windows PowerShell:
-# Copy-Item infra/env/.env.example infra/env/.env
-# Copy-Item infra/env/.env.test.example infra/env/.env.test
+# Copy-Item .env.example .env
+# Copy-Item .env.test.example .env.test
 # 如需 Worker 真正调 DashScope，填入 DASHSCOPE_API_KEY
 
 # 同时启动 API(5003, bun) / Worker(tsx) / Web(5002, vite)
 pnpm run dev
 ```
 
-如果本机已有其他项目占用默认 Docker 端口，可在当前 PowerShell 会话中覆盖宿主机端口；同时把 `infra/env/.env` 中的 `DATABASE_URL`/`SMTP_PORT` 改为对应值：
+如果本机已有其他项目占用默认 Docker 端口，可在当前 PowerShell 会话中覆盖宿主机端口；同时把 `.env` 中的 `DATABASE_URL`/`SMTP_PORT` 改为对应值：
 
 ```powershell
 $env:BL_STUDIO_DEV_POSTGRES_PORT = '55441'
@@ -70,7 +70,7 @@ pnpm run db:up
 时才执行：
 
 ```powershell
-docker compose -f infra/docker/docker-compose.yml down -v
+docker compose -f deploy/docker/compose.yaml down -v
 ```
 
 本地生产形态演练需要 Linux 版 ffmpeg/ffprobe，Windows 宿主机的 `.exe` 不能直接挂进
@@ -89,7 +89,7 @@ pnpm run deploy:rehearsal:up
 ```bash
 pnpm run lint             # Biome lint（TS/TSX/JS，跨平台）
 pnpm run typecheck        # 全仓 typecheck（tsc --noEmit）
-pnpm run typecheck:root   # 根 infra/scripts + tests 的 typecheck
+pnpm run typecheck:root   # 根 scripts + tests 的 typecheck
 pnpm run test             # 根契约测试 + 全仓 vitest（串行，共享 test DB）
 pnpm run test:coverage    # 覆盖率
 pnpm run verify           # migrations + boundaries + manifests + lint + typecheck + test
@@ -151,8 +151,8 @@ src/
 
 - **后端包**：vitest（node 环境），覆盖状态机、仓储、provider、路由契约。
 - **前端**：vitest + happy-dom，只测**纯函数层**（参数投影、引用转换、幂等、错误本地化）——不测 UI/样式（样式后续还会调整）。
-- **根契约**：`tests/` + `infra/scripts/*.test.ts`（包边界、manifest、Docker 清单）。
+- **根契约**：`tests/` + `scripts/**/*.test.ts`（包边界、manifest、Docker 清单）。
 
 ## 部署
 
-单机 Docker Compose + **宿主机 nginx + certbot** 自动 HTTPS（Let's Encrypt；本仓库不内置 Caddy），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `infra/docker/Dockerfile`（oven/bun 基座 + Node 24 + pnpm；API 用 bun，Worker 用 tsx），配置模板在 `infra/env/.env.production.example` 与 `infra/env/.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署；只改前端时用 `pnpm run deploy:prod:web` 走 web-only 快速发版（约 20MB，不动 api/worker）。新库首次部署后需一次性播种模型成本：`pnpm run db:seed:model-costs`（生产用 `docker compose run --rm migrate pnpm exec tsx infra/scripts/seed-model-costs.ts`）。完整运维手册见 `docs/03-ops.md`，部署踩坑清单见 `docs/04-deployment-playbook.md`。
+单机 Docker Compose + **宿主机 nginx + certbot** 自动 HTTPS（Let's Encrypt；本仓库不内置 Caddy），日志经 Loki + Alloy + Grafana 集中可查（`logs.yxswy.com`）。生产镜像见 `deploy/docker/Dockerfile`（oven/bun 基座 + Node 24 + pnpm；API 用 bun，Worker 用 tsx），配置模板在 `.env.production.example` 与 `.env.prod-infra.example`（均 gitignored）。发布前运行 `pnpm run verify`，然后 `pnpm run deploy:prod` 一键部署；只改前端时用 `pnpm run deploy:prod:web` 走 web-only 快速发版（约 20MB，不动 api/worker）。新库首次部署后需一次性播种模型成本：`pnpm run db:seed:model-costs`（生产用 `docker compose run --rm migrate pnpm exec tsx scripts/db/seed-model-costs.ts`）。完整运维手册见 `docs/03-ops.md`，部署踩坑清单见 `docs/04-deployment-playbook.md`。

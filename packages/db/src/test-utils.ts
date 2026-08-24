@@ -24,13 +24,13 @@ import type { BailianStudioDb } from './client'
 /**
  * 读取并校验 DATABASE_URL 环境变量。
  *
- * 缺失时抛错并附上提示（启动测试 DB、参考 infra/env/.env.test.example），避免后续
+ * 缺失时抛错并附上提示（启动测试 DB、参考 .env.test.example），避免后续
  * 在连接阶段才以含糊的错误暴露出来——早失败更易定位。
  */
 export function requireDatabaseUrl(): string {
   const url = process.env.DATABASE_URL
   if (!url) {
-  throw new Error('DATABASE_URL is required. Run `bun run db:test:up` and use `infra/env/.env.test.example`.')
+  throw new Error('DATABASE_URL is required. Run `pnpm run db:test:up` and use `.env.test.example`.')
   }
   return url
 }

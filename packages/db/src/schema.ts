@@ -641,7 +641,7 @@ export const notifications = pgTable('notifications', {
 
 /**
  * 每模型成本单价（admin 维护）—— 供成本毛利分析：成本 = 调用数 × unitCostCents。
- * 播种脚本 infra/scripts/seed-model-costs.ts 从 infra/seed/model-costs.json 初始化。
+ * 播种脚本 scripts/db/seed-model-costs.ts 从 data/fixtures/model-costs.json 初始化。
  */
 export const modelCosts = pgTable('model_costs', {
   modelId: text('model_id').primaryKey(),

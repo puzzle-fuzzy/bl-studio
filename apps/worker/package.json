@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "tsx --env-file=../../infra/env/.env src/index.ts",
+    "dev": "tsx --env-file=../../.env src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run tests",
     "build": "tsc -p tsconfig.json --noEmit"
