@@ -18,7 +18,8 @@ import {
   type CreativeAssetVersionStatus,
   type CreativeProjectStatus,
 } from '@bailian-studio/creative-asset-contracts'
-import { and, asc, desc, eq, ilike, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, exists, gt, ilike, inArray, isNull, ne, notExists, sql } from 'drizzle-orm'
+import { alias } from 'drizzle-orm/pg-core'
 import { CreativeAssetRepositoryError } from './errors'
 import {
   nextCreativeAssetId,
@@ -52,6 +53,8 @@ interface Cursor {
 
 const DEFAULT_LIMIT = 24
 const MAX_LIMIT = 100
+const latestAssetVersion = alias(creativeAssetVersions, 'latest_creative_asset_version')
+const newerAssetVersion = alias(creativeAssetVersions, 'newer_creative_asset_version')
 
 function nowDate(value?: string): Date {
   const date = value === undefined ? new Date() : new Date(value)
@@ -846,10 +849,33 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
       const limit = limitValue(input.limit)
       const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor)
       const cursorDate = cursor === undefined ? undefined : new Date(cursor.createdAt)
+      const latestVersionStatusCondition = input.versionStatus === undefined
+        ? []
+        : [exists(
+            db
+              .select({ id: latestAssetVersion.id })
+              .from(latestAssetVersion)
+              .where(and(
+                eq(latestAssetVersion.assetId, creativeAssets.id),
+                eq(latestAssetVersion.status, input.versionStatus),
+                isNull(latestAssetVersion.deletedAt),
+                notExists(
+                  db
+                    .select({ id: newerAssetVersion.id })
+                    .from(newerAssetVersion)
+                    .where(and(
+                      eq(newerAssetVersion.assetId, latestAssetVersion.assetId),
+                      gt(newerAssetVersion.version, latestAssetVersion.version),
+                      isNull(newerAssetVersion.deletedAt),
+                    )),
+                ),
+              )),
+          )]
       const conditions = [
         eq(creativeAssets.userId, input.userId),
         isNull(creativeAssets.deletedAt),
         ...(input.type === undefined ? [] : [eq(creativeAssets.type, input.type)]),
+        ...latestVersionStatusCondition,
         ...(input.query === undefined || input.query.length === 0 ? [] : [ilike(creativeAssets.name, `%${input.query}%`)]),
         ...(input.projectId === undefined
           ? []

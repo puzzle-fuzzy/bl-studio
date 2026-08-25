@@ -56,6 +56,7 @@ const CreateAssetRequestSchema = CreateCreativeAssetSchema.extend({
 const ListAssetsQuerySchema = z.object({
   projectId: z.string().trim().min(1).max(256).optional(),
   type: CreativeAssetTypeSchema.optional(),
+  versionStatus: CreativeAssetVersionStatusSchema.optional(),
   q: z.string().trim().min(1).max(120).optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
   cursor: z.string().trim().min(1).max(1024).optional(),
@@ -206,6 +207,7 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
         userId: user.id,
         ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
         ...(input.type !== undefined ? { type: input.type } : {}),
+        ...(input.versionStatus !== undefined ? { versionStatus: input.versionStatus } : {}),
         ...(input.q !== undefined ? { query: input.q } : {}),
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),

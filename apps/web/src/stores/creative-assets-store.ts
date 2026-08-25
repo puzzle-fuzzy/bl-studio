@@ -1,16 +1,17 @@
 import { create } from 'zustand'
-import type { CreativeAssetDetail, CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
+import type { CreativeAssetDetail, CreativeAssetSummary, CreativeAssetType, CreativeAssetVersionStatus } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { registerPrivateDataReset } from './auth-store'
 
 export interface CreativeAssetQuery {
   projectId?: string
   type?: CreativeAssetType
+  versionStatus?: CreativeAssetVersionStatus
   q?: string
 }
 
 export function creativeAssetQueryKey(query: CreativeAssetQuery): string {
-  return [query.projectId ?? 'all', query.type ?? 'all', query.q?.trim() ?? ''].join(':')
+  return [query.projectId ?? 'all', query.type ?? 'all', query.versionStatus ?? 'all', query.q?.trim() ?? ''].join(':')
 }
 
 interface CreativeAssetQueryState {
@@ -79,6 +80,7 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
         limit: CREATIVE_ASSETS_PAGE_SIZE,
         ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.type ? { type: query.type } : {}),
+        ...(query.versionStatus ? { versionStatus: query.versionStatus } : {}),
         ...(query.q?.trim() ? { q: query.q.trim() } : {}),
       })
       .then(result => {
@@ -131,6 +133,7 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
         cursor: state.nextCursor,
         ...(query.projectId ? { projectId: query.projectId } : {}),
         ...(query.type ? { type: query.type } : {}),
+        ...(query.versionStatus ? { versionStatus: query.versionStatus } : {}),
         ...(query.q?.trim() ? { q: query.q.trim() } : {}),
       })
       set(current => {

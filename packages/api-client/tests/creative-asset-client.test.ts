@@ -111,7 +111,7 @@ describe('creative asset api client', () => {
     await expect(client.updateCreativeProject('project-1', { status: 'active' })).resolves.toEqual(projectDetail)
     await expect(client.attachCreativeAssetToProject('project-1', { assetId: 'asset-1', sortOrder: 2 })).resolves.toEqual(detail)
     await expect(client.detachCreativeAssetFromProject('project-1', 'asset/1')).resolves.toEqual(projectDetail)
-    await expect(client.listCreativeAssets({ projectId: 'project-1', type: 'character', q: '林默', limit: 10 })).resolves.toMatchObject({
+    await expect(client.listCreativeAssets({ projectId: 'project-1', type: 'character', versionStatus: 'candidate', q: '林默', limit: 10 })).resolves.toMatchObject({
       items: [summary],
       nextCursor: 'asset-cursor',
     })
@@ -134,7 +134,7 @@ describe('creative asset api client', () => {
       'PATCH http://api.test/api/creative/projects/project-1',
       'POST http://api.test/api/creative/projects/project-1/assets',
       'DELETE http://api.test/api/creative/projects/project-1/assets/asset%2F1',
-      'GET http://api.test/api/creative/assets?projectId=project-1&type=character&q=%E6%9E%97%E9%BB%98&limit=10',
+      'GET http://api.test/api/creative/assets?projectId=project-1&type=character&versionStatus=candidate&q=%E6%9E%97%E9%BB%98&limit=10',
       'POST http://api.test/api/creative/assets',
       'GET http://api.test/api/creative/assets/asset%2F1',
       'POST http://api.test/api/creative/assets/asset-1/archive',

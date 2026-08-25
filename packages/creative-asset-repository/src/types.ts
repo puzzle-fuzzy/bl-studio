@@ -140,6 +140,8 @@ export interface ListCreativeAssetsRepositoryInput {
   userId: string
   projectId?: string
   type?: CreativeAssetType
+  /** 只匹配当前未删除的最新版本状态，不匹配历史版本。 */
+  versionStatus?: CreativeAssetVersionStatus
   query?: string
   limit?: number
   cursor?: string

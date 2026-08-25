@@ -209,6 +209,41 @@ describe('creative asset repository', () => {
     expect(restored.projects[0]?.sortOrder).toBe(3)
   })
 
+  it('filters by the current latest version status instead of historical versions', async () => {
+    const currentCandidate = await repository.createAsset({ userId: ownerId, type: 'character', name: '当前候选' })
+    const currentCandidateVersion = await repository.createVersion({
+      userId: ownerId,
+      assetId: currentCandidate.id,
+      semanticSpec: {},
+      generationRecipe: {},
+    })
+    const currentCandidateVersionId = currentCandidateVersion.versions[0]?.id
+    if (currentCandidateVersionId === undefined) throw new Error('expected current candidate version')
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: currentCandidateVersionId, status: 'generating' })
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: currentCandidateVersionId, status: 'candidate' })
+
+    const historicalCandidate = await repository.createAsset({ userId: ownerId, type: 'environment', name: '历史候选' })
+    const historicalCandidateVersion = await repository.createVersion({
+      userId: ownerId,
+      assetId: historicalCandidate.id,
+      semanticSpec: {},
+      generationRecipe: {},
+    })
+    const historicalCandidateVersionId = historicalCandidateVersion.versions[0]?.id
+    if (historicalCandidateVersionId === undefined) throw new Error('expected historical candidate version')
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: historicalCandidateVersionId, status: 'generating' })
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: historicalCandidateVersionId, status: 'candidate' })
+    await repository.createVersion({
+      userId: ownerId,
+      assetId: historicalCandidate.id,
+      semanticSpec: {},
+      generationRecipe: {},
+    })
+
+    const candidates = await repository.listAssets({ userId: ownerId, versionStatus: 'candidate' })
+    expect(candidates.items.map(item => item.id)).toEqual([currentCandidate.id])
+  })
+
   it('requires a ready owned image for a reference', async () => {
     const asset = await repository.createAsset({ userId: ownerId, type: 'character', name: '角色' })
     const versioned = await repository.createVersion({ userId: ownerId, assetId: asset.id, semanticSpec: {}, generationRecipe: {} })

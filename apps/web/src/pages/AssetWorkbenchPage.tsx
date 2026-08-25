@@ -110,6 +110,7 @@ export function AssetWorkbenchPage() {
   const queryText = searchParams.get('q') ?? ''
   const view: AssetView = isAssetView(searchParams.get('view')) ? (searchParams.get('view') as AssetView) : 'grid'
   const type = ASSET_TYPES.includes(tab as CreativeAssetType) ? (tab as CreativeAssetType) : undefined
+  const versionStatus = tab === 'pending' ? 'candidate' as const : undefined
 
   const [searchInput, setSearchInput] = useState(queryText)
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
@@ -123,9 +124,10 @@ export function AssetWorkbenchPage() {
     () => ({
       ...(projectId ? { projectId } : {}),
       ...(type ? { type } : {}),
+      ...(versionStatus ? { versionStatus } : {}),
       ...(queryText ? { q: queryText } : {}),
     }),
-    [projectId, queryText, type],
+    [projectId, queryText, type, versionStatus],
   )
   const assetQueryKey = creativeAssetQueryKey(assetQuery)
   const assetState = useCreativeAssetsStore(state => state.queries[assetQueryKey])
@@ -163,11 +165,19 @@ export function AssetWorkbenchPage() {
   }
 
   function handleTabChange(nextTab: AssetTab) {
-    setSearchParams(updateSearchParams(searchParams, { tab: nextTab === 'all' ? undefined : nextTab }))
+    setSearchParams(updateSearchParams(searchParams, {
+      tab: nextTab === 'all' ? undefined : nextTab,
+      // “项目”是项目列表视图，不应该继续携带上一个项目的过滤上下文。
+      projectId: nextTab === 'projects' ? undefined : projectId,
+    }))
   }
 
   function handleProjectChange(nextProjectId: string) {
-    setSearchParams(updateSearchParams(searchParams, { projectId: nextProjectId }))
+    setSearchParams(updateSearchParams(searchParams, {
+      projectId: nextProjectId,
+      // 从项目列表选择项目后，直接进入该项目的素材集合。
+      tab: tab === 'projects' ? undefined : tab,
+    }))
   }
 
   return (
@@ -186,7 +196,7 @@ export function AssetWorkbenchPage() {
                   </>
                 )}
               </div>
-              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">素材库</h1>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{activeProject?.title ?? '素材库'}</h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
                 按项目整理主体、场景、道具和风格，确认版本后再带入下一次生成。
               </p>
@@ -283,7 +293,7 @@ export function AssetWorkbenchPage() {
             projects={projects}
             isLoading={projectState?.isLoading ?? false}
             error={projectState?.error ?? null}
-            onSelect={project => handleProjectChange(project.id)}
+            onSelect={project => setSearchParams(updateSearchParams(searchParams, { tab: undefined, projectId: project.id }))}
             onCreate={() => setCreateProjectOpen(true)}
           />
         ) : (

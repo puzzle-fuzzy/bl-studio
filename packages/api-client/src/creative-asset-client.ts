@@ -159,6 +159,8 @@ export interface ListCreativeProjectsParams {
 export interface ListCreativeAssetsParams {
   projectId?: string
   type?: CreativeAssetType
+  /** 只匹配当前最新版本的状态，不匹配历史版本。 */
+  versionStatus?: CreativeAssetVersionStatus
   q?: string
   limit?: number
   cursor?: string
