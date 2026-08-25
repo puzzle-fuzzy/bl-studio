@@ -42,14 +42,14 @@ export function NotificationMenu() {
         {/* 侧栏底部整行触发器：铃铛 + 通知 + 未读徽标 */}
         <SidebarMenuButton
           aria-label="通知"
-          className="relative w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!"
+          className="relative w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:overflow-visible! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!"
           title="通知"
         >
           <Bell className="size-4" />
           <span className="group-data-[collapsible=icon]:hidden">通知</span>
           {unreadCount > 0 && (
-            <span className="z-10 ml-auto flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1">
-              {unreadCount}
+            <span className="z-10 ml-auto flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-0.5 text-[10px] font-medium text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1">
+              {unreadCount > 99 ? '99+' : unreadCount}
             </span>
           )}
         </SidebarMenuButton>
