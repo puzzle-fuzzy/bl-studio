@@ -8,6 +8,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { resolveApiUrl } from '@/lib/api'
+import { CREATIVE_ASSET_VERSION_FILTERS, isCreativeAssetVersionFilter, matchesCreativeAssetVersionFilter } from '@/lib/creative-asset-filters'
 import { creativeAssetStatusLabel, creativeAssetTypeLabel, creativeAssetVersionStatusLabel } from '@/lib/labels'
 import { userErrorMessage } from '@/lib/user-error'
 import { useCreativeProjectsStore } from '@/stores/creative-projects-store'
@@ -79,6 +80,8 @@ export function CreativeProjectDetailPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const queryText = searchParams.get('q') ?? ''
   const type = isAssetType(searchParams.get('type')) ? (searchParams.get('type') as CreativeAssetType) : undefined
+  const rawVersionStatus = searchParams.get('status')
+  const versionStatus = isCreativeAssetVersionFilter(rawVersionStatus) ? rawVersionStatus : 'all'
   const view: AssetView = isAssetView(searchParams.get('view')) ? (searchParams.get('view') as AssetView) : 'grid'
   const [searchInput, setSearchInput] = useState(queryText)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -118,10 +121,11 @@ export function CreativeProjectDetailPage() {
     const normalizedQuery = queryText.trim().toLocaleLowerCase()
     return assets.filter(asset => {
       if (type !== undefined && asset.type !== type) return false
+      if (!matchesCreativeAssetVersionFilter(asset.latestVersion?.status, versionStatus)) return false
       if (normalizedQuery.length === 0) return true
       return [asset.name, asset.description ?? ''].some(value => value.toLocaleLowerCase().includes(normalizedQuery))
     })
-  }, [assets, queryText, type])
+  }, [assets, queryText, type, versionStatus])
   const selectedAssets = useMemo(() => assets.filter(asset => selectedIds.has(asset.id)), [assets, selectedIds])
   const excludedAssetIds = useMemo(() => new Set(assets.map(asset => asset.id)), [assets])
   const allVisibleSelected = filteredAssets.length > 0 && filteredAssets.every(asset => selectedIds.has(asset.id))
@@ -243,6 +247,7 @@ export function CreativeProjectDetailPage() {
 
           <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-2 text-xs text-muted-foreground">
             <span><strong className="mr-1 text-foreground">{assets.length}</strong>个素材</span>
+            <span><strong className="mr-1 text-foreground">{assets.filter(asset => asset.latestVersion?.status === 'candidate').length}</strong>待确认</span>
             {counts.map(item => <span key={item.type}><strong className="mr-1 text-foreground">{item.count}</strong>{creativeAssetTypeLabel(item.type)}</span>)}
             {detailState?.isLoading && <span className="text-primary">正在同步项目</span>}
           </div>
@@ -265,6 +270,12 @@ export function CreativeProjectDetailPage() {
               <SelectContent>
                 <SelectItem value="all">全部类型</SelectItem>
                 {ASSET_TYPES.map(assetType => <SelectItem key={assetType} value={assetType}>{creativeAssetTypeLabel(assetType)}</SelectItem>)}
+              </SelectContent>
+            </Select>
+            <Select value={versionStatus} onValueChange={value => setParam('status', value)}>
+              <SelectTrigger className="w-32 bg-background/80"><SelectValue placeholder="全部状态" /></SelectTrigger>
+              <SelectContent>
+                {CREATIVE_ASSET_VERSION_FILTERS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </SelectContent>
             </Select>
             <fieldset className="flex rounded-lg border border-border bg-background/70 p-1">
@@ -300,7 +311,7 @@ export function CreativeProjectDetailPage() {
         )}
 
         {filteredAssets.length === 0 ? (
-          <ProjectEmptyState hasAssets={assets.length > 0} onAdd={() => setPickerOpen(true)} onCreate={() => navigate(`/create?projectId=${encodeURIComponent(project.id)}`)} onClear={() => setSearchParams(updateSearchParams(searchParams, { q: undefined, type: undefined }))} disabled={isArchived || isMutating} />
+          <ProjectEmptyState hasAssets={assets.length > 0} onAdd={() => setPickerOpen(true)} onCreate={() => navigate(`/create?projectId=${encodeURIComponent(project.id)}`)} onClear={() => setSearchParams(updateSearchParams(searchParams, { q: undefined, type: undefined, status: undefined }))} disabled={isArchived || isMutating} />
         ) : view === 'grid' ? (
           <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
             {filteredAssets.map(asset => <ProjectAssetTile key={asset.id} asset={asset} selected={selectedIds.has(asset.id)} disabled={isMutating} onToggle={() => toggleAsset(asset.id)} />)}
