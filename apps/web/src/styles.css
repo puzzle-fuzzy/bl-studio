@@ -340,12 +340,8 @@
 
 .login-card {
   border: none;
-  background:
-    linear-gradient(145deg, rgb(24 27 44 / 0.96), rgb(11 14 27 / 0.96)),
-    rgb(11 14 27 / 0.96);
   box-shadow: 0 28px 80px rgb(0 0 0 / 0.46);
   backdrop-filter: blur(18px);
-  color: rgb(245 247 255 / 0.96);
 }
 
 .login-card [data-slot='card-title'] {
@@ -375,28 +371,6 @@
 .login-card [data-slot='input']:focus-visible {
   border-color: rgb(141 169 255 / 0.92);
   box-shadow: 0 0 0 3px rgb(92 122 255 / 0.22), inset 0 1px 0 rgb(255 255 255 / 0.06);
-}
-
-.login-card [data-slot='button'][data-variant='default'] {
-  background: linear-gradient(135deg, rgb(79 92 255), rgb(121 47 211));
-  color: #fff;
-  box-shadow: 0 10px 24px rgb(55 64 211 / 0.28);
-}
-
-.login-card [data-slot='button'][data-variant='default']:hover {
-  background: linear-gradient(135deg, rgb(101 112 255), rgb(144 64 232));
-}
-
-.login-card [data-slot='button'][data-variant='outline'] {
-  border-color: rgb(190 200 232 / 0.22);
-  background: rgb(255 255 255 / 0.065);
-  color: rgb(241 244 255 / 0.94);
-}
-
-.login-card [data-slot='button'][data-variant='outline']:hover {
-  border-color: rgb(156 173 255 / 0.48);
-  background: rgb(107 126 255 / 0.16);
-  color: #fff;
 }
 
 .login-card [data-slot='separator'] {
