@@ -465,30 +465,16 @@ function MediaAssetCollection({
     )
   }
 
-  if (items.length === 0) {
-    return (
-      <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
-        <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-muted/70 text-primary">
-          <Upload className="size-5" />
-        </div>
-        <div>
-          <h3 className="text-sm font-semibold">还没有普通素材</h3>
-          <p className="mt-1 text-sm text-muted-foreground">上传图片或视频，它们会先保存在这里，不会自动变成主体或场景。</p>
-        </div>
-        <Button onClick={onUpload}><Upload className="size-4" />上传素材</Button>
-      </div>
-    )
-  }
-
   return (
     <>
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
-        <span>{items.length} 个素材</span>
+        {items.length > 0 && <span>{items.length} 个素材</span>}
         {isLoading && <span className="text-primary">正在更新</span>}
         {error && <span className="text-destructive">部分加载失败</span>}
       </div>
       {view === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          <MediaAssetUploadTile onUpload={onUpload} />
           {items.map((asset, index) => <MediaAssetTile key={asset.id} asset={asset} onOpen={() => onPreview(index)} />)}
         </div>
       ) : (
@@ -496,7 +482,12 @@ function MediaAssetCollection({
           <div className="hidden grid-cols-[minmax(0,1.8fr)_120px_140px] gap-4 border-b border-border px-4 py-3 text-xs text-muted-foreground sm:grid">
             <span>素材</span><span>类型</span><span>来源</span>
           </div>
-          {items.map((asset, index) => <MediaAssetRow key={asset.id} asset={asset} onOpen={() => onPreview(index)} />)}
+          {items.length === 0 ? (
+            <div className="flex items-center justify-between gap-3 px-4 py-3">
+              <span className="text-sm text-muted-foreground">还没有普通素材</span>
+              <Button size="sm" onClick={onUpload}><Upload className="size-4" />上传素材</Button>
+            </div>
+          ) : items.map((asset, index) => <MediaAssetRow key={asset.id} asset={asset} onOpen={() => onPreview(index)} />)}
         </div>
       )}
       {hasNextPage && (
@@ -507,6 +498,27 @@ function MediaAssetCollection({
         </div>
       )}
     </>
+  )
+}
+
+function MediaAssetUploadTile({ onUpload }: { onUpload: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onUpload}
+      title="上传图片或视频"
+      className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-dashed border-border bg-card/60 text-left transition-[border-color,background-color,box-shadow] duration-200 hover:border-primary/60 hover:bg-primary/5 hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="flex aspect-[4/3] items-center justify-center bg-muted/20">
+        <span className="flex size-11 items-center justify-center rounded-xl border border-border bg-muted/70 text-primary transition-colors group-hover:bg-primary/10">
+          <Upload className="size-5" aria-hidden="true" />
+        </span>
+      </div>
+      <div className="space-y-1.5 p-3">
+        <p className="truncate text-sm font-semibold">上传素材</p>
+        <p className="truncate text-xs text-muted-foreground">图片或视频</p>
+      </div>
+    </button>
   )
 }
 
