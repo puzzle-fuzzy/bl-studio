@@ -1,4 +1,29 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
-  <rect width="32" height="32" rx="8" fill="#d95567"/>
-  <path d="M16 6l2.2 5.6L24 13.8l-5.8 2.2L16 21.6l-2.2-5.6L8 13.8l5.8-2.2z" fill="#fff"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title desc">
+  <title id="title">Bailian Studio</title>
+  <desc id="desc">Bailian Studio 的 BS 叠层标记</desc>
+  <defs>
+    <linearGradient id="surface" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#16121f"/>
+      <stop offset="1" stop-color="#09090b"/>
+    </linearGradient>
+    <linearGradient id="violet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#d8a7ff"/>
+      <stop offset="1" stop-color="#8d50c8"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="64" height="64" rx="14" fill="url(#surface)"/>
+
+  <!-- Logo 中的错位透明面板与斜切构图。 -->
+  <path d="M9 15 54 9l2 36-45 8Z" fill="#b978e6" fill-opacity=".08" stroke="#d8a7ff" stroke-opacity=".34"/>
+  <path d="M15 11 59 16 48 52 7 43Z" fill="none" stroke="#b978e6" stroke-opacity=".22"/>
+  <path d="M20 10v41M27 9v40M34 8v39M41 8v38" stroke="#d8a7ff" stroke-opacity=".12"/>
+
+  <g transform="skewX(-8) rotate(-3 32 32)" font-family="Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif" font-weight="900">
+    <text x="15" y="35" fill="none" stroke="#faf7ff" stroke-width="1.8" paint-order="stroke" font-size="28" letter-spacing="-2">B</text>
+    <text x="25" y="53" fill="none" stroke="url(#violet)" stroke-width="1.8" paint-order="stroke" font-size="25" letter-spacing="-2">S</text>
+    <path d="M13 37 52 32" stroke="#faf7ff" stroke-opacity=".7" stroke-width="1"/>
+  </g>
+
+  <path d="M39 56 56 53" stroke="#faf7ff" stroke-width="2.2" stroke-linecap="square"/>
 </svg>
