@@ -11,6 +11,7 @@ import {
 import {
   isCreativeAssetReferenceRoleCompatible,
   type CreativeAssetStatus,
+  type CreativeAssetType,
   type CreativeAssetVersionStatus,
   type CreativeProjectStatus,
 } from '@bailian-studio/shared'
@@ -34,6 +35,8 @@ import type {
   CreativeProjectDetail,
   ListCreativeAssetsResult,
   ListCreativeProjectsResult,
+  ResolveCreativeGenerationBindingsRepositoryInput,
+  ResolvedCreativeGenerationBinding,
 } from './types'
 
 interface Cursor {
@@ -317,6 +320,128 @@ async function projectDetail(
   }
 }
 
+function mediaKindForUserAsset(kind: string): 'image' | 'video' | 'audio' | undefined {
+  if (kind === 'image' || kind === 'video' || kind === 'audio') return kind
+  return undefined
+}
+
+/**
+ * 解析一次生成上下文中的资产绑定，输出 compiler 的最小输入。
+ *
+ * 这里不持有跨请求的快照，也不替代 generation repository 的最终事务校验：
+ * 版本/引用可能在本次查询后被归档，因此 createGeneration 仍必须在自己的事务
+ * 中 FOR UPDATE 再检查一次。这个方法的职责是消除 API 层对 DB 表结构的依赖，
+ * 并把 owner、project、approved version 和 ready reference 的判断集中在资产域。
+ */
+async function resolveGenerationBindings(
+  db: BailianStudioDb,
+  input: ResolveCreativeGenerationBindingsRepositoryInput,
+): Promise<ResolvedCreativeGenerationBinding[]> {
+  if (input.context.projectId !== undefined) {
+    await ownedProject(db, input.userId, input.context.projectId)
+  }
+  if (input.context.assetBindings.length === 0) return []
+
+  const versionIds = [...new Set(input.context.assetBindings.map(binding => binding.assetVersionId))]
+  const versionRows = await db
+    .select({
+      assetVersionId: creativeAssetVersions.id,
+      assetVersionStatus: creativeAssetVersions.status,
+      assetVersionDeletedAt: creativeAssetVersions.deletedAt,
+      assetType: creativeAssets.type,
+      assetStatus: creativeAssets.status,
+      assetUserId: creativeAssets.userId,
+      assetDeletedAt: creativeAssets.deletedAt,
+    })
+    .from(creativeAssetVersions)
+    .innerJoin(creativeAssets, eq(creativeAssets.id, creativeAssetVersions.assetId))
+    .where(inArray(creativeAssetVersions.id, versionIds))
+
+  const versionsById = new Map(versionRows.map(row => [row.assetVersionId, row] as const))
+  const bindingsWithVersion = input.context.assetBindings.map((binding, index) => {
+    const version = versionsById.get(binding.assetVersionId)
+    if (
+      version === undefined
+      || version.assetUserId !== input.userId
+      || version.assetVersionStatus !== 'approved'
+      || version.assetVersionDeletedAt !== null
+      || version.assetStatus === 'archived'
+      || version.assetDeletedAt !== null
+    ) {
+      throw new CreativeAssetRepositoryError(
+        'CREATIVE_ASSET_VERSION_STATE_INVALID',
+        `The selected creative asset version is unavailable or not approved: ${binding.assetVersionId}`,
+        { field: `assetBindings.${index}.assetVersionId`, assetVersionId: binding.assetVersionId },
+      )
+    }
+    if (version.assetType !== binding.role) {
+      throw new CreativeAssetRepositoryError(
+        'CREATIVE_ASSET_REFERENCE_INVALID',
+        `Asset type '${version.assetType}' does not match binding role '${binding.role}'`,
+        { field: `assetBindings.${index}.role`, assetType: version.assetType, role: binding.role },
+      )
+    }
+    return { binding, version }
+  })
+
+  const referenceIds = [...new Set(input.context.assetBindings.flatMap(binding => binding.referenceIds))]
+  const referenceRows = referenceIds.length === 0
+    ? []
+    : await db
+      .select({
+        id: creativeAssetReferences.id,
+        assetVersionId: creativeAssetReferences.assetVersionId,
+        role: creativeAssetReferences.role,
+        referenceDeletedAt: creativeAssetReferences.deletedAt,
+        userAssetId: userAssets.id,
+        userAssetUserId: userAssets.userId,
+        userAssetKind: userAssets.kind,
+        userAssetStatus: userAssets.status,
+        userAssetDeletedAt: userAssets.deletedAt,
+      })
+      .from(creativeAssetReferences)
+      .innerJoin(userAssets, eq(userAssets.id, creativeAssetReferences.userAssetId))
+      .where(inArray(creativeAssetReferences.id, referenceIds))
+
+  const referencesById = new Map(referenceRows.map(row => [row.id, row] as const))
+  return bindingsWithVersion.map(({ binding, version }, bindingIndex) => {
+    const references = binding.referenceIds.map((referenceId, referenceIndex) => {
+      const reference = referencesById.get(referenceId)
+      const mediaKind = reference === undefined ? undefined : mediaKindForUserAsset(reference.userAssetKind)
+      if (
+        reference === undefined
+        || reference.assetVersionId !== binding.assetVersionId
+        || reference.referenceDeletedAt !== null
+        || reference.userAssetUserId !== input.userId
+        || reference.userAssetStatus !== 'ready'
+        || reference.userAssetDeletedAt !== null
+        || mediaKind === undefined
+      ) {
+        throw new CreativeAssetRepositoryError(
+          'CREATIVE_ASSET_REFERENCE_INVALID',
+          `The selected reference is unavailable: ${referenceId}`,
+          { field: `assetBindings.${bindingIndex}.referenceIds.${referenceIndex}`, referenceId },
+        )
+      }
+      return {
+        id: reference.id,
+        userAssetId: reference.userAssetId,
+        mediaKind,
+        role: reference.role as ResolvedCreativeGenerationBinding['references'][number]['role'],
+      }
+    })
+    return {
+      assetVersionId: binding.assetVersionId,
+      assetVersionStatus: version.assetVersionStatus as ResolvedCreativeGenerationBinding['assetVersionStatus'],
+      assetType: version.assetType as CreativeAssetType,
+      role: binding.role,
+      position: binding.position,
+      referenceIds: [...binding.referenceIds],
+      references,
+    }
+  })
+}
+
 async function attachAssetInTransaction(
   tx: BailianStudioDbTransaction,
   input: { userId: string; projectId: string; assetId: string; sortOrder: number; now: Date },
@@ -544,6 +669,10 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
         ))
         .limit(1)
       return asset === undefined ? undefined : assetDetail(db, input.userId, input.assetId)
+    },
+
+    async resolveGenerationBindings(input) {
+      return resolveGenerationBindings(db, input)
     },
 
     async archiveAsset(input) {

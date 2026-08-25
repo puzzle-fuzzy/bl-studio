@@ -8,6 +8,9 @@ import type {
   CreativeAssetStatus,
   CreativeAssetType,
   CreativeAssetVersionStatus,
+  CreativeGenerationContext,
+  CreativeGenerationBindingRole,
+  CreativeAssetReferenceRole,
   CreativeProjectStatus,
 } from '@bailian-studio/shared'
 
@@ -162,6 +165,34 @@ export interface TransitionCreativeAssetVersionRepositoryInput {
   now?: string
 }
 
+/**
+ * compiler 所需的已批准资产绑定解析结果。
+ *
+ * repository 只返回已通过 owner、状态、软删除和引用归属校验的数据；
+ * provider/编译器不应自行查询数据库，也不应接收整份资产详情。
+ */
+export interface ResolvedCreativeGenerationReference {
+  id: string
+  userAssetId: string
+  mediaKind: 'image' | 'video' | 'audio'
+  role: CreativeAssetReferenceRole
+}
+
+export interface ResolvedCreativeGenerationBinding {
+  assetVersionId: string
+  assetVersionStatus: CreativeAssetVersionStatus
+  assetType: CreativeAssetType
+  role: CreativeGenerationBindingRole
+  position: number
+  referenceIds: readonly string[]
+  references: readonly ResolvedCreativeGenerationReference[]
+}
+
+export interface ResolveCreativeGenerationBindingsRepositoryInput {
+  userId: string
+  context: CreativeGenerationContext
+}
+
 export interface ArchiveCreativeAssetRepositoryInput {
   userId: string
   assetId: string
@@ -192,4 +223,5 @@ export interface CreativeAssetRepository {
   createVersion(input: CreateCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   addReference(input: AddCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   transitionVersion(input: TransitionCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
+  resolveGenerationBindings(input: ResolveCreativeGenerationBindingsRepositoryInput): Promise<ResolvedCreativeGenerationBinding[]>
 }

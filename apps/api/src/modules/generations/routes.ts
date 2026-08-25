@@ -53,7 +53,11 @@ const SSE_RESPONSE_HEADERS = {
 
 export function createGenerationRoutes(deps: ApiDependencies) {
   const repository = deps.generationRepository
-  const createGeneration = createGenerationUseCase({ repository, limits: deps.generationLimits })
+  const createGeneration = createGenerationUseCase({
+    repository,
+    limits: deps.generationLimits,
+    creativeAssetRepository: deps.creativeAssetRepository,
+  })
   const lifecycle = createGenerationLifecycleUseCases(repository, deps.generationLimits)
   const shareUseCase = createShareUseCase({ repository })
   const resolveArtifactReadUrl = resolveArtifactReadUrlUseCase({ storage: deps.storage })
@@ -61,10 +65,11 @@ export function createGenerationRoutes(deps: ApiDependencies) {
   .post('/estimate', async ({ request, body }) => {
     const user = await requireAuthUser(request, deps.authService)
     const input = validateInput(CreateGenerationSchema, body)
+    const prepared = await createGeneration.prepare({ ...input, userId: user.id })
     const estimate = estimateGenerationRequest({
-      modelId: input.modelId,
-      params: input.params,
-      ...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
+      modelId: prepared.modelId,
+      params: prepared.params,
+      ...(prepared.assetRefs !== undefined ? { assetRefs: prepared.assetRefs } : {}),
     })
     const usage = await getDailyGenerationUsage(repository, user.id)
     const balance = await deps.creditLedger.getBalance({ userId: user.id })

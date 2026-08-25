@@ -6,6 +6,7 @@ import {
   type IsolatedGenerationRepository,
 } from '@bailian-studio/generation-repository'
 import { createCreditLedger, type CreditLedger } from '@bailian-studio/credit-ledger'
+import { createCreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
 import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from '@bailian-studio/storage'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
@@ -123,6 +124,7 @@ describe('generation routes', () => {
       authService: fakeAuthService,
       creditLedger: fakeCreditLedger,
       generationRepository: iso.repository,
+      creativeAssetRepository: createCreativeAssetRepository({ db: iso.db }),
       storage: new FakeStorageAdapter(),
     })
     app = context.app
@@ -232,6 +234,74 @@ describe('generation routes', () => {
     expect(response.status).toBe(400)
     expect(body.error.code).toBe('INVALID_GENERATION_PARAMS')
     expect(body.error.details?.issues?.[0]?.message).toBe('The selected asset is unavailable')
+  })
+
+  it('compiles a creative asset context consistently for estimate and submit', async () => {
+    currentUserId = 'user_creative_submit'
+    await ensureCurrentUserSeeded()
+    const creativeRepository = createCreativeAssetRepository({ db: iso.db })
+    const project = await creativeRepository.createProject({ userId: currentUserId, title: '短剧素材项目' })
+    const asset = await creativeRepository.createAsset({
+      userId: currentUserId,
+      projectId: project.id,
+      type: 'character',
+      name: '林默',
+    })
+    const versioned = await creativeRepository.createVersion({
+      userId: currentUserId,
+      assetId: asset.id,
+      semanticSpec: { identity: { name: '林默' } },
+      generationRecipe: {},
+    })
+    const versionId = versioned.versions[0]?.id
+    if (versionId === undefined) throw new Error('expected creative asset version')
+    await iso.repository.createUserAsset({
+      id: 'creative-submit-reference',
+      userId: currentUserId,
+      kind: 'image',
+      source: 'upload',
+      storageProvider: 'oss',
+      storageKey: 'creative/user_creative_submit/linmo.png',
+    })
+    const withReference = await creativeRepository.addReference({
+      userId: currentUserId,
+      assetVersionId: versionId,
+      userAssetId: 'creative-submit-reference',
+      role: 'front',
+      position: 0,
+      metadata: {},
+    })
+    const referenceId = withReference.versions[0]?.references[0]?.id
+    if (referenceId === undefined) throw new Error('expected creative reference')
+    await creativeRepository.transitionVersion({ userId: currentUserId, assetVersionId: versionId, status: 'generating' })
+    await creativeRepository.transitionVersion({ userId: currentUserId, assetVersionId: versionId, status: 'candidate' })
+    await creativeRepository.transitionVersion({ userId: currentUserId, assetVersionId: versionId, status: 'approved' })
+
+    const creativeContext = {
+      protocolVersion: 1,
+      purpose: 'shot_image',
+      projectId: project.id,
+      prompt: '让 @图1 站在雨中',
+      assetBindings: [{ assetVersionId: versionId, role: 'character', position: 0, referenceIds: [referenceId] }],
+      recipe: { source: 'generation-route-test' },
+      capabilitySnapshot: {},
+    }
+    const body = { modelId: 'qwen-image-edit', params: { prompt: creativeContext.prompt }, creativeContext }
+    const estimateResponse = await app.handle(authed('http://localhost/api/generations/estimate', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify(body),
+    }))
+    expect(estimateResponse.status).toBe(200)
+
+    const submitResponse = await postGeneration(body)
+    const submitted = await submitResponse.json() as {
+      success: true
+      data: { record: { inputParams: Record<string, unknown>; assetRefs: Record<string, string[]> } }
+    }
+    expect(submitResponse.status).toBe(200)
+    expect(submitted.data.record.inputParams).toMatchObject({ prompt: '让 <<<image_1>>> 站在雨中' })
+    expect(submitted.data.record.assetRefs).toEqual({ image: ['creative-submit-reference'] })
   })
 
   it('rejects a generation before provider submission when the estimate is unaffordable', async () => {

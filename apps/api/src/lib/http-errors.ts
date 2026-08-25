@@ -6,6 +6,7 @@
  */
 
 import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
+import { CreativeAssetCompilerError, type CreativeAssetCompilerErrorCode } from '@bailian-studio/creative-asset-compiler'
 import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bailian-studio/director-repository'
 import { CreativeAssetRepositoryError, type CreativeAssetRepositoryErrorCode } from '@bailian-studio/creative-asset-repository'
 import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
@@ -47,6 +48,20 @@ const REPOSITORY_STATUS: Record<GenerationRepositoryErrorCode, number> = {
   POINTS_ACCOUNT_NOT_FOUND: 404,
   POINTS_IDEMPOTENCY_CONFLICT: 409,
   POINTS_SETTLEMENT_ANOMALY: 500,
+}
+
+const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, number> = {
+  CREATIVE_COMPILER_MODEL_UNAVAILABLE: 409,
+  CREATIVE_COMPILER_PROMPT_UNSUPPORTED: 400,
+  CREATIVE_COMPILER_PROMPT_REFERENCE_INVALID: 400,
+  CREATIVE_COMPILER_PARAMETER_CONFLICT: 400,
+  CREATIVE_COMPILER_ASSET_VERSION_NOT_APPROVED: 409,
+  CREATIVE_COMPILER_BINDING_INVALID: 400,
+  CREATIVE_COMPILER_REFERENCE_SELECTION_INVALID: 400,
+  CREATIVE_COMPILER_REFERENCE_KIND_INVALID: 400,
+  CREATIVE_COMPILER_MEDIA_PARAMETER_NOT_FOUND: 400,
+  CREATIVE_COMPILER_MEDIA_PARAMETER_AMBIGUOUS: 400,
+  CREATIVE_COMPILER_MODEL_VALIDATION_FAILED: 400,
 }
 
 const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> = {
@@ -130,6 +145,9 @@ export function httpStatusForError(error: unknown): number {
   if (error instanceof GenerationRepositoryError) {
     return REPOSITORY_STATUS[error.code]
   }
+  if (error instanceof CreativeAssetCompilerError) {
+    return CREATIVE_ASSET_COMPILER_STATUS[error.code]
+  }
   if (error instanceof DirectorRepositoryError) {
     return DIRECTOR_REPOSITORY_STATUS[error.code]
   }
@@ -199,6 +217,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof GenerationRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
+  if (error instanceof CreativeAssetCompilerError) {
     return {
       success: false,
       error: {

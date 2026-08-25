@@ -98,6 +98,39 @@ describe('creative asset repository', () => {
     expect(approved.approvedVersionId).toBe(versionId)
     expect(approved.versions[0]?.status).toBe('approved')
 
+    const referenceId = approved.versions[0]?.references[0]?.id
+    if (referenceId === undefined) throw new Error('expected approved reference')
+    await expect(repository.resolveGenerationBindings({
+      userId: ownerId,
+      context: {
+        protocolVersion: 1,
+        purpose: 'shot_image',
+        projectId: project.id,
+        prompt: '参考 @图1',
+        assetBindings: [{
+          assetVersionId: versionId,
+          role: 'character',
+          position: 0,
+          referenceIds: [referenceId],
+        }],
+        recipe: {},
+        capabilitySnapshot: {},
+      },
+    })).resolves.toEqual([{
+      assetVersionId: versionId,
+      assetVersionStatus: 'approved',
+      assetType: 'character',
+      role: 'character',
+      position: 0,
+      referenceIds: [referenceId],
+      references: [{
+        id: referenceId,
+        userAssetId: 'character-front',
+        mediaKind: 'image',
+        role: 'front',
+      }],
+    }])
+
     await expect(repository.addReference({
       userId: ownerId,
       assetVersionId: versionId,

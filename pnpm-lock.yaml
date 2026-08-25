@@ -214,6 +214,9 @@ importers:
       '@bailian-studio/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@bailian-studio/creative-asset-compiler':
+        specifier: workspace:*
+        version: link:../../packages/creative-asset-compiler
       '@bailian-studio/creative-asset-repository':
         specifier: workspace:*
         version: link:../../packages/creative-asset-repository

@@ -1,3 +1,5 @@
+import { compileCreativeGeneration } from '@bailian-studio/creative-asset-compiler'
+import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
 import {
   estimateGenerationRequest,
   GenerationRepositoryError,
@@ -10,6 +12,7 @@ import {
   type RequestGenerationCancelInput,
   type RetryGenerationInput,
 } from '@bailian-studio/generation-repository'
+import { getModelById } from '@bailian-studio/model-core'
 import type { GenerationLimits } from '../../lib/limits'
 
 export interface CreateGenerationUseCaseResult {
@@ -21,11 +24,72 @@ export interface CreateGenerationUseCaseResult {
 export interface CreateGenerationUseCaseDependencies {
   repository: GenerationRepository
   limits: GenerationLimits
+  creativeAssetRepository: Pick<CreativeAssetRepository, 'resolveGenerationBindings'>
 }
 
 export interface GenerationLifecycleUseCases {
   cancel(input: RequestGenerationCancelInput): Promise<GenerationRecord>
   retry(input: RetryGenerationInput): Promise<CreateGenerationResult>
+}
+
+export interface CreateGenerationUseCase {
+  prepare(input: CreateGenerationInput): Promise<CreateGenerationInput>
+  execute(input: CreateGenerationInput): Promise<CreateGenerationUseCaseResult>
+}
+
+function optionalText(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined
+  const normalized = value.trim()
+  return normalized.length === 0 ? undefined : normalized
+}
+
+/**
+ * 把创意资产上下文编译成 generation repository 的稳定输入。
+ *
+ * creativeContext 是新协议的入口；没有它时保留原有 modelId + params + assetRefs
+ * 请求，以便旧客户端继续工作。编译结果中的 context、assetRefs 和 params 一起
+ * 进入 repository，后者会在同一事务里再次锁定并写入不可变快照。
+ */
+async function prepareCreativeGenerationInput(
+  input: CreateGenerationInput,
+  deps: CreateGenerationUseCaseDependencies,
+): Promise<CreateGenerationInput> {
+  const context = input.creativeContext
+  if (context === undefined) return input
+
+  const manifest = getModelById(input.modelId)
+  if (manifest === undefined) {
+    throw new GenerationRepositoryError('MODEL_NOT_FOUND', `Model not found: ${input.modelId}`)
+  }
+
+  const resolvedBindings = await deps.creativeAssetRepository.resolveGenerationBindings({
+    userId: input.userId,
+    context,
+  })
+  const parameterValues = Object.fromEntries(
+    Object.entries(input.params).filter(([name]) => name !== 'prompt' && name !== 'negativePrompt'),
+  )
+  const prompt = context.prompt.length > 0 ? context.prompt : (optionalText(input.params.prompt) ?? '')
+  const negativePrompt = context.negativePrompt ?? optionalText(input.params.negativePrompt)
+  const compiled = compileCreativeGeneration({
+    manifest,
+    purpose: context.purpose,
+    prompt,
+    ...(negativePrompt === undefined ? {} : { negativePrompt }),
+    ...(context.projectId === undefined ? {} : { projectId: context.projectId }),
+    parameterValues,
+    bindings: resolvedBindings,
+    recipe: context.recipe,
+    capabilitySnapshot: context.capabilitySnapshot,
+  })
+
+  return {
+    ...input,
+    modelId: compiled.modelId,
+    params: compiled.params,
+    assetRefs: compiled.assetRefs,
+    creativeContext: compiled.creativeContext,
+  }
 }
 
 /**
@@ -35,17 +99,21 @@ export interface GenerationLifecycleUseCases {
  * 先估算，再读取当日用量，执行限额校验，最后通过 repository 事务创建记录与
  * 持久化的提交任务。
  */
-export function createGenerationUseCase(deps: CreateGenerationUseCaseDependencies) {
+export function createGenerationUseCase(deps: CreateGenerationUseCaseDependencies): CreateGenerationUseCase {
   return {
+    prepare(input) {
+      return prepareCreativeGenerationInput(input, deps)
+    },
     async execute(input: CreateGenerationInput): Promise<CreateGenerationUseCaseResult> {
+      const prepared = await prepareCreativeGenerationInput(input, deps)
       const estimate = estimateGenerationRequest({
-        modelId: input.modelId,
-        params: input.params,
-        ...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
+        modelId: prepared.modelId,
+        params: prepared.params,
+        ...(prepared.assetRefs !== undefined ? { assetRefs: prepared.assetRefs } : {}),
       })
-      const usage = await getDailyGenerationUsage(deps.repository, input.userId)
+      const usage = await getDailyGenerationUsage(deps.repository, prepared.userId)
       enforceDailyGenerationLimits(estimate, usage, deps.limits)
-      const result = await deps.repository.createGeneration({ ...input, quota: deps.limits })
+      const result = await deps.repository.createGeneration({ ...prepared, quota: deps.limits })
       return { result, estimate, usage }
     },
   }
