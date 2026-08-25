@@ -252,7 +252,7 @@ export function CreatePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
 
-  // 切换模型：重建默认值、清空预估与错误
+  // 模型就绪或切换时：重建默认值、清空预估与错误
   useEffect(() => {
     setFieldErrors(new Map())
     setEstimate(null)
@@ -273,8 +273,7 @@ export function CreatePage() {
       }
       setValues(defaults)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [modelId])
+  }, [creationType, model, modelId])
 
   // `?params=<base64url JSON>` 深链：画廊/提示词库复用 —— 按 manifest 校验后把
   // 纯文本参数预载进表单（媒体值已在编码侧剔除，这里再兜底过滤）。
@@ -1031,12 +1030,23 @@ function CharacterReferenceSlot({ asset }: { asset: AssetItem | undefined }) {
 function characterSettingsSummary(fields: readonly FormField[], values: Readonly<Record<string, unknown>>) {
   const sizeField = fields.find(field => field.parameter.name === 'size')
   const countField = fields.find(field => field.parameter.name === 'n')
-  const sizeOption = sizeField?.parameter.options?.find(option => JSON.stringify(option.value) === JSON.stringify(values.size))
+  const sizeValue = sizeField === undefined ? undefined : characterParameterValue(sizeField, values)
+  const sizeOption = sizeField?.parameter.options?.find(option => JSON.stringify(option.value) === JSON.stringify(sizeValue))
   const size = sizeOption === undefined ? undefined : characterSizeChoice(sizeOption)
-  const summary = [size?.ratio, size?.resolution, countField === undefined ? undefined : values[countField.parameter.name]]
+  const countValue = countField === undefined ? undefined : characterParameterValue(countField, values)
+  const summary = [size?.ratio, size?.resolution, countValue]
     .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
     .map(String)
-  return summary.slice(0, 3).join(' · ') || '输出参数'
+  return summary.slice(0, 3).join(' · ') || '设置'
+}
+
+function characterParameterValue(field: FormField, values: Readonly<Record<string, unknown>>) {
+  const current = values[field.parameter.name]
+  if (current !== undefined) return current
+  if (field.parameter.defaultValue !== undefined) return field.parameter.defaultValue
+  if (field.parameter.options?.[0] !== undefined) return field.parameter.options[0].value
+  if (field.parameter.type === 'number') return field.parameter.min ?? 1
+  return undefined
 }
 
 function CharacterGenerationModePopover({
@@ -1152,8 +1162,8 @@ function CharacterSettingsPopover({
         <span className="mt-1 block text-sm font-medium text-foreground">比例、分辨率和生成数量</span>
       </DropdownMenuLabel>
       <DropdownMenuSeparator />
-      {sizeField !== undefined && <CharacterSizeControl field={sizeField} value={values[sizeField.parameter.name]} onChange={value => onValueChange(sizeField.parameter.name, value)} />}
-      {countField !== undefined && <CharacterCountControl field={countField} value={values[countField.parameter.name]} onChange={value => onValueChange(countField.parameter.name, value)} />}
+      {sizeField !== undefined && <CharacterSizeControl field={sizeField} value={characterParameterValue(sizeField, values)} onChange={value => onValueChange(sizeField.parameter.name, value)} />}
+      {countField !== undefined && <CharacterCountControl field={countField} value={characterParameterValue(countField, values)} onChange={value => onValueChange(countField.parameter.name, value)} />}
       {remainingFields.length > 0 && (
         <section className="mt-4 space-y-3">
           <Separator />
