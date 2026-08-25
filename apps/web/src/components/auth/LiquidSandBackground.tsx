@@ -72,8 +72,14 @@ const fragmentSource = `#version 300 es
 
     float time = u_time;
 
+    // 主平流明确从左向右输送；局部摆动叠加在输送之上，避免“果冻式原地变形”。
+    vec2 rightwardDrift = vec2(
+      time * 0.20,
+      sin(time * 0.42) * 0.035 + cos(time * 0.23) * 0.018
+    );
+    vec2 q = p - rightwardDrift;
+
     // 两层域扭曲制造液体卷动，避免只是平移一张噪声贴图。
-    vec2 q = p;
     vec2 warpA = vec2(
       fbm(q * 1.36 + vec2(-time * 0.11, 3.10)),
       fbm(q * 1.48 + vec2(8.20, time * 0.085))
@@ -168,7 +174,7 @@ const fragmentSource = `#version 300 es
     color += dye * mixingMist * overlap * 0.10;
 
     // 细长流痕像鱼群掠过水体，保持低对比，避免重新变成两条硬色带。
-    float schoolRidge = ridges(q * vec2(4.0, 15.0) + vec2(-time * 0.30, time * 0.18));
+    float schoolRidge = ridges(q * vec2(4.0, 15.0) + vec2(-time * 0.52, time * 0.18));
     float schoolGlint = smoothstep(0.58, 0.90, schoolRidge) * (0.55 + paintC * 0.45);
     color += dye * schoolGlint * (0.035 + dyeMask * 0.06);
 
