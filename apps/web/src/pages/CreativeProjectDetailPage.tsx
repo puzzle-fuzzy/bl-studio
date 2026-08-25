@@ -13,6 +13,7 @@ import { creativeAssetStatusLabel, creativeAssetTypeLabel, creativeAssetVersionS
 import { userErrorMessage } from '@/lib/user-error'
 import { useCreativeProjectsStore } from '@/stores/creative-projects-store'
 import { toast } from 'sonner'
+import { notifyError } from '@/lib/toast'
 
 const ASSET_TYPES: readonly CreativeAssetType[] = ['character', 'environment', 'prop']
 type AssetView = 'grid' | 'list'
@@ -116,6 +117,10 @@ export function CreativeProjectDetailPage() {
     setSelectedIds(new Set())
   }, [projectId])
 
+  useEffect(() => {
+    if (detailState?.error !== undefined && detailState.error !== null) notifyError(detailState.error)
+  }, [detailState?.error])
+
   const assets = project?.assets ?? []
   const filteredAssets = useMemo(() => {
     const normalizedQuery = queryText.trim().toLocaleLowerCase()
@@ -200,7 +205,7 @@ export function CreativeProjectDetailPage() {
   }
 
   if (detailState?.error && project === null) {
-    return <ProjectErrorState title="项目暂时无法打开" description={detailState.error} onBack={() => navigate('/projects')} />
+    return <ProjectErrorState title="暂时无法读取项目详情" description="错误详情已通过右上角通知显示。" onBack={() => navigate('/projects')} />
   }
 
   if (project === null || project === undefined) {

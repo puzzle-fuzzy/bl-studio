@@ -15,6 +15,7 @@ import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 import { modelNameZh } from '@/lib/model-modes'
 import { encodeDeepLinkParams } from '@/lib/deeplink-params'
 
@@ -32,13 +33,11 @@ export function PromptsPage() {
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [q, setQ] = useState('')
 
   const [createOpen, setCreateOpen] = useState(false)
   const [createForm, setCreateForm] = useState({ name: '', modelId: '', prompt: '' })
   const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
 
   /** 请求序号：首载/翻页共用，防止搜索词切换时旧响应覆盖新数据。 */
   const requestSeq = useRef(0)
@@ -52,7 +51,6 @@ export function PromptsPage() {
   const loadFirst = useCallback(async () => {
     const seq = ++requestSeq.current
     setLoading(true)
-    setError(null)
     setItems([])
     setNextCursor(undefined)
     try {
@@ -61,7 +59,7 @@ export function PromptsPage() {
       setItems(page.items)
       setNextCursor(page.nextCursor)
     } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
+      if (seq === requestSeq.current) notifyError(err)
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
@@ -81,7 +79,7 @@ export function PromptsPage() {
       setItems(current => [...current, ...page.items])
       setNextCursor(page.nextCursor)
     } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
+      if (seq === requestSeq.current) notifyError(err)
     } finally {
       if (seq === requestSeq.current) setLoadingMore(false)
     }
@@ -94,11 +92,10 @@ export function PromptsPage() {
 
   const handleCreate = async () => {
     if (createForm.name.trim().length === 0 || createForm.prompt.trim().length === 0 || createForm.modelId.length === 0) {
-      setCreateError('请填写名称、模型与提示词')
+      notifyError('请填写名称、模型与提示词')
       return
     }
     setCreating(true)
-    setCreateError(null)
     try {
       await apiClient.createPromptLibraryItem({
         name: createForm.name.trim(),
@@ -111,7 +108,7 @@ export function PromptsPage() {
       void loadFirst()
       showMessage({ title: '已保存到提示词库', tone: 'success' })
     } catch (err) {
-      setCreateError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setCreating(false)
     }
@@ -154,8 +151,6 @@ export function PromptsPage() {
         </div>
         <Button type="submit" variant="outline">搜索</Button>
       </form>
-
-      {error !== null && <p className="text-sm text-destructive">{error}</p>}
 
       {loading ? (
         <div className="space-y-2">
@@ -230,7 +225,6 @@ export function PromptsPage() {
               <Label htmlFor="prompt-text">提示词</Label>
               <Textarea id="prompt-text" rows={4} value={createForm.prompt} onChange={event => setCreateForm({ ...createForm, prompt: event.target.value })} />
             </div>
-            {createError !== null && <p className="text-sm text-destructive">{createError}</p>}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setCreateOpen(false)}>取消</Button>

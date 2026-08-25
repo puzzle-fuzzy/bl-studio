@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CreativeProject, CreativeProjectDetail } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 import { registerPrivateDataReset } from './auth-store'
 
 export interface CreativeProjectQuery {
@@ -102,7 +103,7 @@ export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get)
             [key]: {
               ...(get().queries[key] ?? initialState()),
               isLoading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: userErrorMessage(error),
             },
           },
         }))
@@ -153,7 +154,7 @@ export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get)
           [key]: {
             ...(current.queries[key] ?? state),
             isLoadingMore: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: userErrorMessage(error),
           },
         },
       }))
@@ -187,7 +188,7 @@ export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get)
             [projectId]: {
               ...(get().details[projectId] ?? initialDetailState()),
               isLoading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: userErrorMessage(error),
             },
           },
         }))

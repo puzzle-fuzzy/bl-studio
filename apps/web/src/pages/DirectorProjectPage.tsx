@@ -21,6 +21,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { apiClient } from '@/lib/api'
+import { notifyError } from '@/lib/toast'
 import { modelNameZh } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
@@ -110,7 +111,6 @@ export function DirectorProjectPage() {
   const { id } = useParams<{ id: string }>()
   const [project, setProject] = useState<DirectorProjectDetail>()
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string>()
   const [title, setTitle] = useState('')
   const [storyText, setStoryText] = useState('')
   const [synopsis, setSynopsis] = useState('')
@@ -133,13 +133,11 @@ export function DirectorProjectPage() {
   const [analysisStale, setAnalysisStale] = useState(false)
   const [scriptMessages, setScriptMessages] = useState<DirectorScriptMessage[]>([])
   const [pendingScriptMessage, setPendingScriptMessage] = useState<ScriptMessageView>()
-  const [scriptMessagesError, setScriptMessagesError] = useState<string>()
   const [scriptMessage, setScriptMessage] = useState('')
   const [scriptVersions, setScriptVersions] = useState<DirectorScriptVersionSummary[]>([])
   const [selectedScriptVersion, setSelectedScriptVersion] = useState<DirectorScriptVersion>()
   const [scriptVersionsLoading, setScriptVersionsLoading] = useState(false)
   const [scriptVersionLoading, setScriptVersionLoading] = useState(false)
-  const [scriptVersionsError, setScriptVersionsError] = useState<string>()
   const scriptMessagesRequestRef = useRef(0)
   const scriptVersionsRequestRef = useRef(0)
   const scriptVersionRequestRef = useRef(0)
@@ -211,7 +209,6 @@ export function DirectorProjectPage() {
           return
         }
         setScriptMessages(messages)
-        setScriptMessagesError(undefined)
         setPendingScriptMessage(current => {
           if (current === undefined || current.runId === null) return current
           return messages.some(message => message.runId === current.runId && message.role === 'user') ? undefined : current
@@ -220,7 +217,7 @@ export function DirectorProjectPage() {
       })
       .catch(error => {
         if (requestSequence !== scriptMessagesRequestRef.current) return
-        setScriptMessagesError('对话记录暂时无法加载，现有内容仍会保留。')
+        notifyError(error)
         logDirectorClientEvent('script_messages.load.failed', {
           projectId,
           reason,
@@ -242,12 +239,11 @@ export function DirectorProjectPage() {
           return
         }
         setScriptVersions(versions)
-        setScriptVersionsError(undefined)
         logDirectorClientEvent('script_versions.load.succeeded', { projectId, reason, requestSequence, versionCount: versions.length })
       })
       .catch(error => {
         if (requestSequence !== scriptVersionsRequestRef.current) return
-        setScriptVersionsError('历史版本暂时无法加载，请稍后重试。')
+        notifyError(error)
         logDirectorClientEvent('script_versions.load.failed', {
           projectId,
           reason,
@@ -279,11 +275,10 @@ export function DirectorProjectPage() {
         return
       }
       setSelectedScriptVersion(version)
-      setScriptVersionsError(undefined)
       logDirectorClientEvent('script_version.load.succeeded', { projectId, versionId, requestSequence, version: version.version })
     } catch (error) {
       if (requestSequence !== scriptVersionRequestRef.current) return
-      setScriptVersionsError('该历史版本暂时无法加载，请稍后重试。')
+      notifyError(error)
       logDirectorClientEvent('script_version.load.failed', {
         projectId,
         versionId,
@@ -367,7 +362,6 @@ export function DirectorProjectPage() {
         scriptVersionCacheRef.current = new Map([[next.scriptVersion.id, next.scriptVersion]])
         setSelectedScriptVersion(next.scriptVersion)
         setScriptVersions([])
-        setScriptVersionsError(undefined)
         scriptVersionRequestRef.current += 1
         setTitle(next.title)
         setStoryText(next.storyText)
@@ -379,7 +373,6 @@ export function DirectorProjectPage() {
         setAnalysisStale(false)
         setScriptMessages([])
         setPendingScriptMessage(undefined)
-        setScriptMessagesError(undefined)
         scriptMessagesRequestRef.current += 1
         setScriptMessage('')
         setCharactersText(undefined)
@@ -509,7 +502,9 @@ export function DirectorProjectPage() {
         }
       })
       .catch(() => {
-        if (!cancelled) setError('项目不存在，或你没有访问权限。')
+        if (!cancelled) {
+          notifyError(new Error('项目不存在，或你没有访问权限。'))
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -1169,7 +1164,7 @@ export function DirectorProjectPage() {
           <ArrowLeft data-icon="inline-start" /> 返回导演台
         </Button>
         <div className="flex flex-col gap-2">
-          <h1 className="text-2xl font-semibold">{error ?? '项目加载失败'}</h1>
+          <h1 className="text-2xl font-semibold">暂时无法读取导演台项目</h1>
           <p className="text-sm text-muted-foreground">请返回项目列表后重新进入。</p>
         </div>
       </main>
@@ -1243,8 +1238,6 @@ export function DirectorProjectPage() {
           <ScreenplayChatWorkspace
             messages={scriptMessages}
             pendingMessage={pendingScriptMessage}
-            historyError={scriptMessagesError}
-            onRetryHistory={() => { if (id !== undefined) void reloadScriptMessages(id, 'manual-retry') }}
             screenplay={displayedScriptVersion.storyText}
             scriptVersion={displayedScriptVersion.version}
             scriptVersionId={displayedScriptVersion.id}
@@ -1252,7 +1245,6 @@ export function DirectorProjectPage() {
             scriptVersions={scriptVersions}
             scriptVersionsLoading={scriptVersionsLoading}
             scriptVersionLoading={scriptVersionLoading}
-            scriptVersionsError={scriptVersionsError}
             onSelectScriptVersion={versionId => { if (id !== undefined) void selectScriptVersion(id, versionId) }}
             analysis={analysisResult}
             analysisStale={analysisStale}
@@ -2582,8 +2574,6 @@ function dialogueLinesFor(dialogue: DirectorShot['dialogue']): Array<{ speaker: 
 function ScreenplayChatWorkspace({
   messages,
   pendingMessage,
-  historyError,
-  onRetryHistory,
   screenplay,
   scriptVersion,
   scriptVersionId,
@@ -2591,7 +2581,6 @@ function ScreenplayChatWorkspace({
   scriptVersions,
   scriptVersionsLoading,
   scriptVersionLoading,
-  scriptVersionsError,
   onSelectScriptVersion,
   analysis,
   analysisStale,
@@ -2605,8 +2594,6 @@ function ScreenplayChatWorkspace({
 }: {
   messages: DirectorScriptMessage[]
   pendingMessage?: ScriptMessageView
-  historyError?: string
-  onRetryHistory: () => void
   screenplay: string
   scriptVersion: number
   scriptVersionId: string
@@ -2614,7 +2601,6 @@ function ScreenplayChatWorkspace({
   scriptVersions: DirectorScriptVersionSummary[]
   scriptVersionsLoading: boolean
   scriptVersionLoading: boolean
-  scriptVersionsError?: string
   onSelectScriptVersion: (versionId: string) => void
   analysis?: DirectorAnalysisResult
   analysisStale: boolean
@@ -2658,8 +2644,7 @@ function ScreenplayChatWorkspace({
                     <DropdownMenuLabel>剧本历史版本</DropdownMenuLabel>
                     <DropdownMenuSeparator />
                     {scriptVersionsLoading && <DropdownMenuItem disabled>加载历史版本…</DropdownMenuItem>}
-                    {scriptVersionsError !== undefined && <DropdownMenuItem disabled>{scriptVersionsError}</DropdownMenuItem>}
-                    {!scriptVersionsLoading && scriptVersionsError === undefined && scriptVersions.length === 0 && (
+                    {!scriptVersionsLoading && scriptVersions.length === 0 && (
                       <DropdownMenuItem disabled>暂无历史版本</DropdownMenuItem>
                     )}
                     {scriptVersions.map(version => (
@@ -2726,12 +2711,6 @@ function ScreenplayChatWorkspace({
 
         <ScrollArea className="min-h-0 flex-1 bg-muted/20 px-4 sm:px-5">
           <div className="flex flex-col gap-4 py-5">
-            {historyError !== undefined && (
-              <div className="flex items-center justify-between gap-3 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                <span>{historyError}</span>
-                <Button type="button" variant="ghost" size="sm" onClick={onRetryHistory}>重试</Button>
-              </div>
-            )}
             {visibleMessages.length === 0 && (
               <div className="flex flex-col gap-3 py-6">
                 <p className="text-sm font-medium">可以这样开始：</p>

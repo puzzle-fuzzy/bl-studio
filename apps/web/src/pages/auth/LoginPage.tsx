@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useSearchParams } from 'react-router'
 import { resolvePostLoginRedirect } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
@@ -9,7 +9,8 @@ import { Separator } from '@/components/ui/separator'
 import { LoginWordmark } from '@/components/auth/LoginWordmark'
 // import { LiquidSandBackground } from '@/components/auth/LiquidSandBackground'
 import { useAuthStore } from '@/stores/auth-store'
-import { canResendVerification, userErrorMessage } from '@/lib/user-error'
+import { canResendVerification } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** GitHub Octocat 图标（lucide 已移除品牌图标，内联 SVG）。 */
 function GithubMark(props: React.SVGProps<SVGSVGElement>) {
@@ -40,7 +41,6 @@ export function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [verificationResendAvailable, setVerificationResendAvailable] = useState(false)
   const [isResending, setIsResending] = useState(false)
 
@@ -48,9 +48,12 @@ export function LoginPage() {
   const oauthErrorCode = searchParams.get('oauth_error')
   const oauthError = oauthErrorCode !== null ? (OAUTH_ERROR_MESSAGES[oauthErrorCode] ?? 'GitHub 登录失败，请重试。') : null
 
+  useEffect(() => {
+    if (oauthError !== null) notifyError(oauthError)
+  }, [oauthError])
+
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    setError(null)
     setVerificationResendAvailable(false)
     try {
       if (mode === 'login') {
@@ -63,7 +66,7 @@ export function LoginPage() {
       // P1-11：cb 回跳过白名单校验（防开放重定向），非法值 fail-closed 回退 /create。
       navigate(resolvePostLoginRedirect(callback, '/create', [window.location.origin]))
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
       setVerificationResendAvailable(mode === 'login' || canResendVerification(err))
     }
   }
@@ -71,18 +74,17 @@ export function LoginPage() {
   const handleResend = async () => {
     if (email.trim() === '') return
     setIsResending(true)
-    setError(null)
     try {
       await resendVerification(email)
       navigate('/auth/check-email')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setIsResending(false)
     }
   }
 
-  const showResend = error !== null && email.trim() !== '' && verificationResendAvailable
+  const showResend = email.trim() !== '' && verificationResendAvailable
 
   return (
     <div className="login-page">
@@ -153,9 +155,6 @@ export function LoginPage() {
                   />
                 </div>
                 <div className="login-card__action-zone space-y-5">
-                  {(error !== null || oauthError !== null) && (
-                    <p role="alert" className="text-sm text-destructive">{error ?? oauthError}</p>
-                  )}
                   {showResend && (
                     <Button type="button" variant="outline" className="h-10 w-full" disabled={isResending} onClick={() => void handleResend()}>
                       {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}

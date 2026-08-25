@@ -15,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { useGenerationArtifactsStore } from '@/stores/generation-artifacts-store'
 import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
 import { apiClient } from '@/lib/api'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 const TYPE_OPTIONS: Array<{ value: CreativeAssetType; label: string }> = [
   { value: 'character', label: '主体' },
@@ -73,7 +73,6 @@ export function CollectGenerationAssetDialog({
   const [artifactId, setArtifactId] = useState('')
   const [role, setRole] = useState<CreativeAssetReferenceRole>('front')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const projects: CreativeProject[] = projectsQuery?.items ?? []
   const imageArtifacts = useMemo(
@@ -103,7 +102,6 @@ export function CollectGenerationAssetDialog({
     setDescription('')
     setArtifactId('')
     setRole('front')
-    setError(null)
     setIsSubmitting(false)
   }
 
@@ -116,15 +114,14 @@ export function CollectGenerationAssetDialog({
     event.preventDefault()
     const normalizedName = name.trim()
     if (normalizedName.length === 0) {
-      setError('请输入素材名称')
+      notifyError('请输入素材名称')
       return
     }
     if (artifactId === '') {
-      setError('请选择一个已落存的图片产物')
+      notifyError('请选择一个已落存的图片产物')
       return
     }
     setIsSubmitting(true)
-    setError(null)
     let creativeAssetId: string | undefined
     try {
       const created = await apiClient.createCreativeAsset({
@@ -144,7 +141,7 @@ export function CollectGenerationAssetDialog({
       reset()
     } catch (submitError) {
       if (creativeAssetId !== undefined) await apiClient.archiveCreativeAsset(creativeAssetId).catch(() => undefined)
-      setError(userErrorMessage(submitError))
+      notifyError(submitError)
     } finally {
       setIsSubmitting(false)
     }
@@ -204,7 +201,6 @@ export function CollectGenerationAssetDialog({
               </div>
             )}
           </div>
-          {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>取消</Button>
             <Button type="submit" disabled={isSubmitting || imageArtifacts.length === 0}>{isSubmitting ? '正在收录…' : '建立待确认版本'}</Button>

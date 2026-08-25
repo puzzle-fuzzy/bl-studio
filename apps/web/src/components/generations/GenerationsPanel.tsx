@@ -10,6 +10,7 @@ import { GenerationStatusFilter } from '@/components/generations/GenerationStatu
 import { useGenerationsStore } from '@/stores/generations-store'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
 import { ACTIVE_GENERATION_STATUSES } from '@/lib/labels'
+import { notifyError } from '@/lib/toast'
 
 /** 产物类型筛选（嵌入态）。 */
 type KindFilter = 'all' | 'image' | 'video' | 'audio'
@@ -48,6 +49,10 @@ export function GenerationsPanel({ variant = 'embedded' }: { variant?: 'embedded
     // 任务行按模型 referenceFormat 解析提示词标记（幂等，页面形态也保证目录就绪）。
     void loadModels()
   }, [hasLoaded, isLoading, load, loadModels])
+
+  useEffect(() => {
+    if (error !== null) notifyError(error)
+  }, [error])
 
   const open = (id: string) => navigate(`/generations/${id}`)
 
@@ -117,7 +122,7 @@ function EmbeddedVariant({
       {filtered.length === 0 ? (
         // R2-P1-07：加载失败时优先渲染错误态（带重试），而不是误导性的「还没有生成任务」空态。
         error !== null && records.length === 0 ? (
-          <TaskLoadError message={error} onRetry={onRetry} />
+          <TaskLoadError onRetry={onRetry} />
         ) : (
           <p className="py-4 text-center text-sm text-muted-foreground">
             {isLoading ? '加载中…' : records.length === 0 ? '还没有生成任务，开始你的第一个创作吧' : '没有符合条件的任务'}
@@ -126,10 +131,6 @@ function EmbeddedVariant({
       ) : (
         // 无卡片包裹：列表项之间用分割线划分。
         <div className="divide-y divide-border">
-          {error !== null && (
-            // 有旧数据但刷新失败：诚实提示列表可能是上次结果。
-            <p className="px-1 pb-2 text-xs text-destructive">任务列表刷新失败（{error}），当前显示上次结果</p>
-          )}
           {filtered.map(record => (
             <GenerationListItem key={record.id} record={record} onOpen={onOpen} />
           ))}
@@ -192,7 +193,7 @@ function PageVariant() {
           // R2-P1-07：空列表区分「加载中 / 加载失败 / 真没有任务」三种情况。
           error !== null ? (
             <div className="flex h-full items-center justify-center">
-              <TaskLoadError message={error} onRetry={() => void load(true)} />
+              <TaskLoadError onRetry={() => void load(true)} />
             </div>
           ) : (
             <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
@@ -222,10 +223,11 @@ function PageVariant() {
 }
 
 /** 任务列表加载失败态：错误信息 + 重试按钮（与「空态」明确区分）。 */
-function TaskLoadError({ message, onRetry }: { message: string; onRetry: () => void }) {
+function TaskLoadError({ onRetry }: { onRetry: () => void }) {
   return (
     <div className="flex flex-col items-center gap-2 py-6 text-center">
-      <p className="text-sm text-destructive">任务列表加载失败：{message}</p>
+      <p className="text-sm font-medium">暂时无法读取任务列表</p>
+      <p className="text-xs text-muted-foreground">错误详情已通过右上角通知显示。</p>
       <Button variant="outline" size="sm" onClick={onRetry}>
         重试
       </Button>

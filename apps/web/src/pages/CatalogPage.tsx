@@ -8,7 +8,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useModelCatalogStore } from '@/stores/model-catalog-store'
 import { categoryLabel } from '@/lib/labels'
 import { modelDescription } from '@/lib/model-description'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 const CATEGORIES = ['all', 'image', 'video', 'audio', 'text'] as const
 type Category = (typeof CATEGORIES)[number]
@@ -25,6 +25,10 @@ export function CatalogPage() {
   useEffect(() => {
     void load()
   }, [load])
+
+  useEffect(() => {
+    if (loadError !== null) notifyError(loadError)
+  }, [loadError])
 
   const filtered = category === 'all' ? models : models.filter(model => model.category === category)
 
@@ -58,7 +62,7 @@ export function CatalogPage() {
         {loadError !== null && models.length === 0 && !isLoading && (
           <Card className="col-span-full">
             <CardContent className="space-y-3 py-10 text-center">
-              <p className="text-sm text-destructive">{userErrorMessage(new Error(loadError))}</p>
+              <p className="text-sm text-muted-foreground">暂时无法加载模型列表，请稍后重试。</p>
               <Button variant="outline" onClick={() => void load(true)}>重新加载</Button>
             </CardContent>
           </Card>

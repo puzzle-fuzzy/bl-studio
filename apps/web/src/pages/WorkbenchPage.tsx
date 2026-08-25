@@ -7,6 +7,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
 import { creativeAssetQueryKey, useCreativeAssetsStore } from '@/stores/creative-assets-store'
 import { creativeAssetTypeLabel } from '@/lib/labels'
+import { notifyError } from '@/lib/toast'
 
 const PROJECT_STATUS_LABELS: Record<string, string> = {
   active: '进行中',
@@ -38,6 +39,14 @@ export function WorkbenchPage() {
     void loadProjects()
     void loadAssets({})
   }, [loadAssets, loadProjects])
+
+  useEffect(() => {
+    if (projectQuery?.error !== undefined && projectQuery.error !== null) notifyError(projectQuery.error)
+  }, [projectQuery?.error])
+
+  useEffect(() => {
+    if (assetQuery?.error !== undefined && assetQuery.error !== null) notifyError(assetQuery.error)
+  }, [assetQuery?.error])
 
   const projects = projectQuery?.items ?? []
   const recentAssets = (assetQuery?.items ?? []).slice(0, 6)
@@ -83,9 +92,9 @@ export function WorkbenchPage() {
             </Button>
           </div>
 
-          {projectQuery?.error ? (
-            <Card className="border-destructive/40 bg-destructive/5">
-              <CardContent className="py-5 text-sm text-destructive">项目加载失败：{projectQuery.error}</CardContent>
+          {projectQuery?.error && projects.length === 0 ? (
+            <Card className="border-dashed bg-card/60">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">暂时无法读取项目，请稍后重试。</CardContent>
             </Card>
           ) : projectQuery?.isLoading ? (
             <div className="grid gap-4 md:grid-cols-3">
@@ -159,9 +168,9 @@ export function WorkbenchPage() {
                 <Skeleton key={index} className="h-24 rounded-xl" />
               ))}
             </div>
-          ) : assetQuery?.error ? (
-            <Card className="border-destructive/40 bg-destructive/5">
-              <CardContent className="py-5 text-sm text-destructive">资产加载失败：{assetQuery.error}</CardContent>
+          ) : assetQuery?.error && recentAssets.length === 0 ? (
+            <Card className="border-dashed bg-card/60">
+              <CardContent className="py-10 text-center text-sm text-muted-foreground">暂时无法读取最近资产，请稍后重试。</CardContent>
             </Card>
           ) : recentAssets.length === 0 ? (
             <Card className="border-dashed bg-card/60">

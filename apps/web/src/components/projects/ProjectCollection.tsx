@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useEffect, useState, type FormEvent } from 'react'
 import { FolderKanban, Plus } from 'lucide-react'
 import type { CreativeProject } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
@@ -7,20 +7,27 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { useCreativeProjectsStore } from '@/stores/creative-projects-store'
+import { notifyError } from '@/lib/toast'
 
 export function ProjectCollection({
   projects,
   isLoading,
   error,
+  onRetry,
   onSelect,
   onCreate,
 }: {
   projects: CreativeProject[]
   isLoading: boolean
   error: string | null
+  onRetry: () => void
   onSelect: (project: CreativeProject) => void
   onCreate: () => void
 }) {
+  useEffect(() => {
+    if (error !== null) notifyError(error)
+  }, [error])
+
   if (isLoading && projects.length === 0) {
     return (
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3" role="status" aria-label="正在加载项目">
@@ -33,9 +40,10 @@ export function ProjectCollection({
 
   if (error && projects.length === 0) {
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
-        <p className="text-sm font-medium">项目暂时加载失败</p>
-        <p className="text-sm text-muted-foreground">{error}</p>
+      <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
+        <p className="text-sm font-medium">暂时没有可显示的项目</p>
+        <p className="text-sm text-muted-foreground">可以稍后重新加载，或先创建一个新项目。</p>
+        <Button variant="outline" onClick={onRetry} title="重新加载项目">重新加载</Button>
       </div>
     )
   }
@@ -97,10 +105,8 @@ export function CreateProjectDialog({
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) setError(null)
     onOpenChange(nextOpen)
   }
 
@@ -108,18 +114,17 @@ export function CreateProjectDialog({
     event.preventDefault()
     const normalizedTitle = title.trim()
     if (normalizedTitle.length === 0) {
-      setError('请输入项目名称')
+      notifyError('请输入项目名称')
       return
     }
     setIsSubmitting(true)
-    setError(null)
     try {
       const project = await createProject({ title: normalizedTitle, ...(description.trim() ? { description: description.trim() } : {}) })
       setTitle('')
       setDescription('')
       onCreated(project)
     } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '创建项目失败，请稍后重试')
+      notifyError(submitError)
     } finally {
       setIsSubmitting(false)
     }
@@ -143,7 +148,6 @@ export function CreateProjectDialog({
             </Label>
             <Textarea id="creative-project-description" value={description} onChange={event => setDescription(event.target.value)} placeholder="记录这个项目的视觉方向或使用范围" maxLength={2_000} rows={4} />
           </div>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)} title="取消创建项目">取消</Button>
             <Button type="submit" disabled={isSubmitting} title="创建项目">{isSubmitting ? '正在创建…' : '创建项目'}</Button>

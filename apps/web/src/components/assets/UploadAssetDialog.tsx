@@ -4,7 +4,7 @@ import { FileImage, Film, Loader2, Upload } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { apiClient } from '@/lib/api'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /**
  * 普通素材的唯一上传入口。
@@ -24,13 +24,11 @@ export function UploadAssetDialog({
   const [file, setFile] = useState<File | null>(null)
   const [progress, setProgress] = useState(0)
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     if (!open) {
       setFile(null)
       setProgress(0)
-      setError(null)
       setIsSubmitting(false)
     }
   }, [open])
@@ -39,7 +37,6 @@ export function UploadAssetDialog({
     if (!nextOpen && !isSubmitting) {
       setFile(null)
       setProgress(0)
-      setError(null)
     }
     onOpenChange(nextOpen)
   }
@@ -48,23 +45,21 @@ export function UploadAssetDialog({
     if (nextFile === undefined) return
     if (!nextFile.type.startsWith('image/') && !nextFile.type.startsWith('video/')) {
       setFile(null)
-      setError('这里只支持图片或视频文件')
+      notifyError('这里只支持图片或视频文件')
       return
     }
     setFile(nextFile)
-    setError(null)
   }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     if (file === null) {
-      setError('请选择一张图片或一个视频')
+      notifyError('请选择一张图片或一个视频')
       return
     }
 
     setIsSubmitting(true)
     setProgress(0)
-    setError(null)
     try {
       const asset = await apiClient.uploadAsset({
         file,
@@ -75,7 +70,7 @@ export function UploadAssetDialog({
       setFile(null)
       setProgress(0)
     } catch (submitError) {
-      setError(userErrorMessage(submitError))
+      notifyError(submitError)
     } finally {
       setIsSubmitting(false)
     }
@@ -141,8 +136,6 @@ export function UploadAssetDialog({
               </div>
             </div>
           )}
-          {error !== null && <p role="alert" className="text-sm text-destructive">{error}</p>}
-
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => handleOpenChange(false)} disabled={isSubmitting}>取消</Button>
             <Button type="submit" disabled={isSubmitting || file === null}>

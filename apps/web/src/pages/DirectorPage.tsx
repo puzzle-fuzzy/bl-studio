@@ -17,6 +17,7 @@ import {
 import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { apiClient } from '@/lib/api'
+import { notifyError } from '@/lib/toast'
 
 const STATUS_LABELS: Record<DirectorProjectSummary['status'], string> = {
   draft: '草稿',
@@ -39,8 +40,9 @@ export function DirectorPage() {
     try {
       const result = await apiClient.listDirectorProjects({ limit: 50 })
       setProjects(result.items)
-    } catch {
-      setError('导演台项目暂时无法加载，请稍后重试。')
+    } catch (loadError) {
+      notifyError(loadError)
+      setError('load')
     } finally {
       setLoading(false)
     }
@@ -61,8 +63,8 @@ export function DirectorPage() {
       toast.success('导演台项目已创建')
       setDialogOpen(false)
       navigate(`/director/${project.id}`)
-    } catch {
-      toast.error('项目创建失败，请稍后重试')
+    } catch (createError) {
+      notifyError(createError)
     } finally {
       setCreating(false)
     }
@@ -130,7 +132,7 @@ export function DirectorPage() {
 
         {!loading && error !== undefined && (
           <div className="flex items-center justify-between gap-4 rounded-xl bg-muted/50 p-5 text-sm">
-            <p className="text-muted-foreground">{error}</p>
+            <p className="text-muted-foreground">暂时无法读取导演台项目，请稍后重试。</p>
             <Button variant="outline" size="sm" onClick={() => void loadProjects()}>重新加载</Button>
           </div>
         )}

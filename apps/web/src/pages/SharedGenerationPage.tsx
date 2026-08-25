@@ -6,8 +6,8 @@ import { BrandMark } from '@/components/shared/BrandMark'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { StatusBadge } from '@/components/generations/StatusBadge'
 import { apiClient } from '@/lib/api'
+import { notifyError } from '@/lib/toast'
 import { resolveApiUrl } from '@/lib/api'
-import { userErrorMessage } from '@/lib/user-error'
 import { generationStatusLabel } from '@/lib/labels'
 import { FileText, Image as ImageIcon, Music } from 'lucide-react'
 
@@ -35,7 +35,10 @@ export function SharedGenerationPage() {
     apiClient
       .getSharedGeneration(shareId)
       .then(setData)
-      .catch(err => setError(userErrorMessage(err)))
+      .catch(err => {
+        notifyError(err)
+        setError('load')
+      })
       .finally(() => setIsLoading(false))
   }, [shareId])
 
@@ -48,7 +51,7 @@ export function SharedGenerationPage() {
         {isLoading && <p className="py-16 text-center text-sm text-muted-foreground">加载中…</p>}
         {error !== null && (
           <Card>
-            <CardContent className="py-10 text-center text-sm text-destructive">{error}</CardContent>
+            <CardContent className="py-10 text-center text-sm text-muted-foreground">暂时无法加载公开内容，请稍后重试。</CardContent>
           </Card>
         )}
         {data !== null && (

@@ -15,7 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { assetQueryKey, useAssetsStore, type AssetQuery } from '@/stores/assets-store'
 import { apiClient } from '@/lib/api'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 import { cn } from '@/lib/utils'
 
 /**
@@ -45,9 +45,7 @@ export function AssetPickerDialog({
   const [uploadedAssets, setUploadedAssets] = useState<AssetItem[]>([])
   const [uploading, setUploading] = useState(false)
   const [uploadProgress, setUploadProgress] = useState(0)
-  const [uploadError, setUploadError] = useState<string | null>(null)
   const [linkUrl, setLinkUrl] = useState('')
-  const [linkError, setLinkError] = useState<string | null>(null)
   // R2-P1-06：持有本次上传的 AbortController，支持「取消上传」与关弹窗时中止 XHR。
   const uploadController = useRef<AbortController | null>(null)
 
@@ -95,7 +93,6 @@ export function AssetPickerDialog({
     uploadController.current = controller
     setUploading(true)
     setUploadProgress(0)
-    setUploadError(null)
     try {
       const asset = await apiClient.uploadAsset({
         file,
@@ -108,7 +105,7 @@ export function AssetPickerDialog({
       void load(query, true)
     } catch (error) {
       // R2-P1-06：用户主动取消不展示错误文案。
-      if (!isAbortError(error)) setUploadError(userErrorMessage(error))
+      if (!isAbortError(error)) notifyError(error)
     } finally {
       if (uploadController.current === controller) uploadController.current = null
       setUploading(false)
@@ -118,14 +115,13 @@ export function AssetPickerDialog({
   const handleImport = async () => {
     const url = linkUrl.trim()
     if (url === '') return
-    setLinkError(null)
     try {
       const asset = await apiClient.importAsset({ url, kind: mediaKind ?? 'image' })
       setSelected(current => (multiple ? [...current, asset] : [asset]))
       setLinkUrl('')
       void load(query, true)
     } catch (error) {
-      setLinkError(userErrorMessage(error))
+      notifyError(error)
     }
   }
 
@@ -255,7 +251,6 @@ export function AssetPickerDialog({
                 </div>
               </div>
             )}
-            {uploadError !== null && <p className="text-sm text-destructive">{uploadError}</p>}
           </TabsContent>
 
           <TabsContent value="link" className="space-y-3">
@@ -274,7 +269,6 @@ export function AssetPickerDialog({
                 导入
               </Button>
             </div>
-            {linkError !== null && <p className="text-sm text-destructive">{linkError}</p>}
           </TabsContent>
         </Tabs>
 

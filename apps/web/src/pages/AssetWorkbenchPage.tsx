@@ -24,6 +24,7 @@ import {
   sourceLabel,
 } from '@/lib/labels'
 import { resolveApiUrl } from '@/lib/api'
+import { notifyError } from '@/lib/toast'
 import { assetQueryKey, useAssetsStore } from '@/stores/assets-store'
 import { creativeAssetQueryKey, useCreativeAssetsStore } from '@/stores/creative-assets-store'
 import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
@@ -155,6 +156,14 @@ export function AssetWorkbenchPage() {
   useEffect(() => {
     setSearchInput(queryText)
   }, [queryText])
+
+  useEffect(() => {
+    if (mediaState?.error !== undefined && mediaState.error !== null) notifyError(mediaState.error)
+  }, [mediaState?.error])
+
+  useEffect(() => {
+    if (assetState?.error !== undefined && assetState.error !== null) notifyError(assetState.error)
+  }, [assetState?.error])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -457,9 +466,9 @@ function MediaAssetCollection({
 
   if (error && items.length === 0) {
     return (
-      <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+      <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
         <p className="text-sm font-medium">素材暂时加载失败</p>
-        <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+        <p className="max-w-md text-sm text-muted-foreground">请稍后重新加载，或先处理其他资产。</p>
         <Button variant="outline" onClick={onRetry}>重新加载</Button>
       </div>
     )
@@ -470,7 +479,6 @@ function MediaAssetCollection({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         {items.length > 0 && <span>{items.length} 个素材</span>}
         {isLoading && <span className="text-primary">正在更新</span>}
-        {error && <span className="text-destructive">部分加载失败</span>}
       </div>
       {view === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
@@ -592,9 +600,9 @@ function CreativeAssetCollection({
 
   if (error && items.length === 0) {
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+      <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
         <p className="text-sm font-medium">创意资产暂时加载失败</p>
-        <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+        <p className="max-w-md text-sm text-muted-foreground">请稍后重新加载，或先创建一个新的资产。</p>
         <Button variant="outline" onClick={onRetry}>重新加载</Button>
       </div>
     )
@@ -624,7 +632,6 @@ function CreativeAssetCollection({
       <div className="flex items-center gap-2 text-xs text-muted-foreground">
         <span>{items.length} 个素材</span>
         {isLoading && <span className="text-primary">正在更新</span>}
-        {error && <span className="text-destructive">部分筛选加载失败</span>}
       </div>
       {view === 'grid' ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">

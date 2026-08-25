@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { GenerationLibraryState, GenerationListView, GenerationRecord } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 import { ACTIVE_GENERATION_STATUSES, GENERATIONS_PAGE_SIZE } from '@/lib/labels'
 import { registerPrivateDataReset } from './auth-store'
 
@@ -87,7 +88,7 @@ export const useGenerationsStore = create<GenerationsState>((set, get) => ({
       set({ records: result.items, nextCursor: result.nextCursor, hasLoaded: true, isLoading: false })
     } catch (error) {
       if (version === requestVersion) {
-        set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
+        set({ error: userErrorMessage(error), isLoading: false })
       }
     }
   },

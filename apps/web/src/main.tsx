@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { ThemeProvider } from 'next-themes'
 import { TooltipProvider } from '@/components/ui/tooltip'
+import { Toaster } from '@/components/ui/sonner'
 import { router } from './routes'
 import { installChunkRecovery } from '@/lib/chunk-recovery'
 import './styles.css'
@@ -21,6 +22,7 @@ if (rootElement === null) {
 createRoot(rootElement).render(
   <StrictMode>
     <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+      <Toaster position="top-right" />
       {/* Tooltip 组件（顶栏主题切换、侧栏折叠提示等）必须在 TooltipProvider 内 */}
       <TooltipProvider delayDuration={0}>
         <RouterProvider router={router} />

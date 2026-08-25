@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Paperclip, Plus, SlidersHorizontal, Sparkles, X } from 'lucide-react'
+import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
@@ -31,6 +31,7 @@ import { buildSubmitPayload, buildValidationParams } from '@/lib/generation-subm
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
 import { modelNameZh } from '@/lib/model-modes'
+import { formatCents } from '@/lib/money'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
 import { apiClient, resolveApiUrl } from '@/lib/api'
@@ -124,7 +125,6 @@ export function CreatePage() {
   const [estimating, setEstimating] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isRestoring, setIsRestoring] = useState(false)
-  const [submitError, setSubmitError] = useState<string | null>(null)
   const [fieldErrors, setFieldErrors] = useState<Map<string, FieldIssue>>(new Map())
 
   // 对比生成：同提示词多模型各提交一条（同一 batchId 分组）。
@@ -171,7 +171,6 @@ export function CreatePage() {
     setCharacterSessionRecords([])
     setSelectedCharacterRecordId(undefined)
     setFieldErrors(new Map())
-    setSubmitError(null)
     setEstimate(null)
   }, [creationType])
 
@@ -224,7 +223,6 @@ export function CreatePage() {
     setModelId(undefined)
     setValues({})
     setFieldErrors(new Map())
-    setSubmitError(null)
     setEstimate(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchParams])
@@ -232,7 +230,6 @@ export function CreatePage() {
   // 切换模型：重建默认值、清空预估与错误
   useEffect(() => {
     setFieldErrors(new Map())
-    setSubmitError(null)
     setEstimate(null)
     if (model !== undefined) {
       const defaults: Record<string, unknown> = {}
@@ -353,7 +350,6 @@ export function CreatePage() {
       next.delete(name)
       return next
     })
-    setSubmitError(null)
   }
 
   // 选中模型：更新状态 + 写入 ?select=，刷新/分享后选中模型不丢失。
@@ -367,7 +363,6 @@ export function CreatePage() {
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (model === undefined || isSubmitting) return
-    setSubmitError(null)
     // 客户端必填校验：缺失时字段级红字提示，不发请求（避免通用「输入内容不合法」）。
     const missing = missingRequiredFields(visibleFormFields(schema, values), values)
     if (missing.length > 0) {
@@ -533,7 +528,6 @@ export function CreatePage() {
           onSubmit={handleSubmit}
           estimate={estimate}
           estimating={estimating}
-          submitError={submitError}
           isSubmitting={isSubmitting}
           isRestoring={isRestoring}
           records={characterRecords}
@@ -832,7 +826,6 @@ type CharacterCreationWorkspaceProps = {
   onSubmit: (event: React.FormEvent<HTMLFormElement>) => void
   estimate: GenerationEstimate | null
   estimating: boolean
-  submitError: string | null
   isSubmitting: boolean
   isRestoring: boolean
   records: readonly GenerationRecord[]
@@ -868,7 +861,6 @@ function CharacterCreationWorkspace({
   onSubmit,
   estimate,
   estimating,
-  submitError,
   isSubmitting,
   isRestoring,
   records,
@@ -933,7 +925,7 @@ function CharacterCreationWorkspace({
         </aside>
       </div>
 
-      <div className="shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
+      <div className="relative shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
         {showControls && (
           <CharacterControlsPanel
             availableModels={availableModels}
@@ -962,61 +954,107 @@ function CharacterCreationWorkspace({
           />
         )}
 
-        <div className="mx-auto max-w-5xl rounded-2xl border border-border bg-card shadow-[0_10px_30px_rgb(0_0_0_/_0.08)] transition-shadow focus-within:shadow-[0_12px_36px_rgb(0_0_0_/_0.12)]">
-          <div className="flex items-center justify-between gap-3 px-4 pb-1 pt-3">
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                <Sparkles className="size-3.5" />
-              </span>
-              <span className="truncate">生成一版人物设定</span>
-              {model !== undefined && <span className="hidden truncate text-muted-foreground/60 sm:inline">· {modelNameZh(model)}</span>}
-            </div>
-            <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setShowControls(current => !current)}>
-              <SlidersHorizontal className="size-3.5" />
-              {showControls ? '收起设置' : '模型与设置'}
-            </Button>
-          </div>
-
-          <div className="px-3 pb-2">
+        <div className="mx-auto max-w-5xl rounded-[22px] border border-border bg-card px-4 pt-3 shadow-[0_10px_30px_rgb(0_0_0_/_0.08)] transition-shadow focus-within:shadow-[0_12px_36px_rgb(0_0_0_/_0.12)]">
+          <div className="flex min-h-[7.5rem] gap-3">
+            <CharacterReferenceSlot
+              asset={referencePool[0]}
+              onOpen={() => {
+                if (creativeMediaField !== undefined) {
+                  onOpenCreativePicker()
+                } else {
+                  setShowControls(true)
+                }
+              }}
+            />
+            <div className="min-w-0 flex-1">
             <PromptInput
               value={typeof values.prompt === 'string' ? values.prompt : ''}
               refs={referencePool}
               onChange={text => onValueChange('prompt', text)}
-              placeholder="描述你想创建的人物……例如：一位在雨夜修复旧相机的女孩"
+              placeholder="上传参考图、输入文字或 @ 主体，描述你想生成的人物。"
               disabled={isSubmitting || isRestoring || model === undefined}
               supportsReferences={model?.referenceFormat !== undefined}
+              className="min-h-[7.5rem] rounded-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0"
             />
+            </div>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 px-3 pb-3">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-3 pt-2">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              {mediaFields.length > 0 && (
-                <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={() => setShowControls(true)}>
-                  <Paperclip className="size-3.5" />
-                  参考图{creativeAssets.length > 0 ? ` · ${creativeAssets.length}` : ''}
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs text-primary" onClick={() => setShowControls(current => !current)} aria-expanded={showControls}>
+                <ImagePlus className="size-3.5" />
+                图片生成
+                <ChevronDown className="size-3.5" />
+              </Button>
+              {model !== undefined && (
+                <Button type="button" variant="outline" size="sm" className="h-8 max-w-44 gap-1.5 text-xs" onClick={() => setShowControls(true)}>
+                  <span className="truncate">{modelNameZh(model)}</span>
                 </Button>
               )}
-              <Button type="button" variant="ghost" size="sm" className="h-8 gap-1.5 text-xs" onClick={onApplyPromptGuide} disabled={isSubmitting || model === undefined}>
-                <ImagePlus className="size-3.5" />
-                插入四视图模板
+              {basicSettingsFields.length > 0 && (
+                <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs" onClick={() => setShowControls(true)}>
+                  <span className="truncate">{characterSettingsSummary(basicSettingsFields, values)}</span>
+                  <ChevronDown className="size-3.5" />
+                </Button>
+              )}
+              <Button type="button" variant="outline" size="icon-sm" className="text-xs font-semibold" onClick={onApplyPromptGuide} disabled={isSubmitting || model === undefined} aria-label="插入人物提示词模板">
+                T
               </Button>
-              <span className="hidden text-[11px] text-muted-foreground/70 md:inline">确定后输入框会清空，可继续输入下一次视角</span>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon-sm"
+                className="text-sm font-semibold"
+                onClick={() => onValueChange('prompt', `${typeof values.prompt === 'string' ? values.prompt : ''}@`)}
+                disabled={isSubmitting || isRestoring || model === undefined}
+                aria-label="引用主体"
+              >
+                @
+              </Button>
             </div>
             <div className="flex items-center gap-2">
-              <div className="hidden w-48 sm:block">
-                <EstimateSummary estimate={estimate} estimating={estimating} />
-              </div>
-              <Button type="submit" size="sm" className="h-9 rounded-xl px-4" disabled={isSubmitting || isRestoring || model === undefined}>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                ✦ {estimating ? '计算中…' : estimate !== null ? `${formatCents(estimate.costEstimate)}/张` : '—/张'}
+              </span>
+              <Button type="submit" size="icon-lg" className="rounded-full" disabled={isSubmitting || isRestoring || model === undefined} aria-label={isSubmitting ? '生成中' : '确定生成'}>
                 {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-                {isSubmitting ? '生成中…' : isRestoring ? '正在还原…' : '确定生成'}
               </Button>
             </div>
           </div>
         </div>
-        {submitError !== null && <p className="mx-auto mt-2 max-w-5xl text-xs text-destructive">{submitError}</p>}
       </div>
     </form>
   )
+}
+
+function CharacterReferenceSlot({ asset, onOpen }: { asset: AssetItem | undefined; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      className="relative mt-1 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted/70 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      aria-label={asset === undefined ? '上传参考图' : '添加或更换参考图'}
+    >
+      {asset === undefined ? <Plus className="size-5" /> : <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />}
+      {asset !== undefined && (
+        <span className="absolute bottom-0 right-0 flex size-5 items-center justify-center rounded-full bg-background/90 text-foreground shadow-sm">
+          <Plus className="size-3.5" />
+        </span>
+      )}
+    </button>
+  )
+}
+
+function characterSettingsSummary(fields: readonly FormField[], values: Readonly<Record<string, unknown>>) {
+  const labels = fields
+    .map(field => {
+      const value = values[field.parameter.name]
+      if (value === undefined || value === null || value === '') return undefined
+      const option = field.parameter.options?.find(item => JSON.stringify(item.value) === JSON.stringify(value))
+      return option?.label ?? String(value)
+    })
+    .filter((label): label is string => label !== undefined)
+  return labels.slice(0, 3).join(' · ') || '输出参数'
 }
 
 function CharacterControlsPanel({
@@ -1043,9 +1081,9 @@ function CharacterControlsPanel({
   onAddCompare,
   onRemoveCompare,
   onCompareSubmit,
-}: Omit<CharacterCreationWorkspaceProps, 'referencePool' | 'onSubmit' | 'estimate' | 'estimating' | 'submitError' | 'isRestoring' | 'records' | 'selectedRecordId' | 'onSelectRecord' | 'onApplyPromptGuide'>) {
+}: Omit<CharacterCreationWorkspaceProps, 'referencePool' | 'onSubmit' | 'estimate' | 'estimating' | 'isRestoring' | 'records' | 'selectedRecordId' | 'onSelectRecord' | 'onApplyPromptGuide'>) {
   return (
-    <div className="mx-auto mb-3 max-h-[min(58svh,34rem)] max-w-5xl overflow-y-auto rounded-2xl border border-border bg-card/95 p-4 shadow-lg shadow-black/5">
+    <div className="absolute bottom-full left-1/2 z-20 mb-3 w-[min(30rem,calc(100vw-2rem))] max-h-[min(70svh,34rem)] -translate-x-1/2 overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">模型与生成设置</p>

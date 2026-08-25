@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 
 interface ModelCatalogState {
   models: ModelCatalogItem[]
@@ -29,7 +30,7 @@ export const useModelCatalogStore = create<ModelCatalogState>((set, get) => ({
         set({ models, hasLoaded: true, isLoading: false })
       })
       .catch(error => {
-        set({ error: error instanceof Error ? error.message : String(error), isLoading: false })
+        set({ error: userErrorMessage(error), isLoading: false })
       })
       .finally(() => {
         inFlight = null

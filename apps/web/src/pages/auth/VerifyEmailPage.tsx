@@ -4,27 +4,27 @@ import { CheckCircle2, Loader2, XCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/auth-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** 邮箱验证落地页：消费 URL fragment 中的 `#token=`，成功后建立会话。 */
 export function VerifyEmailPage() {
   const verifyEmail = useAuthStore(state => state.verifyEmail)
   const navigate = useNavigate()
   const [status, setStatus] = useState<'verifying' | 'success' | 'error'>('verifying')
-  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     const token = extractFragmentToken()
     if (token === null) {
       setStatus('error')
-      setError('验证链接缺少 token，请从邮件中打开完整链接')
+      const message = '验证链接缺少 token，请从邮件中打开完整链接'
+      notifyError(message)
       return
     }
     verifyEmail(token)
       .then(() => setStatus('success'))
       .catch(err => {
         setStatus('error')
-        setError(userErrorMessage(err))
+        notifyError(err)
       })
     // 仅挂载时执行一次
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -43,7 +43,7 @@ export function VerifyEmailPage() {
             {status === 'verifying' ? '正在验证…' : status === 'success' ? '验证成功' : '验证失败'}
           </CardTitle>
           <CardDescription className="text-center">
-            {status === 'error' && error !== null ? error : '你的邮箱已通过验证'}
+            {status === 'error' ? '验证链接无效或已过期，请重新发送验证邮件。' : '你的邮箱已通过验证'}
           </CardDescription>
         </CardHeader>
         <CardContent>

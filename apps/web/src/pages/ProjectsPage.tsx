@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { FolderKanban, Plus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { ProjectCollection, CreateProjectDialog } from '@/components/projects/ProjectCollection'
 import { Button } from '@/components/ui/button'
@@ -23,8 +23,7 @@ export function ProjectsPage() {
         <header className="flex flex-col justify-between gap-4 border-b border-border/70 pb-5 md:flex-row md:items-end">
           <div className="min-w-0">
             <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-              <FolderKanban className="size-3.5" aria-hidden="true" />
-              <span>项目</span>
+              <span>PROJECTS</span>
             </div>
             <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">项目</h1>
             <p className="mt-1 max-w-2xl text-sm text-muted-foreground">项目是短剧素材的组织上下文，集中管理主体、场景和道具，并在项目详情中批量整理它们。</p>
@@ -39,6 +38,7 @@ export function ProjectsPage() {
           projects={projects}
           isLoading={projectState?.isLoading ?? false}
           error={projectState?.error ?? null}
+          onRetry={() => void loadProjects({}, true)}
           onSelect={project => navigate(`/projects/${encodeURIComponent(project.id)}`)}
           onCreate={() => setCreateOpen(true)}
         />

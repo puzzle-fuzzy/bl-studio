@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { apiClient } from '@/lib/api'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 import type { UserFeedback } from '@bailian-studio/api-client'
 
 const KIND_LABELS: Record<string, string> = {
@@ -40,25 +40,22 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
   const [kind, setKind] = useState('feedback')
   const [content, setContent] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const [history, setHistory] = useState<UserFeedback[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [historyError, setHistoryError] = useState<string | null>(null)
 
   // 打开弹窗时拉取我的反馈历史（提交后关闭，下次打开自动刷新）。
   useEffect(() => {
     if (!open) return
     let cancelled = false
     setHistoryLoading(true)
-    setHistoryError(null)
     apiClient
       .listMyFeedback({ limit: 20 })
       .then(page => {
         if (!cancelled) setHistory(page.items)
       })
       .catch(err => {
-        if (!cancelled) setHistoryError(userErrorMessage(err))
+        if (!cancelled) notifyError(err)
       })
       .finally(() => {
         if (!cancelled) setHistoryLoading(false)
@@ -70,11 +67,10 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
 
   const handleSubmit = async () => {
     if (content.trim().length === 0) {
-      setError('请填写反馈内容')
+      notifyError('请填写反馈内容')
       return
     }
     setSubmitting(true)
-    setError(null)
     try {
       await apiClient.submitFeedback({ kind: kind as 'feedback' | 'bug' | 'suggestion' | 'complaint', content: content.trim() })
       setContent('')
@@ -82,7 +78,7 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
       onOpenChange(false)
       showMessage({ title: '已提交，感谢反馈', tone: 'success' })
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setSubmitting(false)
     }
@@ -120,7 +116,6 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
               placeholder="告诉我们你的建议或遇到的问题…"
             />
           </div>
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
         </div>
 
         <Separator />
@@ -134,8 +129,6 @@ export function FeedbackDialog({ open, onOpenChange }: { open: boolean; onOpenCh
             <p className="flex items-center gap-2 py-3 text-sm text-muted-foreground">
               <Loader2 className="size-3.5 animate-spin" /> 加载中…
             </p>
-          ) : historyError !== null ? (
-            <p className="py-3 text-sm text-destructive">{historyError}</p>
           ) : history.length === 0 ? (
             <p className="py-3 text-sm text-muted-foreground">还没有提交过反馈，你的历史记录会显示在这里。</p>
           ) : (

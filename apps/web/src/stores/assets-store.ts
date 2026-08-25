@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { AssetItem, AssetSort } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 import { ASSETS_PAGE_SIZE } from '@/lib/labels'
 import { registerPrivateDataReset } from './auth-store'
 
@@ -89,7 +90,7 @@ export const useAssetsStore = create<AssetsState>((set, get) => ({
             [key]: {
               ...(get().queries[key] ?? initialState()),
               isLoading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: userErrorMessage(error),
             },
           },
         }))

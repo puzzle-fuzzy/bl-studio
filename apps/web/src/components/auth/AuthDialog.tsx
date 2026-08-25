@@ -13,7 +13,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth-store'
 import { useAuthDialogStore } from '@/stores/auth-dialog-store'
-import { canResendVerification, userErrorMessage } from '@/lib/user-error'
+import { canResendVerification } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** 全局登录/注册弹窗（模式可切换，登录后安全回跳）。 */
 export function AuthDialog() {
@@ -31,14 +32,12 @@ export function AuthDialog() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [displayName, setDisplayName] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [verificationResendAvailable, setVerificationResendAvailable] = useState(false)
   const [verificationRequired, setVerificationRequired] = useState(false)
   const [isResending, setIsResending] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
-    setError(null)
     setVerificationResendAvailable(false)
     try {
       if (mode === 'login') {
@@ -60,7 +59,7 @@ export function AuthDialog() {
       setPassword('')
       setDisplayName('')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
       setVerificationResendAvailable(mode === 'login' || canResendVerification(err))
     }
   }
@@ -68,19 +67,18 @@ export function AuthDialog() {
   const handleResend = async () => {
     if (email.trim() === '') return
     setIsResending(true)
-    setError(null)
     try {
       await resendVerification(email)
       close()
       navigate('/auth/check-email')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setIsResending(false)
     }
   }
 
-  const showResend = error !== null && email.trim() !== '' && verificationResendAvailable
+  const showResend = email.trim() !== '' && verificationResendAvailable
 
   const handleOpenChange = (open: boolean) => {
     if (!open) close()
@@ -151,7 +149,6 @@ export function AuthDialog() {
                 required
               />
             </div>
-            {error !== null && <p className="text-sm text-destructive">{error}</p>}
             {showResend && (
               <Button type="button" variant="outline" className="w-full" disabled={isResending} onClick={() => void handleResend()}>
                 {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}

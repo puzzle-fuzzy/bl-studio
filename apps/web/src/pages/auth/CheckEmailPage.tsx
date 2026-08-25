@@ -4,7 +4,7 @@ import { MailCheck } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { useAuthStore } from '@/stores/auth-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** 注册后提示检查邮箱；支持重发验证邮件（带冷却）。 */
 export function CheckEmailPage() {
@@ -17,7 +17,6 @@ export function CheckEmailPage() {
 
   const [clock, setClock] = useState(() => Date.now())
   const [message, setMessage] = useState<string | null>(null)
-  const [error, setError] = useState<string | null>(null)
   const email = pendingEmail ?? ''
   const displayEmail = pendingDisplayEmail ?? ''
   const cooldown = resendAvailableAt === null
@@ -32,12 +31,11 @@ export function CheckEmailPage() {
 
   const handleResend = async () => {
     if (email === '' || cooldown > 0) return
-    setError(null)
     try {
       await resend(email)
       setMessage('验证邮件已重新发送，请查收')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     }
   }
 
@@ -55,7 +53,6 @@ export function CheckEmailPage() {
         </CardHeader>
         <CardContent className="space-y-3">
           {message !== null && <p className="text-center text-sm text-emerald-600">{message}</p>}
-          {error !== null && <p className="text-center text-sm text-destructive">{error}</p>}
           <Button type="button" variant="outline" className="w-full" onClick={() => void handleResend()} disabled={cooldown > 0}>
             {cooldown > 0 ? `${cooldown}s 后可重发` : '重新发送验证邮件'}
           </Button>

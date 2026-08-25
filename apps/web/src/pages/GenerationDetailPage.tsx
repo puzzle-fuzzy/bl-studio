@@ -18,6 +18,7 @@ import { useNotificationsStore } from '@/stores/notifications-store'
 import { useModelCatalogStore, selectModelById } from '@/stores/model-catalog-store'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { apiClient } from '@/lib/api'
+import { notifyError } from '@/lib/toast'
 import { userErrorMessage } from '@/lib/user-error'
 import { describeGenerationFailure } from '@/lib/generation-failure'
 import { formatCents } from '@/lib/money'
@@ -51,7 +52,10 @@ export function GenerationDetailPage() {
     apiClient
       .getGeneration(id)
       .then(setRecord)
-      .catch(err => setError(userErrorMessage(err)))
+      .catch(err => {
+        notifyError(err)
+        setError('load')
+      })
       .finally(() => setIsLoading(false))
   }, [id])
 
@@ -66,7 +70,7 @@ export function GenerationDetailPage() {
   if (error !== null || record === null) {
     return (
       <div className="space-y-3 py-16 text-center">
-        <p className="text-sm text-destructive">{error ?? '记录不存在'}</p>
+        <p className="text-sm text-muted-foreground">{error !== null ? '暂时无法加载任务详情' : '记录不存在'}</p>
         <Button variant="outline" size="sm" onClick={() => navigate('/generations')}>
           <ArrowLeft data-icon />
           返回任务列表
@@ -421,7 +425,10 @@ function DiagnosticsSection({ recordId }: { recordId: string }) {
     apiClient
       .getGenerationDiagnostics(recordId)
       .then(setDiagnostics)
-      .catch(err => setError(userErrorMessage(err)))
+      .catch(err => {
+        notifyError(err)
+        setError('load')
+      })
       .finally(() => setIsLoading(false))
   }, [open, recordId, diagnostics])
 
@@ -447,7 +454,7 @@ function DiagnosticsSection({ recordId }: { recordId: string }) {
                 加载中…
               </p>
             )}
-            {error !== null && <p className="text-sm text-destructive">{error}</p>}
+            {error !== null && <p className="text-sm text-muted-foreground">诊断信息暂时不可用，请稍后重试。</p>}
             {diagnostics !== null && (
               <div className="space-y-3">
                 <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-3">

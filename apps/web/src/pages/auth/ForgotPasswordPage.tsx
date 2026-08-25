@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** 忘记密码：提交邮箱后显示统一提示（防账号枚举）。 */
 export function ForgotPasswordPage() {
@@ -13,17 +13,15 @@ export function ForgotPasswordPage() {
   const [email, setEmail] = useState('')
   const [isPending, setIsPending] = useState(false)
   const [submitted, setSubmitted] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     setIsPending(true)
-    setError(null)
     try {
       await forgotPassword(email)
       setSubmitted(true)
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setIsPending(false)
     }
@@ -54,7 +52,6 @@ export function ForgotPasswordPage() {
                   required
                 />
               </div>
-              {error !== null && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? '发送中…' : '发送重置链接'}
               </Button>

@@ -1,6 +1,5 @@
 import { Outlet } from 'react-router'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
-import { Toaster } from '@/components/ui/sonner'
 import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { Nav } from '@/components/layout/Nav'
 import { GlobalMessage } from '@/components/shared/GlobalMessage'
@@ -25,7 +24,7 @@ export function AppShell() {
       <Nav />
       <SidebarInset>
         <div className="flex min-h-svh min-w-0 flex-col">
-          <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center border-b border-border/70 bg-background/90 px-4 backdrop-blur md:px-6">
+          <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center border-b border-border/70 bg-background/90 px-3 backdrop-blur md:px-3">
             <SidebarTrigger aria-label="展开或收起侧边栏" title="展开或收起侧边栏" className="p-0!" />
           </header>
           <VirtualScrollArea className="min-h-0 min-w-0 flex-1">
@@ -39,7 +38,6 @@ export function AppShell() {
       </SidebarInset>
       <GlobalMessage />
       <AuthDialog />
-      <Toaster position="top-right" />
     </SidebarProvider>
   )
 }

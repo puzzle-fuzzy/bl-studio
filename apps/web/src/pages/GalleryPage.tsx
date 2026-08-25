@@ -15,6 +15,7 @@ import { useAuthStore } from '@/stores/auth-store'
 import { UserAvatar } from '@/components/ui/user-avatar'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 import { modelNameZh } from '@/lib/model-modes'
 import { encodeDeepLinkParams } from '@/lib/deeplink-params'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
@@ -53,7 +54,6 @@ export function GalleryPage() {
   const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const [detailId, setDetailId] = useState<string | null>(null)
   const [detail, setDetail] = useState<GalleryDetail | null>(null)
   const [detailLoading, setDetailLoading] = useState(false)
@@ -82,7 +82,6 @@ export function GalleryPage() {
   const loadFirst = useCallback(async () => {
     const seq = ++requestSeq.current
     setLoading(true)
-    setError(null)
     setItems([])
     setNextCursor(undefined)
     try {
@@ -93,7 +92,7 @@ export function GalleryPage() {
       setItems(page.items)
       setNextCursor(page.nextCursor)
     } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
+      if (seq === requestSeq.current) notifyError(err)
     } finally {
       if (seq === requestSeq.current) setLoading(false)
     }
@@ -116,7 +115,7 @@ export function GalleryPage() {
       setItems(current => [...current, ...page.items])
       setNextCursor(page.nextCursor)
     } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
+      if (seq === requestSeq.current) notifyError(err)
     } finally {
       if (seq === requestSeq.current) setLoadingMore(false)
     }
@@ -351,8 +350,6 @@ export function GalleryPage() {
           ? '我的收藏：收藏自己或同事公开到社区的作品。'
           : '同事公开到社区的作品；点击卡片查看详情，可点赞/收藏/用同参数生成。'}
       </p>
-
-      {error !== null && <p className="text-sm text-destructive">{error}</p>}
 
       {loading ? (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -700,12 +697,10 @@ function ReportDialog({
   const [reason, setReason] = useState<'unsafe' | 'copyright' | 'privacy' | 'spam' | 'other'>('unsafe')
   const [details, setDetails] = useState('')
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const submit = async (event: React.FormEvent) => {
     event.preventDefault()
     setBusy(true)
-    setError(null)
     try {
       await apiClient.submitContentReport({
         generationId,
@@ -716,7 +711,7 @@ function ReportDialog({
       onOpenChange(false)
       onSubmitted()
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setBusy(false)
     }
@@ -741,7 +736,6 @@ function ReportDialog({
             </SelectContent>
           </Select>
           <Textarea value={details} onChange={event => setDetails(event.target.value)} maxLength={2000} placeholder="补充说明（可选）" />
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
           <div className="flex justify-end gap-2">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
             <Button type="submit" disabled={busy || generationId.length === 0}>{busy ? '提交中…' : '提交举报'}</Button>

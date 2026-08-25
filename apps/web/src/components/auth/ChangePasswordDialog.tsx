@@ -12,7 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 const PASSWORD_RULES = '密码长度为 8–256 个字符'
 
@@ -32,16 +32,14 @@ export function ChangePasswordDialog({
   const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [isSubmitting, setIsSubmitting] = useState(false)
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault()
     if (newPassword !== confirmPassword) {
-      setError('两次输入的新密码不一致')
+      notifyError('两次输入的新密码不一致')
       return
     }
-    setError(null)
     setIsSubmitting(true)
     try {
       await changePassword(currentPassword, newPassword)
@@ -51,7 +49,7 @@ export function ChangePasswordDialog({
       setNewPassword('')
       setConfirmPassword('')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setIsSubmitting(false)
     }
@@ -100,7 +98,6 @@ export function ChangePasswordDialog({
               required
             />
           </div>
-          {error !== null && <p className="text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               取消

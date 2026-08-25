@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { useAuthStore } from '@/stores/auth-store'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 /** 重置密码：消费 URL fragment 中的 `#token=`，设置新密码后跳转登录。 */
 export function ResetPasswordPage() {
@@ -13,12 +13,14 @@ export function ResetPasswordPage() {
   const navigate = useNavigate()
   const [newPassword, setNewPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
-  const [error, setError] = useState<string | null>(null)
   const [isPending, setIsPending] = useState(false)
   const [missingToken, setMissingToken] = useState(false)
 
   useEffect(() => {
-    if (extractFragmentToken() === null) setMissingToken(true)
+    if (extractFragmentToken() === null) {
+      setMissingToken(true)
+      notifyError('重置链接缺少 token，请从邮件中打开完整链接')
+    }
   }, [])
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -26,19 +28,19 @@ export function ResetPasswordPage() {
     const token = extractFragmentToken()
     if (token === null) {
       setMissingToken(true)
+      notifyError('重置链接缺少 token，请从邮件中打开完整链接')
       return
     }
     if (newPassword !== confirmPassword) {
-      setError('两次输入的密码不一致')
+      notifyError('两次输入的密码不一致')
       return
     }
-    setError(null)
     setIsPending(true)
     try {
       await resetPassword(token, newPassword)
       navigate('/login?reset=1')
     } catch (err) {
-      setError(userErrorMessage(err))
+      notifyError(err)
     } finally {
       setIsPending(false)
     }
@@ -54,7 +56,7 @@ export function ResetPasswordPage() {
         <CardContent>
           {missingToken ? (
             <div className="space-y-3">
-              <p className="text-sm text-destructive">重置链接缺少 token，请从邮件中打开完整链接。</p>
+              <p className="text-sm text-muted-foreground">重置链接无效或已过期，请重新获取一封重置邮件。</p>
               <p className="text-center text-sm text-muted-foreground">
                 <Link to="/auth/forgot-password" className="hover:text-foreground">
                   重新获取重置链接
@@ -87,7 +89,6 @@ export function ResetPasswordPage() {
                   required
                 />
               </div>
-              {error !== null && <p className="text-sm text-destructive">{error}</p>}
               <Button type="submit" className="w-full" disabled={isPending}>
                 {isPending ? '提交中…' : '重置密码'}
               </Button>

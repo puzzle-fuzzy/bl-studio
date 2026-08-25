@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { creativeAssetTypeLabel, creativeAssetVersionStatusLabel } from '@/lib/labels'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 const TYPE_OPTIONS: Array<{ value: CreativeAssetType | 'all'; label: string }> = [
   { value: 'all', label: '全部类型' },
@@ -58,7 +58,10 @@ export function CreativeProjectAssetPickerDialog({
         setItems(result.items.filter(item => !excludedAssetIds.has(item.id)))
       })
       .catch(loadError => {
-        if (!cancelled) setError(userErrorMessage(loadError))
+        if (!cancelled) {
+          notifyError(loadError)
+          setError('load')
+        }
       })
       .finally(() => {
         if (!cancelled) setIsLoading(false)
@@ -127,8 +130,9 @@ export function CreativeProjectAssetPickerDialog({
               <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />正在读取素材库
             </div>
           ) : error !== null ? (
-            <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center">
+              <p className="text-sm font-medium">暂时无法读取素材列表</p>
+              <p className="text-xs text-muted-foreground">错误详情已通过右上角通知显示。</p>
               <Button size="sm" variant="outline" onClick={() => setReloadToken(current => current + 1)}>重新加载</Button>
             </div>
           ) : items.length === 0 ? (

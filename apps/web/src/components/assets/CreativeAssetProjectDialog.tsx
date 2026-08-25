@@ -4,7 +4,7 @@ import type { CreativeProject } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 export function CreativeAssetProjectDialog({
   open,
@@ -28,15 +28,17 @@ export function CreativeAssetProjectDialog({
   const [selectedProjectIds, setSelectedProjectIds] = useState<Set<string>>(new Set())
   const [query, setQuery] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   const initialProjectKey = initialProjectIds.join('\u0000')
 
   useEffect(() => {
     if (!open) return
     setSelectedProjectIds(new Set(initialProjectKey.length === 0 ? [] : initialProjectKey.split('\u0000')))
     setQuery('')
-    setError(null)
   }, [initialProjectKey, open])
+
+  useEffect(() => {
+    if (projectError !== null) notifyError(projectError)
+  }, [projectError])
 
   const filteredProjects = useMemo(() => {
     const normalizedQuery = query.trim().toLocaleLowerCase()
@@ -55,12 +57,11 @@ export function CreativeAssetProjectDialog({
 
   async function handleSubmit() {
     setIsSubmitting(true)
-    setError(null)
     try {
       await onSubmit([...selectedProjectIds])
       onOpenChange(false)
     } catch (submitError) {
-      setError(userErrorMessage(submitError))
+      notifyError(submitError)
     } finally {
       setIsSubmitting(false)
     }
@@ -84,8 +85,9 @@ export function CreativeAssetProjectDialog({
           <div aria-live="polite" className="text-xs text-muted-foreground">已选择 {selectedProjectIds.size} 个项目</div>
 
           {projectError !== null ? (
-            <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center" role="alert">
-              <p className="text-sm text-destructive">项目列表加载失败：{projectError}</p>
+            <div className="flex min-h-48 flex-col items-center justify-center gap-3 rounded-lg border border-dashed border-border bg-muted/20 p-6 text-center" role="status">
+              <p className="text-sm font-medium">暂时无法读取项目列表</p>
+              <p className="text-xs text-muted-foreground">错误详情已通过右上角通知显示。</p>
               <Button type="button" size="sm" variant="outline" onClick={onRetryProjects} title="重新加载项目列表">重新加载</Button>
             </div>
           ) : isLoadingProjects ? (
@@ -122,7 +124,6 @@ export function CreativeAssetProjectDialog({
             </fieldset>
           )}
 
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
         </div>
 
         <DialogFooter>

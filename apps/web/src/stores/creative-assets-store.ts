@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CreativeAssetDetail, CreativeAssetSummary, CreativeAssetType, CreativeAssetVersionStatus } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { userErrorMessage } from '@/lib/user-error'
 import { diffCreativeAssetMemberships } from '@/lib/creative-asset-memberships'
 import { registerPrivateDataReset } from './auth-store'
 
@@ -107,7 +108,7 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
             [key]: {
               ...(get().queries[key] ?? initialQueryState()),
               isLoading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: userErrorMessage(error),
             },
           },
         }))
@@ -161,7 +162,7 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
           [key]: {
             ...(current.queries[key] ?? state),
             isLoadingMore: false,
-            error: error instanceof Error ? error.message : String(error),
+            error: userErrorMessage(error),
           },
         },
       }))
@@ -195,7 +196,7 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
             [assetId]: {
               ...(get().details[assetId] ?? initialDetailState()),
               isLoading: false,
-              error: error instanceof Error ? error.message : String(error),
+              error: userErrorMessage(error),
             },
           },
         }))

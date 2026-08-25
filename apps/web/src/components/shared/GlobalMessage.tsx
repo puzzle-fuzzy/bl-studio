@@ -1,36 +1,28 @@
-import { useNotificationsStore } from '@/stores/notifications-store'
-import { cn } from '@/lib/utils'
+import { useEffect, useRef } from 'react'
+import { toast } from 'sonner'
+import { useNotificationsStore, type GlobalMessage as GlobalMessageValue } from '@/stores/notifications-store'
 
 /**
- * 全局单例消息条（继承 Vue 版 GlobalMessage）。
- * 业务反馈经 notifications-store 的 showMessage 触发；tone 映射为语义色。
+ * 全局消息桥接：保留 notifications-store 的业务调用协议，统一转为 Sonner 右上角提示。
  */
-const TONE_CLASSES: Record<string, string> = {
-  success: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300',
-  warning: 'border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-300',
-  info: 'border-sky-500/30 bg-sky-500/10 text-sky-700 dark:text-sky-300',
-}
-
 export function GlobalMessage() {
   const message = useNotificationsStore(state => state.activeMessage)
-  const dismiss = useNotificationsStore(state => state.dismissMessage)
+  const lastMessage = useRef<GlobalMessageValue | null>(null)
 
-  if (message === null) return null
+  useEffect(() => {
+    if (message === null) {
+      lastMessage.current = null
+      return
+    }
+    if (lastMessage.current === message) return
+    lastMessage.current = message
+    const show = message.tone === 'success'
+      ? toast.success
+      : message.tone === 'warning'
+        ? toast.warning
+        : toast.info
+    show(message.title, { description: message.description })
+  }, [message])
 
-  return (
-    <button
-      type="button"
-      aria-live="polite"
-      className={cn(
-        'fixed top-4 left-1/2 z-[100] -translate-x-1/2 rounded-lg border bg-transparent px-4 py-2.5 text-left text-sm shadow-sm',
-        TONE_CLASSES[message.tone] ?? TONE_CLASSES.info,
-      )}
-      onClick={dismiss}
-    >
-      <strong className="font-medium">{message.title}</strong>
-      {message.description !== undefined && (
-        <span className="ml-2 text-xs opacity-80">{message.description}</span>
-      )}
-    </button>
-  )
+  return null
 }

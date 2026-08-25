@@ -23,6 +23,7 @@ import { useNotificationsStore } from '@/stores/notifications-store'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { creativeAssetReferenceRoleLabel, creativeAssetStatusLabel, creativeAssetTypeLabel, creativeAssetVersionStatusLabel } from '@/lib/labels'
 import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 
 const REFERENCE_ROLES: Record<CreativeAssetType, CreativeAssetReferenceRole[]> = {
   character: ['front', 'three_quarter', 'side', 'back', 'full_body', 'medium', 'face_closeup'],
@@ -52,12 +53,16 @@ export function CreativeAssetDetailPage() {
   }, [id, loadDetail])
 
   useEffect(() => {
+    if (detail?.error !== undefined && detail.error !== null) notifyError(detail.error)
+  }, [detail?.error])
+
+  useEffect(() => {
     void loadProjects()
   }, [loadProjects])
 
   if (!id) return <DetailState title="缺少资产标识" description="请从资产重新打开一个资产。" />
   if (detail?.isLoading && detail.asset === null) return <DetailState title="正在加载资产详情" description="正在读取版本和引用关系。" loading />
-  if (detail?.error && detail.asset === null) return <DetailState title="资产详情加载失败" description={detail.error} onRetry={() => void loadDetail(id, true)} />
+  if (detail?.error && detail.asset === null) return <DetailState title="暂时无法读取资产详情" description="错误详情已通过右上角通知显示。" onRetry={() => void loadDetail(id, true)} />
   if (detail?.asset === null || detail === undefined) return <DetailState title="找不到这个资产" description="资产可能已经归档，或当前账号没有访问权限。" />
 
   const assetId = id
@@ -326,23 +331,20 @@ function AddReferenceDialog({
   const [position, setPosition] = useState('0')
   const [selected, setSelected] = useState<AssetItem | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
   useEffect(() => {
     if (!open) return
     setRole(REFERENCE_ROLES[assetType][0] ?? 'other')
     setPosition(String(version?.references.length ?? 0))
     setSelected(null)
-    setError(null)
   }, [assetType, open, version])
 
   const occupied = useMemo(() => new Set(version?.references.map(reference => `${reference.role}:${reference.position}`) ?? []), [version])
 
   function submit() {
     const numericPosition = Number(position)
-    if (selected === null) return setError('请选择一张图片')
-    if (!Number.isInteger(numericPosition) || numericPosition < 0) return setError('槽位必须是非负整数')
-    if (occupied.has(`${role}:${numericPosition}`)) return setError('这个角色和槽位已经被占用')
+    if (selected === null) return notifyError('请选择一张图片')
+    if (!Number.isInteger(numericPosition) || numericPosition < 0) return notifyError('槽位必须是非负整数')
+    if (occupied.has(`${role}:${numericPosition}`)) return notifyError('这个角色和槽位已经被占用')
     onSubmit({ userAssetId: selected.id, role, position: numericPosition })
   }
 
@@ -357,7 +359,6 @@ function AddReferenceDialog({
               <div className="space-y-2"><Label htmlFor="reference-position">槽位</Label><Input id="reference-position" title="设置参考图槽位" type="number" min={0} step={1} value={position} onChange={event => setPosition(event.target.value)} /></div>
             </div>
             <div className="space-y-2"><Label>图片</Label>{selected ? <div className="flex items-center gap-3 rounded-lg border p-2"><div className="size-10 shrink-0 overflow-hidden rounded bg-muted"><img src={resolveApiUrl(selected.thumbnailUrl ?? selected.url)} alt={selected.fileName ?? '已选择参考图'} className="size-full object-cover" /></div><span className="min-w-0 flex-1 truncate text-sm">{selected.fileName ?? selected.id}</span><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(null)} title="更换已选择的参考图">更换</Button></div> : <Button type="button" variant="outline" className="w-full" onClick={() => setPickerOpen(true)} title="从资产库选择参考图"><Plus className="size-4" />从资产库选择图片</Button>}</div>
-            {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
           <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} title="取消添加参考图">取消</Button><Button onClick={submit} disabled={selected === null} title="将参考图加入当前草稿版本">加入草稿版本</Button></DialogFooter>
         </DialogContent>
