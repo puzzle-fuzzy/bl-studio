@@ -16,6 +16,7 @@
     "@elysia/cors": "^1.4.2",
     "@bailian-studio/auth": "workspace:*",
     "@bailian-studio/credit-ledger": "workspace:*",
+    "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/creative-asset-compiler": "workspace:*",
     "@bailian-studio/creative-asset-repository": "workspace:*",
     "@bailian-studio/director-repository": "workspace:*",

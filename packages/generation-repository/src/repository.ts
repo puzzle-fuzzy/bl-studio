@@ -72,7 +72,7 @@ import {
   CreativeGenerationContextSchema,
   normalizeCreativeGenerationContext,
   type CreativeGenerationContext,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import {
   clampLimit,
   decodeCursor,

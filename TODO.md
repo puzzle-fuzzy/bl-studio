@@ -14,7 +14,7 @@
 - [x] 将 `creative_projects` 定义为素材整理项目；主体、场景、道具、风格资产可以跨项目复用。
 - [x] 将 `creative_assets`、资产版本、参考图和生成快照分成不同语义层；版本和引用进入生成后不可原地改写。
 - [x] 保持用户负责最终视频的合并、取舍、节奏和镜头切换，平台只保证单步素材生成和稳定引用。
-- [ ] 将创意资产协议从万能 `@bailian-studio/shared` 提取为独立 contracts/domain 包，并完成唯一事实来源迁移。
+- [x] 将创意资产协议从万能 `@bailian-studio/shared` 提取为独立 `@bailian-studio/creative-asset-contracts` 包，并完成唯一事实来源迁移。
 - [x] 在资产 API 路由与 repository 之间增加 service/use-case 层，集中处理当前用户资源查找、错误语义和资产操作编排；事务、锁和状态机仍由 repository 保持。
 - [x] 实现 Provider-neutral compiler：将已批准资产版本、用户提示词和模型 manifest 编译为稳定的生成参数、媒体引用和不可变快照。
 - [x] 将 compiler 接入生成提交 service/repository：API 在估价与正式提交前解析当前用户的已批准资产绑定；generation repository 在最终事务中再次锁定版本、参考图并原子写入 generation record 与创意上下文快照。
@@ -24,7 +24,7 @@
 - [ ] 为资产工作台补页面级 E2E 与真实浏览器验收；当前单元/API/仓储和生产构建门禁已覆盖。
 - [ ] 后续再规划剧本上传/生成与人物、场景、道具提示词分析，不把剧本逻辑塞进资产 repository 或 Provider executor。
 
-当前执行顺序：创意资产 contracts/domain 收口；页面布局继续保持可调整，本阶段不做页面级 UI 测试、不调用真实 Provider/API，也不修改导演、剧本和剪辑流程。
+当前执行顺序：contracts 已收口；下一步再评估无 IO 的 domain 规则包与 API Client/Web 体验演进。页面布局继续保持可调整，本阶段不做页面级 UI 测试、不调用真实 Provider/API，也不修改导演、剧本和剪辑流程。
 
 本轮已完成：旧的 `modelId + params + assetRefs` 请求保持兼容；带 `creativeContext` 的新请求由同一个 prepare 结果驱动 `/estimate` 和正式提交，重试路径继续复用 generation repository 已冻结的快照。
 
@@ -33,6 +33,8 @@ API Client 本轮已完成：项目与素材接口使用统一 cookie/fetch 传�
 资产工作台本轮已完成：草稿版本允许添加/移除参考图并送入确认队列；候选版本可确认或驳回；已确认版本与其参考图保持不可变，只能建立新版本调整。生成页可选择主体、场景、道具和风格的已确认资产，将版本 ID、参考图 ID 与用户提示词编译为 `creativeContext`，同时保留原有媒体参数兼容路径。Docker workspace/runtime 依赖缓存清单已补齐创意资产包。
 
 应用层本轮已完成：创意资产 API 路由通过 `creative-assets/service.ts` 调用 use-case，不再直接编排 repository；资源不存在时统一返回稳定的项目/资产 not-found 错误，状态、权限和持久化边界继续由 service + repository 分层承担。新增的 service 测试只使用 fake repository，不固化页面结构。
+
+协议层本轮已完成：创意资产协议迁移到 `@bailian-studio/creative-asset-contracts`，该包只依赖 Zod，作为资产类型、版本/项目状态、参考图 role、生成 binding/context 和归一化规则的唯一事实来源。`shared` 仅通过依赖该包扩展通用生成输入校验；编译器、repository、API Client 和 API 路由均直接依赖协议包，Docker workspace/runtime manifest 也已同步。
 
 ## 后续设计议题
 

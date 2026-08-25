@@ -5,7 +5,6 @@ import {
   CreateCreativeAssetVersionFromGenerationSchema,
   CreateCreativeProjectAssetSchema,
   CreateCreativeProjectSchema,
-  CreateGenerationSchema,
   isCreativeAssetReferenceRoleCompatible,
   normalizeCreativeGenerationContext,
 } from '../src'
@@ -81,19 +80,6 @@ describe('creative asset protocol', () => {
       assetId: 'character-1',
       sortOrder: 0,
     })
-  })
-
-  it('keeps creative context as a backward-compatible generation input extension', () => {
-    const parsed = CreateGenerationSchema.parse({
-      modelId: 'video-model',
-      params: { prompt: 'walk' },
-      creativeContext: {
-        purpose: 'shot_video',
-        assetBindings: [],
-      },
-    })
-
-    expect(parsed.creativeContext?.protocolVersion).toBe(1)
   })
 
   it('requires deterministic positions and unique artifacts when collecting generation output', () => {

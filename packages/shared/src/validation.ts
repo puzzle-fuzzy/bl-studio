@@ -1,6 +1,6 @@
 import { z } from 'zod'
+import { CreativeGenerationContextSchema } from '@bailian-studio/creative-asset-contracts'
 import { ValidationError } from './errors'
-import { CreativeGenerationContextSchema } from './creative-assets'
 
 /**
  * Bailian Studio API 的运行时输入校验 schema 集合（基于 zod）。

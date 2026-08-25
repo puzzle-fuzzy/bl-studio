@@ -1,5 +1,5 @@
 {
-  "name": "@bailian-studio/creative-asset-repository",
+  "name": "@bailian-studio/creative-asset-contracts",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -8,16 +8,14 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run tests",
-    "build": "tsc -p tsconfig.json --noEmit"
+    "test": "vitest run tests"
   },
   "dependencies": {
-    "@bailian-studio/creative-asset-contracts": "workspace:*",
-    "@bailian-studio/db": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "author": {
     "name": "烟熏三文鱼",

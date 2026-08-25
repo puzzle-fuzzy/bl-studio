@@ -46,6 +46,19 @@ describe('validation schemas', () => {
     })).toThrow()
   })
 
+  it('accepts the creative asset protocol through the generation boundary', () => {
+    const parsed = CreateGenerationSchema.parse({
+      modelId: 'video-model',
+      params: { prompt: 'walk' },
+      creativeContext: {
+        purpose: 'shot_video',
+        assetBindings: [],
+      },
+    })
+
+    expect(parsed.creativeContext?.protocolVersion).toBe(1)
+  })
+
   it('rejects a create-generation body missing required modelId/userId', () => {
     expect(() => CreateGenerationSchema.parse({ params: {} })).toThrow()
   })

@@ -9,7 +9,7 @@
  * 【不存在】userId 这个概念（也正因如此，客户端无法伪造他人的 userId）。
  */
 import { z } from 'zod'
-import type { CreativeGenerationContext } from '@bailian-studio/shared'
+import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-contracts'
 import { createCreativeAssetClient, type CreativeAssetApiClient } from './creative-asset-client'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {

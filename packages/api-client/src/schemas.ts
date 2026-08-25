@@ -6,7 +6,8 @@
  * 成功才能得到带类型的值。
  *
  * 这些类型【刻意】只定义在本包里（而不从 @bailian-studio/model-core 导入），以保持
- * api-client 是一个纯粹的传输层，仅依赖 @bailian-studio/shared + zod。
+ * api-client 是一个纯粹的传输层，通用协议依赖 @bailian-studio/shared，创意资产
+ * 协议依赖 @bailian-studio/creative-asset-contracts，运行时传输校验依赖 zod。
  */
 import { z } from 'zod'
 import {

@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@bailian-studio/credit-ledger": "workspace:*",
+    "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/db": "workspace:*",
     "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
-    "@bailian-studio/shared": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "catalog:"

@@ -13,7 +13,7 @@ import type {
   CreativeGenerationBindingRole,
   CreativeAssetReferenceRole,
   CreativeProjectStatus,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 
 export interface CreativeProject {
   id: string

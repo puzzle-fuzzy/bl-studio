@@ -5,7 +5,7 @@ import {
   CreativeAssetVersionStatusSchema,
   CreativeAssetStatusSchema,
   CreativeProjectStatusSchema,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import type {
   CreateCreativeAssetInput,
   CreateCreativeAssetReferenceInput,
@@ -17,7 +17,7 @@ import type {
   CreativeAssetVersionStatus,
   CreativeAssetStatus,
   CreativeProjectStatus,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import { unwrapData } from './http'
 
 const RecordSchema = z.record(z.string(), z.unknown())

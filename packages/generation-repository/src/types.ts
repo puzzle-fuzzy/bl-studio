@@ -13,7 +13,7 @@
  */
 import type { GenerationStatus } from '@bailian-studio/event-bus'
 import type { ModelCategory, ModelProvider } from '@bailian-studio/model-core'
-import type { CreativeGenerationContext } from '@bailian-studio/shared'
+import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-contracts'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import type { ProviderRequestAudit } from './provider-request-types'
 

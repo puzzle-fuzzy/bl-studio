@@ -217,6 +217,9 @@ importers:
       '@bailian-studio/creative-asset-compiler':
         specifier: workspace:*
         version: link:../../packages/creative-asset-compiler
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../../packages/creative-asset-contracts
       '@bailian-studio/creative-asset-repository':
         specifier: workspace:*
         version: link:../../packages/creative-asset-repository
@@ -430,6 +433,9 @@ importers:
 
   packages/api-client:
     dependencies:
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../creative-asset-contracts
       '@bailian-studio/shared':
         specifier: workspace:*
         version: link:../shared
@@ -465,12 +471,25 @@ importers:
 
   packages/creative-asset-compiler:
     dependencies:
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../creative-asset-contracts
       '@bailian-studio/model-core':
         specifier: workspace:*
         version: link:../model-core
-      '@bailian-studio/shared':
-        specifier: workspace:*
-        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: 'catalog:'
+        version: 4.1.10(@types/node@26.1.2)(@vitest/coverage-v8@4.1.10)(happy-dom@20.11.1)(vite@8.2.0(@types/node@26.1.2)(esbuild@0.28.1)(jiti@2.7.0)(tsx@4.23.5))
+
+  packages/creative-asset-contracts:
+    dependencies:
+      zod:
+        specifier: 'catalog:'
+        version: 4.4.3
     devDependencies:
       typescript:
         specifier: 'catalog:'
@@ -481,12 +500,12 @@ importers:
 
   packages/creative-asset-repository:
     dependencies:
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../creative-asset-contracts
       '@bailian-studio/db':
         specifier: workspace:*
         version: link:../db
-      '@bailian-studio/shared':
-        specifier: workspace:*
-        version: link:../shared
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(postgres@3.4.9)
@@ -551,6 +570,9 @@ importers:
 
   packages/generation-repository:
     dependencies:
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../creative-asset-contracts
       '@bailian-studio/credit-ledger':
         specifier: workspace:*
         version: link:../credit-ledger
@@ -563,9 +585,6 @@ importers:
       '@bailian-studio/model-core':
         specifier: workspace:*
         version: link:../model-core
-      '@bailian-studio/shared':
-        specifier: workspace:*
-        version: link:../shared
       '@bailian-studio/task-engine':
         specifier: workspace:*
         version: link:../task-engine
@@ -614,6 +633,9 @@ importers:
 
   packages/shared:
     dependencies:
+      '@bailian-studio/creative-asset-contracts':
+        specifier: workspace:*
+        version: link:../creative-asset-contracts
       zod:
         specifier: 'catalog:'
         version: 4.4.3

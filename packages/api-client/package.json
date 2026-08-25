@@ -11,6 +11,7 @@
     "test": "vitest run tests"
   },
   "dependencies": {
+    "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
     "zod": "catalog:"
   },

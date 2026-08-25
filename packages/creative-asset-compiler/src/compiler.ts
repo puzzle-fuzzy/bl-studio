@@ -11,7 +11,7 @@ import {
   isCreativeAssetReferenceRoleCompatible,
   normalizeCreativeGenerationContext,
   type CreativeGenerationBinding,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import { CreativeAssetCompilerError } from './errors'
 import type {
   ApprovedCreativeAssetBindingInput,

@@ -11,8 +11,8 @@
     "test": "vitest run tests"
   },
   "dependencies": {
-    "@bailian-studio/model-core": "workspace:*",
-    "@bailian-studio/shared": "workspace:*"
+    "@bailian-studio/creative-asset-contracts": "workspace:*",
+    "@bailian-studio/model-core": "workspace:*"
   },
   "devDependencies": {
     "typescript": "catalog:",

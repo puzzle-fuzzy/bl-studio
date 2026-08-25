@@ -9,8 +9,8 @@ import {
   CreativeAssetTypeSchema,
   CreativeAssetVersionStatusSchema,
   CreativeProjectStatusSchema,
-  validateInput,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
+import { validateInput } from '@bailian-studio/shared'
 import type {
   CreativeAssetDetail,
   CreativeAssetPreviewSource,

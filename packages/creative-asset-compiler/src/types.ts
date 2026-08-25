@@ -5,7 +5,7 @@ import type {
   CreativeGenerationContext,
   CreativeGenerationPurpose,
   CreativeGenerationBindingRole,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
 
 export type CreativeAssetCompilerMediaKind = 'image' | 'video' | 'audio'

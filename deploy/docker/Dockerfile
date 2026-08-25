@@ -49,6 +49,7 @@ COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
+COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
 COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-compiler/
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
 COPY packages/db/package.json ./packages/db/
@@ -82,6 +83,7 @@ COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
+COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
 COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-compiler/
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
 COPY packages/db/package.json ./packages/db/

@@ -17,7 +17,7 @@ import {
   type CreativeAssetType,
   type CreativeAssetVersionStatus,
   type CreativeProjectStatus,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/creative-asset-contracts'
 import { and, asc, desc, eq, ilike, inArray, isNull, ne, sql } from 'drizzle-orm'
 import { CreativeAssetRepositoryError } from './errors'
 import {

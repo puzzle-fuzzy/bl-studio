@@ -1,9 +1,10 @@
 /**
  * @bailian-studio/shared 的公共出口（barrel）。
  *
- * 作为 monorepo 依赖图的最底层叶子包，向 services / apps / 其他 packages 暴露
- * 共享工具：日志（logger）、指标（metrics）、运行时校验（validation）和统一错误类型
- * （errors）。按 package 边界规则，本包不得 import 任何其它 @bailian-studio/* 包。
+ * 向 services / apps / 其他 packages 暴露共享工具：日志（logger）、指标（metrics）、
+ * 运行时校验（validation）和统一错误类型（errors）。创意资产协议由
+ * @bailian-studio/creative-asset-contracts 独立拥有；需要创意资产协议的调用方应直接
+ * 依赖该包，不再通过 shared 间接取得领域类型。
  */
 
 export { createLogger, resolveLogFormat, safeJsonStringify, type LogFormat, type Logger } from './logger'
@@ -36,53 +37,6 @@ export {
   BailianStudioError,
   ValidationError,
 } from './errors'
-
-export {
-  CREATIVE_ASSET_PROTOCOL_VERSION,
-  CREATIVE_ASSET_REFERENCE_ROLES,
-  CREATIVE_ASSET_STATUSES,
-  CREATIVE_ASSET_TYPES,
-  CREATIVE_ASSET_VERSION_STATUSES,
-  CREATIVE_PROJECT_STATUSES,
-  CREATIVE_GENERATION_BINDING_ROLES,
-  CREATIVE_GENERATION_PURPOSES,
-  CreateCreativeProjectAssetSchema,
-  CreateCreativeProjectSchema,
-  CreateCreativeAssetReferenceSchema,
-  CreateCreativeAssetSchema,
-  CreateCreativeAssetVersionSchema,
-  CreateCreativeAssetVersionFromGenerationSchema,
-  CreativeAssetReferenceMetadataSchema,
-  CreativeAssetReferenceRoleSchema,
-  CreativeAssetSemanticSpecSchema,
-  CreativeAssetStatusSchema,
-  CreativeAssetTypeSchema,
-  CreativeAssetVersionStatusSchema,
-  CreativeProjectStatusSchema,
-  CreativeGenerationBindingRoleSchema,
-  CreativeGenerationBindingsSchema,
-  CreativeGenerationContextSchema,
-  CreativeGenerationPurposeSchema,
-  isCreativeAssetReferenceRoleCompatible,
-  normalizeCreativeGenerationContext,
-  type CreateCreativeAssetInput,
-  type CreateCreativeAssetReferenceInput,
-  type CreateCreativeAssetVersionInput,
-  type CreateCreativeAssetVersionFromGenerationInput,
-  type CreateCreativeProjectAssetInput,
-  type CreateCreativeProjectInput,
-  type CreativeAssetReferenceMetadata,
-  type CreativeAssetReferenceRole,
-  type CreativeAssetSemanticSpec,
-  type CreativeAssetStatus,
-  type CreativeAssetType,
-  type CreativeAssetVersionStatus,
-  type CreativeProjectStatus,
-  type CreativeGenerationBinding,
-  type CreativeGenerationBindingRole,
-  type CreativeGenerationContext,
-  type CreativeGenerationPurpose,
-} from './creative-assets'
 
 export {
   CreateDirectorProjectSchema,

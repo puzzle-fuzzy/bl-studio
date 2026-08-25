@@ -120,16 +120,16 @@ apps/worker
 
 ## 6. 包与模块调整目标
 
-### 6.1 `packages/creative-asset-contracts`（目标，未实现）
+### 6.1 `packages/creative-asset-contracts`（已实现）
 
-从当前 `packages/shared/src/creative-assets.ts` 提取以下稳定协议：
+从独立包 `packages/creative-asset-contracts/src/index.ts` 维护以下稳定协议：
 
 - 资产类型、资产/版本/项目状态和参考图 role。
 - `CreativeAssetSemanticSpec`、`CreativeAssetReferenceMetadata`。
 - `CreativeGenerationContext`、binding、协议版本和归一化函数。
 - 创建/更新输入 schema 和对外响应 schema 的基础部分。
 
-该包只依赖 Zod，不依赖 DB、API、Worker、Provider 或 UI。迁移完成后，`shared` 不再作为创意资产协议的事实来源；不保留两套 schema。
+该包只依赖 Zod，不依赖 DB、API、Worker、Provider 或 UI。`shared` 不再作为创意资产协议的事实来源；不保留两套 schema，仅在通用 `CreateGenerationSchema` 中依赖该包完成兼容扩展。
 
 ### 6.2 `packages/creative-asset-domain`（目标，未实现）
 
@@ -142,16 +142,16 @@ apps/worker
 
 数据库 constraint 仍然保留作为最后一道保护，但业务规则的可测试事实来源放在这里。
 
-### 6.3 `packages/creative-asset-repository`（已实现，迁移中）
+### 6.3 `packages/creative-asset-repository`（已实现）
 
-当前已实现项目、资产、版本、参考图的数据库读写和 ownership 防线。后续需要：
+当前已实现项目、资产、版本、参考图的数据库读写和 ownership 防线：
 
-- 将纯状态/兼容性规则调用收敛到 `creative-asset-domain`。
+- 纯状态/兼容性规则目前由 contracts 暴露的无 IO 函数支撑；未来若规则复杂度继续增长，再提取 `creative-asset-domain`。
 - 把查询结果与写入输入继续保持领域类型，不向 API 暴露 Drizzle row。
 - 保留分页、软删除、恢复和事务边界。
 - 补齐并发冲突、唯一约束冲突和审计字段的稳定错误映射。
 
-### 6.4 `apps/api/src/modules/creative-assets/service.ts`（目标，未实现）
+### 6.4 `apps/api/src/modules/creative-assets/service.ts`（已实现）
 
 该层是 HTTP 之外的应用编排：
 
@@ -162,7 +162,7 @@ apps/worker
 
 Elysia route 只做认证、Zod 入参、调用 use case 和响应整形；简单读取也通过同一个 facade，避免路由逐渐变成第二个 service。
 
-### 6.5 `packages/creative-asset-compiler`（目标，未实现）
+### 6.5 `packages/creative-asset-compiler`（已实现）
 
 这是 provider-neutral 的纯编译层：
 
@@ -182,20 +182,19 @@ CreativeGenerationRequest
 
 它不包含 DashScope 字段名、HTTP endpoint、密钥、URL 签名和数据库查询。模型能力来自 `model-core` manifest，不能新增第二份模型参数表。
 
-### 6.6 `packages/api-client`（目标，未实现）
+### 6.6 `packages/api-client`（已实现）
 
-新增项目/资产/版本/参考图 API 的 typed client 和 response schema。Web 页面只使用 client，不直接拼接 `/api/creative/*`，同时保留分页 cursor、搜索、空态、错误和恢复语义。
+项目/资产/版本/参考图 API 已有 typed client 和 response schema。Web 页面只使用 client，不直接拼接 `/api/creative/*`，同时保留分页 cursor、搜索、空态、错误和恢复语义。
 
 ## 7. 当前实现与目标的差距
 
 | 当前情况 | 问题 | 调整策略 |
 | --- | --- | --- |
-| creative asset route 直接调用 repository | 应用编排和 HTTP 适配混在一起 | 先加 service facade，再逐个迁移 route |
-| 创意协议位于 `shared` | shared 逐渐成为万能包，领域边界变模糊 | 提取明确 contracts/domain 包，完成后删除旧事实来源 |
+| 创意协议曾位于 `shared` | shared 逐渐成为万能包，领域边界变模糊 | 已提取 `creative-asset-contracts`，后续仅在规则复杂度增长时提取 domain 包 |
 | generation repository 直接读取 creative 表做准入校验 | 生成持久化层承担了部分资产域规则 | 短期保留数据库事务防线；先让 compiler/service 负责正常路径，后续将校验收敛为可注入的快照准入接口 |
-| `creativeContext` 已能持久化，但没有 compiler | API/前端未来会自行拼 provider 参数，容易产生漂移 | compiler 统一生成 provider-neutral 输入 |
+| `creativeContext` 已能持久化 | API/前端自行拼 provider 参数会产生漂移 | 已由 compiler 统一生成 provider-neutral 输入 |
 | worker 已有物理资产 URL 解析 | 只能解决文件访问，不能解决语义资产映射 | 继续保留；它只消费 compiler 生成的持久化输入 |
-| `api-client` 暂无创意资产 client | Web 无法稳定消费新 API | API 契约稳定后再补 client 和工作台 |
+| Web 工作台仍在快速调整 | 过早固化页面测试会抬高重构成本 | 保留 API/client/纯函数测试，页面级 E2E 延后到布局稳定后 |
 | `director_projects` 与 `creative_projects` 并存 | 名称都叫 project，容易误合并 | 明确为素材组织域与导演工作流域，暂不合表 |
 
 ## 8. 分阶段迁移顺序
@@ -206,37 +205,37 @@ CreativeGenerationRequest
 - 以本文作为资产域重构依据。
 - 不改剧本、分镜、剪辑和导演流程。
 
-### Phase 1：契约和纯规则收敛
+### Phase 1：契约和纯规则收敛（contracts 已完成，domain 延后）
 
-- 提取 `creative-asset-contracts` 和 `creative-asset-domain`。
-- 同步 `shared`、generation repository、API 和测试的 import。
+- 提取 `creative-asset-contracts`；已同步 `shared`、generation repository、API 和测试的 import。
+- `creative-asset-domain` 暂不单独创建，避免在规则尚未复杂到需要额外包边界时增加维护成本。
 - 保持协议版本 1，禁止同时维护两套 schema。
 
-### Phase 2：API 应用层和 API Client
+### Phase 2：API 应用层和 API Client（已完成）
 
 - 增加 `creative-assets/service.ts`。
 - 让路由只保留认证、输入校验和响应适配。
 - 在 `packages/api-client` 增加项目/资产/版本/参考图 client。
-- 暂不改 Web 视觉，先接通真实数据、加载、空态、错误和分页。
+- 保持 Web 视觉和页面布局可调整，先确保真实数据接缝、加载、空态、错误和分页语义稳定。
 
-### Phase 3：Provider-neutral compiler
+### Phase 3：Provider-neutral compiler（已完成）
 
 - 根据真实 model manifest 建立能力映射和媒体参数映射。
 - 将资产版本和参考图编译为生成快照输入。
 - 先用纯函数测试覆盖角色/场景/道具、多参考图、超限、缺失能力和幂等指纹。
 
-### Phase 4：生成事务收敛
+### Phase 4：生成事务收敛（已完成）
 
 - 让生成提交使用 compiler 结果。
 - 保留 generation repository 的数据库事务和历史快照能力。
 - 逐步移除其对创意资产“当前状态查询”的业务编排，只保留必要的原子持久化和防御性校验。
 
-### Phase 5：素材工作台
+### Phase 5：素材工作台（基础版已完成，视觉验收延后）
 
 - Web 端按“项目 → 资产类型 → 资产版本 → 参考图”组织浏览。
 - 支持项目筛选、搜索、分页、版本状态、归档恢复和引用生成。
 - 长列表达到阈值后使用虚拟滚动，但保留 cursor 分页和失败重试。
-- 只有页面交互稳定后，才考虑 Playwright 页面级测试。
+- 只有页面交互稳定后，才考虑 Playwright 页面级测试；当前不新增页面级 UI 测试。
 
 ### Phase 6：剧本能力（未来，不在当前范围）
 
