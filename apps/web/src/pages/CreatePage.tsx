@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Link2, Loader2, Plus, RectangleHorizontal, RectangleVertical, Scan, Sparkles, Square, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
@@ -15,6 +15,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
+import { Input } from '@/components/ui/input'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Separator } from '@/components/ui/separator'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -1163,11 +1164,6 @@ function CharacterSettingsPopover({
 
   return (
     <DropdownMenuContent side="top" align="center" className="w-[min(31rem,calc(100vw-2rem))] p-4">
-      <DropdownMenuLabel className="px-0">
-        <span className="block">输出设置</span>
-        <span className="mt-1 block text-sm font-medium text-foreground">比例、分辨率和生成数量</span>
-      </DropdownMenuLabel>
-      <DropdownMenuSeparator />
       {sizeField !== undefined && <CharacterSizeControl field={sizeField} value={characterParameterValue(sizeField, values)} onChange={value => onValueChange(sizeField.parameter.name, value)} />}
       {countField !== undefined && <CharacterCountControl field={countField} value={characterParameterValue(countField, values)} onChange={value => onValueChange(countField.parameter.name, value)} />}
       {remainingFields.length > 0 && (
@@ -1195,9 +1191,9 @@ function CharacterSizeControl({ field, value, onChange }: { field: FormField; va
   if (choices.length === 0) return null
 
   return (
-    <div className="space-y-3">
+    <div className="flex flex-col gap-4">
       {ratios.length > 0 && (
-        <div className="space-y-1.5">
+        <div className="flex flex-col gap-1.5">
           <p className="text-xs text-muted-foreground">选择比例</p>
           <ToggleGroup
             type="single"
@@ -1208,14 +1204,19 @@ function CharacterSizeControl({ field, value, onChange }: { field: FormField; va
             variant="outline"
             size="sm"
             spacing={0}
-            className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1"
+            className={cn('grid w-full rounded-xl bg-muted/60 p-1', ratioGridClass(ratios.length))}
             aria-label="选择比例"
           >
-            {ratios.map(ratio => <ToggleGroupItem key={ratio} value={ratio} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{ratio}</ToggleGroupItem>)}
+            {ratios.map(ratio => (
+              <ToggleGroupItem key={ratio} value={ratio} className="flex h-14 flex-col items-center justify-center gap-1 rounded-lg border-0 px-1 py-1 text-[11px] font-normal shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">
+                <CharacterRatioGlyph ratio={ratio} />
+                <span>{ratio}</span>
+              </ToggleGroupItem>
+            ))}
           </ToggleGroup>
         </div>
       )}
-      <div className="space-y-1.5">
+      <div className="flex flex-col gap-1.5">
         <p className="text-xs text-muted-foreground">选择分辨率</p>
         <ToggleGroup
           type="single"
@@ -1226,15 +1227,71 @@ function CharacterSizeControl({ field, value, onChange }: { field: FormField; va
           variant="outline"
           size="sm"
           spacing={0}
-          className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1"
+          className={cn('grid w-full rounded-xl bg-muted/60 p-1', optionGridClass(resolutions.length, 4))}
           aria-label="选择分辨率"
         >
-          {resolutions.map(resolution => <ToggleGroupItem key={resolution} value={resolution} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{resolution}</ToggleGroupItem>)}
+          {resolutions.map(resolution => <ToggleGroupItem key={resolution} value={resolution} className="rounded-lg border-0 px-2 py-2 text-xs font-normal shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{resolution}</ToggleGroupItem>)}
         </ToggleGroup>
       </div>
-      <p className="text-[11px] text-muted-foreground">当前尺寸：{selected?.label ?? '—'}</p>
+      <div className="flex flex-col gap-1.5">
+        <p className="text-xs text-muted-foreground">尺寸</p>
+        <div className="flex items-center gap-2">
+          <CharacterDimensionInput label="W" value={selected?.width} />
+          <Link2 className="shrink-0 text-muted-foreground" aria-hidden="true" />
+          <CharacterDimensionInput label="H" value={selected?.height} />
+          <span className="shrink-0 text-xs text-muted-foreground">PX</span>
+        </div>
+      </div>
     </div>
   )
+}
+
+function CharacterRatioGlyph({ ratio }: { ratio: string }) {
+  if (ratio === '智能') return <Scan aria-hidden="true" />
+  const [width, height] = ratio.split(':').map(Number)
+  if (width === undefined || height === undefined || Number.isNaN(width) || Number.isNaN(height)) {
+    return <Square aria-hidden="true" />
+  }
+  const Glyph = width === height ? Square : width > height ? RectangleHorizontal : RectangleVertical
+  const scaleClass = width / height >= 1.7 ? 'scale-x-125' : width / height <= 0.6 ? 'scale-y-125' : ''
+  return <Glyph className={scaleClass} aria-hidden="true" />
+}
+
+function CharacterDimensionInput({ label, value }: { label: string; value: number | undefined }) {
+  return (
+    <div className="flex min-w-0 flex-1 items-center rounded-lg bg-muted/60 px-3">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <Input
+        value={value === undefined ? '' : String(value)}
+        readOnly
+        aria-label={label === 'W' ? '宽度' : '高度'}
+        className="h-9 min-w-0 border-0 bg-transparent px-2 text-right text-xs shadow-none focus-visible:ring-0"
+      />
+    </div>
+  )
+}
+
+function ratioGridClass(count: number) {
+  if (count >= 9) return 'grid-cols-9'
+  if (count === 8) return 'grid-cols-8'
+  if (count === 7) return 'grid-cols-7'
+  if (count === 6) return 'grid-cols-6'
+  if (count === 5) return 'grid-cols-5'
+  if (count === 4) return 'grid-cols-4'
+  return 'grid-cols-2'
+}
+
+function optionGridClass(count: number, maxColumns: number) {
+  if (maxColumns === 8) {
+    if (count >= 8) return 'grid-cols-8'
+    if (count >= 6) return 'grid-cols-6'
+    if (count >= 4) return 'grid-cols-4'
+    if (count >= 2) return 'grid-cols-2'
+    return 'grid-cols-1'
+  }
+  if (count >= 4) return 'grid-cols-4'
+  if (count >= 2) return 'grid-cols-2'
+  return 'grid-cols-1'
 }
 
 function CharacterCountControl({ field, value, onChange }: { field: FormField; value: unknown; onChange: (value: unknown) => void }) {
@@ -1255,10 +1312,10 @@ function CharacterCountControl({ field, value, onChange }: { field: FormField; v
         variant="outline"
         size="sm"
         spacing={0}
-        className="grid w-full grid-cols-6 rounded-xl bg-muted/60 p-1"
+        className={cn('grid w-full rounded-xl bg-muted/60 p-1', optionGridClass(counts.length, 8))}
         aria-label="选择生成数量"
       >
-        {counts.map(count => <ToggleGroupItem key={count} value={String(count)} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{count}</ToggleGroupItem>)}
+        {counts.map(count => <ToggleGroupItem key={count} value={String(count)} className="rounded-lg border-0 px-2 py-2 text-xs font-normal shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{count}</ToggleGroupItem>)}
       </ToggleGroup>
     </div>
   )
@@ -1318,7 +1375,7 @@ function characterSizeChoice(option: { label: string; value: unknown }): Charact
   const resolutionText = resolutionMatch?.[1]
   const ratio = ratioText === undefined ? (width !== undefined && height !== undefined ? `${width / (divisor || 1)}:${height / (divisor || 1)}` : undefined) : ratioText.replace(/\s/g, '')
   const resolution = resolutionText === undefined ? (width !== undefined && height !== undefined ? `${Math.max(width, height) >= 3500 ? 4 : Math.max(width, height) >= 1800 ? 2 : 1}K` : undefined) : resolutionText.toUpperCase()
-  return { label: option.label, value: option.value, ratio, resolution }
+  return { label: option.label, value: option.value, ratio, resolution, width, height }
 }
 
 type CharacterSizeChoice = {
@@ -1326,6 +1383,8 @@ type CharacterSizeChoice = {
   value: unknown
   ratio: string | undefined
   resolution: string | undefined
+  width: number | undefined
+  height: number | undefined
 }
 
 function gcd(left: number, right: number): number {
