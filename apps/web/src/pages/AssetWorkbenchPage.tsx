@@ -10,21 +10,27 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import type { CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
-import { UploadCreativeAssetDialog } from '@/components/assets/UploadCreativeAssetDialog'
+import type { AssetItem, CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
+import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
+import { UploadAssetDialog } from '@/components/assets/UploadAssetDialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { MediaLightbox, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import {
   creativeAssetTypeLabel,
   creativeAssetVersionStatusLabel,
+  kindLabel,
+  sourceLabel,
 } from '@/lib/labels'
 import { resolveApiUrl } from '@/lib/api'
+import { assetQueryKey, useAssetsStore } from '@/stores/assets-store'
 import { creativeAssetQueryKey, useCreativeAssetsStore } from '@/stores/creative-assets-store'
 import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
 
 const ASSET_TABS = [
-  { value: 'all', label: '全部素材' },
+  { value: 'all', label: '全部资产' },
+  { value: 'media', label: '素材' },
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
@@ -41,6 +47,10 @@ function isAssetTab(value: string | null): value is AssetTab {
 
 function isAssetView(value: string | null): value is AssetView {
   return value === 'grid' || value === 'list'
+}
+
+function isPreviewableMedia(asset: AssetItem): asset is AssetItem & { kind: 'image' | 'video' } {
+  return asset.kind === 'image' || asset.kind === 'video'
 }
 
 function previewUrlFromMetadata(asset: CreativeAssetSummary): string | undefined {
@@ -106,6 +116,7 @@ export function AssetWorkbenchPage() {
   const type = ASSET_TYPES.includes(tab as CreativeAssetType) ? (tab as CreativeAssetType) : undefined
   const [searchInput, setSearchInput] = useState(queryText)
   const [uploadOpen, setUploadOpen] = useState(false)
+  const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   const loadProjects = useCreativeProjectsStore(state => state.load)
   const projectState = useCreativeProjectsStore(state => state.queries[creativeProjectQueryKey()])
@@ -119,18 +130,27 @@ export function AssetWorkbenchPage() {
     }),
     [projectId, queryText, type],
   )
-  const assetQueryKey = creativeAssetQueryKey(assetQuery)
-  const assetState = useCreativeAssetsStore(state => state.queries[assetQueryKey])
+  const creativeQueryKey = creativeAssetQueryKey(assetQuery)
+  const assetState = useCreativeAssetsStore(state => state.queries[creativeQueryKey])
   const loadAssets = useCreativeAssetsStore(state => state.load)
   const loadMoreAssets = useCreativeAssetsStore(state => state.loadMore)
+  const mediaQuery = useMemo(() => (queryText ? { q: queryText } : {}), [queryText])
+  const mediaQueryKey = assetQueryKey(mediaQuery)
+  const mediaState = useAssetsStore(state => state.queries[mediaQueryKey])
+  const loadMedia = useAssetsStore(state => state.load)
+  const loadMoreMedia = useAssetsStore(state => state.loadMore)
 
   useEffect(() => {
     void loadProjects()
   }, [loadProjects])
 
   useEffect(() => {
-    void loadAssets(assetQuery)
-  }, [assetQuery, loadAssets])
+    if (tab !== 'media') void loadAssets(assetQuery)
+  }, [assetQuery, loadAssets, tab])
+
+  useEffect(() => {
+    if (tab === 'all' || tab === 'media') void loadMedia(mediaQuery)
+  }, [loadMedia, mediaQuery, tab])
 
   useEffect(() => {
     setSearchInput(queryText)
@@ -145,9 +165,14 @@ export function AssetWorkbenchPage() {
   }, [queryText, searchInput, searchParams, setSearchParams])
 
   const activeProject = projects.find(project => project.id === projectId)
-  const defaultUploadType: CreativeAssetType = ASSET_TYPES.includes(tab as CreativeAssetType)
-    ? (tab as CreativeAssetType)
-    : 'character'
+  const mediaItems = (mediaState?.items ?? []).filter(isPreviewableMedia)
+  const lightboxItems: LightboxMedia[] = mediaItems.map(asset => ({
+    key: asset.id,
+    kind: asset.kind,
+    ...(asset.url === undefined ? {} : { url: asset.url }),
+    ...(asset.thumbnailUrl === undefined ? {} : { thumbnailUrl: asset.thumbnailUrl }),
+    ...(asset.fileName === undefined ? {} : { fileName: asset.fileName }),
+  }))
 
   function setParam(key: string, value: string | undefined) {
     setSearchParams(updateSearchParams(searchParams, { [key]: value }))
@@ -173,7 +198,7 @@ export function AssetWorkbenchPage() {
           <div className="flex flex-wrap items-start gap-3">
             <div className="mr-auto min-w-0">
               <div className="mb-1 flex items-center gap-2 text-xs text-muted-foreground">
-                <span>素材库</span>
+                <span>ASSETS</span>
                 {activeProject && (
                   <>
                     <span aria-hidden="true">/</span>
@@ -181,14 +206,14 @@ export function AssetWorkbenchPage() {
                   </>
                 )}
               </div>
-              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{activeProject?.title ?? '素材库'}</h1>
+              <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{activeProject?.title ?? '资产'}</h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                按项目整理主体、场景和道具，确认版本后再带入下一次生成。
+                统一管理普通图片视频，以及可复用的主体、场景和道具资产。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Select value={projectId ?? 'all'} onValueChange={handleProjectChange}>
-                <SelectTrigger className="w-40 bg-background/80" title="按项目筛选素材">
+                <SelectTrigger className="w-40 bg-background/80" title="按项目筛选资产">
                   <FolderKanban className="size-4 text-muted-foreground" />
                   <SelectValue placeholder="全部项目" />
                 </SelectTrigger>
@@ -205,9 +230,9 @@ export function AssetWorkbenchPage() {
                 <Plus className="size-4" />
                 新建项目
               </Button>
-              <Button onClick={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)} title="打开素材生成页">
+              <Button onClick={() => navigate('/create?assetType=asset')} title="创建通用资产">
                 <Sparkles className="size-4" />
-                生成素材
+                创建资产
               </Button>
             </div>
           </div>
@@ -215,15 +240,15 @@ export function AssetWorkbenchPage() {
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             <div className="relative min-w-0 flex-1 lg:max-w-xl">
               <label htmlFor="asset-search" className="sr-only">
-                搜索素材
+                搜索资产
               </label>
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 id="asset-search"
                 value={searchInput}
                 onChange={event => setSearchInput(event.target.value)}
-                placeholder="搜索素材、项目或提示词"
-                title="搜索素材、项目或提示词"
+                placeholder="搜索资产、项目或提示词"
+                title="搜索资产、项目或提示词"
                 className="bg-background/80 pl-9 pr-9"
               />
               {searchInput && (
@@ -239,7 +264,7 @@ export function AssetWorkbenchPage() {
               )}
             </div>
             <div className="flex items-center gap-2 lg:ml-auto">
-              <Button variant="outline" onClick={() => setUploadOpen(true)} title="上传素材到素材库">
+              <Button variant="outline" onClick={() => setUploadOpen(true)} title="上传图片或视频到素材">
                 <Upload className="size-4" />
                 上传素材
               </Button>
@@ -256,7 +281,7 @@ export function AssetWorkbenchPage() {
           </div>
         </header>
 
-        <nav className="-mb-1 flex gap-1 overflow-x-auto pb-1" aria-label="素材类型">
+        <nav className="-mb-1 flex gap-1 overflow-x-auto pb-1" aria-label="资产类型">
           {ASSET_TABS.map(item => (
               <button
                 key={item.value}
@@ -276,33 +301,83 @@ export function AssetWorkbenchPage() {
           ))}
         </nav>
 
-        <AssetCollection
-          items={assetState?.items ?? []}
-          view={view}
-          isLoading={assetState?.isLoading ?? false}
-          isLoadingMore={assetState?.isLoadingMore ?? false}
-          hasNextPage={assetState?.nextCursor !== undefined}
-          error={assetState?.error ?? null}
-          onLoadMore={() => void loadMoreAssets(assetQuery)}
-          onRetry={() => void loadAssets(assetQuery, true)}
-          onCreate={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
-          onUpload={() => setUploadOpen(true)}
-        />
+        {tab === 'all' && (
+          <div className="space-y-8">
+            <AssetSection title="素材" description="先把普通图片和视频放在这里，后续创作时随时调用。">
+              <MediaAssetCollection
+                items={mediaItems}
+                view={view}
+                isLoading={mediaState?.isLoading ?? false}
+                isLoadingMore={mediaState?.isLoadingMore ?? false}
+                hasNextPage={mediaState?.nextCursor !== undefined}
+                error={mediaState?.error ?? null}
+                onLoadMore={() => void loadMoreMedia(mediaQuery)}
+                onRetry={() => void loadMedia(mediaQuery, true)}
+                onUpload={() => setUploadOpen(true)}
+                onPreview={index => setPreviewIndex(index)}
+              />
+            </AssetSection>
+            <AssetSection title="主体 / 场景 / 道具" description="经过版本确认的结构化资产，可以稳定地带入下一次生成。">
+              <CreativeAssetCollection
+                items={assetState?.items ?? []}
+                view={view}
+                isLoading={assetState?.isLoading ?? false}
+                isLoadingMore={assetState?.isLoadingMore ?? false}
+                hasNextPage={assetState?.nextCursor !== undefined}
+                error={assetState?.error ?? null}
+                onLoadMore={() => void loadMoreAssets(assetQuery)}
+                onRetry={() => void loadAssets(assetQuery, true)}
+                onCreate={() => navigate('/create?assetType=asset')}
+              />
+            </AssetSection>
+          </div>
+        )}
+        {tab === 'media' && (
+          <MediaAssetCollection
+            items={mediaItems}
+            view={view}
+            isLoading={mediaState?.isLoading ?? false}
+            isLoadingMore={mediaState?.isLoadingMore ?? false}
+            hasNextPage={mediaState?.nextCursor !== undefined}
+            error={mediaState?.error ?? null}
+            onLoadMore={() => void loadMoreMedia(mediaQuery)}
+            onRetry={() => void loadMedia(mediaQuery, true)}
+            onUpload={() => setUploadOpen(true)}
+            onPreview={index => setPreviewIndex(index)}
+          />
+        )}
+        {tab !== 'all' && tab !== 'media' && (
+          <CreativeAssetCollection
+            items={assetState?.items ?? []}
+            view={view}
+            isLoading={assetState?.isLoading ?? false}
+            isLoadingMore={assetState?.isLoadingMore ?? false}
+            hasNextPage={assetState?.nextCursor !== undefined}
+            error={assetState?.error ?? null}
+            onLoadMore={() => void loadMoreAssets(assetQuery)}
+            onRetry={() => void loadAssets(assetQuery, true)}
+            onCreate={() => navigate(`/create?assetType=${tab}`)}
+          />
+        )}
       </div>
 
-      <UploadCreativeAssetDialog
+      <UploadAssetDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
-        projects={projects}
-        projectId={projectId}
-        defaultType={defaultUploadType}
-        onCreated={asset => {
+        onCreated={() => {
           setUploadOpen(false)
-          void loadAssets(assetQuery, true)
-          void loadProjects({}, true)
-          navigate(`/assets/${encodeURIComponent(asset.id)}`)
+          void loadMedia(mediaQuery, true)
         }}
       />
+      {previewIndex !== null && lightboxItems.length > 0 && (
+        <MediaLightbox
+          items={lightboxItems}
+          index={previewIndex}
+          onIndexChange={setPreviewIndex}
+          onClose={() => setPreviewIndex(null)}
+          downloadUrl={mediaItems[previewIndex]?.downloadUrl}
+        />
+      )}
     </div>
   )
 }
@@ -335,7 +410,149 @@ function ViewButton({
   )
 }
 
-function AssetCollection({
+function AssetSection({
+  title,
+  description,
+  children,
+}: {
+  title: string
+  description: string
+  children: React.ReactNode
+}) {
+  return (
+    <section className="space-y-3" aria-labelledby={`asset-section-${title}`}>
+      <div>
+        <h2 id={`asset-section-${title}`} className="text-base font-semibold tracking-tight">{title}</h2>
+        <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+      </div>
+      {children}
+    </section>
+  )
+}
+
+function MediaAssetCollection({
+  items,
+  view,
+  isLoading,
+  isLoadingMore,
+  hasNextPage,
+  error,
+  onLoadMore,
+  onRetry,
+  onUpload,
+  onPreview,
+}: {
+  items: AssetItem[]
+  view: AssetView
+  isLoading: boolean
+  isLoadingMore: boolean
+  hasNextPage: boolean
+  error: string | null
+  onLoadMore: () => void
+  onRetry: () => void
+  onUpload: () => void
+  onPreview: (index: number) => void
+}) {
+  if (isLoading && items.length === 0) return <AssetSkeleton view={view} />
+
+  if (error && items.length === 0) {
+    return (
+      <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
+        <p className="text-sm font-medium">素材暂时加载失败</p>
+        <p className="max-w-md text-sm text-muted-foreground">{error}</p>
+        <Button variant="outline" onClick={onRetry}>重新加载</Button>
+      </div>
+    )
+  }
+
+  if (items.length === 0) {
+    return (
+      <div className="flex min-h-56 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
+        <div className="flex size-11 items-center justify-center rounded-xl border border-border bg-muted/70 text-primary">
+          <Upload className="size-5" />
+        </div>
+        <div>
+          <h3 className="text-sm font-semibold">还没有普通素材</h3>
+          <p className="mt-1 text-sm text-muted-foreground">上传图片或视频，它们会先保存在这里，不会自动变成主体或场景。</p>
+        </div>
+        <Button onClick={onUpload}><Upload className="size-4" />上传素材</Button>
+      </div>
+    )
+  }
+
+  return (
+    <>
+      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+        <span>{items.length} 个素材</span>
+        {isLoading && <span className="text-primary">正在更新</span>}
+        {error && <span className="text-destructive">部分加载失败</span>}
+      </div>
+      {view === 'grid' ? (
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6">
+          {items.map((asset, index) => <MediaAssetTile key={asset.id} asset={asset} onOpen={() => onPreview(index)} />)}
+        </div>
+      ) : (
+        <div className="overflow-hidden rounded-xl border border-border bg-card/60">
+          <div className="hidden grid-cols-[minmax(0,1.8fr)_120px_140px] gap-4 border-b border-border px-4 py-3 text-xs text-muted-foreground sm:grid">
+            <span>素材</span><span>类型</span><span>来源</span>
+          </div>
+          {items.map((asset, index) => <MediaAssetRow key={asset.id} asset={asset} onOpen={() => onPreview(index)} />)}
+        </div>
+      )}
+      {hasNextPage && (
+        <div className="flex justify-center pb-2">
+          <Button variant="outline" size="sm" disabled={isLoadingMore} onClick={onLoadMore}>
+            {isLoadingMore ? '正在加载…' : '加载更多'}
+          </Button>
+        </div>
+      )}
+    </>
+  )
+}
+
+function MediaAssetTile({ asset, onOpen }: { asset: AssetItem; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`预览素材：${asset.fileName ?? kindLabel(asset.kind)}`}
+      className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <div className="aspect-[4/3] overflow-hidden bg-muted/60">
+        <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} alt={asset.fileName ?? kindLabel(asset.kind)} />
+      </div>
+      <div className="space-y-1.5 p-3">
+        <p className="truncate text-sm font-semibold">{asset.fileName ?? '未命名素材'}</p>
+        <p className="text-xs text-muted-foreground">{kindLabel(asset.kind)} · {sourceLabel(asset.source)}</p>
+      </div>
+    </button>
+  )
+}
+
+function MediaAssetRow({ asset, onOpen }: { asset: AssetItem; onOpen: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`预览素材：${asset.fileName ?? kindLabel(asset.kind)}`}
+      className="grid w-full grid-cols-1 gap-2 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1.8fr)_120px_140px] sm:items-center sm:gap-4"
+    >
+      <span className="flex min-w-0 items-center gap-3">
+        <span className="size-10 shrink-0 overflow-hidden rounded-lg bg-muted">
+          <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} alt="" />
+        </span>
+        <span className="min-w-0">
+          <span className="block truncate text-sm font-semibold">{asset.fileName ?? '未命名素材'}</span>
+          <span className="block truncate text-xs text-muted-foreground">点击预览图片或视频</span>
+        </span>
+      </span>
+      <span className="text-xs text-muted-foreground">{kindLabel(asset.kind)}</span>
+      <span className="text-xs text-muted-foreground">{sourceLabel(asset.source)}</span>
+    </button>
+  )
+}
+
+function CreativeAssetCollection({
   items,
   view,
   isLoading,
@@ -345,7 +562,6 @@ function AssetCollection({
   onLoadMore,
   onRetry,
   onCreate,
-  onUpload,
 }: {
   items: CreativeAssetSummary[]
   view: AssetView
@@ -356,7 +572,6 @@ function AssetCollection({
   onLoadMore: () => void
   onRetry: () => void
   onCreate: () => void
-  onUpload: () => void
 }) {
   if (isLoading && items.length === 0) {
     return <AssetSkeleton view={view} />
@@ -365,7 +580,7 @@ function AssetCollection({
   if (error && items.length === 0) {
     return (
       <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center">
-        <p className="text-sm font-medium">素材暂时加载失败</p>
+        <p className="text-sm font-medium">创意资产暂时加载失败</p>
         <p className="max-w-md text-sm text-muted-foreground">{error}</p>
         <Button variant="outline" onClick={onRetry}>重新加载</Button>
       </div>
@@ -380,12 +595,11 @@ function AssetCollection({
             <Sparkles className="size-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold">这个项目还没有素材</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">先创建主体、场景或道具，再把确认版本带入下一次生成。</p>
+          <h2 className="text-base font-semibold">还没有结构化资产</h2>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">从创建主体、场景或道具开始，生成后再确认版本。</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
-            <Button onClick={onCreate}><Sparkles className="size-4" />生成素材</Button>
-            <Button variant="outline" onClick={onUpload}><Upload className="size-4" />上传素材</Button>
+            <Button onClick={onCreate}><Sparkles className="size-4" />开始创建</Button>
           </div>
         </div>
       </div>

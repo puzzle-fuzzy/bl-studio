@@ -50,20 +50,20 @@ export function WorkbenchPage() {
             <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Studio workspace</p>
             <h1 className="text-3xl font-semibold tracking-tight">工作台</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              从项目进入素材库，维护主体、场景和道具的稳定版本，再把它们带入生成。
+              从资产进入项目，管理普通素材和主体、场景、道具的稳定版本，再把它们带入生成。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             <Button asChild variant="outline">
               <Link to="/assets">
                 <LibraryBig />
-                打开素材库
+                打开资产
               </Link>
             </Button>
             <Button asChild>
-              <Link to="/create">
+              <Link to="/create?assetType=asset">
                 <Sparkles />
-                开始生成
+                创建资产
               </Link>
             </Button>
           </div>
@@ -73,7 +73,7 @@ export function WorkbenchPage() {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-lg font-semibold">项目</h2>
-              <p className="mt-1 text-sm text-muted-foreground">项目是整理素材的第一层上下文。</p>
+              <p className="mt-1 text-sm text-muted-foreground">项目是整理资产的第一层上下文。</p>
             </div>
             <Button asChild variant="ghost" size="sm">
               <Link to="/projects">
@@ -101,7 +101,7 @@ export function WorkbenchPage() {
                 </div>
                 <div>
                   <p className="font-medium">还没有项目</p>
-                  <p className="mt-1 text-sm text-muted-foreground">先建立一个项目，再把素材按剧集或视觉主题归档。</p>
+                  <p className="mt-1 text-sm text-muted-foreground">先建立一个项目，再把资产按剧集或视觉主题归档。</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
                   <Link to="/projects">
@@ -129,7 +129,7 @@ export function WorkbenchPage() {
                     </CardHeader>
                     <CardContent className="flex items-center gap-2 text-xs text-muted-foreground">
                       <FolderKanban className="size-3.5" />
-                      查看项目素材
+                      查看项目资产
                       <ArrowRight className="ml-auto size-3.5 transition-transform group-hover:translate-x-0.5" />
                     </CardContent>
                   </Card>
@@ -142,7 +142,7 @@ export function WorkbenchPage() {
         <section className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-lg font-semibold">最近素材</h2>
+              <h2 className="text-lg font-semibold">最近资产</h2>
               <p className="mt-1 text-sm text-muted-foreground">继续处理最近创建或更新的创意资产。</p>
             </div>
             <Button asChild variant="ghost" size="sm">
@@ -161,7 +161,7 @@ export function WorkbenchPage() {
             </div>
           ) : assetQuery?.error ? (
             <Card className="border-destructive/40 bg-destructive/5">
-              <CardContent className="py-5 text-sm text-destructive">素材加载失败：{assetQuery.error}</CardContent>
+              <CardContent className="py-5 text-sm text-destructive">资产加载失败：{assetQuery.error}</CardContent>
             </Card>
           ) : recentAssets.length === 0 ? (
             <Card className="border-dashed bg-card/60">

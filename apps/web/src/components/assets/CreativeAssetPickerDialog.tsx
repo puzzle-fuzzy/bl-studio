@@ -55,7 +55,7 @@ export function CreativeAssetPickerDialog({
       .then(asset => {
         if (cancelled) return
         if (asset.approvedVersionId === undefined || !asset.versions.some(version => version.id === asset.approvedVersionId && version.references.length > 0)) {
-          setError('这个素材还没有可用的已确认参考图')
+          setError('这个资产还没有可用的已确认参考图')
           return
         }
         setSelected(current => current.some(item => item.id === asset.id) ? current : [...current, asset])
@@ -79,7 +79,7 @@ export function CreativeAssetPickerDialog({
       const detail = await apiClient.getCreativeAsset(item.id)
       const approved = detail.versions.find(version => version.id === detail.approvedVersionId)
       if (approved === undefined || approved.references.length === 0) {
-        setError('这个素材的已确认版本没有可用参考图')
+        setError('这个资产的已确认版本没有可用参考图')
         return
       }
       setSelected(current => [...current, detail])

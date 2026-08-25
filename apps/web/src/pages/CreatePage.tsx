@@ -40,12 +40,40 @@ const ESTIMATE_DEBOUNCE_MS = 350
 /** 不常用的输出参数，收进「高级设置」折叠，默认隐藏。 */
 const ADVANCED_PARAM_NAMES = ['watermark', 'seed']
 
+const CREATION_INTENTS = {
+  asset: {
+    eyebrow: '普通资产',
+    title: '创建资产',
+    description: '生成可以继续整理、复用或收录的图片和视频资产。',
+  },
+  character: {
+    eyebrow: '结构化资产 / 主体',
+    title: '创建主体',
+    description: '用素材库中的图片或视频作为参考，生成可确认、可复用的主体版本。',
+  },
+  environment: {
+    eyebrow: '结构化资产 / 场景',
+    title: '创建场景',
+    description: '用已有素材建立场景方向，生成后可在详情页收录为可复用场景。',
+  },
+} as const
+
+type CreationIntentType = keyof typeof CREATION_INTENTS
+
+function isCreationIntentType(value: string | null): value is CreationIntentType {
+  return value !== null && value in CREATION_INTENTS
+}
+
 /**
  * 创作工作台：模型下拉 → 参考素材 → 提示词(@图N) → 动态参数 → 固定预估区 → 提交（幂等）。
  * 左右两栏 1:1，中间竖分割线；表单内容不套卡片边框。
  */
 export function CreatePage() {
   const [searchParams, setSearchParams] = useSearchParams()
+  const creationType: CreationIntentType = isCreationIntentType(searchParams.get('assetType'))
+    ? searchParams.get('assetType') as CreationIntentType
+    : 'asset'
+  const creationIntent = CREATION_INTENTS[creationType]
   const models = useModelCatalogStore(state => state.models)
   const loadModels = useModelCatalogStore(state => state.load)
   const showMessage = useNotificationsStore(state => state.showMessage)
@@ -135,7 +163,7 @@ export function CreatePage() {
   // 从带深链参数（?reuse= / ?params= / ?edit= / ?ref=）进入 /create 后，再导航到
   // 无参 /create（如点侧栏「创作」）时重置为空白表单。React Router 同路由仅 query
   // 变化不会重挂组件，还原进本地 useState 的内容需显式清空。
-  const deepLinkKeys = ['reuse', 'params', 'edit', 'ref', 'select', 'creativeAssetId'] as const
+  const deepLinkKeys = ['reuse', 'params', 'edit', 'ref', 'select', 'creativeAssetId', 'assetType'] as const
   useEffect(() => {
     const hasIntent = deepLinkKeys.some(key => searchParams.get(key) !== null)
     if (hasIntent) return
@@ -383,6 +411,14 @@ export function CreatePage() {
 
   return (
     <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-2">
+      <header className="col-span-full flex flex-col justify-between gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end">
+        <div>
+          <p className="mb-1 text-xs font-medium uppercase tracking-[0.18em] text-primary">{creationIntent.eyebrow}</p>
+          <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{creationIntent.title}</h1>
+          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{creationIntent.description}</p>
+        </div>
+        <p className="max-w-xs text-xs leading-5 text-muted-foreground sm:text-right">生成完成后，可在生成详情中收录为主体、场景或其它结构化资产。</p>
+      </header>
       {/* 左栏：模型下拉 + 表单（无卡片边框）。xl 下两栏各自独立滚动（OverlayScrollbars
           虚拟滚动条），表单很长时不连带滚走最近任务。 */}
       <VirtualScrollArea className="xl:max-h-[calc(100svh-3rem)]">

@@ -1,4 +1,4 @@
-import { Boxes, Clapperboard, FolderKanban, History, LayoutDashboard, LibraryBig, Sparkles, Wrench } from 'lucide-react'
+import { Boxes, Clapperboard, FolderKanban, History, ImagePlus, LayoutDashboard, LibraryBig, Mountain, UserRound, Wrench } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -25,14 +25,16 @@ const NAV_GROUPS = [
     items: [
       { to: '/workbench', label: '工作台', icon: LayoutDashboard },
       { to: '/projects', label: '项目', icon: FolderKanban },
-      { to: '/assets', label: '素材库', icon: LibraryBig },
+      { to: '/assets', label: '资产', icon: LibraryBig },
       { to: '/generations', label: '生成记录', icon: History },
     ],
   },
   {
     label: '创作',
     items: [
-      { to: '/create', label: '生成素材', icon: Sparkles },
+      { to: '/create?assetType=asset', label: '创建资产', icon: ImagePlus },
+      { to: '/create?assetType=character', label: '创建主体', icon: UserRound },
+      { to: '/create?assetType=environment', label: '创建场景', icon: Mountain },
       { to: '/director', label: '导演台', icon: Clapperboard },
     ],
   },
@@ -47,7 +49,7 @@ const NAV_GROUPS = [
 
 /** 主导航侧栏：工作区优先，项目上下文与业务资源分层。 */
 export function Nav() {
-  const { pathname } = useLocation()
+  const { pathname, search } = useLocation()
 
   return (
     <Sidebar collapsible="icon">
@@ -74,7 +76,7 @@ export function Nav() {
                     <SidebarMenuItem key={item.to}>
                       <SidebarMenuButton
                         asChild
-                        isActive={pathname === item.to || pathname.startsWith(`${item.to}/`)}
+                        isActive={isNavItemActive(item.to, pathname, search)}
                         tooltip={item.label}
                       >
                         <NavLink to={item.to}>
@@ -100,4 +102,13 @@ export function Nav() {
       <SidebarRail />
     </Sidebar>
   )
+}
+
+function isNavItemActive(to: string, pathname: string, search: string): boolean {
+  const [itemPath, itemQuery] = to.split('?')
+  if (itemQuery !== undefined) {
+    const expectedType = new URLSearchParams(itemQuery).get('assetType')
+    return pathname === itemPath && new URLSearchParams(search).get('assetType') === expectedType
+  }
+  return pathname === itemPath || pathname.startsWith(`${itemPath}/`)
 }

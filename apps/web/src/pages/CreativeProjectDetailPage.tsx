@@ -235,11 +235,11 @@ export function CreativeProjectDetailPage() {
                 <Button asChild variant="outline">
                   <Link to="/projects" title="返回项目列表"><ArrowLeft className="size-4" />返回项目列表</Link>
               </Button>
-              <Button variant="outline" disabled={isArchived || isMutating} onClick={() => setPickerOpen(true)} title="从素材库添加已有素材">
-                <Plus className="size-4" />添加已有素材
+              <Button variant="outline" disabled={isArchived || isMutating} onClick={() => setPickerOpen(true)} title="从资产添加已有资产">
+                <Plus className="size-4" />添加已有资产
               </Button>
               <Button asChild disabled={isMutating}>
-                <Link to={`/create?projectId=${encodeURIComponent(project.id)}`} title="在当前项目中生成素材"><Sparkles className="size-4" />生成素材</Link>
+                <Link to={`/create?assetType=asset&projectId=${encodeURIComponent(project.id)}`} title="在当前项目中创建资产"><Sparkles className="size-4" />创建资产</Link>
               </Button>
             </div>
           </div>

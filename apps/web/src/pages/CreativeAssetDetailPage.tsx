@@ -55,10 +55,10 @@ export function CreativeAssetDetailPage() {
     void loadProjects()
   }, [loadProjects])
 
-  if (!id) return <DetailState title="缺少素材标识" description="请从素材库重新打开一个素材。" />
-  if (detail?.isLoading && detail.asset === null) return <DetailState title="正在加载素材详情" description="正在读取版本和引用关系。" loading />
-  if (detail?.error && detail.asset === null) return <DetailState title="素材详情加载失败" description={detail.error} onRetry={() => void loadDetail(id, true)} />
-  if (detail?.asset === null || detail === undefined) return <DetailState title="找不到这个素材" description="素材可能已经归档，或当前账号没有访问权限。" />
+  if (!id) return <DetailState title="缺少资产标识" description="请从资产重新打开一个资产。" />
+  if (detail?.isLoading && detail.asset === null) return <DetailState title="正在加载资产详情" description="正在读取版本和引用关系。" loading />
+  if (detail?.error && detail.asset === null) return <DetailState title="资产详情加载失败" description={detail.error} onRetry={() => void loadDetail(id, true)} />
+  if (detail?.asset === null || detail === undefined) return <DetailState title="找不到这个资产" description="资产可能已经归档，或当前账号没有访问权限。" />
 
   const assetId = id
   const asset = detail.asset
@@ -133,7 +133,7 @@ export function CreativeAssetDetailPage() {
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/assets')} title="返回素材库"><ArrowLeft className="size-4" />返回素材库</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/assets')} title="返回资产"><ArrowLeft className="size-4" />返回资产</Button>
         <span aria-hidden="true">/</span>
         <span>{creativeAssetTypeLabel(asset.type)}</span>
         <span aria-hidden="true">/</span>
@@ -159,7 +159,7 @@ export function CreativeAssetDetailPage() {
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <h2 id="creative-asset-projects-title" className="flex items-center gap-2 text-base font-semibold"><FolderKanban className="size-4 text-primary" aria-hidden="true" />所属项目</h2>
-            <p className="mt-1 text-sm text-muted-foreground">一个素材可以被多个项目复用，项目归属不会改变素材版本。</p>
+            <p className="mt-1 text-sm text-muted-foreground">一个资产可以被多个项目复用，项目归属不会改变资产版本。</p>
           </div>
           <Button variant="outline" size="sm" onClick={() => setProjectDialogOpen(true)} disabled={isSyncingProjects} title="管理当前资产所属的项目"><FolderKanban className="size-4" aria-hidden="true" />整理项目</Button>
         </div>
@@ -213,7 +213,7 @@ export function CreativeAssetDetailPage() {
               <span className="text-xs text-muted-foreground">给生成器的最小输入</span>
             </CardHeader>
             <CardContent className="space-y-2 text-sm leading-6 text-muted-foreground">
-              <p>只有“已确认”版本会进入生成编译层。每次生成会保存版本 ID 和具体参考图 ID，后续替换素材不会改变历史任务的含义。</p>
+              <p>只有“已确认”版本会进入生成编译层。每次生成会保存版本 ID 和具体参考图 ID，后续替换资产不会改变历史任务的含义。</p>
               <p>版本确认后不可直接改参考图；需要调整时建立新版本，保留旧版本用于复现。</p>
             </CardContent>
           </Card>
