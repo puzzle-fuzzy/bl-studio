@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
-import { BrandMark } from '@/components/shared/BrandMark'
+import { LoginWordmark } from '@/components/auth/LoginWordmark'
 import { TypeGpuPointField } from '@/components/auth/TypeGpuPointField'
 import { useAuthStore } from '@/stores/auth-store'
 import { canResendVerification, userErrorMessage } from '@/lib/user-error'
@@ -90,8 +90,8 @@ export function LoginPage() {
       <div className="login-page__veil" aria-hidden="true" />
       <main className="login-page__content">
         <div className="login-page__form-wrap">
-          <div className="mb-5 flex justify-center sm:justify-start">
-            <BrandMark />
+          <div className="login-wordmark-wrap mb-5 flex justify-center sm:justify-start">
+            <LoginWordmark />
           </div>
           <Card className="login-card w-full max-w-sm">
             <CardHeader className="pb-1">

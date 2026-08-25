@@ -145,6 +145,87 @@
   animation: login-form-enter 650ms cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+.login-wordmark-wrap {
+  min-height: 4.7rem;
+  align-items: center;
+}
+
+.login-wordmark {
+  position: relative;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  isolation: isolate;
+  padding: 0.7rem 0.9rem 0.85rem 0.75rem;
+  transform: skewX(-9deg) rotate(-2deg);
+  transform-origin: left center;
+}
+
+.login-wordmark::before {
+  position: absolute;
+  z-index: -1;
+  inset: 0.55rem -0.55rem 0.35rem -0.45rem;
+  border: 1px solid rgb(69 29 80 / 0.26);
+  background:
+    linear-gradient(135deg, rgb(255 255 255 / 0.18), transparent 56%),
+    repeating-linear-gradient(90deg, rgb(118 57 139 / 0.06) 0 1px, transparent 1px 8px);
+  clip-path: polygon(0 14%, 96% 0, 100% 80%, 8% 100%);
+  content: '';
+  transform: skewX(7deg) rotate(-1deg);
+}
+
+.login-wordmark::after {
+  position: absolute;
+  right: -0.55rem;
+  bottom: 0.15rem;
+  width: 2.3rem;
+  height: 0.16rem;
+  background: rgb(23 13 29 / 0.74);
+  content: '';
+  transform: rotate(-8deg);
+}
+
+.login-wordmark__word {
+  position: relative;
+  display: block;
+  color: transparent;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+  font-size: clamp(1.8rem, 3.6vw, 2.7rem);
+  font-weight: 900;
+  letter-spacing: -0.095em;
+  line-height: 0.78;
+  text-shadow: 0.11em 0.1em 0 rgb(179 104 205 / 0.2);
+  -webkit-text-stroke: 1.2px rgb(28 15 35 / 0.84);
+}
+
+.login-wordmark__word::before {
+  position: absolute;
+  inset: 0;
+  color: transparent;
+  content: attr(data-word);
+  -webkit-text-stroke: 1px rgb(91 40 111 / 0.5);
+  transform: translate(0.1em, 0.11em) skewX(7deg);
+  clip-path: inset(48% 0 0);
+}
+
+.login-wordmark__word::after {
+  position: absolute;
+  right: -0.1em;
+  bottom: 0.05em;
+  left: -0.08em;
+  height: 1px;
+  background: rgb(27 15 34 / 0.55);
+  content: '';
+  transform: rotate(-7deg);
+}
+
+.login-wordmark__word--studio {
+  margin-top: 0.12rem;
+  margin-left: 1.1rem;
+  font-size: clamp(1.45rem, 3vw, 2.25rem);
+  letter-spacing: -0.085em;
+}
+
 .login-page__veil {
   position: absolute;
   z-index: 1;
