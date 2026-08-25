@@ -1,6 +1,7 @@
 import type { AssetItem } from '@bailian-studio/api-client'
 import { Textarea } from '@/components/ui/textarea'
 import { RichPromptEditor } from '@/components/create/RichPromptEditor'
+import { cn } from '@/lib/utils'
 
 /**
  * 提示词输入。
@@ -17,6 +18,7 @@ export interface PromptInputProps {
   placeholder?: string
   maxLength?: number
   disabled?: boolean
+  className?: string
   /** 模型是否支持参考图（决定是否启用 @ 引用 + 行内缩略图）。 */
   supportsReferences?: boolean
 }
@@ -28,6 +30,7 @@ export function PromptInput({
   placeholder,
   maxLength,
   disabled,
+  className,
   supportsReferences = false,
 }: PromptInputProps) {
   if (!supportsReferences) {
@@ -38,7 +41,7 @@ export function PromptInput({
         placeholder={placeholder ?? '描述你想要生成的内容…'}
         maxLength={maxLength}
         disabled={disabled}
-        className="min-h-28"
+        className={cn('min-h-28', className)}
       />
     )
   }
@@ -49,6 +52,8 @@ export function PromptInput({
       refs={refs}
       onChange={onChange}
       disabled={disabled}
+      placeholder={placeholder}
+      className={className}
     />
   )
 }

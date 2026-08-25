@@ -34,12 +34,14 @@ interface RichPromptEditorProps {
   refs: readonly AssetItem[]
   onChange: (text: string) => void
   disabled?: boolean
+  placeholder?: string
+  className?: string
 }
 
 const MARKER_RE = /@图(\d+)/g
 const PICKER_ID = 'prompt-ref-picker'
 
-export function RichPromptEditor({ value, refs, onChange, disabled }: RichPromptEditorProps) {
+export function RichPromptEditor({ value, refs, onChange, disabled, placeholder, className }: RichPromptEditorProps) {
   const editorRef = useRef<HTMLDivElement>(null)
   const pickerRef = useRef<HTMLDivElement>(null)
   // query 会话跟踪：`@` 文本节点 + 零宽锚点 span + 最近一次光标位置。
@@ -258,13 +260,14 @@ export function RichPromptEditor({ value, refs, onChange, disabled }: RichPrompt
         aria-autocomplete="list"
         aria-activedescendant={activeDescendant}
         aria-label="提示词"
-        data-placeholder="描述你想要生成的内容…（输入 @ 可引用图片）"
+        data-placeholder={placeholder ?? '描述你想要生成的内容…（输入 @ 可引用图片）'}
         onInput={handleInput}
         onKeyDown={handleKeyDown}
         className={cn(
           'min-h-28 rounded-md border bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring',
           'empty:before:pointer-events-none empty:before:text-muted-foreground empty:before:content-[attr(data-placeholder)]',
           disabled && 'cursor-not-allowed opacity-60',
+          className,
         )}
       />
       {pickerOpen &&
