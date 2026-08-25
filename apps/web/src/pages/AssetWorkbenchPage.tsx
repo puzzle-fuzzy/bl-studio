@@ -507,9 +507,10 @@ function MediaAssetUploadTile({ onUpload }: { onUpload: () => void }) {
       type="button"
       onClick={onUpload}
       title="上传图片或视频"
-      className="group flex min-w-0 flex-col overflow-hidden rounded-xl border border-dashed border-border bg-card/60 text-left transition-[border-color,background-color,box-shadow] duration-200 hover:border-primary/60 hover:bg-primary/5 hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group relative flex min-w-0 flex-col overflow-hidden rounded-xl border border-dashed border-border bg-card/60 text-left transition-[border-color,background-color,box-shadow] duration-200 hover:border-primary/60 hover:bg-primary/5 hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
-      <div className="flex aspect-[4/3] items-center justify-center bg-muted/20">
+      <div className="aspect-[4/3] bg-muted/20" />
+      <div className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center">
         <span className="flex size-11 items-center justify-center rounded-xl border border-border bg-muted/70 text-primary transition-colors group-hover:bg-primary/10">
           <Upload className="size-5" aria-hidden="true" />
         </span>
