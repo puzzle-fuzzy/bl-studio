@@ -19,13 +19,15 @@
 - [x] 实现 Provider-neutral compiler：将已批准资产版本、用户提示词和模型 manifest 编译为稳定的生成参数、媒体引用和不可变快照。
 - [x] 将 compiler 接入生成提交 service/repository：API 在估价与正式提交前解析当前用户的已批准资产绑定；generation repository 在最终事务中再次锁定版本、参考图并原子写入 generation record 与创意上下文快照。
 - [x] Provider 编译遇到多个同类型媒体槽位时返回结构化歧义错误，禁止自动猜测首帧/尾帧等语义。
-- [ ] API Client 增加项目、资产、版本、参考图的类型化接口。
+- [x] API Client 增加项目、资产、版本、参考图的类型化接口；独立 client 模块已合并进共享 `createApiClient()`，覆盖分页、筛选、项目整理、版本和参考图状态操作。
 - [ ] Web 增加按项目整理的资产工作台；在页面稳定后再补页面级 E2E。
 - [ ] 后续再规划剧本上传/生成与人物、场景、道具提示词分析，不把剧本逻辑塞进资产 repository 或 Provider executor。
 
-当前执行顺序：API Client → Web 资产工作台；本阶段不修改导演、剧本和剪辑流程。
+当前执行顺序：Web 资产工作台；本阶段不修改导演、剧本和剪辑流程。
 
 本轮已完成：旧的 `modelId + params + assetRefs` 请求保持兼容；带 `creativeContext` 的新请求由同一个 prepare 结果驱动 `/estimate` 和正式提交，重试路径继续复用 generation repository 已冻结的快照。
+
+API Client 本轮已完成：项目与素材接口使用统一 cookie/fetch 传输层和 zod 响应校验，保留 cursor、筛选、路径编码和服务端错误码；暂不把页面状态或资产工作台交互塞进 client。
 
 ## 后续设计议题
 

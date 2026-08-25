@@ -29,6 +29,7 @@ export {
   type BailianStudioApiClient,
   type UploadAssetInput,
 } from './generation-client'
+export * from './creative-asset-client'
 export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
 export { DirectorAnalysisResultSchema, DirectorAssemblyPreflightResponseSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationDraftSchema, DirectorLocationsResultSchema, DirectorMusicEstimateResponseSchema, DirectorPromptRebuildResultSchema, DirectorScriptChatInputSchema, DirectorScriptMessageSchema, DirectorScriptMessagesResponseSchema, DirectorScriptVersionResponseSchema, DirectorScriptVersionsResponseSchema, DirectorShotDraftSchema, DirectorShotResponseSchema, DirectorShotSchema, DirectorStoryboardResultSchema, DirectorVideoEstimateResponseSchema, UpdateDirectorShotSchema } from './schemas'

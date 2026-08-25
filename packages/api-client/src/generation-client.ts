@@ -10,6 +10,7 @@
  */
 import { z } from 'zod'
 import type { CreativeGenerationContext } from '@bailian-studio/shared'
+import { createCreativeAssetClient, type CreativeAssetApiClient } from './creative-asset-client'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
   AdminListUsersResponseSchema,
@@ -316,7 +317,7 @@ export interface RegisterInput extends CredentialsInput {
  * 把会话 cookie 带上；未登录调用会被服务端以 401 拒绝，并在传输层映射为
  * `ApiClientError`。返回值都经过 schema 校验，类型由 schema 推断。
  */
-export interface BailianStudioApiClient {
+export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `GET /api/models/catalog` —— 列出所有可用模型（返回数组形式）。 */
   getModels(): Promise<ModelCatalogItem[]>
   /** `GET /api/models/:id` —— 获取单个模型的 manifest 摘要。 */
@@ -621,6 +622,8 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
   const base = options.baseUrl.replace(/\/+$/, '')
 
   return {
+    ...createCreativeAssetClient({ baseUrl: base, fetch: fetchImpl }),
+
     async getModels() {
       const data = await unwrapData(
         `${base}/api/models/catalog`,
