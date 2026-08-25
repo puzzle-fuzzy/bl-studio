@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { ArrowUp, Check, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
@@ -30,7 +30,7 @@ import {
 import { buildSubmitPayload, buildValidationParams } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
-import { modelNameZh } from '@/lib/model-modes'
+import { firstEnabledModel, isModelEnabled, modelNameZh, SUB_MODE_LABELS, subModeOf } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
@@ -40,7 +40,6 @@ import { notifyError } from '@/lib/toast'
 import { buildCreativeGenerationContext, creativeAssetReferencesToAssetItems } from '@/lib/creative-generation'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/components/generations/GenerationListItem'
-import type { CreationPreset } from '@/lib/creation-presets'
 
 const ESTIMATE_DEBOUNCE_MS = 350
 
@@ -520,7 +519,6 @@ export function CreatePage() {
               setValues(current => ({ ...current, [creativeMediaField.parameter.name]: creativeAssetReferencesToAssetItems(next) }))
             }
           }}
-          textInputFields={textInputFields}
           basicSettingsFields={basicSettingsFields}
           advancedSettingsFields={advancedSettingsFields}
           fieldErrors={fieldErrors}
@@ -533,16 +531,6 @@ export function CreatePage() {
           records={characterRecords}
           selectedRecordId={selectedCharacterRecordId}
           onSelectRecord={setSelectedCharacterRecordId}
-          onApplyPreset={preset => {
-            setModelId(preset.modelId)
-            setValues(preset.params)
-          }}
-          compareModels={compareModels}
-          compareBusy={compareBusy}
-          compareModelCount={compareModels.length + 1}
-          onAddCompare={candidate => setCompareModels(current => [...current, candidate])}
-          onRemoveCompare={id => setCompareModels(current => current.filter(item => item.id !== id))}
-          onCompareSubmit={() => void handleCompareSubmit()}
           onApplyPromptGuide={() => setValues(current => ({
             ...current,
             prompt: typeof current.prompt === 'string' && current.prompt.trim().length > 0
@@ -818,7 +806,6 @@ type CharacterCreationWorkspaceProps = {
   creativeAssets: readonly CreativeAssetDetail[]
   onOpenCreativePicker: () => void
   onRemoveCreativeAsset: (assetId: string) => void
-  textInputFields: readonly FormField[]
   basicSettingsFields: readonly FormField[]
   advancedSettingsFields: readonly FormField[]
   fieldErrors: ReadonlyMap<string, FieldIssue>
@@ -832,13 +819,6 @@ type CharacterCreationWorkspaceProps = {
   selectedRecordId: string | undefined
   onSelectRecord: (recordId: string) => void
   onApplyPromptGuide: () => void
-  onApplyPreset: (preset: CreationPreset) => void
-  compareModels: readonly ModelCatalogItem[]
-  compareBusy: boolean
-  compareModelCount: number
-  onAddCompare: (model: ModelCatalogItem) => void
-  onRemoveCompare: (modelId: string) => void
-  onCompareSubmit: () => void
 }
 
 function CharacterCreationWorkspace({
@@ -853,7 +833,6 @@ function CharacterCreationWorkspace({
   creativeAssets,
   onOpenCreativePicker,
   onRemoveCreativeAsset,
-  textInputFields,
   basicSettingsFields,
   advancedSettingsFields,
   fieldErrors,
@@ -867,16 +846,28 @@ function CharacterCreationWorkspace({
   selectedRecordId,
   onSelectRecord,
   onApplyPromptGuide,
-  onApplyPreset,
-  compareModels,
-  compareBusy,
-  compareModelCount,
-  onAddCompare,
-  onRemoveCompare,
-  onCompareSubmit,
 }: CharacterCreationWorkspaceProps) {
-  const [showControls, setShowControls] = useState(false)
+  const [activePopover, setActivePopover] = useState<CharacterPopover>(null)
+  const composerRef = useRef<HTMLDivElement>(null)
   const selectedRecord = records.find(record => record.id === selectedRecordId) ?? records[0]
+
+  useEffect(() => {
+    if (activePopover === null) return
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!(event.target instanceof Node) || composerRef.current?.contains(event.target) !== true) {
+        setActivePopover(null)
+      }
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setActivePopover(null)
+    }
+    document.addEventListener('pointerdown', handlePointerDown)
+    document.addEventListener('keydown', handleKeyDown)
+    return () => {
+      document.removeEventListener('pointerdown', handlePointerDown)
+      document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [activePopover])
 
   return (
     <form
@@ -925,32 +916,41 @@ function CharacterCreationWorkspace({
         </aside>
       </div>
 
-      <div className="relative shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
-        {showControls && (
-          <CharacterControlsPanel
-            availableModels={availableModels}
-            model={model}
-            modelId={modelId}
-            onModelSelect={onModelSelect}
+      <div ref={composerRef} className="relative shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
+        {activePopover === 'mode' && (
+          <CharacterGenerationModePopover models={availableModels} selectedId={modelId} onSelect={modelId => {
+            onModelSelect(modelId)
+            setActivePopover(null)
+          }} />
+        )}
+        {activePopover === 'model' && (
+          <CharacterModelPopover models={availableModels} selectedId={modelId} onSelect={modelId => {
+            onModelSelect(modelId)
+            setActivePopover(null)
+          }} />
+        )}
+        {activePopover === 'settings' && (
+          <CharacterSettingsPopover
+            basicSettingsFields={basicSettingsFields}
+            advancedSettingsFields={advancedSettingsFields}
             values={values}
+            fieldErrors={fieldErrors}
+            onValueChange={onValueChange}
+          />
+        )}
+        {activePopover === 'reference' && (
+          <CharacterReferencePopover
             mediaFields={mediaFields}
             creativeMediaField={creativeMediaField}
             creativeAssets={creativeAssets}
-            onOpenCreativePicker={onOpenCreativePicker}
-            onRemoveCreativeAsset={onRemoveCreativeAsset}
-            textInputFields={textInputFields}
-            basicSettingsFields={basicSettingsFields}
-            advancedSettingsFields={advancedSettingsFields}
+            values={values}
             fieldErrors={fieldErrors}
             onValueChange={onValueChange}
-            isSubmitting={isSubmitting}
-            onApplyPreset={onApplyPreset}
-            compareModels={compareModels}
-            compareBusy={compareBusy}
-            compareModelCount={compareModelCount}
-            onAddCompare={onAddCompare}
-            onRemoveCompare={onRemoveCompare}
-            onCompareSubmit={onCompareSubmit}
+            onOpenCreativePicker={() => {
+              setActivePopover(null)
+              onOpenCreativePicker()
+            }}
+            onRemoveCreativeAsset={onRemoveCreativeAsset}
           />
         )}
 
@@ -958,13 +958,8 @@ function CharacterCreationWorkspace({
           <div className="flex min-h-[7.5rem] gap-3">
             <CharacterReferenceSlot
               asset={referencePool[0]}
-              onOpen={() => {
-                if (creativeMediaField !== undefined) {
-                  onOpenCreativePicker()
-                } else {
-                  setShowControls(true)
-                }
-              }}
+              active={activePopover === 'reference'}
+              onOpen={() => setActivePopover(current => current === 'reference' ? null : 'reference')}
             />
             <div className="min-w-0 flex-1">
             <PromptInput
@@ -981,18 +976,19 @@ function CharacterCreationWorkspace({
 
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 pt-2">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs text-primary" onClick={() => setShowControls(current => !current)} aria-expanded={showControls}>
+              <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs text-primary" onClick={() => setActivePopover(current => current === 'mode' ? null : 'mode')} aria-expanded={activePopover === 'mode'}>
                 <ImagePlus className="size-3.5" />
                 图片生成
                 <ChevronDown className="size-3.5" />
               </Button>
               {model !== undefined && (
-                <Button type="button" variant="outline" size="sm" className="h-8 max-w-44 gap-1.5 text-xs" onClick={() => setShowControls(true)}>
+                <Button type="button" variant="outline" size="sm" className="h-8 max-w-44 gap-1.5 text-xs" onClick={() => setActivePopover(current => current === 'model' ? null : 'model')} aria-expanded={activePopover === 'model'}>
+                  <Sparkles className="size-3.5" />
                   <span className="truncate">{modelNameZh(model)}</span>
                 </Button>
               )}
               {basicSettingsFields.length > 0 && (
-                <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs" onClick={() => setShowControls(true)}>
+                <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs" onClick={() => setActivePopover(current => current === 'settings' ? null : 'settings')} aria-expanded={activePopover === 'settings'}>
                   <span className="truncate">{characterSettingsSummary(basicSettingsFields, values)}</span>
                   <ChevronDown className="size-3.5" />
                 </Button>
@@ -1027,13 +1023,16 @@ function CharacterCreationWorkspace({
   )
 }
 
-function CharacterReferenceSlot({ asset, onOpen }: { asset: AssetItem | undefined; onOpen: () => void }) {
+type CharacterPopover = 'mode' | 'model' | 'settings' | 'reference' | null
+
+function CharacterReferenceSlot({ asset, active, onOpen }: { asset: AssetItem | undefined; active: boolean; onOpen: () => void }) {
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="relative mt-1 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted/70 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className={cn('relative mt-1 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted/70 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', active && 'ring-2 ring-primary/40')}
       aria-label={asset === undefined ? '上传参考图' : '添加或更换参考图'}
+      aria-expanded={active}
     >
       {asset === undefined ? <Plus className="size-5" /> : <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />}
       {asset !== undefined && (
@@ -1046,131 +1045,259 @@ function CharacterReferenceSlot({ asset, onOpen }: { asset: AssetItem | undefine
 }
 
 function characterSettingsSummary(fields: readonly FormField[], values: Readonly<Record<string, unknown>>) {
-  const labels = fields
-    .map(field => {
-      const value = values[field.parameter.name]
-      if (value === undefined || value === null || value === '') return undefined
-      const option = field.parameter.options?.find(item => JSON.stringify(item.value) === JSON.stringify(value))
-      return option?.label ?? String(value)
-    })
-    .filter((label): label is string => label !== undefined)
-  return labels.slice(0, 3).join(' · ') || '输出参数'
+  const sizeField = fields.find(field => field.parameter.name === 'size')
+  const countField = fields.find(field => field.parameter.name === 'n')
+  const sizeOption = sizeField?.parameter.options?.find(option => JSON.stringify(option.value) === JSON.stringify(values.size))
+  const size = sizeOption === undefined ? undefined : characterSizeChoice(sizeOption)
+  const summary = [size?.ratio, size?.resolution, countField === undefined ? undefined : values[countField.parameter.name]]
+    .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
+    .map(String)
+  return summary.slice(0, 3).join(' · ') || '输出参数'
 }
 
-function CharacterControlsPanel({
-  availableModels,
-  model,
-  modelId,
-  onModelSelect,
-  values,
-  mediaFields,
-  creativeMediaField,
-  creativeAssets,
-  onOpenCreativePicker,
-  onRemoveCreativeAsset,
-  textInputFields,
-  basicSettingsFields,
-  advancedSettingsFields,
-  fieldErrors,
-  onValueChange,
-  isSubmitting,
-  onApplyPreset,
-  compareModels,
-  compareBusy,
-  compareModelCount,
-  onAddCompare,
-  onRemoveCompare,
-  onCompareSubmit,
-}: Omit<CharacterCreationWorkspaceProps, 'referencePool' | 'onSubmit' | 'estimate' | 'estimating' | 'isRestoring' | 'records' | 'selectedRecordId' | 'onSelectRecord' | 'onApplyPromptGuide'>) {
+function CharacterGenerationModePopover({
+  models,
+  selectedId,
+  onSelect,
+}: {
+  models: readonly ModelCatalogItem[]
+  selectedId: string | undefined
+  onSelect: (modelId: string) => void
+}) {
+  const selected = models.find(model => model.id === selectedId)
+  const modes = [...new Set(models.map(model => subModeOf(model)))]
+
   return (
-    <div className="absolute bottom-full left-1/2 z-20 mb-3 w-[min(30rem,calc(100vw-2rem))] max-h-[min(70svh,34rem)] -translate-x-1/2 overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div>
-          <p className="text-sm font-semibold">模型与生成设置</p>
-          <p className="mt-1 text-xs text-muted-foreground">常用参数收在这里，输入区只保留人物描述和生成动作。</p>
-        </div>
-        <span className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">可随时调整</span>
+    <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-popover p-2 shadow-2xl shadow-black/15">
+      <p className="px-3 py-2 text-xs text-muted-foreground">选择图片生成方式</p>
+      {modes.map(mode => {
+        const modeModel = firstEnabledModel(models, 'image', mode)
+        const selectedMode = selected !== undefined && subModeOf(selected) === mode
+        if (modeModel === undefined) return null
+        return (
+          <button key={mode} type="button" onClick={() => onSelect(modeModel.id)} className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70', selectedMode && 'bg-muted')}>
+            <ImagePlus className="size-4 shrink-0 text-primary" />
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium">{SUB_MODE_LABELS[mode]}</span>
+              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{modelNameZh(modeModel)}</span>
+            </span>
+            {selectedMode && <Check className="size-4 shrink-0" />}
+          </button>
+        )
+      })}
+    </div>
+  )
+}
+
+function CharacterModelPopover({
+  models,
+  selectedId,
+  onSelect,
+}: {
+  models: readonly ModelCatalogItem[]
+  selectedId: string | undefined
+  onSelect: (modelId: string) => void
+}) {
+  const selected = models.find(model => model.id === selectedId)
+
+  return (
+    <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl shadow-black/15">
+      <div className="border-b border-border/70 px-4 py-3">
+        <p className="text-xs text-muted-foreground">选择模型</p>
+        <p className="mt-1 truncate text-sm font-medium">{selected === undefined ? '图片生成' : `${modelNameZh(selected)} · ${selected.displayName}`}</p>
       </div>
-      <div className="space-y-5">
-        <section className="space-y-2">
-          <p className="text-xs font-medium text-muted-foreground">生成模型</p>
-          <ModelSelector models={availableModels} selectedId={modelId} onSelect={onModelSelect} defaultCategory="image" />
-          {model?.description !== undefined && <p className="text-xs leading-5 text-muted-foreground">{model.description}</p>}
-        </section>
-
-        {mediaFields.length > 0 && (
-          <section className="space-y-2 border-t border-border/70 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">参考图与素材</p>
-            {creativeMediaField !== undefined && (
-              <CreativeAssetReferencePanel assets={creativeAssets} onOpen={onOpenCreativePicker} onRemove={onRemoveCreativeAsset} />
-            )}
-            <ParameterForm fields={mediaFields} values={values} onChange={onValueChange} errors={fieldErrors} />
-          </section>
-        )}
-
-        {textInputFields.length > 0 && (
-          <section className="space-y-2 border-t border-border/70 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">辅助输入</p>
-            <ParameterForm fields={textInputFields} values={values} onChange={onValueChange} errors={fieldErrors} />
-          </section>
-        )}
-
-        {basicSettingsFields.length > 0 && (
-          <section className="space-y-2 border-t border-border/70 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">输出参数</p>
-            <ParameterForm fields={basicSettingsFields} values={values} onChange={onValueChange} errors={fieldErrors} layout="grid" />
-          </section>
-        )}
-
-        {advancedSettingsFields.length > 0 && (
-          <Collapsible className="group border-t border-border/70 pt-4">
-            <CollapsibleTrigger asChild>
-              <button type="button" className="flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-foreground">
-                高级设置
-                <ChevronDown className="size-3.5 transition-transform group-data-[state=open]:rotate-180" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-3">
-              <ParameterForm fields={advancedSettingsFields} values={values} onChange={onValueChange} errors={fieldErrors} layout="grid" />
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-
-        {model !== undefined && (
-          <section className="space-y-2 border-t border-border/70 pt-4">
-            <p className="text-xs font-medium text-muted-foreground">人物工作流预设</p>
-            <CreationPresetPanel modelId={model.id} params={values} disabled={isSubmitting} allowedModelIds={availableModels.map(item => item.id)} onApply={onApplyPreset} />
-          </section>
-        )}
-
-        <section className="space-y-2 rounded-xl border border-dashed border-border p-3">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-medium">多模型对比</p>
-              <p className="mt-1 text-[11px] text-muted-foreground">用同一人物提示词并行生成，方便比较风格稳定性。</p>
-            </div>
-            <Button type="button" size="sm" variant="outline" disabled={compareModels.length === 0 || compareBusy || model === undefined} onClick={onCompareSubmit}>
-              {compareBusy ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-              {compareBusy ? '提交中…' : `对比生成（${compareModelCount}）`}
-            </Button>
-          </div>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {compareModels.map(candidate => (
-              <span key={candidate.id} className="inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs">
-                {modelNameZh(candidate)}
-                <button type="button" className="text-muted-foreground hover:text-destructive" onClick={() => onRemoveCompare(candidate.id)} aria-label={`移除 ${candidate.id}`}>
-                  <X className="size-3" />
-                </button>
+      <div className="max-h-[min(58svh,25rem)] overflow-y-auto p-2">
+        {models.map(candidate => {
+          const selected = candidate.id === selectedId
+          const enabled = isModelEnabled(candidate)
+          return (
+            <button
+              key={candidate.id}
+              type="button"
+              disabled={!enabled}
+              onClick={() => onSelect(candidate.id)}
+              className={cn(
+                'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-45',
+                selected && 'bg-muted',
+              )}
+              aria-pressed={selected}
+            >
+              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-background text-foreground">
+                <Sparkles className="size-4" />
               </span>
-            ))}
-            {compareModels.length < 4 && (
-              <ModelCompareAdd models={availableModels} compareIds={compareModels.map(item => item.id)} excludeIds={model === undefined ? [] : [model.id]} onAdd={onAddCompare} />
-            )}
-          </div>
-        </section>
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-2">
+                  <span className="truncate text-sm font-medium">{modelNameZh(candidate)}</span>
+                  {candidate.availability?.notActivated !== undefined && <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">{candidate.availability.notActivated}</span>}
+                </span>
+                <span className="mt-0.5 block truncate text-xs text-muted-foreground">{candidate.description ?? candidate.displayName}</span>
+              </span>
+              {selected && <Check className="size-4 shrink-0" />}
+            </button>
+          )
+        })}
       </div>
     </div>
   )
+}
+
+function CharacterSettingsPopover({
+  basicSettingsFields,
+  advancedSettingsFields,
+  values,
+  fieldErrors,
+  onValueChange,
+}: {
+  basicSettingsFields: readonly FormField[]
+  advancedSettingsFields: readonly FormField[]
+  values: Record<string, unknown>
+  fieldErrors: ReadonlyMap<string, FieldIssue>
+  onValueChange: (name: string, value: unknown) => void
+}) {
+  const allFields = [...basicSettingsFields, ...advancedSettingsFields]
+  const sizeField = allFields.find(field => field.parameter.name === 'size')
+  const countField = allFields.find(field => field.parameter.name === 'n')
+  const remainingFields = allFields.filter(field => field !== sizeField && field !== countField)
+
+  return (
+    <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(31rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground">输出设置</p>
+        <p className="mt-1 text-sm font-medium">比例、分辨率和生成数量</p>
+      </div>
+      {sizeField !== undefined && <CharacterSizeControl field={sizeField} value={values[sizeField.parameter.name]} onChange={value => onValueChange(sizeField.parameter.name, value)} />}
+      {countField !== undefined && <CharacterCountControl field={countField} value={values[countField.parameter.name]} onChange={value => onValueChange(countField.parameter.name, value)} />}
+      {remainingFields.length > 0 && (
+        <section className="mt-4 border-t border-border/70 pt-4">
+          <p className="mb-3 text-xs font-medium text-muted-foreground">更多参数</p>
+          <ParameterForm fields={remainingFields} values={values} onChange={onValueChange} errors={fieldErrors} layout="grid" />
+        </section>
+      )}
+    </div>
+  )
+}
+
+function CharacterSizeControl({ field, value, onChange }: { field: FormField; value: unknown; onChange: (value: unknown) => void }) {
+  const choices = (field.parameter.options ?? []).map(characterSizeChoice)
+  const selected = choices.find(choice => JSON.stringify(choice.value) === JSON.stringify(value)) ?? choices[0]
+  const ratios = [...new Set(choices.map(choice => choice.ratio).filter((ratio): ratio is string => ratio !== undefined))]
+  const resolutions = [...new Set(choices.map(choice => choice.resolution).filter((resolution): resolution is string => resolution !== undefined))]
+  const selectChoice = (key: 'ratio' | 'resolution', next: string) => {
+    const otherKey = key === 'ratio' ? 'resolution' : 'ratio'
+    const match = choices.find(choice => choice[key] === next && selected?.[otherKey] === choice[otherKey]) ?? choices.find(choice => choice[key] === next)
+    if (match !== undefined) onChange(match.value)
+  }
+
+  if (choices.length === 0) return null
+
+  return (
+    <div className="space-y-3">
+      {ratios.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-muted-foreground">选择比例</p>
+          <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
+            {ratios.map(ratio => <button key={ratio} type="button" onClick={() => selectChoice('ratio', ratio)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', selected?.ratio === ratio ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{ratio}</button>)}
+          </div>
+        </div>
+      )}
+      <div className="space-y-1.5">
+        <p className="text-xs text-muted-foreground">选择分辨率</p>
+        <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
+          {resolutions.map(resolution => <button key={resolution} type="button" onClick={() => selectChoice('resolution', resolution)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', selected?.resolution === resolution ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{resolution}</button>)}
+        </div>
+      </div>
+      <p className="text-[11px] text-muted-foreground">当前尺寸：{selected?.label ?? '—'}</p>
+    </div>
+  )
+}
+
+function CharacterCountControl({ field, value, onChange }: { field: FormField; value: unknown; onChange: (value: unknown) => void }) {
+  const min = Math.ceil(field.parameter.min ?? 1)
+  const max = Math.min(Math.ceil(field.parameter.max ?? 8), 12)
+  const current = typeof value === 'number' ? value : min
+  const counts = Array.from({ length: Math.max(1, max - min + 1) }, (_, index) => min + index)
+
+  return (
+    <div className="mt-4 space-y-1.5">
+      <p className="text-xs text-muted-foreground">选择生成数量</p>
+      <div className="grid grid-cols-6 gap-1 rounded-xl bg-muted/60 p-1">
+        {counts.map(count => <button key={count} type="button" onClick={() => onChange(count)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', current === count ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{count}</button>)}
+      </div>
+    </div>
+  )
+}
+
+function CharacterReferencePopover({
+  mediaFields,
+  creativeMediaField,
+  creativeAssets,
+  values,
+  fieldErrors,
+  onValueChange,
+  onOpenCreativePicker,
+  onRemoveCreativeAsset,
+}: {
+  mediaFields: readonly FormField[]
+  creativeMediaField: FormField | undefined
+  creativeAssets: readonly CreativeAssetDetail[]
+  values: Record<string, unknown>
+  fieldErrors: ReadonlyMap<string, FieldIssue>
+  onValueChange: (name: string, value: unknown) => void
+  onOpenCreativePicker: () => void
+  onRemoveCreativeAsset: (assetId: string) => void
+}) {
+  return (
+    <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
+      <div className="mb-4">
+        <p className="text-xs text-muted-foreground">参考图与素材</p>
+        <p className="mt-1 text-sm font-medium">上传图片，或引用已确认的创意资产</p>
+      </div>
+      {creativeMediaField !== undefined && <CreativeAssetReferencePanel assets={creativeAssets} onOpen={onOpenCreativePicker} onRemove={onRemoveCreativeAsset} />}
+      {mediaFields.length > 0 ? (
+        <div className={cn(creativeMediaField !== undefined && 'mt-4 border-t border-border/70 pt-4')}>
+          <p className="mb-3 text-xs font-medium text-muted-foreground">上传参考图 / 素材</p>
+          <ParameterForm fields={mediaFields} values={values} onChange={onValueChange} errors={fieldErrors} />
+        </div>
+      ) : (
+        <p className="rounded-xl bg-muted/50 px-3 py-4 text-xs text-muted-foreground">当前模型不需要参考素材。</p>
+      )}
+    </div>
+  )
+}
+
+function characterSizeChoice(option: { label: string; value: unknown }): CharacterSizeChoice {
+  const source = `${option.label} ${String(option.value)}`
+  const dimensions = source.match(/(\d{3,5})\s*[×x*]\s*(\d{3,5})/i)
+  const ratioMatch = option.label.match(/\b(\d+\s*:\s*\d+)\b/)
+  const resolutionMatch = source.match(/\b([1248]K)\b/i)
+  const widthText = dimensions?.[1]
+  const heightText = dimensions?.[2]
+  const width = widthText === undefined ? undefined : Number(widthText)
+  const height = heightText === undefined ? undefined : Number(heightText)
+  const divisor = width === undefined || height === undefined ? 0 : gcd(width, height)
+  const ratioText = ratioMatch?.[1]
+  const resolutionText = resolutionMatch?.[1]
+  const ratio = ratioText === undefined ? (width !== undefined && height !== undefined ? `${width / (divisor || 1)}:${height / (divisor || 1)}` : undefined) : ratioText.replace(/\s/g, '')
+  const resolution = resolutionText === undefined ? (width !== undefined && height !== undefined ? `${Math.max(width, height) >= 3500 ? 4 : Math.max(width, height) >= 1800 ? 2 : 1}K` : undefined) : resolutionText.toUpperCase()
+  return { label: option.label, value: option.value, ratio, resolution }
+}
+
+type CharacterSizeChoice = {
+  label: string
+  value: unknown
+  ratio: string | undefined
+  resolution: string | undefined
+}
+
+function gcd(left: number, right: number): number {
+  let a = Math.abs(left)
+  let b = Math.abs(right)
+  while (b !== 0) {
+    const next = a % b
+    a = b
+    b = next
+  }
+  return a
 }
 
 function CharacterPromptRow({ record, selected, onSelect }: { record: GenerationRecord; selected: boolean; onSelect: () => void }) {

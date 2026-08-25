@@ -39,7 +39,7 @@ export function MediaParameterInput({
             </button>
           </div>
         ))}
-        <Button variant="outline" size="icon" onClick={() => setOpen(true)} aria-label="选择素材">
+        <Button type="button" variant="outline" size="icon" onClick={() => setOpen(true)} aria-label="选择素材">
           <ImagePlus className="size-4" />
         </Button>
       </div>
