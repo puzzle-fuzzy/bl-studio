@@ -8,6 +8,7 @@ import { createAuthServiceFromUrl } from '@bailian-studio/auth'
 import { createCreditLedgerFromUrl } from '@bailian-studio/credit-ledger'
 import { createGenerationRepositoryFromUrl } from '@bailian-studio/generation-repository'
 import { createDirectorRepositoryFromUrl } from '@bailian-studio/director-repository'
+import { createCreativeAssetRepositoryFromUrl } from '@bailian-studio/creative-asset-repository'
 import { createMediaRepositoryFromUrl } from '@bailian-studio/media-repository'
 import { createStorageFromEnv, resolveArtifactLocalRoot } from '@bailian-studio/storage'
 import { createLogger } from '@bailian-studio/shared'
@@ -32,6 +33,7 @@ async function main(): Promise<void> {
   const env = readApiEnvOrThrow()
   const generationHandle = createGenerationRepositoryFromUrl(env.databaseUrl)
   const directorHandle = createDirectorRepositoryFromUrl(env.databaseUrl)
+  const creativeAssetHandle = createCreativeAssetRepositoryFromUrl(env.databaseUrl)
   const mediaHandle = createMediaRepositoryFromUrl(env.databaseUrl)
   const authHandle = createAuthServiceFromUrl(env.databaseUrl, {
     jwtSecret: env.authJwtSecret,
@@ -50,6 +52,7 @@ async function main(): Promise<void> {
     creditLedger: creditHandle.ledger,
     generationRepository: generationHandle.repository,
     directorRepository: directorHandle.repository,
+    creativeAssetRepository: creativeAssetHandle.repository,
     mediaRepository: mediaHandle.repository,
     storage,
     generationSseHub,
@@ -93,7 +96,7 @@ async function main(): Promise<void> {
       clearInterval(authStateSweepTimer)
       await app.stop()
       if (listener !== undefined) await listener.close()
-      await Promise.all([generationHandle.close(), directorHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
+      await Promise.all([generationHandle.close(), directorHandle.close(), creativeAssetHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
       server.stop?.()
     }
 
@@ -103,7 +106,7 @@ async function main(): Promise<void> {
   catch (error) {
     clearInterval(authStateSweepTimer)
     if (listener !== undefined) await listener.close()
-    await Promise.all([generationHandle.close(), directorHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
+    await Promise.all([generationHandle.close(), directorHandle.close(), creativeAssetHandle.close(), mediaHandle.close(), authHandle.close(), creditHandle.close()])
     throw error
   }
 }

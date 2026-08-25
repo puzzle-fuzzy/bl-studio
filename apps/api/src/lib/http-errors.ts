@@ -7,6 +7,7 @@
 
 import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
 import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bailian-studio/director-repository'
+import { CreativeAssetRepositoryError, type CreativeAssetRepositoryErrorCode } from '@bailian-studio/creative-asset-repository'
 import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
 import { CreditLedgerError, type CreditLedgerErrorCode } from '@bailian-studio/credit-ledger'
 import { ValidationError } from '@bailian-studio/shared'
@@ -71,6 +72,21 @@ const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> = 
   DIRECTOR_DATABASE_ERROR: 500,
 }
 
+const CREATIVE_ASSET_REPOSITORY_STATUS: Record<CreativeAssetRepositoryErrorCode, number> = {
+  CREATIVE_PROJECT_NOT_FOUND: 404,
+  CREATIVE_PROJECT_STATE_INVALID: 409,
+  CREATIVE_ASSET_NOT_FOUND: 404,
+  CREATIVE_ASSET_STATUS_INVALID: 409,
+  CREATIVE_ASSET_ALREADY_ATTACHED: 409,
+  CREATIVE_PROJECT_ASSET_NOT_FOUND: 404,
+  CREATIVE_ASSET_VERSION_NOT_FOUND: 404,
+  CREATIVE_ASSET_VERSION_STATE_INVALID: 409,
+  CREATIVE_ASSET_REFERENCE_NOT_FOUND: 404,
+  CREATIVE_ASSET_REFERENCE_INVALID: 400,
+  CREATIVE_INVALID_CURSOR: 400,
+  CREATIVE_DATABASE_ERROR: 500,
+}
+
 const AUTH_STATUS: Record<AuthErrorCode, number> = {
   AUTH_INVALID_CREDENTIALS: 401,
   AUTH_EMAIL_TAKEN: 409,
@@ -116,6 +132,9 @@ export function httpStatusForError(error: unknown): number {
   }
   if (error instanceof DirectorRepositoryError) {
     return DIRECTOR_REPOSITORY_STATUS[error.code]
+  }
+  if (error instanceof CreativeAssetRepositoryError) {
+    return CREATIVE_ASSET_REPOSITORY_STATUS[error.code]
   }
   if (error instanceof CreditLedgerError) {
     return CREDIT_LEDGER_STATUS[error.code]
@@ -191,6 +210,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof DirectorRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
+  if (error instanceof CreativeAssetRepositoryError) {
     return {
       success: false,
       error: {

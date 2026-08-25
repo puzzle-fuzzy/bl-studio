@@ -214,6 +214,9 @@ importers:
       '@bailian-studio/auth':
         specifier: workspace:*
         version: link:../../packages/auth
+      '@bailian-studio/creative-asset-repository':
+        specifier: workspace:*
+        version: link:../../packages/creative-asset-repository
       '@bailian-studio/credit-ledger':
         specifier: workspace:*
         version: link:../../packages/credit-ledger
@@ -449,6 +452,22 @@ importers:
       '@node-rs/argon2':
         specifier: 'catalog:'
         version: 2.0.2
+      drizzle-orm:
+        specifier: 'catalog:'
+        version: 0.45.2(postgres@3.4.9)
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+
+  packages/creative-asset-repository:
+    dependencies:
+      '@bailian-studio/db':
+        specifier: workspace:*
+        version: link:../db
+      '@bailian-studio/shared':
+        specifier: workspace:*
+        version: link:../shared
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(postgres@3.4.9)

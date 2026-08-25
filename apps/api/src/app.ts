@@ -37,6 +37,7 @@ import { createUsageRoutes } from './modules/usage'
 import { createPointsRoutes } from './modules/points'
 import { createAdminRoutes } from './modules/admin'
 import { createDirectorRoutes } from './modules/director/routes'
+import { createCreativeAssetRoutes } from './modules/creative-assets'
 import { appMetrics } from './lib/metrics'
 import { requireAdminUser } from './modules/auth/session'
 
@@ -162,6 +163,7 @@ export function createApp(options: ApiAppOptions) {
   .use(createPointsRoutes(dependencies))
   .use(createAdminRoutes(dependencies))
   .use(createDirectorRoutes(dependencies))
+  .use(createCreativeAssetRoutes(dependencies))
   .get('/api/metrics', async ({ request }) => {
     await requireAdminUser(request, dependencies.authService)
     return { success: true, data: appMetrics.snapshot() }

@@ -9,6 +9,7 @@ import type { AuthService } from '@bailian-studio/auth'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
+import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { resolveArtifactLocalRoot, type StorageAdapter } from '@bailian-studio/storage'
 import { createApp, type App } from './app'
@@ -45,6 +46,7 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
     creditLedger: overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository: overrides.generationRepository ?? missing<GenerationRepository>('generationRepository'),
     directorRepository: overrides.directorRepository ?? missing<DirectorRepository>('directorRepository'),
+    creativeAssetRepository: overrides.creativeAssetRepository ?? missing<CreativeAssetRepository>('creativeAssetRepository'),
     mediaRepository: overrides.mediaRepository ?? missing<MediaRepository>('mediaRepository'),
     storage: overrides.storage ?? missing<StorageAdapter>('storage'),
     generationSseHub,

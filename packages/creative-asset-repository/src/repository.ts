@@ -1,0 +1,770 @@
+import {
+  creativeAssetReferences,
+  creativeAssetVersions,
+  creativeAssets,
+  creativeProjectAssets,
+  creativeProjects,
+  type BailianStudioDb,
+  type BailianStudioDbTransaction,
+  userAssets,
+} from '@bailian-studio/db'
+import {
+  isCreativeAssetReferenceRoleCompatible,
+  type CreativeAssetStatus,
+  type CreativeAssetVersionStatus,
+  type CreativeProjectStatus,
+} from '@bailian-studio/shared'
+import { and, asc, desc, eq, ilike, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { CreativeAssetRepositoryError } from './errors'
+import {
+  nextCreativeAssetId,
+  nextCreativeAssetReferenceId,
+  nextCreativeAssetVersionId,
+  nextCreativeProjectAssetId,
+  nextCreativeProjectId,
+} from './id'
+import type {
+  CreativeAssetDetail,
+  CreativeAssetReference,
+  CreativeAssetRepository,
+  CreativeAssetSummary,
+  CreativeAssetVersion,
+  CreativeProject,
+  CreativeProjectAssetMembership,
+  CreativeProjectDetail,
+  ListCreativeAssetsResult,
+  ListCreativeProjectsResult,
+} from './types'
+
+interface Cursor {
+  createdAt: string
+  id: string
+}
+
+const DEFAULT_LIMIT = 24
+const MAX_LIMIT = 100
+
+function nowDate(value?: string): Date {
+  const date = value === undefined ? new Date() : new Date(value)
+  if (!Number.isFinite(date.getTime())) {
+    throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Invalid timestamp')
+  }
+  return date
+}
+
+function encodeCursor(cursor: Cursor): string {
+  return Buffer.from(JSON.stringify(cursor), 'utf8').toString('base64url')
+}
+
+function nextCursorForRow(row: { createdAt: Date; id: string } | undefined): string | undefined {
+  return row === undefined ? undefined : encodeCursor({ createdAt: row.createdAt.toISOString(), id: row.id })
+}
+
+function decodeCursor(value: string): Cursor {
+  try {
+    const parsed: unknown = JSON.parse(Buffer.from(value, 'base64url').toString('utf8'))
+    if (typeof parsed !== 'object' || parsed === null) throw new Error('invalid cursor')
+    const candidate = parsed as { createdAt?: unknown; id?: unknown }
+    if (typeof candidate.createdAt !== 'string' || typeof candidate.id !== 'string') throw new Error('invalid cursor')
+    if (!Number.isFinite(Date.parse(candidate.createdAt)) || candidate.id.length === 0) throw new Error('invalid cursor')
+    return { createdAt: candidate.createdAt, id: candidate.id }
+  } catch {
+    throw new CreativeAssetRepositoryError('CREATIVE_INVALID_CURSOR', 'Invalid creative asset cursor')
+  }
+}
+
+function limitValue(value?: number): number {
+  if (value === undefined) return DEFAULT_LIMIT
+  return Math.min(MAX_LIMIT, Math.max(1, Math.trunc(value)))
+}
+
+function toProject(row: typeof creativeProjects.$inferSelect): CreativeProject {
+  return {
+    id: row.id,
+    userId: row.userId,
+    title: row.title,
+    description: row.description,
+    status: row.status as CreativeProjectStatus,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+function toMembership(row: typeof creativeProjectAssets.$inferSelect): CreativeProjectAssetMembership {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    assetId: row.assetId,
+    sortOrder: row.sortOrder,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+function toReference(row: typeof creativeAssetReferences.$inferSelect): CreativeAssetReference {
+  return {
+    id: row.id,
+    assetVersionId: row.assetVersionId,
+    userAssetId: row.userAssetId,
+    role: row.role as CreativeAssetReference['role'],
+    position: row.position,
+    metadata: row.metadataJson,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+function toVersion(
+  row: typeof creativeAssetVersions.$inferSelect,
+  references: CreativeAssetReference[],
+): CreativeAssetVersion {
+  return {
+    id: row.id,
+    assetId: row.assetId,
+    ...(row.sourceGenerationId !== null ? { sourceGenerationId: row.sourceGenerationId } : {}),
+    version: row.version,
+    status: row.status as CreativeAssetVersionStatus,
+    semanticSpec: row.semanticSpecJson,
+    generationRecipe: row.generationRecipeJson,
+    ...(row.notes !== null ? { notes: row.notes } : {}),
+    references,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+type VersionSummary = Pick<typeof creativeAssetVersions.$inferSelect, 'id' | 'assetId' | 'version' | 'status'>
+
+function summarizeVersions(rows: VersionSummary[]): Map<string, { latestVersion?: VersionSummary; approvedVersionId?: string }> {
+  const result = new Map<string, { latestVersion?: VersionSummary; approvedVersionId?: string }>()
+  for (const row of rows) {
+    const current = result.get(row.assetId) ?? {}
+    if (current.latestVersion === undefined || row.version > current.latestVersion.version) {
+      current.latestVersion = row
+    }
+    if (row.status === 'approved') current.approvedVersionId = row.id
+    result.set(row.assetId, current)
+  }
+  return result
+}
+
+function toSummary(
+  row: typeof creativeAssets.$inferSelect,
+  versionSummary?: { latestVersion?: VersionSummary; approvedVersionId?: string },
+): CreativeAssetSummary {
+  return {
+    id: row.id,
+    userId: row.userId,
+    type: row.type as CreativeAssetSummary['type'],
+    name: row.name,
+    description: row.description,
+    status: row.status as CreativeAssetStatus,
+    metadata: row.metadataJson,
+    ...(versionSummary?.latestVersion !== undefined
+      ? {
+          latestVersion: {
+            id: versionSummary.latestVersion.id,
+            version: versionSummary.latestVersion.version,
+            status: versionSummary.latestVersion.status as CreativeAssetVersionStatus,
+          },
+        }
+      : {}),
+    ...(versionSummary?.approvedVersionId !== undefined ? { approvedVersionId: versionSummary.approvedVersionId } : {}),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
+async function summariesForRows(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  rows: Array<typeof creativeAssets.$inferSelect>,
+): Promise<CreativeAssetSummary[]> {
+  if (rows.length === 0) return []
+  const versionRows = await db
+    .select({
+      id: creativeAssetVersions.id,
+      assetId: creativeAssetVersions.assetId,
+      version: creativeAssetVersions.version,
+      status: creativeAssetVersions.status,
+    })
+    .from(creativeAssetVersions)
+    .where(and(
+      inArray(creativeAssetVersions.assetId, rows.map(row => row.id)),
+      isNull(creativeAssetVersions.deletedAt),
+    ))
+    .orderBy(desc(creativeAssetVersions.version), desc(creativeAssetVersions.createdAt))
+  const summaries = summarizeVersions(versionRows)
+  return rows.map(row => toSummary(row, summaries.get(row.id)))
+}
+
+async function ownedProject(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  userId: string,
+  projectId: string,
+  options: { includeArchived?: boolean } = {},
+): Promise<typeof creativeProjects.$inferSelect> {
+  const [project] = await db
+    .select()
+    .from(creativeProjects)
+    .where(and(
+      eq(creativeProjects.id, projectId),
+      eq(creativeProjects.userId, userId),
+      isNull(creativeProjects.deletedAt),
+    ))
+    .limit(1)
+  if (project === undefined) {
+    throw new CreativeAssetRepositoryError('CREATIVE_PROJECT_NOT_FOUND', `Creative project not found: ${projectId}`)
+  }
+  if (options.includeArchived !== true && project.status === 'archived') {
+    throw new CreativeAssetRepositoryError('CREATIVE_PROJECT_STATE_INVALID', `Creative project is archived: ${projectId}`)
+  }
+  return project
+}
+
+async function ownedAsset(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  userId: string,
+  assetId: string,
+): Promise<typeof creativeAssets.$inferSelect> {
+  const [asset] = await db
+    .select()
+    .from(creativeAssets)
+    .where(and(
+      eq(creativeAssets.id, assetId),
+      eq(creativeAssets.userId, userId),
+      isNull(creativeAssets.deletedAt),
+    ))
+    .limit(1)
+  if (asset === undefined) {
+    throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${assetId}`)
+  }
+  return asset
+}
+
+async function assetDetail(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  userId: string,
+  assetId: string,
+): Promise<CreativeAssetDetail> {
+  const asset = await ownedAsset(db, userId, assetId)
+  const memberships = await db
+    .select()
+    .from(creativeProjectAssets)
+    .innerJoin(creativeProjects, eq(creativeProjectAssets.projectId, creativeProjects.id))
+    .where(and(
+      eq(creativeProjectAssets.assetId, asset.id),
+      eq(creativeProjects.userId, userId),
+      isNull(creativeProjectAssets.deletedAt),
+      isNull(creativeProjects.deletedAt),
+    ))
+    .orderBy(asc(creativeProjectAssets.sortOrder), asc(creativeProjects.createdAt))
+  const versionRows = await db
+    .select()
+    .from(creativeAssetVersions)
+    .where(and(
+      eq(creativeAssetVersions.assetId, asset.id),
+      isNull(creativeAssetVersions.deletedAt),
+    ))
+    .orderBy(desc(creativeAssetVersions.version))
+  const references = versionRows.length === 0
+    ? []
+    : await db
+      .select()
+      .from(creativeAssetReferences)
+      .where(and(
+        inArray(creativeAssetReferences.assetVersionId, versionRows.map(row => row.id)),
+        isNull(creativeAssetReferences.deletedAt),
+      ))
+      .orderBy(asc(creativeAssetReferences.assetVersionId), asc(creativeAssetReferences.role), asc(creativeAssetReferences.position))
+  const referencesByVersion = new Map<string, CreativeAssetReference[]>()
+  for (const reference of references) {
+    const current = referencesByVersion.get(reference.assetVersionId) ?? []
+    current.push(toReference(reference))
+    referencesByVersion.set(reference.assetVersionId, current)
+  }
+  const versions = versionRows.map(row => toVersion(row, referencesByVersion.get(row.id) ?? []))
+  const latestVersion = versionRows[0]
+  const summary = toSummary(asset, {
+    ...(latestVersion !== undefined ? { latestVersion } : {}),
+    ...(versionRows.find(row => row.status === 'approved')?.id !== undefined
+      ? { approvedVersionId: versionRows.find(row => row.status === 'approved')?.id }
+      : {}),
+  })
+  return {
+    ...summary,
+    projects: memberships.map(row => toMembership(row.creative_project_assets)),
+    versions,
+  }
+}
+
+async function projectDetail(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  project: typeof creativeProjects.$inferSelect,
+): Promise<CreativeProjectDetail> {
+  const rows = await db
+    .select({ asset: creativeAssets })
+    .from(creativeProjectAssets)
+    .innerJoin(creativeAssets, eq(creativeProjectAssets.assetId, creativeAssets.id))
+    .where(and(
+      eq(creativeProjectAssets.projectId, project.id),
+      isNull(creativeProjectAssets.deletedAt),
+      isNull(creativeAssets.deletedAt),
+    ))
+    .orderBy(asc(creativeProjectAssets.sortOrder), asc(creativeAssets.createdAt), asc(creativeAssets.id))
+  return {
+    ...toProject(project),
+    assets: await summariesForRows(db, rows.map(row => row.asset)),
+  }
+}
+
+async function attachAssetInTransaction(
+  tx: BailianStudioDbTransaction,
+  input: { userId: string; projectId: string; assetId: string; sortOrder: number; now: Date },
+): Promise<void> {
+  const project = await ownedProject(tx, input.userId, input.projectId)
+  const asset = await ownedAsset(tx, input.userId, input.assetId)
+  const [existing] = await tx
+    .select()
+    .from(creativeProjectAssets)
+    .where(and(
+      eq(creativeProjectAssets.projectId, project.id),
+      eq(creativeProjectAssets.assetId, asset.id),
+    ))
+    .limit(1)
+  if (existing?.deletedAt === null) {
+    throw new CreativeAssetRepositoryError('CREATIVE_ASSET_ALREADY_ATTACHED', `Creative asset is already in project: ${asset.id}`)
+  }
+  if (existing !== undefined) {
+    await tx
+      .update(creativeProjectAssets)
+      .set({
+        sortOrder: input.sortOrder,
+        deletedAt: null,
+        deletedBy: null,
+        updatedBy: input.userId,
+        updatedAt: input.now,
+      })
+      .where(eq(creativeProjectAssets.id, existing.id))
+    return
+  }
+  await tx.insert(creativeProjectAssets).values({
+    id: nextCreativeProjectAssetId(),
+    projectId: project.id,
+    assetId: asset.id,
+    sortOrder: input.sortOrder,
+    createdBy: input.userId,
+    updatedBy: input.userId,
+    createdAt: input.now,
+    updatedAt: input.now,
+  })
+}
+
+function assertVersionTransition(from: CreativeAssetVersionStatus, to: CreativeAssetVersionStatus): void {
+  const allowed: Record<CreativeAssetVersionStatus, readonly CreativeAssetVersionStatus[]> = {
+    draft: ['generating', 'archived'],
+    generating: ['candidate', 'rejected'],
+    candidate: ['approved', 'rejected', 'archived'],
+    approved: ['archived'],
+    archived: [],
+    rejected: [],
+  }
+  if (from === to || allowed[from].includes(to)) return
+  throw new CreativeAssetRepositoryError(
+    'CREATIVE_ASSET_VERSION_STATE_INVALID',
+    `Invalid creative asset version transition: ${from} -> ${to}`,
+  )
+}
+
+export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): CreativeAssetRepository {
+  return {
+    async createProject(input) {
+      const now = nowDate(input.now)
+      const projectId = nextCreativeProjectId()
+      await db.insert(creativeProjects).values({
+        id: projectId,
+        userId: input.userId,
+        title: input.title,
+        description: input.description ?? null,
+        status: 'draft',
+        createdBy: input.userId,
+        updatedBy: input.userId,
+        createdAt: now,
+        updatedAt: now,
+      })
+      const project = await ownedProject(db, input.userId, projectId)
+      return projectDetail(db, project)
+    },
+
+    async listProjects(input): Promise<ListCreativeProjectsResult> {
+      const limit = limitValue(input.limit)
+      const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor)
+      const cursorDate = cursor === undefined ? undefined : new Date(cursor.createdAt)
+      const conditions = [
+        eq(creativeProjects.userId, input.userId),
+        isNull(creativeProjects.deletedAt),
+        ...(input.query === undefined || input.query.length === 0 ? [] : [ilike(creativeProjects.title, `%${input.query}%`)]),
+        ...(cursorDate === undefined || cursor === undefined
+          ? []
+          : [sql`(${creativeProjects.createdAt} < ${cursorDate} or (${creativeProjects.createdAt} = ${cursorDate} and ${creativeProjects.id} < ${cursor.id}))`]),
+      ]
+      const rows = await db
+        .select()
+        .from(creativeProjects)
+        .where(and(...conditions))
+        .orderBy(desc(creativeProjects.createdAt), desc(creativeProjects.id))
+        .limit(limit + 1)
+      const hasMore = rows.length > limit
+      const items = hasMore ? rows.slice(0, limit) : rows
+      const nextCursor = hasMore ? nextCursorForRow(items.at(-1)) : undefined
+      return {
+        items: items.map(toProject),
+        ...(nextCursor === undefined ? {} : { nextCursor }),
+      }
+    },
+
+    async getProject(input) {
+      const [project] = await db
+        .select()
+        .from(creativeProjects)
+        .where(and(
+          eq(creativeProjects.id, input.projectId),
+          eq(creativeProjects.userId, input.userId),
+          isNull(creativeProjects.deletedAt),
+        ))
+        .limit(1)
+      return project === undefined ? undefined : projectDetail(db, project)
+    },
+
+    async updateProject(input) {
+      const now = nowDate(input.now)
+      const project = await ownedProject(db, input.userId, input.projectId, { includeArchived: true })
+      if (input.patch.status === 'active' && project.status === 'archived') {
+        // 归档项目可以由用户显式恢复为 active；不会自动恢复已删除关系。
+      }
+      const [updated] = await db
+        .update(creativeProjects)
+        .set({
+          ...(input.patch.title !== undefined ? { title: input.patch.title } : {}),
+          ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
+          ...(input.patch.status !== undefined ? { status: input.patch.status } : {}),
+          updatedBy: input.userId,
+          updatedAt: now,
+        })
+        .where(and(eq(creativeProjects.id, project.id), eq(creativeProjects.userId, input.userId), isNull(creativeProjects.deletedAt)))
+        .returning()
+      if (updated === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Creative project could not be updated')
+      return projectDetail(db, updated)
+    },
+
+    async createAsset(input) {
+      const now = nowDate(input.now)
+      const assetId = nextCreativeAssetId()
+      await db.transaction(async tx => {
+        if (input.projectId !== undefined) await ownedProject(tx, input.userId, input.projectId)
+        await tx.insert(creativeAssets).values({
+          id: assetId,
+          userId: input.userId,
+          type: input.type,
+          name: input.name,
+          description: input.description ?? '',
+          status: 'draft',
+          metadataJson: input.metadata ?? {},
+          createdBy: input.userId,
+          updatedBy: input.userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+        if (input.projectId !== undefined) {
+          await attachAssetInTransaction(tx, {
+            userId: input.userId,
+            projectId: input.projectId,
+            assetId,
+            sortOrder: 0,
+            now,
+          })
+        }
+      })
+      return assetDetail(db, input.userId, assetId)
+    },
+
+    async listAssets(input): Promise<ListCreativeAssetsResult> {
+      const limit = limitValue(input.limit)
+      const cursor = input.cursor === undefined ? undefined : decodeCursor(input.cursor)
+      const cursorDate = cursor === undefined ? undefined : new Date(cursor.createdAt)
+      const conditions = [
+        eq(creativeAssets.userId, input.userId),
+        isNull(creativeAssets.deletedAt),
+        ...(input.type === undefined ? [] : [eq(creativeAssets.type, input.type)]),
+        ...(input.query === undefined || input.query.length === 0 ? [] : [ilike(creativeAssets.name, `%${input.query}%`)]),
+        ...(input.projectId === undefined
+          ? []
+          : [
+              eq(creativeProjectAssets.projectId, input.projectId),
+              isNull(creativeProjectAssets.deletedAt),
+              isNull(creativeProjects.deletedAt),
+              eq(creativeProjects.userId, input.userId),
+            ]),
+        ...(cursorDate === undefined || cursor === undefined
+          ? []
+          : [sql`(${creativeAssets.createdAt} < ${cursorDate} or (${creativeAssets.createdAt} = ${cursorDate} and ${creativeAssets.id} < ${cursor.id}))`]),
+      ]
+      const rows = input.projectId === undefined
+        ? await db
+            .select()
+            .from(creativeAssets)
+            .where(and(...conditions))
+            .orderBy(desc(creativeAssets.createdAt), desc(creativeAssets.id))
+            .limit(limit + 1)
+        : (await db
+            .select({ asset: creativeAssets })
+            .from(creativeAssets)
+            .innerJoin(creativeProjectAssets, eq(creativeAssets.id, creativeProjectAssets.assetId))
+            .innerJoin(creativeProjects, eq(creativeProjectAssets.projectId, creativeProjects.id))
+            .where(and(...conditions))
+            .orderBy(desc(creativeAssets.createdAt), desc(creativeAssets.id))
+            .limit(limit + 1)).map(row => row.asset)
+      const hasMore = rows.length > limit
+      const items = hasMore ? rows.slice(0, limit) : rows
+      const summaries = await summariesForRows(db, items)
+      const nextCursor = hasMore ? nextCursorForRow(items.at(-1)) : undefined
+      return {
+        items: summaries,
+        ...(nextCursor === undefined ? {} : { nextCursor }),
+      }
+    },
+
+    async getAsset(input) {
+      const [asset] = await db
+        .select({ id: creativeAssets.id })
+        .from(creativeAssets)
+        .where(and(
+          eq(creativeAssets.id, input.assetId),
+          eq(creativeAssets.userId, input.userId),
+          isNull(creativeAssets.deletedAt),
+        ))
+        .limit(1)
+      return asset === undefined ? undefined : assetDetail(db, input.userId, input.assetId)
+    },
+
+    async archiveAsset(input) {
+      const now = nowDate(input.now)
+      await ownedAsset(db, input.userId, input.assetId)
+      const [updated] = await db
+        .update(creativeAssets)
+        .set({ status: 'archived', updatedBy: input.userId, updatedAt: now })
+        .where(and(eq(creativeAssets.id, input.assetId), eq(creativeAssets.userId, input.userId), isNull(creativeAssets.deletedAt)))
+        .returning()
+      if (updated === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Creative asset could not be archived')
+      return assetDetail(db, input.userId, updated.id)
+    },
+
+    async attachAsset(input) {
+      const now = nowDate(input.now)
+      await db.transaction(async tx => {
+        await attachAssetInTransaction(tx, {
+          userId: input.userId,
+          projectId: input.projectId,
+          assetId: input.assetId,
+          sortOrder: input.sortOrder ?? 0,
+          now,
+        })
+      })
+      return assetDetail(db, input.userId, input.assetId)
+    },
+
+    async detachAsset(input) {
+      const now = nowDate(input.now)
+      const project = await ownedProject(db, input.userId, input.projectId, { includeArchived: true })
+      const [membership] = await db
+        .select()
+        .from(creativeProjectAssets)
+        .innerJoin(creativeAssets, eq(creativeProjectAssets.assetId, creativeAssets.id))
+        .where(and(
+          eq(creativeProjectAssets.projectId, project.id),
+          eq(creativeProjectAssets.assetId, input.assetId),
+          eq(creativeAssets.userId, input.userId),
+          isNull(creativeProjectAssets.deletedAt),
+          isNull(creativeAssets.deletedAt),
+        ))
+        .limit(1)
+      if (membership === undefined) {
+        throw new CreativeAssetRepositoryError('CREATIVE_PROJECT_ASSET_NOT_FOUND', `Asset is not in project: ${input.assetId}`)
+      }
+      await db
+        .update(creativeProjectAssets)
+        .set({ deletedAt: now, deletedBy: input.userId, updatedBy: input.userId, updatedAt: now })
+        .where(eq(creativeProjectAssets.id, membership.creative_project_assets.id))
+      const refreshed = await db.select().from(creativeProjects).where(eq(creativeProjects.id, project.id)).limit(1)
+      const currentProject = refreshed[0]
+      if (currentProject === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Creative project could not be reloaded')
+      return projectDetail(db, currentProject)
+    },
+
+    async createVersion(input) {
+      const now = nowDate(input.now)
+      await db.transaction(async tx => {
+        const [asset] = await tx
+          .select()
+          .from(creativeAssets)
+          .where(and(
+            eq(creativeAssets.id, input.assetId),
+            eq(creativeAssets.userId, input.userId),
+            isNull(creativeAssets.deletedAt),
+          ))
+          .limit(1)
+          .for('update')
+        if (asset === undefined) {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${input.assetId}`)
+        }
+        if (asset.status === 'archived') {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', `Creative asset is archived: ${input.assetId}`)
+        }
+        const [latest] = await tx
+          .select({ version: creativeAssetVersions.version })
+          .from(creativeAssetVersions)
+          .where(and(eq(creativeAssetVersions.assetId, asset.id), isNull(creativeAssetVersions.deletedAt)))
+          .orderBy(desc(creativeAssetVersions.version))
+          .limit(1)
+          .for('update')
+        await tx.insert(creativeAssetVersions).values({
+          id: nextCreativeAssetVersionId(),
+          assetId: asset.id,
+          version: (latest?.version ?? 0) + 1,
+          status: 'draft',
+          semanticSpecJson: input.semanticSpec,
+          generationRecipeJson: input.generationRecipe,
+          notes: input.notes ?? null,
+          createdBy: input.userId,
+          updatedBy: input.userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+      })
+      return assetDetail(db, input.userId, input.assetId)
+    },
+
+    async addReference(input) {
+      const now = nowDate(input.now)
+      await db.transaction(async tx => {
+        const [version] = await tx
+          .select({ version: creativeAssetVersions, assetType: creativeAssets.type, assetStatus: creativeAssets.status })
+          .from(creativeAssetVersions)
+          .innerJoin(creativeAssets, eq(creativeAssetVersions.assetId, creativeAssets.id))
+          .where(and(
+            eq(creativeAssetVersions.id, input.assetVersionId),
+            eq(creativeAssets.userId, input.userId),
+            isNull(creativeAssetVersions.deletedAt),
+            isNull(creativeAssets.deletedAt),
+          ))
+          .limit(1)
+          .for('update')
+        if (version === undefined) throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_NOT_FOUND', `Creative asset version not found: ${input.assetVersionId}`)
+        if (version.assetStatus === 'archived') {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', 'References cannot be added to an archived asset')
+        }
+        if (version.version.status !== 'draft') {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_STATE_INVALID', 'References can only be changed on a draft asset version')
+        }
+        if (!isCreativeAssetReferenceRoleCompatible(version.assetType as Parameters<typeof isCreativeAssetReferenceRoleCompatible>[0], input.role)) {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', `Reference role '${input.role}' is incompatible with asset type '${version.assetType}'`)
+        }
+        const [source] = await tx
+          .select({ id: userAssets.id })
+          .from(userAssets)
+          .where(and(
+            eq(userAssets.id, input.userAssetId),
+            eq(userAssets.userId, input.userId),
+            eq(userAssets.kind, 'image'),
+            eq(userAssets.status, 'ready'),
+            isNull(userAssets.deletedAt),
+          ))
+          .limit(1)
+        if (source === undefined) {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', 'Reference source must be an owned ready image asset')
+        }
+        const [existing] = await tx
+          .select({ id: creativeAssetReferences.id })
+          .from(creativeAssetReferences)
+          .where(and(
+            eq(creativeAssetReferences.assetVersionId, input.assetVersionId),
+            eq(creativeAssetReferences.role, input.role),
+            eq(creativeAssetReferences.position, input.position),
+            isNull(creativeAssetReferences.deletedAt),
+          ))
+          .limit(1)
+        if (existing !== undefined) {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', 'Reference role and position are already occupied')
+        }
+        await tx.insert(creativeAssetReferences).values({
+          id: nextCreativeAssetReferenceId(),
+          assetVersionId: input.assetVersionId,
+          userAssetId: input.userAssetId,
+          role: input.role,
+          position: input.position,
+          metadataJson: input.metadata,
+          createdBy: input.userId,
+          updatedBy: input.userId,
+          createdAt: now,
+          updatedAt: now,
+        })
+      })
+      const version = await db.select({ assetId: creativeAssetVersions.assetId }).from(creativeAssetVersions).where(eq(creativeAssetVersions.id, input.assetVersionId)).limit(1)
+      const assetId = version[0]?.assetId
+      if (assetId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Reference asset could not be reloaded')
+      return assetDetail(db, input.userId, assetId)
+    },
+
+    async transitionVersion(input) {
+      const now = nowDate(input.now)
+      let assetId: string | undefined
+      await db.transaction(async tx => {
+        const [current] = await tx
+          .select({ version: creativeAssetVersions, assetUserId: creativeAssets.userId })
+          .from(creativeAssetVersions)
+          .innerJoin(creativeAssets, eq(creativeAssetVersions.assetId, creativeAssets.id))
+          .where(and(
+            eq(creativeAssetVersions.id, input.assetVersionId),
+            eq(creativeAssets.userId, input.userId),
+            isNull(creativeAssetVersions.deletedAt),
+            isNull(creativeAssets.deletedAt),
+          ))
+          .limit(1)
+          .for('update')
+        if (current === undefined) throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_NOT_FOUND', `Creative asset version not found: ${input.assetVersionId}`)
+        assetId = current.version.assetId
+        assertVersionTransition(current.version.status as CreativeAssetVersionStatus, input.status)
+        if (input.status === 'approved') {
+          const [reference] = await tx
+            .select({ id: creativeAssetReferences.id })
+            .from(creativeAssetReferences)
+            .where(and(eq(creativeAssetReferences.assetVersionId, input.assetVersionId), isNull(creativeAssetReferences.deletedAt)))
+            .limit(1)
+          if (reference === undefined) throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_STATE_INVALID', 'An asset version needs at least one reference before approval')
+          const [approved] = await tx
+            .select({ id: creativeAssetVersions.id })
+            .from(creativeAssetVersions)
+            .where(and(
+              eq(creativeAssetVersions.assetId, current.version.assetId),
+              eq(creativeAssetVersions.status, 'approved'),
+              ne(creativeAssetVersions.id, input.assetVersionId),
+              isNull(creativeAssetVersions.deletedAt),
+            ))
+            .limit(1)
+          if (approved !== undefined) throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_STATE_INVALID', 'The asset already has an approved version')
+        }
+        await tx
+          .update(creativeAssetVersions)
+          .set({ status: input.status, updatedBy: input.userId, updatedAt: now })
+          .where(eq(creativeAssetVersions.id, input.assetVersionId))
+        if (input.status === 'approved') {
+          await tx
+            .update(creativeAssets)
+            .set({ status: 'active', updatedBy: input.userId, updatedAt: now })
+            .where(eq(creativeAssets.id, current.version.assetId))
+        }
+      })
+      if (assetId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Asset version could not be reloaded')
+      return assetDetail(db, input.userId, assetId)
+    },
+  }
+}

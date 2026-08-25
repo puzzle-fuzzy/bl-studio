@@ -444,6 +444,7 @@ async function lockAndValidateCreativeContext(
       versionStatus: creativeAssetVersions.status,
       versionDeletedAt: creativeAssetVersions.deletedAt,
       assetType: creativeAssets.type,
+      assetStatus: creativeAssets.status,
       assetUserId: creativeAssets.userId,
       assetDeletedAt: creativeAssets.deletedAt,
     })
@@ -461,6 +462,7 @@ async function lockAndValidateCreativeContext(
       version === undefined
       || version.assetUserId !== input.userId
       || (!input.allowDeleted && version.assetDeletedAt !== null)
+      || (!input.allowDeleted && version.assetStatus === 'archived')
       || (!input.allowDeleted && version.versionDeletedAt !== null)
       || (!candidateAllowed && version.versionStatus !== 'approved')
       || (candidateAllowed && version.versionStatus !== 'approved' && version.versionStatus !== 'candidate')
