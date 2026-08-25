@@ -75,16 +75,23 @@ const fragmentSource = `#version 300 es
     // 两层域扭曲制造液体卷动，避免只是平移一张噪声贴图。
     vec2 q = p;
     vec2 warpA = vec2(
-      fbm(q * 1.36 + vec2(-time * 0.075, 3.10)),
-      fbm(q * 1.48 + vec2(8.20, time * 0.060))
+      fbm(q * 1.36 + vec2(-time * 0.11, 3.10)),
+      fbm(q * 1.48 + vec2(8.20, time * 0.085))
     ) - 0.5;
     q += warpA * vec2(0.25, 0.19);
 
     vec2 warpB = vec2(
-      fbm(q * 2.72 + vec2(time * 0.052, 11.30)),
-      fbm(q * 2.86 + vec2(-6.80, -time * 0.047))
+      fbm(q * 2.72 + vec2(time * 0.095, 11.30)),
+      fbm(q * 2.86 + vec2(-6.80, -time * 0.082))
     ) - 0.5;
     q += warpB * vec2(0.10, 0.075);
+
+    // 群流层：不同速度的 curl-like 噪声让局部纹理成群转向、聚拢和散开。
+    vec2 schoolWarp = vec2(
+      fbm(q * vec2(1.80, 4.20) + vec2(-time * 0.18, time * 0.11)),
+      fbm(q * vec2(2.10, 3.40) + vec2(time * 0.15, -time * 0.10))
+    ) - 0.5;
+    q += schoolWarp * vec2(0.13, 0.09);
 
     // 鼠标只推动局部流场，不改变蓝紫两股流体的颜色归属。
     vec2 pointer = u_pointer.xy - 0.5;
@@ -94,41 +101,41 @@ const fragmentSource = `#version 300 es
     q += vec2(-toPointer.y, toPointer.x) * pointerForce * 0.24;
 
     // 用连续的液体密度和颜料偏置塑造云状流动，不再用上下两条中心线。
-    float paintA = fbm(q * vec2(1.18, 1.92) + vec2(-time * 0.075, time * 0.055));
-    float paintB = fbm(q * vec2(1.72, 2.64) + vec2(time * 0.065, -time * 0.045));
-    float paintC = fbm(q * vec2(3.15, 4.80) + vec2(-time * 0.11, time * 0.085));
+    float paintA = fbm(q * vec2(1.18, 1.92) + vec2(-time * 0.12, time * 0.09));
+    float paintB = fbm(q * vec2(1.72, 2.64) + vec2(time * 0.105, -time * 0.075));
+    float paintC = fbm(q * vec2(3.15, 4.80) + vec2(-time * 0.17, time * 0.12));
     float paintField = paintA * 0.50 + paintB * 0.36 + paintC * 0.14;
-    float liquidBoundary = fbm(q * vec2(2.80, 5.60) + vec2(time * 0.085, -time * 0.065)) - 0.5;
+    float liquidBoundary = fbm(q * vec2(2.80, 5.60) + vec2(time * 0.13, -time * 0.10)) - 0.5;
     float dyeMask = smoothstep(0.30, 0.64, paintField + liquidBoundary * 0.18);
 
     // 蓝紫归属由旋转流场连续计算；每一帧都会重新交融和分离。
     float blueSignal = 0.5 + 0.5 * sin(
-      q.x * 1.72 - q.y * 2.55 + time * 0.30 + paintB * 4.8
+      q.x * 1.72 - q.y * 2.55 + time * 0.58 + paintB * 4.8
     );
     float purpleSignal = 0.5 + 0.5 * sin(
-      q.x * 2.20 + q.y * 1.38 - time * 0.24 + paintA * 4.2
+      q.x * 2.20 + q.y * 1.38 - time * 0.46 + paintA * 4.2
     );
     float blueMix = clamp(blueSignal * 0.55 + purpleSignal * 0.18 + paintB * 0.27, 0.0, 1.0);
     float overlap = clamp(1.0 - abs(blueMix * 2.0 - 1.0), 0.0, 1.0);
 
     float blueDetail = clamp(
       0.24
-      + 0.76 * fbm(q * vec2(2.25, 10.2) + vec2(-time * 0.12, 2.7))
-      + 0.17 * ridges(q * vec2(5.1, 16.0) + vec2(time * 0.08, 5.4)),
+      + 0.76 * fbm(q * vec2(2.25, 10.2) + vec2(-time * 0.20, 2.7))
+      + 0.17 * ridges(q * vec2(5.1, 16.0) + vec2(time * 0.14, 5.4)),
       0.0,
       1.0
     );
 
     float purpleDetail = clamp(
       0.22
-      + 0.78 * fbm(q * vec2(2.10, 9.7) + vec2(time * 0.10, 18.9))
-      + 0.16 * ridges(q * vec2(4.7, 15.2) + vec2(-time * 0.07, 21.2)),
+      + 0.78 * fbm(q * vec2(2.10, 9.7) + vec2(time * 0.17, 18.9))
+      + 0.16 * ridges(q * vec2(4.7, 15.2) + vec2(-time * 0.12, 21.2)),
       0.0,
       1.0
     );
 
     vec3 deepWater = vec3(0.004, 0.015, 0.040);
-    float waterMist = fbm(q * vec2(1.25, 4.3) + vec2(time * 0.025, -7.0));
+    float waterMist = fbm(q * vec2(1.25, 4.3) + vec2(time * 0.06, -7.0));
     vec3 water = deepWater + vec3(0.005, 0.018, 0.035) * waterMist;
 
     vec3 blueInk = mix(
@@ -157,8 +164,13 @@ const fragmentSource = `#version 300 es
     vec3 color = mix(water, dye, dyeMask);
 
     // 重叠区域增加一层缓慢变化的颜料雾，让交融感持续发生。
-    float mixingMist = fbm(q * vec2(8.5, 13.0) + vec2(-time * 0.12, time * 0.09));
+    float mixingMist = fbm(q * vec2(8.5, 13.0) + vec2(-time * 0.22, time * 0.16));
     color += dye * mixingMist * overlap * 0.10;
+
+    // 细长流痕像鱼群掠过水体，保持低对比，避免重新变成两条硬色带。
+    float schoolRidge = ridges(q * vec2(4.0, 15.0) + vec2(-time * 0.30, time * 0.18));
+    float schoolGlint = smoothstep(0.58, 0.90, schoolRidge) * (0.55 + paintC * 0.45);
+    color += dye * schoolGlint * (0.035 + dyeMask * 0.06);
 
     // 边缘压暗，顶部保留冷色折射光。
     float edge = smoothstep(0.29, 0.72, length((uv - 0.5) * vec2(0.72, 1.85)));
