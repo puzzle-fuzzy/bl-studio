@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
 import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
@@ -981,8 +981,14 @@ function CharacterCreationWorkspace({
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs">
-                      <span className="truncate">{characterSettingsSummary(basicSettingsFields, values)}</span>
-                      <ChevronDown data-icon="inline-end" />
+                      <span className="flex min-w-0 items-center gap-2 truncate">
+                        {characterSettingsSummary(basicSettingsFields, values).map((value, index) => (
+                          <Fragment key={`${value}-${index}`}>
+                            {index > 0 && <Separator orientation="vertical" className="h-3" />}
+                            <span className="truncate">{value}</span>
+                          </Fragment>
+                        ))}
+                      </span>
                     </Button>
                   </DropdownMenuTrigger>
                   <CharacterSettingsPopover
@@ -1037,7 +1043,7 @@ function characterSettingsSummary(fields: readonly FormField[], values: Readonly
   const summary = [size?.ratio, size?.resolution, countValue]
     .filter((value): value is string | number => typeof value === 'string' || typeof value === 'number')
     .map(String)
-  return summary.slice(0, 3).join(' · ') || '设置'
+  return summary.length > 0 ? summary.slice(0, 3).map(String) : ['设置']
 }
 
 function characterParameterValue(field: FormField, values: Readonly<Record<string, unknown>>) {
