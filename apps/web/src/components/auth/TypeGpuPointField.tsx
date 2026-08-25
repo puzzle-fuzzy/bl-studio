@@ -1,11 +1,37 @@
 import { useEffect, useRef } from 'react'
 import tgpu, { common, d } from 'typegpu'
+import type { TgpuUniform } from 'typegpu'
 
-const createPointFieldFragment = (aspect: number) => tgpu.fragmentFn({
-  in: { uv: d.vec2f },
-  out: d.vec4f,
-}) /* wgsl */ `{
+type AnyUniform = TgpuUniform<any>
+
+const clamp01 = (value: number) => Math.min(1, Math.max(0, value))
+
+const pointFieldDensity = (x: number, y: number) => {
+  const ellipse = (centerX: number, centerY: number, radiusX: number, radiusY: number) =>
+    1 - Math.hypot((x - centerX) / radiusX, (y - centerY) / radiusY)
+
+  return Math.max(
+    ellipse(0.22, 0.72, 0.30, 0.28),
+    ellipse(0.28, 0.49, 0.16, 0.28),
+    ellipse(0.56, 0.36, 0.13, 0.21),
+    ellipse(0.40, 0.56, 0.22, 0.16),
+    ellipse(0.31, 0.05, 0.08, 0.11),
+  )
+}
+
+const createPointFieldFragment = (
+  timeUniform: AnyUniform,
+  pointerUniform: AnyUniform,
+  resolutionUniform: AnyUniform,
+) => {
+  const fragment = tgpu.fragmentFn({
+    in: { uv: d.vec2f },
+    out: d.vec4f,
+  }) /* wgsl */ `{
   let p = in.uv;
+  let resolution = pointFieldResolution;
+  let time = pointFieldTime;
+  let pointer = pointFieldPointer;
 
   // Keep the field weighted toward the left side, leaving the form readable.
   let mainMass = 1.0 - length((p - vec2f(0.22, 0.72)) / vec2f(0.30, 0.28));
@@ -15,35 +41,121 @@ const createPointFieldFragment = (aspect: number) => tgpu.fragmentFn({
   let topDrop = 1.0 - length((p - vec2f(0.31, 0.05)) / vec2f(0.08, 0.11));
 
   let density = clamp(max(max(mainMass, risingMass), max(max(upperMass, bridge), topDrop)), 0.0, 1.0);
-  // Compensate for the canvas aspect ratio so every dot stays round.
-  let cells = vec2f(${(52 * aspect).toFixed(3)}, 52.0);
-  let local = fract(p * cells) - vec2f(0.5, 0.5);
-  let distanceToDot = length(local);
-  let dotRadius = 0.035 + density * 0.17;
-  let dot = 1.0 - smoothstep(dotRadius * 0.60, dotRadius, distanceToDot);
-  let edgeFade = smoothstep(0.015, 0.12, density);
-  let alpha = dot * edgeFade * (0.18 + density * 0.72);
+  let aspect = max(resolution.x / max(resolution.y, 1.0), 0.5);
+  let cells = vec2f(70.0 * aspect, 70.0);
 
-  return vec4f(vec3f(0.72, 0.42, 0.80), alpha);
+  // Stable per-cell phases make the movement feel organic instead of uniform.
+  let cell = floor(p * cells);
+  let seedA = sin(dot(cell, vec2f(127.1, 311.7))) * 43758.5453;
+  let seedB = sin(dot(cell, vec2f(269.5, 183.3))) * 43758.5453;
+  let randomA = fract(seedA);
+  let randomB = fract(seedB);
+  let phaseA = randomA * 6.2831853;
+  let phaseB = randomB * 6.2831853;
+
+  let pointerDistance = distance(p, pointer.xy);
+  let hover = (1.0 - smoothstep(0.015, 0.34, pointerDistance)) * pointer.z;
+  let pushDirection = normalize(p - pointer.xy + vec2f(0.0001, 0.0001));
+  let drift = vec2f(
+    sin(time * (0.50 + randomA * 0.28) + phaseA),
+    cos(time * (0.42 + randomB * 0.25) + phaseB)
+  ) * (0.010 + density * 0.018);
+  let pointerPush = pushDirection * hover * (0.010 + density * 0.012);
+  let pointerWiggle = vec2f(
+    sin(time * 2.4 + phaseB),
+    cos(time * 2.1 + phaseA)
+  ) * hover * 0.008;
+  let moved = p + drift + pointerPush + pointerWiggle;
+
+  let local = fract(moved * cells) - vec2f(0.5, 0.5);
+  let distanceToDot = length(local);
+  let pulse = 0.5 + 0.5 * sin(time * (0.62 + randomA * 0.18) + phaseA);
+  let dotRadius = 0.032 + density * (0.122 + pulse * 0.018) + hover * 0.020;
+  let dot = 1.0 - smoothstep(dotRadius * 0.52, dotRadius, distanceToDot);
+  let edgeFade = smoothstep(0.015, 0.12, density);
+  let alpha = dot * edgeFade * (0.16 + density * 0.74 + hover * 0.10);
+
+  let ring = (0.5 + 0.5 * sin(pointerDistance * 52.0 - time * 3.8))
+    * (1.0 - smoothstep(0.0, 0.38, pointerDistance))
+    * pointer.z;
+  let blueInfluence = clamp(hover * 0.92 + ring * 0.16, 0.0, 1.0);
+  let darkInfluence = hover * (1.0 - smoothstep(0.025, 0.20, pointerDistance)) * 0.76;
+  let purple = vec3f(0.72, 0.42, 0.80);
+  let electricBlue = vec3f(0.06, 0.04, 0.82);
+  let nearBlack = vec3f(0.025, 0.018, 0.045);
+  let color = mix(purple, electricBlue, blueInfluence);
+  color = mix(color, nearBlack, darkInfluence);
+
+  return vec4f(color, alpha);
 }`
+
+  return fragment.$uses({
+    pointFieldTime: timeUniform,
+    pointFieldPointer: pointerUniform,
+    pointFieldResolution: resolutionUniform,
+  })
+}
 
 /** WebGPU / TypeGPU 点阵氛围层；不支持 WebGPU 时保留 CSS 点阵兜底。 */
 export function TypeGpuPointField() {
+  const fieldRef = useRef<HTMLDivElement>(null)
   const canvasRef = useRef<HTMLCanvasElement>(null)
+  const pointerUniformRef = useRef<AnyUniform | null>(null)
+  const pointerRef = useRef({ x: 0.22, y: 0.72, active: 0 })
 
   useEffect(() => {
+    const field = fieldRef.current
     const canvas = canvasRef.current
-    if (canvas === null || !('gpu' in navigator) || navigator.gpu === undefined) return
+    if (field === null || canvas === null) return
 
     let disposed = false
+    let frameId: number | null = null
     let root: ReturnType<typeof tgpu.initFromDevice> | null = null
     let removeResizeListener: (() => void) | null = null
+    let timeUniform: AnyUniform | null = null
+    let resolutionUniform: AnyUniform | null = null
+
+    const updatePointer = (x: number, y: number, active: number) => {
+      const next = { x: clamp01(x), y: clamp01(y), active }
+      pointerRef.current = next
+      field.dataset.pointerActive = active > 0 ? 'true' : 'false'
+      field.style.setProperty('--pointer-x', `${next.x * 100}%`)
+      field.style.setProperty('--pointer-y', `${next.y * 100}%`)
+      pointerUniformRef.current?.write(d.vec4f(next.x, next.y, next.active, 1))
+    }
+
+    const handlePointerMove = (event: PointerEvent) => {
+      const rect = canvas.getBoundingClientRect()
+      if (rect.width === 0 || rect.height === 0) return
+
+      const x = (event.clientX - rect.left) / rect.width
+      const y = (event.clientY - rect.top) / rect.height
+      const isInside = x >= 0 && x <= 1 && y >= 0 && y <= 1 && pointFieldDensity(x, y) > 0.02
+      updatePointer(x, y, isInside ? 1 : 0)
+    }
+
+    const handlePointerLeave = () => {
+      updatePointer(pointerRef.current.x, pointerRef.current.y, 0)
+    }
+
+    window.addEventListener('pointermove', handlePointerMove, { passive: true })
+    document.addEventListener('mouseleave', handlePointerLeave)
+    window.addEventListener('blur', handlePointerLeave)
+
+    if (!('gpu' in navigator) || navigator.gpu === undefined) {
+      return () => {
+        window.removeEventListener('pointermove', handlePointerMove)
+        document.removeEventListener('mouseleave', handlePointerLeave)
+        window.removeEventListener('blur', handlePointerLeave)
+      }
+    }
 
     const resizeCanvas = () => {
       const rect = canvas.getBoundingClientRect()
       const pixelRatio = Math.min(window.devicePixelRatio || 1, 1.5)
       canvas.width = Math.max(1, Math.floor(rect.width * pixelRatio))
       canvas.height = Math.max(1, Math.floor(rect.height * pixelRatio))
+      resolutionUniform?.write(d.vec2f(rect.width, rect.height))
     }
 
     const render = async () => {
@@ -54,32 +166,45 @@ export function TypeGpuPointField() {
 
         root = tgpu.initFromDevice({ device })
         const rect = canvas.getBoundingClientRect()
-        const aspect = rect.height === 0 ? 1.78 : rect.width / rect.height
+        timeUniform = root.createUniform(d.f32, 0)
+        pointerUniformRef.current = root.createUniform(d.vec4f, d.vec4f(
+          pointerRef.current.x,
+          pointerRef.current.y,
+          pointerRef.current.active,
+          1,
+        ))
+        resolutionUniform = root.createUniform(d.vec2f, d.vec2f(rect.width, rect.height))
+
         const format = navigator.gpu.getPreferredCanvasFormat()
         const context = root.configureContext({ canvas, format, alphaMode: 'premultiplied' })
         const pipeline = root.createRenderPipeline({
           vertex: common.fullScreenTriangle,
-          fragment: createPointFieldFragment(aspect),
+          fragment: createPointFieldFragment(timeUniform, pointerUniformRef.current, resolutionUniform),
           targets: { format },
         })
+        const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        const startedAt = performance.now()
 
-        const draw = () => {
+        const draw = (timestamp = performance.now()) => {
           if (disposed) return
+          if (!reducedMotion) timeUniform?.write((timestamp - startedAt) / 1000)
           pipeline.withColorAttachment({ view: context, clearValue: [1, 1, 1, 0] }).draw(3)
+          if (!reducedMotion) frameId = window.requestAnimationFrame(draw)
         }
 
         const handleResize = () => {
           resizeCanvas()
-          draw()
+          if (reducedMotion) draw()
         }
 
         resizeCanvas()
+        updatePointer(pointerRef.current.x, pointerRef.current.y, pointerRef.current.active)
         draw()
         window.addEventListener('resize', handleResize, { passive: true })
         removeResizeListener = () => window.removeEventListener('resize', handleResize)
-        canvas.closest('[data-point-field]')?.setAttribute('data-gpu-ready', 'true')
+        field.dataset.gpuReady = 'true'
       } catch {
-        // The SVG fallback remains visible when adapter/device/pipeline setup fails.
+        // The CSS fallback remains visible when adapter/device/pipeline setup fails.
       }
     }
 
@@ -87,14 +212,20 @@ export function TypeGpuPointField() {
 
     return () => {
       disposed = true
+      if (frameId !== null) window.cancelAnimationFrame(frameId)
       removeResizeListener?.()
+      pointerUniformRef.current = null
       root?.destroy()
+      window.removeEventListener('pointermove', handlePointerMove)
+      document.removeEventListener('mouseleave', handlePointerLeave)
+      window.removeEventListener('blur', handlePointerLeave)
     }
   }, [])
 
   return (
-    <div className="login-point-field" data-point-field aria-hidden="true">
+    <div ref={fieldRef} className="login-point-field" data-point-field aria-hidden="true">
       <div className="login-point-field__fallback" />
+      <div className="login-point-field__pointer" />
       <canvas ref={canvasRef} className="login-point-field__canvas" />
     </div>
   )

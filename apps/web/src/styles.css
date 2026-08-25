@@ -170,6 +170,7 @@
 }
 
 .login-point-field__fallback,
+.login-point-field__pointer,
 .login-point-field__canvas {
   position: absolute;
   inset: 0;
@@ -181,7 +182,7 @@
 .login-point-field__fallback {
   background-image: radial-gradient(circle, currentColor 0 2px, transparent 2.4px);
   background-position: 0 0;
-  background-size: 14px 14px;
+  background-size: 12px 12px;
   -webkit-mask-image:
     radial-gradient(ellipse 30% 29% at 20% 75%, #000 0 78%, transparent 100%),
     radial-gradient(ellipse 17% 30% at 31% 50%, #000 0 78%, transparent 100%),
@@ -197,7 +198,30 @@
     radial-gradient(ellipse 8% 11% at 31% 5%, #000 0 78%, transparent 100%);
   mask-composite: add;
   opacity: 0.92;
+  animation: login-point-field-drift 15s ease-in-out infinite alternate;
   transition: opacity 500ms ease-out;
+}
+
+.login-point-field__pointer {
+  background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 2.8px, transparent 3.2px);
+  background-position: 0 0;
+  background-size: 12px 12px;
+  -webkit-mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
+  mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
+  mix-blend-mode: multiply;
+  opacity: 0;
+  transition: opacity 180ms ease-out;
+}
+
+.login-point-field__pointer::after {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 2.9px, transparent 3.3px);
+  background-position: 0 0;
+  background-size: 12px 12px;
+  -webkit-mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
+  mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
+  content: '';
 }
 
 .login-point-field__canvas {
@@ -211,6 +235,22 @@
 
 .login-point-field[data-gpu-ready='true'] .login-point-field__canvas {
   opacity: 0.92;
+}
+
+.login-point-field[data-pointer-active='true']:not([data-gpu-ready='true']) .login-point-field__pointer {
+  opacity: 0.96;
+}
+
+@keyframes login-point-field-drift {
+  0% {
+    transform: translate3d(-3px, 1px, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(2px, -2px, 0) scale(1.008);
+  }
+  100% {
+    transform: translate3d(4px, 2px, 0) scale(1.014);
+  }
 }
 
 @keyframes login-form-enter {
@@ -242,6 +282,7 @@
 @media (prefers-reduced-motion: reduce) {
   .login-page__form-wrap,
   .login-point-field__fallback,
+  .login-point-field__pointer,
   .login-point-field__canvas {
     animation: none;
     transition: none;
