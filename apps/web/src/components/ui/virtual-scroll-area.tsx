@@ -10,6 +10,12 @@ import type { PartialOptions } from 'overlayscrollbars'
  * 右侧 padding 以免 handle 遮住文字）。
  */
 const OVERLAY_SCROLLBAR_OPTIONS: PartialOptions = {
+  // 工作台页面只允许纵向滚动；横向溢出应由内容自身的响应式布局处理，
+  // 不应在页面底部生成一条无意义的水平滚动条。
+  overflow: {
+    x: 'hidden',
+    y: 'scroll',
+  },
   scrollbars: {
     theme: 'os-theme-custom',
     autoHide: 'never',
