@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { LoginWordmark } from '@/components/auth/LoginWordmark'
-import { TypeGpuPointField } from '@/components/auth/TypeGpuPointField'
+import { LiquidSandBackground } from '@/components/auth/LiquidSandBackground'
 import { useAuthStore } from '@/stores/auth-store'
 import { canResendVerification, userErrorMessage } from '@/lib/user-error'
 
@@ -86,7 +86,7 @@ export function LoginPage() {
 
   return (
     <div className="login-page">
-      <TypeGpuPointField />
+      <LiquidSandBackground />
       <div className="login-page__veil" aria-hidden="true" />
       <main className="login-page__content">
         <div className="login-page__form-wrap">
