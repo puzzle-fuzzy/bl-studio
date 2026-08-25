@@ -29,3 +29,6 @@ web-*.tar
 playwright-report/
 test-results/
 tests/e2e/.playwright
+
+# 本地 rehearsal 用的静态 ffmpeg/ffprobe（fetch-static-ffmpeg.sh 下载，不入库）
+infra/ffmpeg/
