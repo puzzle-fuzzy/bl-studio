@@ -525,6 +525,9 @@ importers:
       '@bailian-studio/model-core':
         specifier: workspace:*
         version: link:../model-core
+      '@bailian-studio/shared':
+        specifier: workspace:*
+        version: link:../shared
       '@bailian-studio/task-engine':
         specifier: workspace:*
         version: link:../task-engine

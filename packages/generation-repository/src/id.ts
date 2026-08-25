@@ -17,6 +17,9 @@ let usageRecordSeq = 0
 let auditLogSeq = 0
 let generationEventSeq = 0
 let assetDerivativeSeq = 0
+let creativeGenerationContextSeq = 0
+let creativeGenerationContextAssetSeq = 0
+let creativeGenerationContextReferenceSeq = 0
 
 export function nextGenerationRecordId(): string {
   recordSeq += 1
@@ -65,4 +68,19 @@ export function nextGenerationEventId(): string {
 export function nextAssetDerivativeId(): string {
   assetDerivativeSeq += 1
   return `asset_derivative_${Date.now()}_${assetDerivativeSeq}`
+}
+
+export function nextCreativeGenerationContextId(): string {
+  creativeGenerationContextSeq += 1
+  return `creative_context_${Date.now()}_${creativeGenerationContextSeq}`
+}
+
+export function nextCreativeGenerationContextAssetId(): string {
+  creativeGenerationContextAssetSeq += 1
+  return `creative_context_asset_${Date.now()}_${creativeGenerationContextAssetSeq}`
+}
+
+export function nextCreativeGenerationContextReferenceId(): string {
+  creativeGenerationContextReferenceSeq += 1
+  return `creative_context_reference_${Date.now()}_${creativeGenerationContextReferenceSeq}`
 }

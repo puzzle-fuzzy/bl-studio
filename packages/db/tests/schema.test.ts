@@ -5,6 +5,13 @@ import {
   createDb,
   creditAccounts,
   creditLedgerEntries,
+  creativeAssetPacks,
+  creativeAssets,
+  creativeAssetReferences,
+  creativeAssetVersions,
+  creativeGenerationContexts,
+  creativeGenerationContextAssets,
+  creativeGenerationContextReferences,
   generationArtifacts,
   generationInputAssets,
   generationRecords,
@@ -94,6 +101,32 @@ describe('db schema exports', () => {
       'config' in index && index.config.name === 'generation_input_assets_parameter_idx'
     )
     expect(parameterIndex?.config.unique).toBe(true)
+  })
+
+  it('exports typed creative asset tables and preserves canonical-version uniqueness', () => {
+    expect(creativeAssetPacks.title).toBeDefined()
+    expect(creativeAssets.type).toBeDefined()
+    expect(creativeAssets.packId).toBeDefined()
+    expect(creativeAssetVersions.semanticSpecJson).toBeDefined()
+    expect(creativeAssetReferences.role).toBeDefined()
+    expect(creativeGenerationContexts.protocolVersion).toBeDefined()
+    expect(creativeGenerationContexts.fingerprint).toBeDefined()
+    expect(creativeGenerationContextAssets.assetVersionId).toBeDefined()
+    expect(creativeGenerationContextReferences.referenceId).toBeDefined()
+
+    const tableInternals = creativeAssetVersions as unknown as Record<symbol, unknown>
+    const extraConfigBuilder = tableInternals[Symbol.for('drizzle:ExtraConfigBuilder')]
+    const extraConfigColumns = tableInternals[Symbol.for('drizzle:ExtraConfigColumns')]
+    if (typeof extraConfigBuilder !== 'function') {
+      throw new Error('expected creative_asset_versions extra config builder')
+    }
+
+    const indexes = extraConfigBuilder(extraConfigColumns) as IndexConfigProbe[]
+    const approvedIndex = indexes.find(index =>
+      'config' in index && index.config.name === 'creative_asset_versions_asset_approved_idx'
+    )
+    expect(approvedIndex?.config.unique).toBe(true)
+    expect(approvedIndex?.config.where).toBeDefined()
   })
 
   it('exports reusable asset derivatives with one active thumbnail per asset', () => {

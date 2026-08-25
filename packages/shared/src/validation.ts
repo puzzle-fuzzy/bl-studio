@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { ValidationError } from './errors'
+import { CreativeGenerationContextSchema } from './creative-assets'
 
 /**
  * Bailian Studio API 的运行时输入校验 schema 集合（基于 zod）。
@@ -25,6 +26,8 @@ export const CreateGenerationSchema = z.object({
       z.array(z.string().min(1, 'Asset ID is required')).min(1, 'At least one asset ID is required'),
     ]),
   ).optional(),
+  /** 可选的短剧素材引用快照；旧的 assetRefs 协议继续兼容。 */
+  creativeContext: CreativeGenerationContextSchema.optional(),
   idempotencyKey: z.string().optional(),
   // 对比批次 ID：同一次"同 prompt 多模型对比生成"的多条提交共用。注意本 schema
   // 是【非 strict】的 z.object——未声明字段会被静默剥离，因此必须显式声明。

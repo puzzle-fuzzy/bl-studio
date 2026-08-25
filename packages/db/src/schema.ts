@@ -31,7 +31,7 @@
  */
 
 import { sql } from 'drizzle-orm'
-import { boolean, check, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
 
 /**
  * 用户表 —— 自托管认证的用户主表。
@@ -507,6 +507,195 @@ export const generationInputAssets = pgTable('generation_input_assets', {
 }, table => [
   uniqueIndex('generation_input_assets_parameter_idx').on(table.generationId, table.parameterName, table.position),
   index('generation_input_assets_asset_idx').on(table.assetId),
+])
+
+/**
+ * 创意资产包 —— 只负责整理素材，不代表剧本、分集或剪辑工程。
+ *
+ * packId 在 creative_assets 中是可选的：用户可以先做个人资产，也可以把
+ * 一组角色/场景/道具归入某个短剧素材包。这样资产域不会被导演流程绑定。
+ */
+export const creativeAssetPacks = pgTable('creative_asset_packs', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  title: text('title').notNull(),
+  description: text('description'),
+  status: text('status').notNull().default('draft'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_asset_packs_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
+  index('creative_asset_packs_user_created_idx').on(table.userId, table.createdAt, table.id),
+  index('creative_asset_packs_user_updated_idx').on(table.userId, table.updatedAt),
+])
+
+/** 创意资产实体：角色、环境、道具或风格，不是某一张图片。 */
+export const creativeAssets = pgTable('creative_assets', {
+  id: text('id').primaryKey(),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  packId: text('pack_id').references(() => creativeAssetPacks.id, { onDelete: 'set null' }),
+  type: text('type').notNull(),
+  name: text('name').notNull(),
+  description: text('description').notNull().default(''),
+  status: text('status').notNull().default('draft'),
+  metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>().notNull().default({}),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_assets_type_check', sql`${table.type} in ('character', 'environment', 'prop', 'style')`),
+  check('creative_assets_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
+  index('creative_assets_user_type_created_idx').on(table.userId, table.type, table.createdAt),
+  index('creative_assets_pack_created_idx').on(table.packId, table.createdAt),
+  index('creative_assets_user_updated_idx').on(table.userId, table.updatedAt),
+])
+
+/**
+ * 创意资产版本 —— 版本一旦用于生成就不应被原地改写。
+ * approved 状态在未软删除范围内至多存在一个，作为当前 canonical version。
+ */
+export const creativeAssetVersions = pgTable('creative_asset_versions', {
+  id: text('id').primaryKey(),
+  assetId: text('asset_id').notNull().references(() => creativeAssets.id, { onDelete: 'cascade' }),
+  sourceGenerationId: text('source_generation_id').references(() => generationRecords.id, { onDelete: 'set null' }),
+  version: integer('version').notNull(),
+  status: text('status').notNull().default('draft'),
+  semanticSpecJson: jsonb('semantic_spec_json').$type<Record<string, unknown>>().notNull().default({}),
+  generationRecipeJson: jsonb('generation_recipe_json').$type<Record<string, unknown>>().notNull().default({}),
+  notes: text('notes'),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_asset_versions_version_check', sql`${table.version} > 0`),
+  check(
+    'creative_asset_versions_status_check',
+    sql`${table.status} in ('draft', 'generating', 'candidate', 'approved', 'archived', 'rejected')`,
+  ),
+  uniqueIndex('creative_asset_versions_asset_version_idx').on(table.assetId, table.version),
+  uniqueIndex('creative_asset_versions_asset_approved_idx')
+    .on(table.assetId)
+    .where(sql`${table.status} = 'approved' and ${table.deletedAt} is null`),
+  index('creative_asset_versions_asset_status_idx').on(table.assetId, table.status, table.createdAt),
+  index('creative_asset_versions_source_generation_idx').on(table.sourceGenerationId),
+])
+
+/**
+ * 参考资料绑定 —— 把 user_assets 的物理文件绑定到某个创意资产版本，
+ * 并用 role 明确它是正面、侧面、全景、细节还是交互状态，而不是依赖文件名。
+ */
+export const creativeAssetReferences = pgTable('creative_asset_references', {
+  id: text('id').primaryKey(),
+  assetVersionId: text('asset_version_id').notNull().references(() => creativeAssetVersions.id, { onDelete: 'cascade' }),
+  userAssetId: text('user_asset_id').notNull().references(() => userAssets.id, { onDelete: 'restrict' }),
+  role: text('role').notNull(),
+  position: integer('position').notNull().default(0),
+  metadataJson: jsonb('metadata_json').$type<Record<string, unknown>>().notNull().default({}),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check(
+    'creative_asset_references_role_check',
+    sql`${table.role} in ('front', 'three_quarter', 'side', 'back', 'full_body', 'medium', 'face_closeup', 'wide', 'detail', 'isolated', 'interaction', 'mask', 'style_board', 'other')`,
+  ),
+  check('creative_asset_references_position_check', sql`${table.position} >= 0`),
+  uniqueIndex('creative_asset_references_version_role_position_idx')
+    .on(table.assetVersionId, table.role, table.position)
+    .where(sql`${table.deletedAt} is null`),
+  uniqueIndex('creative_asset_references_version_id_idx').on(table.assetVersionId, table.id),
+  index('creative_asset_references_user_asset_idx').on(table.userAssetId),
+  index('creative_asset_references_version_role_idx').on(table.assetVersionId, table.role),
+])
+
+/**
+ * 生成上下文 —— generation_records 记录 provider 执行；本表记录这次执行
+ * 在创意资产域中的意图、协议版本和快照。二者一对一，保证重跑/审计时不会
+ * 只剩下 provider 参数而丢失“引用了哪个角色版本”的语义信息。
+ */
+export const creativeGenerationContexts = pgTable('creative_generation_contexts', {
+  id: text('id').primaryKey(),
+  generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
+  userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  protocolVersion: integer('protocol_version').notNull().default(1),
+  purpose: text('purpose').notNull(),
+  fingerprint: text('fingerprint').notNull(),
+  prompt: text('prompt').notNull().default(''),
+  negativePrompt: text('negative_prompt'),
+  modelId: text('model_id'),
+  recipeJson: jsonb('recipe_json').$type<Record<string, unknown>>().notNull().default({}),
+  capabilitySnapshotJson: jsonb('capability_snapshot_json').$type<Record<string, unknown>>().notNull().default({}),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_generation_contexts_protocol_version_check', sql`${table.protocolVersion} > 0`),
+  check(
+    'creative_generation_contexts_purpose_check',
+    sql`${table.purpose} in ('asset_reference_sheet', 'asset_variant', 'shot_image', 'shot_video', 'utility')`,
+  ),
+  uniqueIndex('creative_generation_contexts_generation_idx').on(table.generationId),
+  index('creative_generation_contexts_user_created_idx').on(table.userId, table.createdAt),
+  index('creative_generation_contexts_purpose_created_idx').on(table.purpose, table.createdAt),
+])
+
+/** 一次生成中使用的创意资产版本，role + position 是稳定的引用槽位。 */
+export const creativeGenerationContextAssets = pgTable('creative_generation_context_assets', {
+  id: text('id').primaryKey(),
+  contextId: text('context_id').notNull().references(() => creativeGenerationContexts.id, { onDelete: 'cascade' }),
+  assetVersionId: text('asset_version_id').notNull().references(() => creativeAssetVersions.id, { onDelete: 'restrict' }),
+  role: text('role').notNull(),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_generation_context_assets_role_check', sql`${table.role} in ('character', 'environment', 'prop', 'style')`),
+  check('creative_generation_context_assets_position_check', sql`${table.position} >= 0`),
+  uniqueIndex('creative_generation_context_assets_context_role_position_idx').on(table.contextId, table.role, table.position),
+  uniqueIndex('creative_generation_context_assets_context_version_role_idx').on(table.contextId, table.assetVersionId, table.role),
+  uniqueIndex('creative_generation_context_assets_id_version_idx').on(table.id, table.assetVersionId),
+  index('creative_generation_context_assets_version_idx').on(table.assetVersionId),
+])
+
+/**
+ * 一次生成从资产版本中选择的具体参考图。单独建关联表避免把 referenceIds
+ * 塞进 JSON，确保历史生成不会因为资产库后续增删参考图而改变含义。
+ */
+export const creativeGenerationContextReferences = pgTable('creative_generation_context_references', {
+  id: text('id').primaryKey(),
+  contextAssetId: text('context_asset_id').notNull().references(() => creativeGenerationContextAssets.id, { onDelete: 'cascade' }),
+  assetVersionId: text('asset_version_id').notNull(),
+  referenceId: text('reference_id').notNull().references(() => creativeAssetReferences.id, { onDelete: 'restrict' }),
+  position: integer('position').notNull().default(0),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_generation_context_references_position_check', sql`${table.position} >= 0`),
+  uniqueIndex('creative_generation_context_references_asset_position_idx').on(table.contextAssetId, table.position),
+  uniqueIndex('creative_generation_context_references_asset_reference_idx').on(table.contextAssetId, table.referenceId),
+  index('creative_generation_context_references_reference_idx').on(table.referenceId),
+  foreignKey({
+    columns: [table.contextAssetId, table.assetVersionId],
+    foreignColumns: [creativeGenerationContextAssets.id, creativeGenerationContextAssets.assetVersionId],
+    name: 'creative_generation_context_references_context_asset_version_fk',
+  }),
+  foreignKey({
+    columns: [table.assetVersionId, table.referenceId],
+    foreignColumns: [creativeAssetReferences.assetVersionId, creativeAssetReferences.id],
+    name: 'creative_generation_context_references_version_reference_fk',
+  }),
 ])
 
 /**

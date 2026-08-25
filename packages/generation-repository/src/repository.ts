@@ -25,6 +25,7 @@
  *    toPublicSharedRecord / toPublicSharedArtifact 严格裁剪，剥除 owner id /
  *    cost / task / provider / outputResult / readUrl 等一切敏感或内部字段。
  */
+import { createHash } from 'node:crypto'
 import { and, asc, desc, eq, exists, gt, gte, ilike, inArray, isNotNull, isNull, lt, or, sql } from 'drizzle-orm'
 import {
   CreditLedgerError,
@@ -33,7 +34,27 @@ import {
   reserveCreditsInTransaction,
   settleCreditsInTransaction,
 } from '@bailian-studio/credit-ledger'
-import { assetDerivatives, auditLogs, generationArtifacts, generationEvents, generationInputAssets, generationRecords, generationShares, providerRequestAudits, taskRecords, usageRecords, userAssets, workerHeartbeats, type BailianStudioDb } from '@bailian-studio/db'
+import {
+  assetDerivatives,
+  auditLogs,
+  creativeAssetReferences,
+  creativeAssetVersions,
+  creativeAssets,
+  creativeGenerationContextAssets,
+  creativeGenerationContextReferences,
+  creativeGenerationContexts,
+  generationArtifacts,
+  generationEvents,
+  generationInputAssets,
+  generationRecords,
+  generationShares,
+  providerRequestAudits,
+  taskRecords,
+  usageRecords,
+  userAssets,
+  workerHeartbeats,
+  type BailianStudioDb,
+} from '@bailian-studio/db'
 import {
   estimateModelCost,
   getModelAuditMetadata,
@@ -47,6 +68,11 @@ import {
 } from '@bailian-studio/model-core'
 import { transitionTask, type TaskRecord, type TaskError } from '@bailian-studio/task-engine'
 import {
+  CreativeGenerationContextSchema,
+  normalizeCreativeGenerationContext,
+  type CreativeGenerationContext,
+} from '@bailian-studio/shared'
+import {
   clampLimit,
   decodeCursor,
   encodeCursor,
@@ -57,7 +83,7 @@ import {
 import { GenerationRepositoryError } from './errors'
 import { createContentRepository } from './content'
 import { assetCursorFilters, decodeAssetCursor, encodeAssetCursor } from './asset-cursor'
-import { nextArtifactId, nextAssetDerivativeId, nextAuditLogId, nextGenerationEventId, nextGenerationRecordId, nextGenerationShareId, nextProviderRequestAuditId, nextTaskRecordId, nextUsageRecordId } from './id'
+import { nextArtifactId, nextAssetDerivativeId, nextAuditLogId, nextCreativeGenerationContextAssetId, nextCreativeGenerationContextId, nextCreativeGenerationContextReferenceId, nextGenerationEventId, nextGenerationRecordId, nextGenerationShareId, nextProviderRequestAuditId, nextTaskRecordId, nextUsageRecordId } from './id'
 import {
     toGenerationArtifact,
     toGenerationEvent,
@@ -314,6 +340,197 @@ function invalidAssetReference(
       }],
     },
   )
+}
+
+function invalidCreativeContext(
+  field: string,
+  message: string,
+  chineseMessage: string,
+): never {
+  throw new GenerationRepositoryError(
+    'INVALID_GENERATION_PARAMS',
+    'Invalid creative asset context',
+    {
+      issues: [{
+        code: 'INVALID_CREATIVE_CONTEXT',
+        field,
+        message,
+        messages: { 'zh-CN': chineseMessage, 'en-US': message },
+      }],
+    },
+  )
+}
+
+function normalizeCreativeContextInput(input: CreativeGenerationContext | undefined): CreativeGenerationContext | undefined {
+  if (input === undefined) return undefined
+  const parsed = CreativeGenerationContextSchema.safeParse(input)
+  if (!parsed.success) {
+    const issue = parsed.error.issues[0]
+    invalidCreativeContext(
+      issue?.path.join('.') || 'creativeContext',
+      issue?.message ?? 'Creative context is invalid',
+      '创意资产引用上下文无效',
+    )
+  }
+  return normalizeCreativeGenerationContext(parsed.data)
+}
+
+function fingerprintCreativeContext(context: CreativeGenerationContext | undefined): string | undefined {
+  if (context === undefined) return undefined
+  return createHash('sha256')
+    .update(canonicalize(context))
+    .digest('hex')
+}
+
+/** 在创建 generation 的事务中校验语义资产归属、版本状态和参考图归属。 */
+async function lockAndValidateCreativeContext(
+  tx: BailianStudioTx,
+  input: {
+    userId: string
+    context?: CreativeGenerationContext
+    allowDeleted?: boolean
+  },
+): Promise<void> {
+  const context = input.context
+  if (context === undefined || context.assetBindings.length === 0) return
+
+  const assetVersionIds = [...new Set(context.assetBindings.map(binding => binding.assetVersionId))]
+  const versionRows = await tx
+    .select({
+      assetVersionId: creativeAssetVersions.id,
+      versionStatus: creativeAssetVersions.status,
+      versionDeletedAt: creativeAssetVersions.deletedAt,
+      assetType: creativeAssets.type,
+      assetUserId: creativeAssets.userId,
+      assetDeletedAt: creativeAssets.deletedAt,
+    })
+    .from(creativeAssetVersions)
+    .innerJoin(creativeAssets, eq(creativeAssets.id, creativeAssetVersions.assetId))
+    .where(inArray(creativeAssetVersions.id, assetVersionIds))
+    .orderBy(asc(creativeAssetVersions.id))
+    .for('update')
+
+  const versionsById = new Map(versionRows.map(row => [row.assetVersionId, row] as const))
+  const candidateAllowed = context.purpose === 'asset_variant'
+  for (const [index, binding] of context.assetBindings.entries()) {
+    const version = versionsById.get(binding.assetVersionId)
+    if (
+      version === undefined
+      || version.assetUserId !== input.userId
+      || (!input.allowDeleted && version.assetDeletedAt !== null)
+      || (!input.allowDeleted && version.versionDeletedAt !== null)
+      || (!candidateAllowed && version.versionStatus !== 'approved')
+      || (candidateAllowed && version.versionStatus !== 'approved' && version.versionStatus !== 'candidate')
+    ) {
+      invalidCreativeContext(
+        `assetBindings.${index}.assetVersionId`,
+        'The selected creative asset version is unavailable or not approved',
+        '所选创意资产版本不可用或尚未批准',
+      )
+    }
+    if (version.assetType !== binding.role) {
+      invalidCreativeContext(
+        `assetBindings.${index}.role`,
+        `Asset version type '${version.assetType}' does not match binding role '${binding.role}'`,
+        `资产版本类型 '${version.assetType}' 与引用角色 '${binding.role}' 不匹配`,
+      )
+    }
+  }
+
+  const referenceIds = [...new Set(context.assetBindings.flatMap(binding => binding.referenceIds))]
+  if (referenceIds.length === 0) return
+
+  const referenceRows = await tx
+    .select({
+      id: creativeAssetReferences.id,
+      assetVersionId: creativeAssetReferences.assetVersionId,
+      referenceDeletedAt: creativeAssetReferences.deletedAt,
+      userAssetUserId: userAssets.userId,
+      userAssetStatus: userAssets.status,
+      userAssetDeletedAt: userAssets.deletedAt,
+    })
+    .from(creativeAssetReferences)
+    .innerJoin(userAssets, eq(userAssets.id, creativeAssetReferences.userAssetId))
+    .where(inArray(creativeAssetReferences.id, referenceIds))
+    .orderBy(asc(creativeAssetReferences.id))
+    .for('update')
+
+  const referencesById = new Map(referenceRows.map(row => [row.id, row] as const))
+  for (const [bindingIndex, binding] of context.assetBindings.entries()) {
+    for (const [referenceIndex, referenceId] of binding.referenceIds.entries()) {
+      const reference = referencesById.get(referenceId)
+      if (
+        reference === undefined
+        || reference.assetVersionId !== binding.assetVersionId
+        || (!input.allowDeleted && reference.referenceDeletedAt !== null)
+        || reference.userAssetUserId !== input.userId
+        || reference.userAssetStatus !== 'ready'
+        || (!input.allowDeleted && reference.userAssetDeletedAt !== null)
+      ) {
+        invalidCreativeContext(
+          `assetBindings.${bindingIndex}.referenceIds.${referenceIndex}`,
+          'The selected reference does not belong to the bound asset version',
+          '所选参考图不属于当前绑定的资产版本',
+        )
+      }
+    }
+  }
+}
+
+async function persistCreativeGenerationContext(
+  tx: BailianStudioTx,
+  input: {
+    generationId: string
+    userId: string
+    modelId: string
+    context: CreativeGenerationContext
+    createdAt: Date
+  },
+): Promise<void> {
+  const contextId = nextCreativeGenerationContextId()
+  await tx.insert(creativeGenerationContexts).values({
+    id: contextId,
+    generationId: input.generationId,
+    userId: input.userId,
+    protocolVersion: input.context.protocolVersion,
+    purpose: input.context.purpose,
+    fingerprint: fingerprintCreativeContext(input.context) as string,
+    prompt: input.context.prompt,
+    negativePrompt: input.context.negativePrompt ?? null,
+    modelId: input.context.modelId ?? input.modelId,
+    recipeJson: input.context.recipe,
+    capabilitySnapshotJson: input.context.capabilitySnapshot,
+    createdAt: input.createdAt,
+    updatedAt: input.createdAt,
+  })
+
+  if (input.context.assetBindings.length === 0) return
+
+  const contextAssetRows = input.context.assetBindings.map(binding => ({
+    id: nextCreativeGenerationContextAssetId(),
+    contextId,
+    assetVersionId: binding.assetVersionId,
+    role: binding.role,
+    position: binding.position,
+    createdAt: input.createdAt,
+  }))
+  await tx.insert(creativeGenerationContextAssets).values(contextAssetRows)
+
+  const contextReferenceRows = input.context.assetBindings.flatMap((binding, index) => {
+    const contextAssetId = contextAssetRows[index]?.id
+    if (contextAssetId === undefined) return []
+    return binding.referenceIds.map((referenceId, position) => ({
+      id: nextCreativeGenerationContextReferenceId(),
+      contextAssetId,
+      assetVersionId: binding.assetVersionId,
+      referenceId,
+      position,
+      createdAt: input.createdAt,
+    }))
+  })
+  if (contextReferenceRows.length > 0) {
+    await tx.insert(creativeGenerationContextReferences).values(contextReferenceRows)
+  }
 }
 
 function referenceIds(value: AssetReferenceValue): string[] {
@@ -1244,6 +1461,82 @@ interface ExpectedIdempotentRequest {
   modelId: string
   params: Record<string, unknown>
   assetRefs?: GenerationAssetRefs
+  creativeContextFingerprint?: string
+}
+
+async function readCreativeGenerationContext(
+  db: BailianStudioDb | BailianStudioTx,
+  generationId: string,
+): Promise<CreativeGenerationContext | undefined> {
+  const [row] = await db
+    .select()
+    .from(creativeGenerationContexts)
+    .where(eq(creativeGenerationContexts.generationId, generationId))
+    .limit(1)
+
+  if (row === undefined) return undefined
+  if (row.protocolVersion !== 1) {
+    throw new GenerationRepositoryError(
+      'DATABASE_ERROR',
+      `Unsupported creative asset protocol version ${row.protocolVersion}: ${row.id}`,
+    )
+  }
+
+  const assetRows = await db
+    .select({
+      assetVersionId: creativeGenerationContextAssets.assetVersionId,
+      role: creativeGenerationContextAssets.role,
+      position: creativeGenerationContextAssets.position,
+      contextAssetId: creativeGenerationContextAssets.id,
+    })
+    .from(creativeGenerationContextAssets)
+    .where(eq(creativeGenerationContextAssets.contextId, row.id))
+    .orderBy(asc(creativeGenerationContextAssets.role), asc(creativeGenerationContextAssets.position))
+
+  const referenceRows = assetRows.length === 0
+    ? []
+    : await db
+      .select({
+        contextAssetId: creativeGenerationContextReferences.contextAssetId,
+        referenceId: creativeGenerationContextReferences.referenceId,
+        position: creativeGenerationContextReferences.position,
+      })
+      .from(creativeGenerationContextReferences)
+      .where(inArray(creativeGenerationContextReferences.contextAssetId, assetRows.map(asset => asset.contextAssetId)))
+      .orderBy(asc(creativeGenerationContextReferences.contextAssetId), asc(creativeGenerationContextReferences.position))
+
+  const referencesByContextAsset = new Map<string, Array<{ referenceId: string; position: number }>>()
+  for (const reference of referenceRows) {
+    const current = referencesByContextAsset.get(reference.contextAssetId) ?? []
+    current.push({ referenceId: reference.referenceId, position: reference.position })
+    referencesByContextAsset.set(reference.contextAssetId, current)
+  }
+
+  const context = {
+    protocolVersion: 1 as const,
+    purpose: row.purpose,
+    prompt: row.prompt,
+    ...(row.negativePrompt !== null ? { negativePrompt: row.negativePrompt } : {}),
+    ...(row.modelId !== null ? { modelId: row.modelId } : {}),
+    assetBindings: assetRows.map(asset => ({
+      assetVersionId: asset.assetVersionId,
+      role: asset.role,
+      position: asset.position,
+      referenceIds: (referencesByContextAsset.get(asset.contextAssetId) ?? [])
+        .sort((left, right) => left.position - right.position)
+        .map(reference => reference.referenceId),
+    })),
+    recipe: row.recipeJson,
+    capabilitySnapshot: row.capabilitySnapshotJson,
+  }
+  const parsed = CreativeGenerationContextSchema.safeParse(context)
+  if (!parsed.success) {
+    throw new GenerationRepositoryError(
+      'DATABASE_ERROR',
+      `Invalid creative asset context ${row.id}: ${parsed.error.issues[0]?.message ?? 'unknown error'}`,
+    )
+  }
+  return normalizeCreativeGenerationContext(parsed.data)
 }
 
 async function readGenerationInputAssetRows(
@@ -1316,15 +1609,22 @@ async function getIdempotentGenerationResult(
   const existingRefs = refsFromRows(
     await readGenerationInputAssetRows(db, [existing.id]),
   )
+  const [existingCreativeContext] = await db
+    .select({ fingerprint: creativeGenerationContexts.fingerprint })
+    .from(creativeGenerationContexts)
+    .where(eq(creativeGenerationContexts.generationId, existing.id))
+    .limit(1)
   const existingCanonical = canonicalize({
     modelId: existing.modelId,
     params: existing.inputParamsJson,
     assetRefs: existingRefs ?? {},
+    creativeContextFingerprint: existingCreativeContext?.fingerprint,
   })
   const expectedCanonical = canonicalize({
     modelId: expected.modelId,
     params: expected.params,
     assetRefs: expected.assetRefs ?? {},
+    creativeContextFingerprint: expected.creativeContextFingerprint,
   })
   if (existingCanonical !== expectedCanonical) {
     throw new GenerationRepositoryError(
@@ -1725,6 +2025,8 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
      * catch 到唯一冲突后再做一次幂等查询返回既有结果，保证调用方拿到稳定输出。
      */
     async createGeneration(input) {
+      const creativeContext = normalizeCreativeContextInput(input.creativeContext)
+      const creativeContextFingerprint = fingerprintCreativeContext(creativeContext)
       const { estimate, prepared } = prepareGenerationRequest({
         modelId: input.modelId,
         params: input.params,
@@ -1738,6 +2040,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
         modelId: model.id,
         params: prepared.params,
         ...(prepared.assetRefs !== undefined ? { assetRefs: prepared.assetRefs } : {}),
+        ...(creativeContextFingerprint !== undefined ? { creativeContextFingerprint } : {}),
       }
 
       try {
@@ -1776,6 +2079,11 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
             userId: input.userId,
             manifest: model,
             assetRefs: prepared.assetRefs,
+            allowDeleted: input.allowDeletedAssetRefs === true,
+          })
+          await lockAndValidateCreativeContext(tx, {
+            userId: input.userId,
+            ...(creativeContext !== undefined ? { context: creativeContext } : {}),
             allowDeleted: input.allowDeletedAssetRefs === true,
           })
 
@@ -1820,6 +2128,16 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
                 assetId: binding.assetId,
                 createdAt: new Date(createdAt),
               })))
+          }
+
+          if (creativeContext !== undefined) {
+            await persistCreativeGenerationContext(tx, {
+              generationId: insertedRecord.id,
+              userId: insertedRecord.userId,
+              modelId: insertedRecord.modelId,
+              context: creativeContext,
+              createdAt: new Date(createdAt),
+            })
           }
 
           try {
@@ -2847,6 +3165,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
       const originalAssetRefs = refsFromRows(
         await readGenerationInputAssetRows(db, [original.id]),
       )
+      const originalCreativeContext = await readCreativeGenerationContext(db, original.id)
 
       // 起新记录：复用 createGeneration 的全部校验/成本/任务/幂等逻辑。
       const created = await this.createGeneration({
@@ -2857,6 +3176,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
           assetRefs: originalAssetRefs,
           allowDeletedAssetRefs: true,
         } : {}),
+        ...(originalCreativeContext !== undefined ? { creativeContext: originalCreativeContext } : {}),
         ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
         ...(input.quota !== undefined ? { quota: input.quota } : {}),
       })

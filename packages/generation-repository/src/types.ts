@@ -13,6 +13,7 @@
  */
 import type { GenerationStatus } from '@bailian-studio/event-bus'
 import type { ModelCategory, ModelProvider } from '@bailian-studio/model-core'
+import type { CreativeGenerationContext } from '@bailian-studio/shared'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import type { ProviderRequestAudit } from './provider-request-types'
 
@@ -89,6 +90,8 @@ export interface CreateGenerationInput {
   modelId: string
   params: Record<string, unknown>
   assetRefs?: GenerationAssetRefInput
+  /** 短剧素材域的类型化引用快照；缺省表示兼容旧生成请求。 */
+  creativeContext?: CreativeGenerationContext
   idempotencyKey?: string
   /** 对比批次 ID：一次"同 prompt 多模型对比生成"的多条记录共用（可空）。 */
   batchId?: string

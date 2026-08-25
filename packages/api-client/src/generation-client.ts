@@ -9,6 +9,7 @@
  * 【不存在】userId 这个概念（也正因如此，客户端无法伪造他人的 userId）。
  */
 import { z } from 'zod'
+import type { CreativeGenerationContext } from '@bailian-studio/shared'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
   AdminListUsersResponseSchema,
@@ -249,6 +250,7 @@ export interface CreateGenerationRequest {
   modelId: string
   params: Record<string, unknown>
   assetRefs?: Record<string, string | string[]>
+  creativeContext?: CreativeGenerationContext
   idempotencyKey?: string
   /** 对比批次 ID：同一次"同提示词多模型对比"的多条提交共用。 */
   batchId?: string
@@ -933,6 +935,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         modelId: input.modelId,
         params: input.params,
         ...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
+        ...(input.creativeContext !== undefined ? { creativeContext: input.creativeContext } : {}),
         ...(input.batchId !== undefined ? { batchId: input.batchId } : {}),
         ...(input.idempotencyKey !== undefined ? { idempotencyKey: input.idempotencyKey } : {}),
       }
@@ -954,6 +957,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         modelId: input.modelId,
         params: input.params,
         ...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
+        ...(input.creativeContext !== undefined ? { creativeContext: input.creativeContext } : {}),
       }
       const data = await unwrapData(
         `${base}/api/generations/estimate`,
