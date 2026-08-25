@@ -22,3 +22,41 @@
   --os-handle-border-hover: transparent;
   --os-handle-border-active: transparent;
 }
+
+/*
+ * 页面内仍由第三方组件维护滚动节点时，统一使用与 OverlayScrollbars
+ * 相同的细 handle 视觉，避免写作消息、虚拟列表和弹窗回退到浏览器默认样式。
+ */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--muted-foreground) transparent;
+  scrollbar-color: color-mix(in oklab, var(--muted-foreground) 42%, transparent) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  min-height: 28px;
+  border: 2px solid transparent;
+  border-radius: 9999px;
+  background: color-mix(in oklab, var(--muted-foreground) 42%, transparent);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: color-mix(in oklab, var(--muted-foreground) 65%, transparent);
+  background-clip: padding-box;
+}
+
+*::-webkit-scrollbar-button {
+  display: none;
+  width: 0;
+  height: 0;
+}

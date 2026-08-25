@@ -13,6 +13,7 @@ import { userErrorMessage } from '@/lib/user-error'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { resolveApiUrl } from '@/lib/api'
 import { buildToolGenerationPayload, selectToolModel } from '@/lib/tool-submission'
+import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 
 /** 辅助工具：视频理解→剧本 / 提取音频 / 语音识别。 */
 export function FunctionsPage() {
@@ -264,7 +265,9 @@ function GenerationResult({ record }: { record: GenerationRecord }) {
     <div className="rounded-lg border bg-muted/30 p-3">
       <p className="mb-2 text-xs text-muted-foreground">状态：{record.status}</p>
       {text !== undefined && (
-        <p className="max-h-48 overflow-y-auto whitespace-pre-wrap text-sm">{text}</p>
+        <VirtualScrollArea className="max-h-48">
+          <p className="whitespace-pre-wrap pr-2 text-sm">{text}</p>
+        </VirtualScrollArea>
       )}
       {media?.sourceUrl !== undefined && (
         <img src={resolveApiUrl(media.sourceUrl)} alt="" className="mt-2 max-h-48 rounded-md object-contain" />

@@ -19,6 +19,7 @@ import { Separator } from '@/components/ui/separator'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
+import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { apiClient } from '@/lib/api'
 import { modelNameZh } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
@@ -1620,14 +1621,16 @@ export function DirectorProjectPage() {
                   ) : assemblyPreflight.plan.shots.length === 0 ? (
                     <p className="text-sm leading-6 text-muted-foreground">还没有可用于合成的镜头。</p>
                   ) : (
-                    <div className="flex max-h-64 flex-col gap-2 overflow-y-auto">
+                    <VirtualScrollArea className="max-h-64">
+                      <div className="flex flex-col gap-2 pr-2">
                       {assemblyPreflight.plan.shots.map(shot => (
                         <div key={shot.shotId} className="flex items-center justify-between gap-3 text-sm">
                           <span className="truncate">镜头 {String(shot.sequence).padStart(2, '0')}</span>
                           <span className="shrink-0 tabular-nums text-muted-foreground">{shot.durationSeconds.toFixed(1)}s</span>
                         </div>
                       ))}
-                    </div>
+                      </div>
+                    </VirtualScrollArea>
                   )}
                   {assemblyPreflight?.issues.map(issue => (
                     <div key={`${issue.code}-${issue.shotId ?? 'project'}`} className="flex items-start gap-2 text-sm text-destructive">

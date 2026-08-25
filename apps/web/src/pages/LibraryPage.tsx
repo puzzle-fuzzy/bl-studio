@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { AssetThumbnail } from '@/components/assets/AssetThumbnail'
 import { MediaLightbox, isLightboxKind } from '@/components/shared/MediaLightbox'
+import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { assetQueryKey, useAssetsStore, type AssetQuery } from '@/stores/assets-store'
 import { usePendingThumbnailRefresh, hasPendingThumbnails } from '@/hooks/use-thumbnail-refresh'
 import { kindLabel, sourceLabel } from '@/lib/labels'
@@ -118,7 +119,7 @@ export function LibraryPage() {
           )}
         </div>
       ) : layout === 'project' ? (
-        <div className="h-[calc(100vh-16rem)] min-h-64 overflow-y-auto pr-1">
+        <VirtualScrollArea className="h-[calc(100vh-16rem)] min-h-64 pr-1">
           {items.length === 0 ? (
             <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
               {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
@@ -126,9 +127,9 @@ export function LibraryPage() {
           ) : (
             <ProjectView items={items} onPreviewGroup={setGroupPreview} />
           )}
-        </div>
+        </VirtualScrollArea>
       ) : (
-        <div className="h-[calc(100vh-16rem)] min-h-64 overflow-y-auto pr-1">
+        <VirtualScrollArea className="h-[calc(100vh-16rem)] min-h-64 pr-1">
           {items.length === 0 ? (
             <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
               {state?.isLoading ? '加载中…' : '还没有作品，去创作吧'}
@@ -136,7 +137,7 @@ export function LibraryPage() {
           ) : (
             <TimelineView items={items} onPreview={setPreviewIndex} />
           )}
-        </div>
+        </VirtualScrollArea>
       )}
 
       {state?.nextCursor !== undefined && (
@@ -407,4 +408,3 @@ function groupAssetsByProject(items: readonly AssetItem[]): Array<{ items: Asset
         new Date(b.items[0]?.createdAt ?? 0).getTime() - new Date(a.items[0]?.createdAt ?? 0).getTime(),
     )
 }
-
