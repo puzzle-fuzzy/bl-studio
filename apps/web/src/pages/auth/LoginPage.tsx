@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Separator } from '@/components/ui/separator'
 import { BrandMark } from '@/components/shared/BrandMark'
+import { TypeGpuPointField } from '@/components/auth/TypeGpuPointField'
 import { useAuthStore } from '@/stores/auth-store'
 import { canResendVerification, userErrorMessage } from '@/lib/user-error'
 
@@ -84,23 +85,30 @@ export function LoginPage() {
   const showResend = error !== null && email.trim() !== '' && verificationResendAvailable
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/20 p-4">
-      <BrandMark />
-      <Card className="w-full max-w-sm">
-        <CardHeader>
-          <CardTitle>{mode === 'login' ? '登录' : '注册'}</CardTitle>
-          <CardDescription>
-            {mode === 'login' ? '登录后即可开始创作' : '注册后请前往邮箱完成验证'}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+    <div className="login-page">
+      <TypeGpuPointField />
+      <div className="login-page__veil" aria-hidden="true" />
+      <main className="login-page__content">
+        <div className="login-page__form-wrap">
+          <div className="mb-5 flex justify-center sm:justify-start">
+            <BrandMark />
+          </div>
+          <Card className="login-card w-full max-w-sm">
+            <CardHeader className="pb-1">
+              <CardTitle className="text-xl">{mode === 'login' ? '登录' : '注册'}</CardTitle>
+              <CardDescription>
+                {mode === 'login' ? '登录后即可开始创作' : '注册后请前往邮箱完成验证'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSubmit} className="space-y-4">
             {mode === 'register' && (
               <div className="space-y-1.5">
                 <Label htmlFor="login-display-name">昵称（可选）</Label>
                 <Input
                   id="login-display-name"
                   maxLength={100}
+                  className="h-10 bg-white/70"
                   value={displayName}
                   onChange={event => setDisplayName(event.target.value)}
                 />
@@ -112,6 +120,7 @@ export function LoginPage() {
                 id="login-email"
                 type="email"
                 autoComplete="email"
+                className="h-10 bg-white/70"
                 value={email}
                 onChange={event => setEmail(event.target.value)}
                 required
@@ -125,6 +134,7 @@ export function LoginPage() {
                 autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                 minLength={8}
                 maxLength={256}
+                className="h-10 bg-white/70"
                 value={password}
                 onChange={event => setPassword(event.target.value)}
                 required
@@ -183,9 +193,11 @@ export function LoginPage() {
               和
               <Link to="/privacy" className="ml-1 underline underline-offset-2">隐私政策</Link>。
             </p>
-          </form>
-        </CardContent>
-      </Card>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+      </main>
     </div>
   )
 }
