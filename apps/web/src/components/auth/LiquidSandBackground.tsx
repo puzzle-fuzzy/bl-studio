@@ -93,33 +93,23 @@ const fragmentSource = `#version 300 es
     float pointerForce = exp(-dot(toPointer, toPointer) * 5.5) * u_pointer.z;
     q += vec2(-toPointer.y, toPointer.x) * pointerForce * 0.24;
 
-    // 两股独立流沙：各自保持蓝色或紫色，在边界处不混成脏色。
-    float sharedCurrent =
-      0.105 * sin(q.x * 1.58 + time * 0.43)
-      + 0.034 * sin(q.x * 4.72 - time * 0.21);
+    // 用连续的液体密度和颜料偏置塑造云状流动，不再用上下两条中心线。
+    float paintA = fbm(q * vec2(1.18, 1.92) + vec2(-time * 0.075, time * 0.055));
+    float paintB = fbm(q * vec2(1.72, 2.64) + vec2(time * 0.065, -time * 0.045));
+    float paintC = fbm(q * vec2(3.15, 4.80) + vec2(-time * 0.11, time * 0.085));
+    float paintField = paintA * 0.50 + paintB * 0.36 + paintC * 0.14;
+    float liquidBoundary = fbm(q * vec2(2.80, 5.60) + vec2(time * 0.085, -time * 0.065)) - 0.5;
+    float dyeMask = smoothstep(0.30, 0.64, paintField + liquidBoundary * 0.18);
 
-    float blueCenter =
-      sharedCurrent - 0.112
-      + 0.024 * sin(q.x * 3.16 - time * 0.27 + 0.80);
-
-    float purpleCenter =
-      sharedCurrent + 0.112
-      + 0.024 * sin(q.x * 3.02 + time * 0.24 + 3.10);
-
-    float blueScore =
-      0.165 - abs(q.y - blueCenter)
-      + 0.065 * (fbm(q * vec2(1.75, 7.25) + vec2(-time * 0.055, 13.0)) - 0.5);
-
-    float purpleScore =
-      0.165 - abs(q.y - purpleCenter)
-      + 0.065 * (fbm(q * vec2(1.66, 7.55) + vec2(time * 0.050, 37.0)) - 0.5);
-
-    float unionScore = max(blueScore, purpleScore);
-    float outerAA = max(fwidth(unionScore) * 1.35, 0.001);
-    float dyeMask = smoothstep(-outerAA, outerAA, unionScore);
-
-    float scoreDelta = blueScore - purpleScore;
-    float blueOwns = step(0.0, scoreDelta);
+    // 蓝紫归属由旋转流场连续计算；每一帧都会重新交融和分离。
+    float blueSignal = 0.5 + 0.5 * sin(
+      q.x * 1.72 - q.y * 2.55 + time * 0.30 + paintB * 4.8
+    );
+    float purpleSignal = 0.5 + 0.5 * sin(
+      q.x * 2.20 + q.y * 1.38 - time * 0.24 + paintA * 4.2
+    );
+    float blueMix = clamp(blueSignal * 0.55 + purpleSignal * 0.18 + paintB * 0.27, 0.0, 1.0);
+    float overlap = clamp(1.0 - abs(blueMix * 2.0 - 1.0), 0.0, 1.0);
 
     float blueDetail = clamp(
       0.24
@@ -153,7 +143,9 @@ const fragmentSource = `#version 300 es
       purpleDetail
     );
 
-    vec3 dye = mix(purpleInk, blueInk, blueOwns);
+    vec3 dye = mix(purpleInk, blueInk, blueMix);
+    vec3 blendedInk = mix(purpleInk, blueInk, 0.5 + 0.22 * sin(time * 0.34 + q.y * 8.0));
+    dye = mix(dye, blendedInk, overlap * 0.78);
 
     // 微细颗粒提升流沙质感，颗粒随域流动而不是随机闪烁。
     float sand = pow(
@@ -164,11 +156,9 @@ const fragmentSource = `#version 300 es
 
     vec3 color = mix(water, dye, dyeMask);
 
-    // 蓝紫接触线压住硬边，但不混合两种颜色。
-    float seamWidth = max(fwidth(scoreDelta) * 1.65, 0.003);
-    float seam = (1.0 - smoothstep(0.0, seamWidth, abs(scoreDelta))) * dyeMask;
-    color *= 1.0 - seam * 0.44;
-    color += vec3(0.13, 0.21, 0.30) * seam * 0.12;
+    // 重叠区域增加一层缓慢变化的颜料雾，让交融感持续发生。
+    float mixingMist = fbm(q * vec2(8.5, 13.0) + vec2(-time * 0.12, time * 0.09));
+    color += dye * mixingMist * overlap * 0.10;
 
     // 边缘压暗，顶部保留冷色折射光。
     float edge = smoothstep(0.29, 0.72, length((uv - 0.5) * vec2(0.72, 1.85)));
