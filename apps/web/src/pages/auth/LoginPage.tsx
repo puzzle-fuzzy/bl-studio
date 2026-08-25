@@ -96,9 +96,7 @@ export function LoginPage() {
           <Card className="login-card w-full max-w-sm">
             <CardHeader className="pb-1">
               <CardTitle className="text-xl">{mode === 'login' ? '登录' : '注册'}</CardTitle>
-              <CardDescription>
-                {mode === 'login' ? '登录后即可开始创作' : '注册后请前往邮箱完成验证'}
-              </CardDescription>
+              {mode === 'register' && <CardDescription>注册后请前往邮箱完成验证</CardDescription>}
             </CardHeader>
             <CardContent>
               <form onSubmit={handleSubmit} className="space-y-4">
