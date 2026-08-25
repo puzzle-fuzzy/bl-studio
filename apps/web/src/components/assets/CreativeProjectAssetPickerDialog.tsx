@@ -34,6 +34,7 @@ export function CreativeProjectAssetPickerDialog({
   const [query, setQuery] = useState('')
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [reloadToken, setReloadToken] = useState(0)
 
   useEffect(() => {
     if (!open) return
@@ -66,7 +67,7 @@ export function CreativeProjectAssetPickerDialog({
     return () => {
       cancelled = true
     }
-  }, [excludedAssetIds, open, query, type])
+  }, [excludedAssetIds, open, query, reloadToken, type])
 
   function toggle(asset: CreativeAssetSummary) {
     setSelectedAssets(current => current.some(item => item.id === asset.id)
@@ -126,7 +127,7 @@ export function CreativeProjectAssetPickerDialog({
           ) : error !== null ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
               <p className="text-sm text-destructive">{error}</p>
-              <Button size="sm" variant="outline" onClick={() => setError(null)}>重新加载</Button>
+              <Button size="sm" variant="outline" onClick={() => setReloadToken(current => current + 1)}>重新加载</Button>
             </div>
           ) : items.length === 0 ? (
             <div className="flex h-72 flex-col items-center justify-center gap-2 rounded-lg border border-dashed text-sm text-muted-foreground">
