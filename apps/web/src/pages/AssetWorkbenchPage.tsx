@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import {
   FolderKanban,
@@ -168,7 +168,6 @@ export function AssetWorkbenchPage() {
 
   return (
     <div className="relative isolate min-h-[calc(100svh-3rem)] overflow-hidden">
-      <AmbientPointField />
       <div className="relative z-10 mx-auto flex w-full max-w-[1660px] flex-col gap-5">
         <header className="flex flex-col gap-4 border-b border-border/70 pb-5">
           <div className="flex flex-wrap items-start gap-3">
@@ -303,24 +302,6 @@ export function AssetWorkbenchPage() {
           void loadProjects({}, true)
           navigate(`/assets/${encodeURIComponent(asset.id)}`)
         }}
-      />
-    </div>
-  )
-}
-
-function AmbientPointField() {
-  const pointStyle: CSSProperties = {
-    backgroundImage: 'radial-gradient(circle, rgb(216 183 228 / 0.55) 1px, transparent 1.5px)',
-    backgroundSize: '18px 18px',
-    maskImage: 'radial-gradient(ellipse at center, black 0%, transparent 70%)',
-  }
-
-  return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden opacity-40">
-      <div className="absolute -top-40 right-[-12rem] h-[38rem] w-[38rem] rotate-[-16deg]" style={pointStyle} />
-      <div
-        className="absolute top-24 right-[-8rem] h-[28rem] w-[46rem] rotate-[-16deg] opacity-60"
-        style={{ ...pointStyle, backgroundSize: '14px 14px' }}
       />
     </div>
   )

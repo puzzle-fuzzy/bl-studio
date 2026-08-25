@@ -96,7 +96,7 @@ components:
 
 Bailian Studio is a product interface for creators who need to generate, approve, reuse, and trace visual assets for short-drama projects. The physical scene is a creator working at a large monitor in a quiet production room, comparing several character references and scene variations while keeping a project brief open nearby. The interface must make that comparison fast and calm.
 
-The system is content-first and information-dense without becoming an administration console. Deep graphite surfaces provide a neutral viewing environment for image and video thumbnails. Warm, restrained coral is reserved for the current selection, primary actions, and important states. A low-opacity point field may create a sense of space around the workbench, but it must never compete with media, metadata, or controls.
+The system is content-first and information-dense without becoming an administration console. Deep graphite surfaces provide a neutral viewing environment for image and video thumbnails. Warm, restrained coral is reserved for the current selection, primary actions, and important states. A low-opacity point field sits persistently in the top-right of the authenticated content shell, giving every working page the same quiet studio atmosphere without competing with media, metadata, or controls.
 
 The visual language borrows Krea's task-oriented navigation and asset-first workspace, then adds a project and version discipline specific to short-drama production. It rejects a traditional backend, pure-black cyberpunk, decorative AI-tool chrome, glass-heavy surfaces, and SaaS layouts that leave too much empty space around the actual work.
 
@@ -231,10 +231,10 @@ The component language is compact, familiar, and state-complete. Every interacti
 
 ### Ambient Point Field
 
-- **Purpose:** A decorative, `aria-hidden` background layer for the workbench and selected empty states.
+- **Purpose:** A decorative, `aria-hidden` background layer for the authenticated content shell, anchored to the top-right across working pages.
 - **Shape:** Deterministic dots with variable size and density, inspired by the supplied reference image but not copied literally.
 - **Behavior:** TypeGPU/WebGPU is progressive enhancement. Canvas 2D or a static fallback must render the page with no visual or functional break when WebGPU is unavailable.
-- **Limits:** `pointer-events: none`, low opacity, no continuous high-frequency animation, and never behind a media preview or dense form.
+- **Limits:** `pointer-events: none`, low opacity, no continuous high-frequency animation, and never above a media preview or dense form. Page-specific gradients and duplicate point fields should not be introduced.
 
 ## 6. Do's and Don'ts
 

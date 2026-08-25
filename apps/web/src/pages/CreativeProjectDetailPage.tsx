@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, FolderKanban, Grid2X2, Image as ImageIcon, List, Loader2, Plus, Search, Sparkles, Trash2, X } from 'lucide-react'
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
@@ -209,7 +209,6 @@ export function CreativeProjectDetailPage() {
 
   return (
     <div className="relative isolate min-h-[calc(100svh-3rem)] overflow-hidden">
-      <AmbientPointField />
       <div className="relative z-10 mx-auto flex w-full max-w-[1660px] flex-col gap-5">
         <header className="border-b border-border/70 pb-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -384,9 +383,4 @@ function ProjectLoadingState() {
 
 function ProjectErrorState({ title, description, onBack }: { title: string; description: string; onBack: () => void }) {
   return <div className="flex min-h-[calc(100svh-8rem)] flex-col items-center justify-center gap-3 p-8 text-center"><FolderKanban className="size-9 text-muted-foreground" /><h1 className="text-xl font-semibold">{title}</h1><p className="max-w-md text-sm text-muted-foreground">{description}</p><Button variant="outline" onClick={onBack}><ArrowLeft className="size-4" />返回项目列表</Button></div>
-}
-
-function AmbientPointField() {
-  const pointStyle: CSSProperties = { backgroundImage: 'radial-gradient(circle, rgb(216 183 228 / 0.55) 1px, transparent 1.5px)', backgroundSize: '18px 18px', maskImage: 'radial-gradient(ellipse at center, black 0%, transparent 70%)' }
-  return <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden opacity-40"><div className="absolute -top-40 right-[-12rem] h-[38rem] w-[38rem] rotate-[-16deg]" style={pointStyle} /><div className="absolute top-24 right-[-8rem] h-[28rem] w-[46rem] rotate-[-16deg] opacity-60" style={{ ...pointStyle, backgroundSize: '14px 14px' }} /></div>
 }

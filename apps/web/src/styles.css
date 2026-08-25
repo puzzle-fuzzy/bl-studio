@@ -126,6 +126,47 @@
   }
 }
 
+/*
+ * 全局片场氛围：点阵只存在于内容区右上角，作为安静的水印层。
+ * 它不参与布局、不接收事件，也不会覆盖页面内容或素材预览。
+ */
+[data-slot='sidebar-inset'] {
+  isolation: isolate;
+}
+
+[data-slot='sidebar-inset']::before {
+  position: absolute;
+  z-index: 0;
+  top: -7rem;
+  right: -10rem;
+  width: min(44rem, 72vw);
+  height: 40rem;
+  pointer-events: none;
+  content: '';
+  opacity: 0.34;
+  background-image:
+    radial-gradient(circle, rgb(185 124 209 / 0.42) 1px, transparent 1.5px),
+    radial-gradient(circle, rgb(228 107 120 / 0.22) 0.8px, transparent 1.35px);
+  background-position: 0 0, 7px 72px;
+  background-size: 18px 18px, 14px 14px;
+  clip-path: ellipse(72% 65% at 48% 42%);
+  transform: rotate(-16deg);
+  -webkit-mask-image: radial-gradient(ellipse at 48% 42%, #000 0%, rgb(0 0 0 / 0.96) 36%, transparent 74%);
+  mask-image: radial-gradient(ellipse at 48% 42%, #000 0%, rgb(0 0 0 / 0.96) 36%, transparent 74%);
+}
+
+[data-slot='sidebar-inset'] > * {
+  position: relative;
+  z-index: 1;
+}
+
+.dark [data-slot='sidebar-inset']::before {
+  opacity: 0.42;
+  background-image:
+    radial-gradient(circle, rgb(216 183 228 / 0.55) 1px, transparent 1.5px),
+    radial-gradient(circle, rgb(228 107 120 / 0.24) 0.8px, transparent 1.35px);
+}
+
 .login-page {
   position: relative;
   min-height: 100svh;

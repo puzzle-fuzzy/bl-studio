@@ -19,7 +19,6 @@ export function ProjectsPage() {
 
   return (
     <div className="relative isolate min-h-[calc(100svh-3rem)] overflow-hidden">
-      <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_0%,oklch(0.82_0.08_330/0.2),transparent_34%),radial-gradient(circle_at_15%_45%,oklch(0.8_0.06_70/0.12),transparent_30%)]" />
       <div className="relative z-10 mx-auto flex w-full max-w-[1660px] flex-col gap-5">
         <header className="flex flex-col justify-between gap-4 border-b border-border/70 pb-5 md:flex-row md:items-end">
           <div className="min-w-0">
