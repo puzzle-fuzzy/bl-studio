@@ -41,8 +41,9 @@ const createPointFieldFragment = (
   let topDrop = 1.0 - length((p - vec2f(0.31, 0.05)) / vec2f(0.08, 0.11));
 
   let density = clamp(max(max(mainMass, risingMass), max(max(upperMass, bridge), topDrop)), 0.0, 1.0);
-  let aspect = max(resolution.x / max(resolution.y, 1.0), 0.5);
-  let cells = vec2f(84.0 * aspect, 84.0);
+  // Keep the GPU grid aligned with the 10px CSS fallback grid.
+  let cells = max(resolution / vec2f(10.0, 10.0), vec2f(1.0, 1.0));
+  let cellMotion = vec2f(1.0 / cells.x, 1.0 / cells.y);
 
   // Stable per-cell phases make the movement feel organic instead of uniform.
   let cell = floor(p * cells);
@@ -53,33 +54,34 @@ const createPointFieldFragment = (
   let phaseA = randomA * 6.2831853;
   let phaseB = randomB * 6.2831853;
 
-  let pointerDistance = distance(p, pointer.xy);
-  let hover = (1.0 - smoothstep(0.015, 0.34, pointerDistance)) * pointer.z;
-  let pushDirection = normalize(p - pointer.xy + vec2f(0.0001, 0.0001));
+  let pointerDelta = (p - pointer.xy) / cellMotion;
+  let pointerDistance = length(pointerDelta);
+  let hover = (1.0 - smoothstep(0.0, 18.0, pointerDistance)) * pointer.z;
+  let pushDirection = normalize(pointerDelta + vec2f(0.0001, 0.0001)) * cellMotion;
   let drift = vec2f(
-    sin(time * (0.50 + randomA * 0.28) + phaseA),
-    cos(time * (0.42 + randomB * 0.25) + phaseB)
-  ) * (0.010 + density * 0.018);
-  let pointerPush = pushDirection * hover * (0.010 + density * 0.012);
+    sin(time * (0.72 + randomA * 0.34) + phaseA),
+    cos(time * (0.64 + randomB * 0.30) + phaseB)
+  ) * cellMotion * (0.12 + density * 0.22);
+  let pointerPush = pushDirection * hover * (0.28 + density * 0.22);
   let pointerWiggle = vec2f(
     sin(time * 2.4 + phaseB),
     cos(time * 2.1 + phaseA)
-  ) * hover * 0.008;
+  ) * cellMotion * hover * 0.14;
   let moved = p + drift + pointerPush + pointerWiggle;
 
   let local = fract(moved * cells) - vec2f(0.5, 0.5);
   let distanceToDot = length(local);
   let pulse = 0.5 + 0.5 * sin(time * (0.62 + randomA * 0.18) + phaseA);
-  let dotRadius = 0.038 + density * (0.140 + pulse * 0.022) + hover * 0.024;
+  let dotRadius = 0.12 + pulse * 0.016 + hover * 0.05;
   let dot = 1.0 - smoothstep(dotRadius * 0.52, dotRadius, distanceToDot);
   let edgeFade = smoothstep(0.015, 0.12, density);
-  let alpha = clamp(dot * edgeFade * (0.34 + density * 0.92 + hover * 0.18), 0.0, 1.0);
+  let alpha = clamp(dot * edgeFade * (0.30 + density * 0.78 + hover * 0.16), 0.0, 1.0);
 
-  let ring = (0.5 + 0.5 * sin(pointerDistance * 52.0 - time * 3.8))
-    * (1.0 - smoothstep(0.0, 0.38, pointerDistance))
+  let ring = (0.5 + 0.5 * sin(pointerDistance * 3.5 - time * 3.8))
+    * (1.0 - smoothstep(0.0, 18.0, pointerDistance))
     * pointer.z;
   let blueInfluence = clamp(hover * 0.92 + ring * 0.16, 0.0, 1.0);
-  let darkInfluence = hover * (1.0 - smoothstep(0.025, 0.20, pointerDistance)) * 0.76;
+  let darkInfluence = hover * (1.0 - smoothstep(0.3, 6.0, pointerDistance)) * 0.76;
   let purple = vec3f(0.68, 0.32, 0.78);
   let electricBlue = vec3f(0.06, 0.04, 0.82);
   let nearBlack = vec3f(0.025, 0.018, 0.045);
@@ -130,7 +132,7 @@ export function TypeGpuPointField() {
 
       const x = (event.clientX - rect.left) / rect.width
       const y = (event.clientY - rect.top) / rect.height
-      const isInside = x >= 0 && x <= 1 && y >= 0 && y <= 1 && pointFieldDensity(x, y) > 0.02
+      const isInside = x >= 0 && x <= 1 && y >= 0 && y <= 1 && pointFieldDensity(x, y) > 0
       updatePointer(x, y, isInside ? 1 : 0)
     }
 
@@ -201,6 +203,10 @@ export function TypeGpuPointField() {
         resizeCanvas()
         updatePointer(pointerRef.current.x, pointerRef.current.y, pointerRef.current.active)
         draw()
+        // Wait until the first submitted GPU frame reaches a paint cycle before
+        // switching off the fallback. This prevents a blank flash on startup.
+        await new Promise<void>(resolve => window.requestAnimationFrame(() => resolve()))
+        if (disposed) return
         window.addEventListener('resize', handleResize, { passive: true })
         removeResizeListener = () => window.removeEventListener('resize', handleResize)
         field.dataset.gpuReady = 'true'

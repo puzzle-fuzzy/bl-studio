@@ -266,8 +266,12 @@
 }
 
 .login-point-field__fallback {
+  z-index: 0;
+}
+
+.login-point-field__fallback {
   background-image: radial-gradient(circle, currentColor 0 1.7px, transparent 2.1px);
-  background-position: 0 0;
+  background-position: 5px 5px;
   background-size: 10px 10px;
   -webkit-mask-image:
     radial-gradient(ellipse 30% 29% at 20% 75%, #000 0 78%, transparent 100%),
@@ -284,13 +288,14 @@
     radial-gradient(ellipse 8% 11% at 31% 5%, #000 0 78%, transparent 100%);
   mask-composite: add;
   opacity: 0.98;
-  animation: login-point-field-drift 15s ease-in-out infinite alternate;
+  animation: login-point-field-drift 11s ease-in-out infinite alternate;
   transition: opacity 500ms ease-out;
 }
 
 .login-point-field__pointer {
+  z-index: 2;
   background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 2.4px, transparent 2.9px);
-  background-position: 0 0;
+  background-position: 5px 5px;
   background-size: 10px 10px;
   -webkit-mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
   mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
@@ -303,7 +308,7 @@
   position: absolute;
   inset: 0;
   background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 2.5px, transparent 3px);
-  background-position: 0 0;
+  background-position: 5px 5px;
   background-size: 10px 10px;
   -webkit-mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
   mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
@@ -311,6 +316,7 @@
 }
 
 .login-point-field__canvas {
+  z-index: 1;
   opacity: 0;
   transition: opacity 700ms ease-out;
 }
@@ -323,19 +329,19 @@
   opacity: 1;
 }
 
-.login-point-field[data-pointer-active='true']:not([data-gpu-ready='true']) .login-point-field__pointer {
+.login-point-field[data-pointer-active='true'] .login-point-field__pointer {
   opacity: 0.96;
 }
 
 @keyframes login-point-field-drift {
   0% {
-    transform: translate3d(-3px, 1px, 0) scale(1);
+    transform: translate3d(-6px, 2px, 0);
   }
   50% {
-    transform: translate3d(2px, -2px, 0) scale(1.008);
+    transform: translate3d(4px, -4px, 0);
   }
   100% {
-    transform: translate3d(4px, 2px, 0) scale(1.014);
+    transform: translate3d(7px, 4px, 0);
   }
 }
 
