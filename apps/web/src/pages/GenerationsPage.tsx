@@ -8,13 +8,13 @@ export function GenerationsPage() {
   )
 
   return (
-    <div className="mx-auto w-full max-w-[1660px] space-y-6">
-      <div>
+    <div className="mx-auto flex w-full max-w-[1660px] flex-col gap-5">
+      <header className="border-b border-border/70 pb-5">
         <h1 className="text-2xl font-semibold">生成任务</h1>
-        <p className="text-sm text-muted-foreground">
+        <p className="mt-1 text-sm text-muted-foreground">
           {activeCount > 0 ? `${activeCount} 个任务进行中，实时更新。` : '当前没有进行中的任务。'}
         </p>
-      </div>
+      </header>
       <GenerationsPanel variant="page" />
     </div>
   )

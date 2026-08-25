@@ -43,14 +43,14 @@ export function WorkbenchPage() {
   const recentAssets = (assetQuery?.items ?? []).slice(0, 6)
 
   return (
-    <div className="relative min-h-full overflow-hidden py-8">
+    <div className="relative min-h-full overflow-hidden">
       <div className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_78%_0%,oklch(0.82_0.08_330/0.2),transparent_34%),radial-gradient(circle_at_15%_45%,oklch(0.8_0.06_70/0.12),transparent_30%)]" />
-      <div className="mx-auto w-full max-w-[1660px] space-y-10">
-        <header className="flex flex-col justify-between gap-5 md:flex-row md:items-end">
+      <div className="mx-auto flex w-full max-w-[1660px] flex-col gap-5">
+        <header className="flex flex-col justify-between gap-4 border-b border-border/70 pb-5 md:flex-row md:items-end">
           <div>
-            <p className="mb-3 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Studio workspace</p>
+            <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Studio workspace</p>
             <h1 className="text-3xl font-semibold tracking-tight">工作台</h1>
-            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
               从项目进入素材库，维护主体、场景、道具与风格的稳定版本，再把它们带入生成。
             </p>
           </div>
