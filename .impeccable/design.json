@@ -1,0 +1,161 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-08-25T00:00:00+08:00",
+  "title": "Design System: Bailian Studio",
+  "extensions": {
+    "colorMeta": {
+      "accent_primary": {
+        "role": "primary",
+        "displayName": "Muted Coral Signal",
+        "canonical": "oklch(67% 0.13 8)",
+        "tonalRamp": ["#351316", "#572027", "#7d303c", "#a64252", "#c85a6a", "#e46b78", "#f29aa3", "#ffd9dc"]
+      },
+      "canvas_dark": {
+        "role": "neutral",
+        "displayName": "Graphite Canvas",
+        "canonical": "oklch(18% 0.008 135)",
+        "tonalRamp": ["#0b0b0b", "#111211", "#191b19", "#202420", "#2b302b", "#4c554c", "#8b938b", "#f1f1f1"]
+      },
+      "point_lilac": {
+        "role": "secondary",
+        "displayName": "Point Lilac",
+        "canonical": "oklch(79% 0.08 320)",
+        "tonalRamp": ["#33243a", "#553b61", "#77527f", "#996a9f", "#b682bd", "#d8b7e4", "#ebd9f0", "#faf4fc"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Workbench Display",
+        "purpose": "Page and project headings only; keep the same system sans family as body text."
+      },
+      "label": {
+        "displayName": "Utility Label",
+        "purpose": "Filters, metadata, status, and compact navigation labels."
+      }
+    },
+    "shadows": [
+      {
+        "name": "panel-ambient",
+        "value": "0 14px 32px rgb(0 0 0 / 0.2)",
+        "purpose": "Floating inspector and raised workbench panel in dark mode."
+      },
+      {
+        "name": "popover",
+        "value": "0 18px 42px rgb(22 25 23 / 0.14)",
+        "purpose": "Project switcher, menus, and command palette."
+      }
+    ],
+    "motion": [
+      {
+        "name": "ease-standard",
+        "value": "cubic-bezier(0.2, 0.8, 0.2, 1)",
+        "purpose": "Short state transitions between 150ms and 250ms."
+      },
+      {
+        "name": "motion-reduced",
+        "value": "none",
+        "purpose": "Use instant or opacity-only feedback when prefers-reduced-motion is enabled."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "compact",
+        "value": "767px"
+      },
+      {
+        "name": "workbench",
+        "value": "1024px"
+      },
+      {
+        "name": "wide",
+        "value": "1440px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button_primary",
+      "description": "A compact coral action for creating or approving an asset.",
+      "html": "<button class=\"ds-btn-primary\" type=\"button\">生成新版本</button>",
+      "css": ".ds-btn-primary { height: 44px; padding: 0 16px; border: 0; border-radius: 8px; background: #e46b78; color: #f1f1f1; font: 500 15px/1.35 \"PingFang SC\", sans-serif; cursor: pointer; transition: background-color 180ms cubic-bezier(0.2,0.8,0.2,1), outline-color 180ms cubic-bezier(0.2,0.8,0.2,1); } .ds-btn-primary:hover { background: #f0818c; } .ds-btn-primary:focus-visible { outline: 2px solid #f1f1f1; outline-offset: 2px; } .ds-btn-primary:disabled { background: #2b302b; color: #a6aaa3; cursor: not-allowed; }"
+    },
+    {
+      "name": "Ghost Button",
+      "kind": "button",
+      "refersTo": "button_ghost",
+      "description": "A low-emphasis action for filters, navigation, and secondary asset operations.",
+      "html": "<button class=\"ds-btn-ghost\" type=\"button\">筛选</button>",
+      "css": ".ds-btn-ghost { height: 40px; padding: 0 12px; border: 1px solid #ffffff1f; border-radius: 8px; background: transparent; color: #a6aaa3; font: 500 13px/1.35 \"PingFang SC\", sans-serif; cursor: pointer; transition: background-color 180ms cubic-bezier(0.2,0.8,0.2,1), color 180ms cubic-bezier(0.2,0.8,0.2,1); } .ds-btn-ghost:hover { background: #202420; color: #f1f1f1; } .ds-btn-ghost:focus-visible { outline: 2px solid #e46b78; outline-offset: 2px; }"
+    },
+    {
+      "name": "Search Field",
+      "kind": "input",
+      "refersTo": "search_field",
+      "description": "A persistent search field for finding assets, projects, and generations.",
+      "html": "<label class=\"ds-search-label\"><span class=\"ds-sr-only\">搜索素材</span><input class=\"ds-search\" placeholder=\"搜索素材、项目或提示词\" /></label>",
+      "css": ".ds-search-label { display: block; } .ds-search { width: 280px; height: 44px; padding: 0 12px; border: 1px solid #ffffff1f; border-radius: 8px; background: #191b19; color: #f1f1f1; font: 400 15px/1.35 \"PingFang SC\", sans-serif; } .ds-search::placeholder { color: #a6aaa3; } .ds-search:focus-visible { border-color: #e46b78; outline: 2px solid #e46b78; outline-offset: 1px; } .ds-sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; }"
+    },
+    {
+      "name": "Navigation Item",
+      "kind": "nav",
+      "refersTo": "button_ghost",
+      "description": "A compact primary navigation row that remains legible when the sidebar collapses.",
+      "html": "<a class=\"ds-nav-item ds-nav-item-active\" href=\"#assets\"><span class=\"ds-nav-icon\" aria-hidden=\"true\">◆</span><span>素材库</span></a>",
+      "css": ".ds-nav-item { display: flex; align-items: center; gap: 10px; min-height: 40px; padding: 0 12px; border-radius: 8px; color: #a6aaa3; text-decoration: none; font: 500 14px/1.35 \"PingFang SC\", sans-serif; transition: background-color 180ms cubic-bezier(0.2,0.8,0.2,1), color 180ms cubic-bezier(0.2,0.8,0.2,1); } .ds-nav-item:hover { background: #202420; color: #f1f1f1; } .ds-nav-item-active { background: #2b2022; color: #f0818c; } .ds-nav-item:focus-visible { outline: 2px solid #e46b78; outline-offset: 2px; } .ds-nav-icon { width: 18px; text-align: center; color: currentColor; }"
+    },
+    {
+      "name": "Asset Tile",
+      "kind": "custom",
+      "refersTo": "asset_tile",
+      "description": "The primary reusable-media unit: image first, then version and project context.",
+      "html": "<article class=\"ds-asset-tile\"><div class=\"ds-asset-preview\" aria-label=\"主体预览\"></div><div class=\"ds-asset-meta\"><strong>林默</strong><span>主体 · v3 · 已确认</span></div></article>",
+      "css": ".ds-asset-tile { overflow: hidden; border: 1px solid #ffffff1f; border-radius: 10px; background: #191b19; color: #f1f1f1; } .ds-asset-tile:focus-within { outline: 2px solid #e46b78; outline-offset: 2px; } .ds-asset-preview { aspect-ratio: 4 / 5; background: #202420; } .ds-asset-meta { display: grid; gap: 4px; padding: 8px; } .ds-asset-meta strong { font: 600 15px/1.35 \"PingFang SC\", sans-serif; } .ds-asset-meta span { color: #a6aaa3; font: 400 12px/1.35 \"PingFang SC\", sans-serif; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "安静的数字片场",
+    "overview": "Bailian Studio is a content-first product interface for generating and reusing short-drama visual assets. Graphite surfaces keep attention on media while a restrained coral signal makes selection and action legible. A low-opacity point field can add spatial atmosphere without changing the product's operational clarity.",
+    "keyCharacteristics": [
+      "Content-first media grids with version context",
+      "Graphite tonal layers rather than pure black",
+      "One restrained coral accent",
+      "Compact project-aware navigation",
+      "Progressive point-field enhancement"
+    ],
+    "rules": [
+      {
+        "name": "The One Signal Rule",
+        "body": "The coral accent is reserved for primary actions, active navigation, selected assets, and semantic states.",
+        "section": "colors"
+      },
+      {
+        "name": "The Media Truth Rule",
+        "body": "Never tint, blur, or overlay an asset thumbnail for atmosphere.",
+        "section": "colors"
+      },
+      {
+        "name": "The Quiet Hierarchy Rule",
+        "body": "Prefer one size step and one weight step to clarify a relationship.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tonal Layer Rule",
+        "body": "Use surface contrast and a one-pixel border before adding a shadow.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do make the asset thumbnail, approved version, and reference role visible before secondary metadata.",
+      "Do use projects as the primary organizing unit and tags/types as filters.",
+      "Do provide a static or Canvas 2D fallback before enabling TypeGPU/WebGPU decoration."
+    ],
+    "donts": [
+      "Don't make the product look like a traditional backend with unrelated management menus.",
+      "Don't use a pure-black cyberpunk surface, neon borders, scanlines, HUD decorations, or glowing text.",
+      "Don't build a flashy AI tool site with gradient text, glassmorphism by default, decorative blobs, or animation that does not communicate state.",
+      "Don't create an over-spacious SaaS layout that hides the asset collection behind large empty regions."
+    ]
+  }
+}
