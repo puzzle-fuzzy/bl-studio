@@ -25,6 +25,40 @@ export const KIND_LABELS: Record<string, string> = {
   archive: '压缩包',
 }
 
+export const CREATIVE_ASSET_TYPE_LABELS: Record<string, string> = {
+  character: '主体',
+  environment: '场景',
+  prop: '道具',
+  style: '风格',
+}
+
+export const CREATIVE_ASSET_STATUS_LABELS: Record<string, string> = {
+  draft: '草稿',
+  active: '活跃',
+  archived: '已归档',
+}
+
+export const CREATIVE_ASSET_VERSION_STATUS_LABELS: Record<string, string> = {
+  draft: '草稿',
+  generating: '生成中',
+  candidate: '候选',
+  approved: '已确认',
+  archived: '已归档',
+  rejected: '已拒绝',
+}
+
+export function creativeAssetTypeLabel(type: string | undefined): string {
+  return type === undefined ? '素材' : (CREATIVE_ASSET_TYPE_LABELS[type] ?? type)
+}
+
+export function creativeAssetStatusLabel(status: string | undefined): string {
+  return status === undefined ? '未知' : (CREATIVE_ASSET_STATUS_LABELS[status] ?? status)
+}
+
+export function creativeAssetVersionStatusLabel(status: string | undefined): string {
+  return status === undefined ? '未生成版本' : (CREATIVE_ASSET_VERSION_STATUS_LABELS[status] ?? status)
+}
+
 export function kindLabel(kind: string | undefined): string {
   return kind === undefined ? '文件' : (KIND_LABELS[kind] ?? kind)
 }

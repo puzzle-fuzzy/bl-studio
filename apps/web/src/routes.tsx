@@ -8,6 +8,7 @@ import { notifyChunkLoadFailure } from '@/lib/chunk-recovery'
 import { CreatePage } from '@/pages/CreatePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { GenerationsPage } from '@/pages/GenerationsPage'
+import { WorkbenchPage } from '@/pages/WorkbenchPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { LegalPage } from '@/pages/LegalPage'
 
@@ -58,10 +59,13 @@ export const router = createBrowserRouter([
     // 登录/认证/分享等没有内层边界的路由。
     errorElement: <RouteErrorElement />,
     children: [
-      { path: '/', element: <Navigate to="/create" replace /> },
+      { path: '/', element: <Navigate to="/workbench" replace /> },
       {
         element: <ProtectedRoute />,
         children: [
+          { path: '/workbench', element: <WorkbenchPage /> },
+          { path: '/assets', element: lazyPage('AssetWorkbenchPage', () => import('@/pages/AssetWorkbenchPage')) },
+          { path: '/assets/:id', element: lazyPage('CreativeAssetDetailPage', () => import('@/pages/CreativeAssetDetailPage')) },
           { path: '/create', element: <CreatePage /> },
           { path: '/writing', element: lazyPage('WritingPage', () => import('@/pages/WritingPage')) },
           { path: '/director', element: lazyPage('DirectorPage', () => import('@/pages/DirectorPage')) },
@@ -70,7 +74,7 @@ export const router = createBrowserRouter([
           { path: '/generations', element: <GenerationsPage /> },
           { path: '/generations/:id', element: lazyPage('GenerationDetailPage', () => import('@/pages/GenerationDetailPage')) },
           { path: '/functions', element: lazyPage('FunctionsPage', () => import('@/pages/FunctionsPage')) },
-          { path: '/library', element: lazyPage('LibraryPage', () => import('@/pages/LibraryPage')) },
+          { path: '/library', element: <Navigate to="/assets" replace /> },
           { path: '/gallery', element: lazyPage('GalleryPage', () => import('@/pages/GalleryPage')) },
           { path: '/prompts', element: lazyPage('PromptsPage', () => import('@/pages/PromptsPage')) },
           { path: '/settings', element: lazyPage('ProfilePage', () => import('@/pages/ProfilePage')) },
@@ -91,7 +95,7 @@ export const router = createBrowserRouter([
       { path: '/auth/forgot-password', element: lazyPage('ForgotPasswordPage', () => import('@/pages/auth/ForgotPasswordPage')) },
       { path: '/auth/reset-password', element: lazyPage('ResetPasswordPage', () => import('@/pages/auth/ResetPasswordPage')) },
       { path: '/share/generations/:shareId', element: lazyPage('SharedGenerationPage', () => import('@/pages/SharedGenerationPage')) },
-      { path: '*', element: <Navigate to="/create" replace /> },
+      { path: '*', element: <Navigate to="/workbench" replace /> },
     ],
   },
 ])
