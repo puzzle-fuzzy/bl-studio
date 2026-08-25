@@ -6,7 +6,7 @@ import type { ModelCatalogItem } from '@bailian-studio/api-client'
  * 三连下拉：分类（视频/图片/音乐）→ 子模式（参考生视频/图生视频/文生视频/视频编辑…）
  * → 模型。子模式由模型的 `capabilities` 推导，与 manifest 保持单一事实源：
  * - video：video_input→视频编辑；multi_reference→参考生视频；image_input→图生视频；否则文生视频；
- * - image：image_input→图生图；否则文生图；
+ * - image：multi_reference→参考生图；image_input→图生图；否则文生图；
  * - audio：audio_input→语音识别；否则音乐生成。
  */
 
@@ -54,6 +54,7 @@ export function subModeOf(model: Pick<ModelCatalogItem, 'category' | 'capabiliti
     return 't2v'
   }
   if (model.category === 'image') {
+    if (caps.has('multi_reference')) return 'r2i'
     if (caps.has('image_input')) return 'i2i'
     return 't2i'
   }

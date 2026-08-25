@@ -42,21 +42,29 @@ export function ModelSelector({
   models,
   selectedId,
   onSelect,
+  defaultCategory = 'video',
 }: {
   models: readonly ModelCatalogItem[]
   selectedId: string | undefined
   onSelect: (modelId: string) => void
+  defaultCategory?: ModelCategory
 }) {
   const categories = CATEGORY_OPTIONS.filter(category => models.some(model => model.category === category.value))
   const selected = models.find(model => model.id === selectedId)
+  const defaultCategoryValue = categories.some(category => category.value === defaultCategory)
+    ? defaultCategory
+    : (categories[0]?.value ?? defaultCategory)
+  const availableDefaultModes = availableSubModes(models, defaultCategoryValue)
 
   const category: ModelCategory =
     selected !== undefined
       && (selected.category === 'video' || selected.category === 'image' || selected.category === 'audio')
       ? selected.category
-      : 'video'
+      : defaultCategoryValue
   const derivedSubMode: SubMode =
-    selected !== undefined ? subModeOf(selected) : (SUB_MODE_ORDER[category][0] ?? 'r2v')
+    selected !== undefined
+      ? subModeOf(selected)
+      : (availableDefaultModes[0] ?? SUB_MODE_ORDER[category][0] ?? 'r2v')
 
   // 浏览置灰子模式的覆盖（见上方注释）：仅当 browse.anchoredId === selectedId 时生效。
   const [browse, setBrowse] = useState<{ mode: SubMode; anchoredId: string | undefined } | null>(null)

@@ -17,11 +17,13 @@ export function CreationPresetPanel({
   params,
   onApply,
   disabled,
+  allowedModelIds,
 }: {
   modelId: string | undefined
   params: Record<string, unknown>
   onApply: (preset: CreationPreset) => void
   disabled?: boolean
+  allowedModelIds?: readonly string[]
 }) {
   const showMessage = useNotificationsStore(state => state.showMessage)
   const [name, setName] = useState('')
@@ -45,6 +47,10 @@ export function CreationPresetPanel({
     setPresets(removeCreationPreset(id))
   }
 
+  const visiblePresets = allowedModelIds === undefined
+    ? presets
+    : presets.filter(preset => allowedModelIds.includes(preset.modelId))
+
   return (
     <div className="space-y-2">
       <div className="flex gap-2">
@@ -59,9 +65,9 @@ export function CreationPresetPanel({
           保存
         </Button>
       </div>
-      {presets.length > 0 && (
+      {visiblePresets.length > 0 && (
         <div className="flex flex-wrap gap-2">
-          {presets.map(preset => (
+          {visiblePresets.map(preset => (
             <span
               key={preset.id}
               className={cn(

@@ -1,4 +1,4 @@
-import { Boxes, Clapperboard, FolderKanban, History, ImagePlus, LayoutDashboard, LibraryBig, Mountain, UserRound, Wrench } from 'lucide-react'
+import { Boxes, Clapperboard, FolderKanban, History, ImagePlus, LayoutDashboard, LibraryBig, Mountain, Package, UserRound, Wrench } from 'lucide-react'
 import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
@@ -33,8 +33,9 @@ const NAV_GROUPS = [
     label: '创作',
     items: [
       { to: '/create?assetType=asset', label: '创建资产', icon: ImagePlus },
-      { to: '/create?assetType=character', label: '创建主体', icon: UserRound },
-      { to: '/create?assetType=environment', label: '创建场景', icon: Mountain },
+      { to: '/create?assetType=character', label: '创建人物', icon: UserRound },
+      { to: '/create?assetType=environment', label: '创建场地', icon: Mountain },
+      { to: '/create?assetType=prop', label: '创建道具', icon: Package },
       { to: '/director', label: '导演台', icon: Clapperboard },
     ],
   },

@@ -48,6 +48,10 @@ describe('subModeOf', () => {
     expect(subModeOf(model({ id: 'i2i', category: 'image', capabilities: ['text_prompt', 'image_input'] }))).toBe('i2i')
   })
 
+  it('image: multi_reference → 参考生图', () => {
+    expect(subModeOf(model({ id: 'r2i', category: 'image', capabilities: ['text_prompt', 'image_input', 'multi_reference'] }))).toBe('r2i')
+  })
+
   it('image: 仅文本 → 文生图', () => {
     expect(subModeOf(model({ id: 't2i', category: 'image', capabilities: ['text_prompt'] }))).toBe('t2i')
   })
@@ -86,6 +90,7 @@ describe('subModeOf 派生对级联下拉的回归不变量', () => {
     ['video', ['screenplay'], 'understand'],
     ['video', ['screenplay', 'video_input', 'streaming'], 'understand'],
     ['image', ['image_input'], 'i2i'],
+    ['image', ['image_input', 'multi_reference'], 'r2i'],
     ['image', ['text_prompt'], 't2i'],
     ['audio', ['audio_input'], 'asr'],
     ['audio', ['text_prompt'], 'music'],

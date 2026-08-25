@@ -45,16 +45,41 @@ const CREATION_INTENTS = {
     eyebrow: '普通资产',
     title: '创建资产',
     description: '生成可以继续整理、复用或收录的图片和视频资产。',
+    imageOnly: false,
+    promptGuide: null,
   },
   character: {
-    eyebrow: '结构化资产 / 主体',
-    title: '创建主体',
-    description: '用素材库中的图片或视频作为参考，生成可确认、可复用的主体版本。',
+    eyebrow: '图片资产 / 人物',
+    title: '创建人物',
+    description: '通过提示词和参考图片生成可复用的人物设定图，重点产出正面、左侧、右侧、背面四视图。',
+    imageOnly: true,
+    promptGuide: {
+      title: '人物四视图提示词',
+      description: '建议要求同一张设定板展示正面、左侧、右侧、背面，保持人物外观、服装、比例和光线一致。',
+      template: '角色设定图，同一人物的正面、左侧、右侧、背面四视图，完整身体，保持脸部特征、发型、服装、配色和比例一致，白色背景，平视，均匀光线，无文字，无水印。',
+    },
   },
   environment: {
-    eyebrow: '结构化资产 / 场景',
-    title: '创建场景',
-    description: '用已有素材建立场景方向，生成后可在详情页收录为可复用场景。',
+    eyebrow: '图片资产 / 场地',
+    title: '创建场地',
+    description: '通过文生图、图生图或参考生图生成可复用的场地背景。',
+    imageOnly: true,
+    promptGuide: {
+      title: '场地背景提示词',
+      description: '建议写清空间类型、时间、天气、材质、景别和镜头方向，避免把人物或道具当作主体。',
+      template: '场地背景设定图，完整展示空间结构和环境氛围，明确时间、天气、材质、光线和镜头方向，画面干净，无人物，无文字，无水印。',
+    },
+  },
+  prop: {
+    eyebrow: '图片资产 / 道具',
+    title: '创建道具',
+    description: '通过文生图、图生图或参考生图生成可复用的道具图片。',
+    imageOnly: true,
+    promptGuide: {
+      title: '道具图片提示词',
+      description: '建议写清道具的材质、结构、颜色、角度和使用状态，并让主体与背景保持简洁。',
+      template: '道具设定图，完整展示道具的结构、材质、颜色和关键细节，主体居中，干净背景，清晰光线，无人物，无文字，无水印。',
+    },
   },
 } as const
 
@@ -75,6 +100,10 @@ export function CreatePage() {
     : 'asset'
   const creationIntent = CREATION_INTENTS[creationType]
   const models = useModelCatalogStore(state => state.models)
+  const availableModels = useMemo(
+    () => creationIntent.imageOnly ? models.filter(item => item.category === 'image') : models,
+    [creationIntent.imageOnly, models],
+  )
   const loadModels = useModelCatalogStore(state => state.load)
   const showMessage = useNotificationsStore(state => state.showMessage)
   const refreshGenerations = useGenerationsStore(state => state.refresh)
@@ -99,8 +128,9 @@ export function CreatePage() {
 
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const estimateEpoch = useRef(0)
+  const previousCreationType = useRef(creationType)
 
-  const model = selectModelById(models, modelId ?? '')
+  const model = selectModelById(availableModels, modelId ?? '')
   const creativeAssetId = searchParams.get('creativeAssetId')
   const projectId = searchParams.get('projectId') ?? undefined
   const creativeContext = useMemo(
@@ -121,6 +151,19 @@ export function CreatePage() {
     void loadModels()
   }, [loadModels])
 
+  // 三种结构化创作是独立工作流：从侧栏切换时不继承上一种工作流的模型、参数和对比列表。
+  useEffect(() => {
+    if (previousCreationType.current === creationType) return
+    previousCreationType.current = creationType
+    setModelId(undefined)
+    setValues({})
+    setCompareModels([])
+    setCreativeAssets([])
+    setFieldErrors(new Map())
+    setSubmitError(null)
+    setEstimate(null)
+  }, [creationType])
+
   useEffect(() => {
     if (creativeAssetId !== null) setCreativePickerOpen(true)
   }, [creativeAssetId])
@@ -140,7 +183,7 @@ export function CreatePage() {
       .getGeneration(reuseId)
       .then(record => {
         if (cancelled) return
-        const recordModel = selectModelById(models, record.modelId)
+        const recordModel = selectModelById(availableModels, record.modelId)
         if (recordModel === undefined) return // 目录未就绪：本次作罢，models 就绪后由 effect 再次触发
         setModelId(record.modelId)
         void restoreRecordParams(record.inputParams, record.assetRefs, recordModel).then(restored => {
@@ -158,7 +201,7 @@ export function CreatePage() {
     return () => {
       cancelled = true
     }
-  }, [reuseId, models])
+  }, [availableModels, reuseId])
 
   // 从带深链参数（?reuse= / ?params= / ?edit= / ?ref=）进入 /create 后，再导航到
   // 无参 /create（如点侧栏「创作」）时重置为空白表单。React Router 同路由仅 query
@@ -357,11 +400,18 @@ export function CreatePage() {
 
   /** 对比生成：用当前表单的提示词/文本参数，对选中的每个模型各提交一条（同 batchId）。 */
   const handleCompareSubmit = async () => {
-    if (compareModels.length === 0 || compareBusy) return
+    if (compareBusy || (creationIntent.imageOnly && (model === undefined || compareModels.length === 0)) || (!creationIntent.imageOnly && compareModels.length === 0)) return
+    const selectedModels = creationIntent.imageOnly
+      ? [model, ...compareModels].filter((candidate): candidate is ModelCatalogItem => candidate !== undefined)
+      : compareModels
+    const targetModels = selectedModels.filter(
+      (candidate, index) => selectedModels.findIndex(item => item.id === candidate.id) === index,
+    )
+    if (targetModels.length === 0) return
     setCompareBusy(true)
     const batchId = crypto.randomUUID()
     let submitted = 0
-    for (const compareModel of compareModels) {
+    for (const compareModel of targetModels) {
       // 提交前实时校验：跳过不满足该模型约束的对比项（与服务端等价）。
       const validation = validateModelParams(compareModel, buildValidationParams(compareModel, values))
       if (!validation.valid) {
@@ -409,6 +459,18 @@ export function CreatePage() {
     )
   }
 
+  if (availableModels.length === 0) {
+    return (
+      <div className="mx-auto max-w-3xl space-y-3 py-8">
+        <p className="text-xs font-medium uppercase tracking-[0.18em] text-primary">{creationIntent.eyebrow}</p>
+        <h1 className="text-2xl font-semibold tracking-tight">{creationIntent.title}</h1>
+        <p className="text-sm text-muted-foreground">当前模型目录中没有可用的图片模型，暂时无法创建这一类图片资产。</p>
+      </div>
+    )
+  }
+
+  const compareModelCount = creationIntent.imageOnly ? compareModels.length + 1 : compareModels.length
+
   return (
     <form onSubmit={handleSubmit} className="mx-auto grid max-w-7xl gap-8 xl:grid-cols-2">
       <header className="col-span-full flex flex-col justify-between gap-4 border-b border-border/70 pb-5 sm:flex-row sm:items-end">
@@ -417,7 +479,11 @@ export function CreatePage() {
           <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{creationIntent.title}</h1>
           <p className="mt-1 max-w-2xl text-sm text-muted-foreground">{creationIntent.description}</p>
         </div>
-        <p className="max-w-xs text-xs leading-5 text-muted-foreground sm:text-right">生成完成后，可在生成详情中收录为主体、场景或其它结构化资产。</p>
+        <p className="max-w-xs text-xs leading-5 text-muted-foreground sm:text-right">
+          {creationIntent.imageOnly
+            ? '这里只展示图片模型；生成完成后，可在生成详情中收录为人物、场地或道具。'
+            : '生成完成后，可在生成详情中收录为结构化资产。'}
+        </p>
       </header>
       {/* 左栏：模型下拉 + 表单（无卡片边框）。xl 下两栏各自独立滚动（OverlayScrollbars
           虚拟滚动条），表单很长时不连带滚走最近任务。 */}
@@ -425,7 +491,12 @@ export function CreatePage() {
         <div className="space-y-6 xl:pl-1 xl:pr-4 xl:pb-8">
         <section className="space-y-2">
           <h2 className="text-sm font-semibold">选择模型</h2>
-          <ModelSelector models={models} selectedId={modelId} onSelect={handleModelSelect} />
+          <ModelSelector
+            models={availableModels}
+            selectedId={modelId}
+            onSelect={handleModelSelect}
+            defaultCategory={creationIntent.imageOnly ? 'image' : 'video'}
+          />
         </section>
 
         {model !== undefined && (
@@ -453,7 +524,7 @@ export function CreatePage() {
 
             {mediaFields.length > 0 && (
               <div className="space-y-2">
-                <p className="text-sm font-medium">输入参考素材</p>
+                <p className="text-sm font-medium">{creationIntent.imageOnly ? '参考图片' : '输入参考素材'}</p>
                 {creativeMediaField !== undefined && (
                   <CreativeAssetReferencePanel
                     assets={creativeAssets}
@@ -475,6 +546,18 @@ export function CreatePage() {
             )}
 
             <div className="space-y-2">
+              {creationIntent.promptGuide !== null && (
+                <CreationPromptGuide
+                  title={creationIntent.promptGuide.title}
+                  description={creationIntent.promptGuide.description}
+                  onApply={() => setValues(current => ({
+                    ...current,
+                    prompt: typeof current.prompt === 'string' && current.prompt.trim().length > 0
+                      ? `${current.prompt.trim()}\n${creationIntent.promptGuide?.template ?? ''}`
+                      : creationIntent.promptGuide?.template,
+                  }))}
+                />
+              )}
               <p className="text-sm font-medium">提示词</p>
               <PromptInput
                 value={typeof values.prompt === 'string' ? values.prompt : ''}
@@ -542,6 +625,7 @@ export function CreatePage() {
                 modelId={model.id}
                 params={values}
                 disabled={isSubmitting}
+                allowedModelIds={creationIntent.imageOnly ? availableModels.map(item => item.id) : undefined}
                 onApply={preset => {
                   setModelId(preset.modelId)
                   setValues(preset.params)
@@ -549,19 +633,21 @@ export function CreatePage() {
               />
 
               {/* 对比生成：同提示词多模型并行提交（同一 batchId）。 */}
-              <Collapsible className="group space-y-2 rounded-lg border border-dashed p-3">
+              <Collapsible defaultOpen={creationIntent.imageOnly} className="group space-y-2 rounded-lg border border-dashed p-3">
                 <CollapsibleTrigger asChild>
                   <button
                     type="button"
                     className="flex w-full items-center justify-between text-sm font-medium text-muted-foreground hover:text-foreground"
                   >
-                    对比生成（同提示词多模型）
+                    {creationIntent.imageOnly ? '选择多个图片模型' : '对比生成（同提示词多模型）'}
                     <ChevronDown className="size-4 transition-transform group-data-[state=open]:rotate-180" />
                   </button>
                 </CollapsibleTrigger>
                 <CollapsibleContent className="space-y-2">
                   <p className="text-xs text-muted-foreground">
-                    用当前提示词/文本参数对多个模型各提交一条对比任务。参考图/媒体参数不跨模型复用；请选择同一类模型以获得可比结果。
+                    {creationIntent.imageOnly
+                      ? '主模型会与这里追加的图片模型一起生成。支持文生图、图生图和参考生图；不会混入视频模型。'
+                      : '用当前提示词/文本参数对多个模型各提交一条对比任务。参考图/媒体参数不跨模型复用；请选择同一类模型以获得可比结果。'}
                   </p>
                   <div className="flex flex-wrap items-center gap-1.5">
                     {compareModels.map(candidate => (
@@ -578,17 +664,22 @@ export function CreatePage() {
                       </span>
                     ))}
                     {compareModels.length < 4 && (
-                      <ModelCompareAdd models={models} compareIds={compareModels.map(item => item.id)} onAdd={model => setCompareModels(current => [...current, model])} />
+                      <ModelCompareAdd
+                        models={availableModels}
+                        compareIds={compareModels.map(item => item.id)}
+                        excludeIds={model === undefined ? [] : [model.id]}
+                        onAdd={candidate => setCompareModels(current => [...current, candidate])}
+                      />
                     )}
                   </div>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={compareModels.length === 0 || compareBusy}
+                    disabled={compareModels.length === 0 || compareBusy || model === undefined}
                     onClick={() => void handleCompareSubmit()}
                   >
-                    {compareBusy ? <Loader2 className="size-4 animate-spin" /> : `开始对比（${compareModels.length} 个模型）`}
+                    {compareBusy ? <Loader2 className="size-4 animate-spin" /> : creationIntent.imageOnly ? `批量生成（${compareModelCount} 个图片模型）` : `开始对比（${compareModelCount} 个模型）`}
                   </Button>
                 </CollapsibleContent>
               </Collapsible>
@@ -633,9 +724,29 @@ function CreativeAssetReferencePanel({
     <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div><p className="text-sm font-medium">已确认创意资产</p><p className="mt-1 text-xs text-muted-foreground">引用版本和参考图会写入本次生成快照</p></div>
-        <Button type="button" size="sm" variant="outline" onClick={onOpen}><Sparkles className="size-3.5" />选择主体 / 场景</Button>
+        <Button type="button" size="sm" variant="outline" onClick={onOpen}><Sparkles className="size-3.5" />选择创意资产</Button>
       </div>
       {assets.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{assets.map(asset => <div key={asset.id} className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-background/70 px-2 py-1.5"><span className="size-7 overflow-hidden rounded bg-muted">{asset.preview?.thumbnailUrl || asset.preview?.url ? <img src={resolveApiUrl(asset.preview.thumbnailUrl ?? asset.preview.url)} alt="" className="size-full object-cover" /> : <ImageIcon className="m-1.5 size-4 text-muted-foreground" />}</span><span className="max-w-36 truncate text-xs">{asset.name}</span><button type="button" aria-label={`移除${asset.name}`} onClick={() => onRemove(asset.id)} className="rounded p-0.5 text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-3" /></button></div>)}</div>}
+    </div>
+  )
+}
+
+function CreationPromptGuide({
+  title,
+  description,
+  onApply,
+}: {
+  title: string
+  description: string
+  onApply: () => void
+}) {
+  return (
+    <div className="rounded-lg border border-primary/20 bg-primary/5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <p className="text-sm font-medium">{title}</p>
+        <Button type="button" size="sm" variant="outline" onClick={onApply}>插入建议</Button>
+      </div>
+      <p className="mt-1 text-xs leading-5 text-muted-foreground">{description}</p>
     </div>
   )
 }
@@ -644,13 +755,15 @@ function CreativeAssetReferencePanel({
 function ModelCompareAdd({
   models,
   compareIds,
+  excludeIds,
   onAdd,
 }: {
   models: readonly ModelCatalogItem[]
   compareIds: readonly string[]
+  excludeIds: readonly string[]
   onAdd: (model: ModelCatalogItem) => void
 }) {
-  const available = models.filter(model => !compareIds.includes(model.id))
+  const available = models.filter(model => !compareIds.includes(model.id) && !excludeIds.includes(model.id))
   if (available.length === 0) return null
   return (
     <Select value="" onValueChange={modelId => {
