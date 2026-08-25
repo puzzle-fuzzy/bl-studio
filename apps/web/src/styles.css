@@ -131,7 +131,7 @@
   min-height: 100svh;
   overflow: hidden;
   isolation: isolate;
-  background: #07080c;
+  background: #0a0a0a;
   color: oklch(0.97 0.01 300);
 }
 
@@ -339,11 +339,11 @@
 }
 
 .login-card {
-  border: 1px solid rgb(224 214 255 / 0.18);
+  border: none;
   background:
     linear-gradient(145deg, rgb(24 27 44 / 0.96), rgb(11 14 27 / 0.96)),
     rgb(11 14 27 / 0.96);
-  box-shadow: 0 28px 80px rgb(0 0 0 / 0.46), 0 0 0 1px rgb(124 100 255 / 0.08);
+  box-shadow: 0 28px 80px rgb(0 0 0 / 0.46);
   backdrop-filter: blur(18px);
   color: rgb(245 247 255 / 0.96);
 }
@@ -419,7 +419,7 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  background: #05060a;
+  background: #0a0a0a;
 }
 
 .login-liquid-sand__fallback,
