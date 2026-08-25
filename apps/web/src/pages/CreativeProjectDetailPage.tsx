@@ -14,7 +14,7 @@ import { userErrorMessage } from '@/lib/user-error'
 import { useCreativeProjectsStore } from '@/stores/creative-projects-store'
 import { toast } from 'sonner'
 
-const ASSET_TYPES: readonly CreativeAssetType[] = ['character', 'environment', 'prop', 'style']
+const ASSET_TYPES: readonly CreativeAssetType[] = ['character', 'environment', 'prop']
 type AssetView = 'grid' | 'list'
 
 function isAssetView(value: string | null): value is AssetView {
@@ -192,7 +192,7 @@ export function CreativeProjectDetailPage() {
   }
 
   if (projectId === undefined) {
-    return <ProjectErrorState title="项目地址无效" description="请从素材库重新进入项目。" onBack={() => navigate('/assets?tab=projects')} />
+    return <ProjectErrorState title="项目地址无效" description="请从项目页重新进入项目。" onBack={() => navigate('/projects')} />
   }
 
   if (detailState?.isLoading && project === null) {
@@ -200,7 +200,7 @@ export function CreativeProjectDetailPage() {
   }
 
   if (detailState?.error && project === null) {
-    return <ProjectErrorState title="项目暂时无法打开" description={detailState.error} onBack={() => navigate('/assets?tab=projects')} />
+    return <ProjectErrorState title="项目暂时无法打开" description={detailState.error} onBack={() => navigate('/projects')} />
   }
 
   if (project === null || project === undefined) {
@@ -215,7 +215,7 @@ export function CreativeProjectDetailPage() {
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0">
               <div className="mb-2 flex items-center gap-2 text-xs text-muted-foreground">
-                <Link to="/assets" className="transition-colors hover:text-foreground">素材库</Link>
+                <Link to="/projects" className="transition-colors hover:text-foreground">项目</Link>
                 <span aria-hidden="true">/</span>
                 <span className="truncate">项目详情</span>
               </div>
@@ -233,8 +233,8 @@ export function CreativeProjectDetailPage() {
               </div>
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
-              <Button asChild variant="outline">
-                <Link to="/assets" title="返回素材库"><ArrowLeft className="size-4" />返回素材库</Link>
+                <Button asChild variant="outline">
+                  <Link to="/projects" title="返回项目列表"><ArrowLeft className="size-4" />返回项目列表</Link>
               </Button>
               <Button variant="outline" disabled={isArchived || isMutating} onClick={() => setPickerOpen(true)} title="从素材库添加已有素材">
                 <Plus className="size-4" />添加已有素材

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type CSSProperties, type FormEvent } from 'react'
+import { useEffect, useMemo, useState, type CSSProperties } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
 import {
   FolderKanban,
@@ -10,14 +10,11 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import type { CreativeAssetSummary, CreativeAssetType, CreativeProject } from '@bailian-studio/api-client'
+import type { CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
 import { UploadCreativeAssetDialog } from '@/components/assets/UploadCreativeAssetDialog'
 import { Button } from '@/components/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Textarea } from '@/components/ui/textarea'
 import {
   creativeAssetTypeLabel,
   creativeAssetVersionStatusLabel,
@@ -28,18 +25,15 @@ import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/crea
 
 const ASSET_TABS = [
   { value: 'all', label: '全部素材' },
-  { value: 'projects', label: '项目' },
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
-  { value: 'style', label: '风格' },
-  { value: 'pending', label: '待确认' },
 ] as const
 
 type AssetTab = (typeof ASSET_TABS)[number]['value']
 type AssetView = 'grid' | 'list'
 
-const ASSET_TYPES: readonly CreativeAssetType[] = ['character', 'environment', 'prop', 'style']
+const ASSET_TYPES: readonly CreativeAssetType[] = ['character', 'environment', 'prop']
 
 function isAssetTab(value: string | null): value is AssetTab {
   return value !== null && ASSET_TABS.some(tab => tab.value === value)
@@ -110,10 +104,7 @@ export function AssetWorkbenchPage() {
   const queryText = searchParams.get('q') ?? ''
   const view: AssetView = isAssetView(searchParams.get('view')) ? (searchParams.get('view') as AssetView) : 'grid'
   const type = ASSET_TYPES.includes(tab as CreativeAssetType) ? (tab as CreativeAssetType) : undefined
-  const versionStatus = tab === 'pending' ? 'candidate' as const : undefined
-
   const [searchInput, setSearchInput] = useState(queryText)
-  const [createProjectOpen, setCreateProjectOpen] = useState(false)
   const [uploadOpen, setUploadOpen] = useState(false)
 
   const loadProjects = useCreativeProjectsStore(state => state.load)
@@ -124,10 +115,9 @@ export function AssetWorkbenchPage() {
     () => ({
       ...(projectId ? { projectId } : {}),
       ...(type ? { type } : {}),
-      ...(versionStatus ? { versionStatus } : {}),
       ...(queryText ? { q: queryText } : {}),
     }),
-    [projectId, queryText, type, versionStatus],
+    [projectId, queryText, type],
   )
   const assetQueryKey = creativeAssetQueryKey(assetQuery)
   const assetState = useCreativeAssetsStore(state => state.queries[assetQueryKey])
@@ -139,9 +129,8 @@ export function AssetWorkbenchPage() {
   }, [loadProjects])
 
   useEffect(() => {
-    if (tab === 'projects') return
     void loadAssets(assetQuery)
-  }, [assetQuery, loadAssets, tab])
+  }, [assetQuery, loadAssets])
 
   useEffect(() => {
     setSearchInput(queryText)
@@ -167,16 +156,13 @@ export function AssetWorkbenchPage() {
   function handleTabChange(nextTab: AssetTab) {
     setSearchParams(updateSearchParams(searchParams, {
       tab: nextTab === 'all' ? undefined : nextTab,
-      // “项目”是项目列表视图，不应该继续携带上一个项目的过滤上下文。
-      projectId: nextTab === 'projects' ? undefined : projectId,
     }))
   }
 
   function handleProjectChange(nextProjectId: string) {
     setSearchParams(updateSearchParams(searchParams, {
       projectId: nextProjectId,
-      // 从项目列表选择项目后，直接进入该项目的素材集合。
-      tab: tab === 'projects' ? undefined : tab,
+      tab,
     }))
   }
 
@@ -198,7 +184,7 @@ export function AssetWorkbenchPage() {
               </div>
               <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">{activeProject?.title ?? '素材库'}</h1>
               <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                按项目整理主体、场景、道具和风格，确认版本后再带入下一次生成。
+                按项目整理主体、场景和道具，确认版本后再带入下一次生成。
               </p>
             </div>
             <div className="flex flex-wrap items-center gap-2">
@@ -216,7 +202,7 @@ export function AssetWorkbenchPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="h-[42px]" onClick={() => setCreateProjectOpen(true)} title="新建创作项目">
+              <Button variant="outline" className="h-[42px]" onClick={() => navigate('/projects')} title="前往项目管理">
                 <Plus className="size-4" />
                 新建项目
               </Button>
@@ -291,39 +277,20 @@ export function AssetWorkbenchPage() {
           ))}
         </nav>
 
-        {tab === 'projects' ? (
-          <ProjectGrid
-            projects={projects}
-            isLoading={projectState?.isLoading ?? false}
-            error={projectState?.error ?? null}
-            onSelect={project => navigate(`/assets/projects/${encodeURIComponent(project.id)}`)}
-            onCreate={() => setCreateProjectOpen(true)}
-          />
-        ) : (
-          <AssetCollection
-            items={assetState?.items ?? []}
-            view={view}
-            isLoading={assetState?.isLoading ?? false}
-            isLoadingMore={assetState?.isLoadingMore ?? false}
-            hasNextPage={assetState?.nextCursor !== undefined}
-            error={assetState?.error ?? null}
-            tab={tab}
-            onLoadMore={() => void loadMoreAssets(assetQuery)}
-            onRetry={() => void loadAssets(assetQuery, true)}
-            onCreate={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
-            onUpload={() => setUploadOpen(true)}
-          />
-        )}
+        <AssetCollection
+          items={assetState?.items ?? []}
+          view={view}
+          isLoading={assetState?.isLoading ?? false}
+          isLoadingMore={assetState?.isLoadingMore ?? false}
+          hasNextPage={assetState?.nextCursor !== undefined}
+          error={assetState?.error ?? null}
+          onLoadMore={() => void loadMoreAssets(assetQuery)}
+          onRetry={() => void loadAssets(assetQuery, true)}
+          onCreate={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
+          onUpload={() => setUploadOpen(true)}
+        />
       </div>
 
-      <CreateProjectDialog
-        open={createProjectOpen}
-        onOpenChange={setCreateProjectOpen}
-        onCreated={project => {
-          setCreateProjectOpen(false)
-          navigate(`/assets/projects/${encodeURIComponent(project.id)}`)
-        }}
-      />
       <UploadCreativeAssetDialog
         open={uploadOpen}
         onOpenChange={setUploadOpen}
@@ -394,7 +361,6 @@ function AssetCollection({
   isLoadingMore,
   hasNextPage,
   error,
-  tab,
   onLoadMore,
   onRetry,
   onCreate,
@@ -406,7 +372,6 @@ function AssetCollection({
   isLoadingMore: boolean
   hasNextPage: boolean
   error: string | null
-  tab: AssetTab
   onLoadMore: () => void
   onRetry: () => void
   onCreate: () => void
@@ -434,10 +399,8 @@ function AssetCollection({
             <Sparkles className="size-5" />
           </div>
           <div>
-            <h2 className="text-base font-semibold">{tab === 'pending' ? '没有待确认素材' : '这个项目还没有素材'}</h2>
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {tab === 'pending' ? '新生成的候选版本会在这里等待你的确认。' : '先创建主体、场景或道具，再把确认版本带入下一次生成。'}
-            </p>
+            <h2 className="text-base font-semibold">这个项目还没有素材</h2>
+            <p className="mt-1 text-sm leading-6 text-muted-foreground">先创建主体、场景或道具，再把确认版本带入下一次生成。</p>
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={onCreate}><Sparkles className="size-4" />生成素材</Button>
@@ -564,97 +527,5 @@ function CreativeAssetPreview({ asset, previewUrl }: { asset: CreativeAssetSumma
         </span>
       </div>
     </div>
-  )
-}
-
-function ProjectGrid({
-  projects,
-  isLoading,
-  error,
-  onSelect,
-  onCreate,
-}: {
-  projects: CreativeProject[]
-  isLoading: boolean
-  error: string | null
-  onSelect: (project: CreativeProject) => void
-  onCreate: () => void
-}) {
-  if (isLoading && projects.length === 0) return <AssetSkeleton view="grid" />
-  if (error && projects.length === 0) {
-    return <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-destructive/20 bg-destructive/5 p-8 text-center"><p className="text-sm font-medium">项目暂时加载失败</p><p className="text-sm text-muted-foreground">{error}</p></div>
-  }
-  if (projects.length === 0) {
-    return <div className="flex min-h-80 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center"><FolderKanban className="size-8 text-primary" /><h2 className="text-base font-semibold">还没有创作项目</h2><p className="text-sm text-muted-foreground">先用项目把短剧素材分开，之后可以跨项目复用主体和场景。</p><Button onClick={onCreate}><Plus className="size-4" />新建项目</Button></div>
-  }
-  return (
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
-      {projects.map(project => (
-        <button key={project.id} type="button" onClick={() => onSelect(project)} title={`打开项目：${project.title}`} className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <div className="absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-primary/10 blur-2xl transition-opacity group-hover:opacity-100" />
-          <div className="relative flex items-start gap-3">
-            <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/60 text-primary"><FolderKanban className="size-5" /></div>
-            <div className="min-w-0 flex-1"><h2 className="truncate font-semibold">{project.title}</h2><p className="mt-1 line-clamp-2 min-h-10 text-sm leading-5 text-muted-foreground">{project.description || '还没有项目描述'}</p></div>
-          </div>
-          <div className="relative mt-6 flex items-center justify-between text-xs text-muted-foreground"><span>{project.status === 'active' ? '活跃项目' : project.status === 'archived' ? '已归档' : '草稿项目'}</span><span>打开项目 →</span></div>
-        </button>
-      ))}
-    </div>
-  )
-}
-
-function CreateProjectDialog({
-  open,
-  onOpenChange,
-  onCreated,
-}: {
-  open: boolean
-  onOpenChange: (open: boolean) => void
-  onCreated: (project: CreativeProject) => void
-}) {
-  const createProject = useCreativeProjectsStore(state => state.create)
-  const [title, setTitle] = useState('')
-  const [description, setDescription] = useState('')
-  const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-
-  function handleOpenChange(nextOpen: boolean) {
-    if (nextOpen) setError(null)
-    onOpenChange(nextOpen)
-  }
-
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault()
-    const normalizedTitle = title.trim()
-    if (normalizedTitle.length === 0) {
-      setError('请输入项目名称')
-      return
-    }
-    setIsSubmitting(true)
-    setError(null)
-    try {
-      const project = await createProject({ title: normalizedTitle, ...(description.trim() ? { description: description.trim() } : {}) })
-      setTitle('')
-      setDescription('')
-      onCreated(project)
-    } catch (submitError) {
-      setError(submitError instanceof Error ? submitError.message : '创建项目失败，请稍后重试')
-    } finally {
-      setIsSubmitting(false)
-    }
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
-        <DialogHeader><DialogTitle>新建创作项目</DialogTitle><DialogDescription>项目用于整理一部短剧或一个系列的主体、场景、道具和风格资产。</DialogDescription></DialogHeader>
-        <form className="space-y-4" onSubmit={handleSubmit}>
-          <div className="space-y-2"><Label htmlFor="creative-project-title">项目名称</Label><Input id="creative-project-title" value={title} onChange={event => setTitle(event.target.value)} placeholder="例如：夜班便利店" maxLength={120} autoFocus /></div>
-          <div className="space-y-2"><Label htmlFor="creative-project-description">项目描述 <span className="font-normal text-muted-foreground">（可选）</span></Label><Textarea id="creative-project-description" value={description} onChange={event => setDescription(event.target.value)} placeholder="记录这个项目的视觉方向或使用范围" maxLength={2_000} rows={4} /></div>
-          {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
-          <DialogFooter><Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button><Button type="submit" disabled={isSubmitting}>{isSubmitting ? '正在创建…' : '创建项目'}</Button></DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
   )
 }

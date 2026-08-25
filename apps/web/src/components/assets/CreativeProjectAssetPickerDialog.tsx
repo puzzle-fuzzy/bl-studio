@@ -14,7 +14,6 @@ const TYPE_OPTIONS: Array<{ value: CreativeAssetType | 'all'; label: string }> =
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
-  { value: 'style', label: '风格' },
 ]
 
 export function CreativeProjectAssetPickerDialog({
@@ -86,7 +85,7 @@ export function CreativeProjectAssetPickerDialog({
         <DialogHeader>
           <DialogTitle>添加已有素材</DialogTitle>
           <DialogDescription>
-            从素材库挑选要放进当前项目的主体、场景、道具或风格。素材本身不会被复制，后续仍可在其他项目中复用。
+            从素材库挑选要放进当前项目的主体、场景或道具。素材本身不会被复制，后续仍可在其他项目中复用。
           </DialogDescription>
         </DialogHeader>
 

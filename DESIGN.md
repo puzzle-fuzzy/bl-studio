@@ -216,7 +216,7 @@ The component language is compact, familiar, and state-complete. Every interacti
 
 ### Navigation
 
-- **Style:** A 256px expanded sidebar and 72px collapsed icon rail. Keep primary navigation to six concepts: 工作台, 素材库, 生成素材, 生成记录, 导演台, 资源.
+- **Style:** A 256px expanded sidebar and 72px collapsed icon rail. Keep primary navigation to seven concepts: 工作台, 项目, 素材库, 生成素材, 生成记录, 导演台, 资源.
 - **Default:** Neutral text and tonal hover background.
 - **Active:** Accent text or a low-area accent surface plus an icon and accessible label. Do not use a thick colored side stripe.
 - **Mobile:** Replace the rail with a sheet or bottom-accessible menu; preserve the current project switcher and global search.
@@ -260,4 +260,3 @@ The component language is compact, familiar, and state-complete. Every interacti
 - **Don't** place TypeGPU effects over thumbnails, prompts, or version metadata.
 - **Don't** rely on color alone for status, approval, selection, error, or loading feedback.
 - **Don't** use large decorative shadows with borders on every card. Depth must come from tonal layers first.
-

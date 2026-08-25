@@ -21,7 +21,6 @@ const TYPE_OPTIONS: Array<{ value: CreativeAssetType; label: string }> = [
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
-  { value: 'style', label: '风格' },
 ]
 
 const ROLE_OPTIONS: Record<CreativeAssetType, Array<{ value: CreativeAssetReferenceRole; label: string }>> = {
@@ -191,7 +190,7 @@ export function CollectGenerationAssetDialog({
           </div>
           <div className="space-y-2">
             <Label htmlFor="collect-generation-description">说明 <span className="font-normal text-muted-foreground">（可选）</span></Label>
-            <Textarea id="collect-generation-description" value={description} onChange={event => setDescription(event.target.value)} placeholder="记录服装、风格或后续使用限制" maxLength={4_000} rows={3} />
+            <Textarea id="collect-generation-description" value={description} onChange={event => setDescription(event.target.value)} placeholder="记录服装或后续使用限制" maxLength={4_000} rows={3} />
           </div>
           <div className="space-y-2">
             <Label>图片产物</Label>

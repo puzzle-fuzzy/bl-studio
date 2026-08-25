@@ -147,7 +147,7 @@ export function CreativeAssetDetailPage() {
             <h1 className="text-3xl font-semibold tracking-tight">{asset.name}</h1>
             <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs text-primary">{creativeAssetStatusLabel(asset.status)}</span>
           </div>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{asset.description || '用版本保存主体、场景、道具或风格的稳定参考，不把某一张图片误当成资产本身。'}</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{asset.description || '用版本保存主体、场景或道具的稳定参考，不把某一张图片误当成资产本身。'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="outline" onClick={() => navigate(`/create?creativeAssetId=${encodeURIComponent(asset.id)}`)} title="在生成页引用当前资产"><Sparkles className="size-4" />在生成页引用</Button>
@@ -167,7 +167,7 @@ export function CreativeAssetDetailPage() {
           {asset.projects.length === 0 ? <span className="text-sm text-muted-foreground">暂未归入项目</span> : asset.projects.map(membership => {
             const project = projects.find(item => item.id === membership.projectId)
             const projectTitle = project?.title ?? `项目 ${membership.projectId.slice(0, 8)}`
-            return <Link key={membership.id} to={`/assets/projects/${encodeURIComponent(membership.projectId)}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title={`打开项目：${projectTitle}`}><FolderKanban className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{projectTitle}</span></Link>
+            return <Link key={membership.id} to={`/projects/${encodeURIComponent(membership.projectId)}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title={`打开项目：${projectTitle}`}><FolderKanban className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{projectTitle}</span></Link>
           })}
           {projectQuery?.isLoading && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" role="status"><Loader2 className="size-3 animate-spin" aria-hidden="true" />正在加载项目名称</span>}
         </div>

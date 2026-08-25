@@ -8,6 +8,7 @@ import { notifyChunkLoadFailure } from '@/lib/chunk-recovery'
 import { CreatePage } from '@/pages/CreatePage'
 import { CatalogPage } from '@/pages/CatalogPage'
 import { GenerationsPage } from '@/pages/GenerationsPage'
+import { ProjectsPage } from '@/pages/ProjectsPage'
 import { WorkbenchPage } from '@/pages/WorkbenchPage'
 import { LoginPage } from '@/pages/auth/LoginPage'
 import { LegalPage } from '@/pages/LegalPage'
@@ -64,6 +65,8 @@ export const router = createBrowserRouter([
         element: <ProtectedRoute />,
         children: [
           { path: '/workbench', element: <WorkbenchPage /> },
+          { path: '/projects', element: <ProjectsPage /> },
+          { path: '/projects/:projectId', element: lazyPage('CreativeProjectDetailPage', () => import('@/pages/CreativeProjectDetailPage')) },
           { path: '/assets', element: lazyPage('AssetWorkbenchPage', () => import('@/pages/AssetWorkbenchPage')) },
           { path: '/assets/projects/:projectId', element: lazyPage('CreativeProjectDetailPage', () => import('@/pages/CreativeProjectDetailPage')) },
           { path: '/assets/:id', element: lazyPage('CreativeAssetDetailPage', () => import('@/pages/CreativeAssetDetailPage')) },

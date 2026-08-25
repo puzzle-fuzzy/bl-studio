@@ -14,7 +14,6 @@ const TYPE_OPTIONS: Array<{ value: CreativeAssetType | 'all'; label: string }> =
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
-  { value: 'style', label: '风格' },
 ]
 
 export function CreativeAssetPickerDialog({
@@ -96,7 +95,7 @@ export function CreativeAssetPickerDialog({
       <DialogContent className="max-h-[min(780px,calc(100svh-2rem))] overflow-y-auto sm:max-w-4xl">
         <DialogHeader>
           <DialogTitle>引用已确认创意资产</DialogTitle>
-          <DialogDescription>选择主体、场景、道具或风格。生成时会带入已确认版本和具体参考图，后续资产更新不会改写这次引用。</DialogDescription>
+          <DialogDescription>选择主体、场景或道具。生成时会带入已确认版本和具体参考图，后续资产更新不会改写这次引用。</DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row">

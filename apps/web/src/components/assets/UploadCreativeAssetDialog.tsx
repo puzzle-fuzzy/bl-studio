@@ -18,7 +18,6 @@ const TYPE_OPTIONS: Array<{ value: CreativeAssetType; label: string }> = [
   { value: 'character', label: '主体' },
   { value: 'environment', label: '场景' },
   { value: 'prop', label: '道具' },
-  { value: 'style', label: '风格' },
 ]
 
 const ROLE_OPTIONS: Record<CreativeAssetType, Array<{ value: CreativeAssetReferenceRole; label: string }>> = {

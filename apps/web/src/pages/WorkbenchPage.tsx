@@ -51,7 +51,7 @@ export function WorkbenchPage() {
             <p className="mb-1 text-xs font-medium uppercase tracking-[0.2em] text-muted-foreground">Studio workspace</p>
             <h1 className="text-3xl font-semibold tracking-tight">工作台</h1>
             <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">
-              从项目进入素材库，维护主体、场景、道具与风格的稳定版本，再把它们带入生成。
+              从项目进入素材库，维护主体、场景和道具的稳定版本，再把它们带入生成。
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -77,7 +77,7 @@ export function WorkbenchPage() {
               <p className="mt-1 text-sm text-muted-foreground">项目是整理素材的第一层上下文。</p>
             </div>
             <Button asChild variant="ghost" size="sm">
-              <Link to="/assets?tab=projects">
+              <Link to="/projects">
                 管理项目
                 <ArrowRight />
               </Link>
@@ -105,7 +105,7 @@ export function WorkbenchPage() {
                   <p className="mt-1 text-sm text-muted-foreground">先建立一个项目，再把素材按剧集或视觉主题归档。</p>
                 </div>
                 <Button asChild variant="outline" size="sm">
-                  <Link to="/assets?tab=projects">
+                  <Link to="/projects">
                     <Plus />
                     创建第一个项目
                   </Link>
@@ -115,7 +115,7 @@ export function WorkbenchPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {projects.slice(0, 6).map(project => (
-                <Link key={project.id} to={`/assets/projects/${encodeURIComponent(project.id)}`} className="group">
+                <Link key={project.id} to={`/projects/${encodeURIComponent(project.id)}`} className="group">
                   <Card className="h-full transition-colors group-hover:border-primary/50">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">
@@ -167,7 +167,7 @@ export function WorkbenchPage() {
           ) : recentAssets.length === 0 ? (
             <Card className="border-dashed bg-card/60">
               <CardContent className="py-10 text-center text-sm text-muted-foreground">
-                还没有创意资产。创建主体、场景、道具或风格后，它们会出现在这里。
+                还没有创意资产。创建主体、场景或道具后，它们会出现在这里。
               </CardContent>
             </Card>
           ) : (

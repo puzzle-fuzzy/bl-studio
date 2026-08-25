@@ -1,5 +1,5 @@
 import { useEffect } from 'react'
-import { Boxes, Clapperboard, History, LayoutDashboard, LibraryBig, Sparkles, Wrench } from 'lucide-react'
+import { Boxes, Clapperboard, FolderKanban, History, LayoutDashboard, LibraryBig, Sparkles, Wrench } from 'lucide-react'
 import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router'
 import type { CreativeProject } from '@bailian-studio/api-client'
 import {
@@ -28,6 +28,7 @@ const NAV_GROUPS = [
     label: '工作区',
     items: [
       { to: '/workbench', label: '工作台', icon: LayoutDashboard },
+      { to: '/projects', label: '项目', icon: FolderKanban },
       { to: '/assets', label: '素材库', icon: LibraryBig },
       { to: '/generations', label: '生成记录', icon: History },
     ],
