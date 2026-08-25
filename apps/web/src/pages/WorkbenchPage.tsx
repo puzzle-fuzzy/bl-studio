@@ -115,7 +115,7 @@ export function WorkbenchPage() {
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {projects.slice(0, 6).map(project => (
-                <Link key={project.id} to={`/assets?projectId=${encodeURIComponent(project.id)}`} className="group">
+                <Link key={project.id} to={`/assets/projects/${encodeURIComponent(project.id)}`} className="group">
                   <Card className="h-full transition-colors group-hover:border-primary/50">
                     <CardHeader>
                       <div className="flex items-start justify-between gap-4">

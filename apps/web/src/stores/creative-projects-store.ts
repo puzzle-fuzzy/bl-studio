@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { CreativeProject } from '@bailian-studio/api-client'
+import type { CreativeProject, CreativeProjectDetail } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { registerPrivateDataReset } from './auth-store'
 
@@ -20,16 +20,27 @@ interface CreativeProjectQueryState {
   error: string | null
 }
 
+interface CreativeProjectDetailState {
+  project: CreativeProjectDetail | null
+  isLoading: boolean
+  error: string | null
+}
+
 interface CreativeProjectsState {
   queries: Record<string, CreativeProjectQueryState>
+  details: Record<string, CreativeProjectDetailState>
   load(query?: CreativeProjectQuery, force?: boolean): Promise<void>
   loadMore(query?: CreativeProjectQuery): Promise<void>
+  loadDetail(projectId: string, force?: boolean): Promise<void>
   create(input: { title: string; description?: string }): Promise<CreativeProject>
+  attachAssets(projectId: string, assetIds: string[]): Promise<void>
+  detachAssets(projectId: string, assetIds: string[]): Promise<void>
   clear(): void
 }
 
 const PROJECTS_PAGE_SIZE = 100
 const pendingLoads = new Map<string, Promise<void>>()
+const pendingDetails = new Map<string, Promise<void>>()
 
 function initialState(): CreativeProjectQueryState {
   return {
@@ -42,8 +53,13 @@ function initialState(): CreativeProjectQueryState {
   }
 }
 
+function initialDetailState(): CreativeProjectDetailState {
+  return { project: null, isLoading: false, error: null }
+}
+
 export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get) => ({
   queries: {},
+  details: {},
 
   async load(query = {}, force = false) {
     const key = creativeProjectQueryKey(query)
@@ -144,6 +160,46 @@ export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get)
     }
   },
 
+  async loadDetail(projectId, force = false) {
+    const existing = get().details[projectId]
+    if (existing?.project !== null && !force) return
+    const pending = pendingDetails.get(projectId)
+    if (pending !== undefined) return pending
+
+    set(state => ({
+      details: {
+        ...state.details,
+        [projectId]: { ...(existing ?? initialDetailState()), isLoading: true, error: null },
+      },
+    }))
+
+    const task = apiClient
+      .getCreativeProject(projectId)
+      .then(project => {
+        set(state => ({
+          details: { ...state.details, [projectId]: { project, isLoading: false, error: null } },
+        }))
+      })
+      .catch(error => {
+        set(state => ({
+          details: {
+            ...state.details,
+            [projectId]: {
+              ...(get().details[projectId] ?? initialDetailState()),
+              isLoading: false,
+              error: error instanceof Error ? error.message : String(error),
+            },
+          },
+        }))
+      })
+      .finally(() => {
+        pendingDetails.delete(projectId)
+      })
+
+    pendingDetails.set(projectId, task)
+    return task
+  },
+
   async create(input) {
     const project = await apiClient.createCreativeProject(input)
     set(state => {
@@ -152,14 +208,49 @@ export const useCreativeProjectsStore = create<CreativeProjectsState>((set, get)
         const matchesQuery = key.length === 0 || project.title.toLocaleLowerCase().includes(key.toLocaleLowerCase())
         queries[key] = matchesQuery ? { ...entry, items: [project, ...entry.items.filter(item => item.id !== project.id)] } : entry
       }
-      return { queries }
+      return {
+        queries,
+        details: {
+          ...state.details,
+          [project.id]: { project, isLoading: false, error: null },
+        },
+      }
     })
     return project
   },
 
+  async attachAssets(projectId, assetIds) {
+    const uniqueAssetIds = [...new Set(assetIds)]
+    if (uniqueAssetIds.length === 0) return
+    const existingCount = get().details[projectId]?.project?.assets.length ?? 0
+    try {
+      for (const [index, assetId] of uniqueAssetIds.entries()) {
+        await apiClient.attachCreativeAssetToProject(projectId, {
+          assetId,
+          sortOrder: existingCount + index,
+        })
+      }
+    } finally {
+      await get().loadDetail(projectId, true)
+    }
+  },
+
+  async detachAssets(projectId, assetIds) {
+    const uniqueAssetIds = [...new Set(assetIds)]
+    if (uniqueAssetIds.length === 0) return
+    try {
+      for (const assetId of uniqueAssetIds) {
+        await apiClient.detachCreativeAssetFromProject(projectId, assetId)
+      }
+    } finally {
+      await get().loadDetail(projectId, true)
+    }
+  },
+
   clear() {
     pendingLoads.clear()
-    set({ queries: {} })
+    pendingDetails.clear()
+    set({ queries: {}, details: {} })
   },
 }))
 

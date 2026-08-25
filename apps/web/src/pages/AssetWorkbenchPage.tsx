@@ -293,7 +293,7 @@ export function AssetWorkbenchPage() {
             projects={projects}
             isLoading={projectState?.isLoading ?? false}
             error={projectState?.error ?? null}
-            onSelect={project => setSearchParams(updateSearchParams(searchParams, { tab: undefined, projectId: project.id }))}
+            onSelect={project => navigate(`/assets/projects/${encodeURIComponent(project.id)}`)}
             onCreate={() => setCreateProjectOpen(true)}
           />
         ) : (
@@ -318,7 +318,7 @@ export function AssetWorkbenchPage() {
         onOpenChange={setCreateProjectOpen}
         onCreated={project => {
           setCreateProjectOpen(false)
-          setSearchParams(updateSearchParams(searchParams, { projectId: project.id, tab: undefined }))
+          navigate(`/assets/projects/${encodeURIComponent(project.id)}`)
         }}
       />
       <UploadCreativeAssetDialog

@@ -65,6 +65,7 @@ export const router = createBrowserRouter([
         children: [
           { path: '/workbench', element: <WorkbenchPage /> },
           { path: '/assets', element: lazyPage('AssetWorkbenchPage', () => import('@/pages/AssetWorkbenchPage')) },
+          { path: '/assets/projects/:projectId', element: lazyPage('CreativeProjectDetailPage', () => import('@/pages/CreativeProjectDetailPage')) },
           { path: '/assets/:id', element: lazyPage('CreativeAssetDetailPage', () => import('@/pages/CreativeAssetDetailPage')) },
           { path: '/create', element: <CreatePage /> },
           { path: '/writing', element: lazyPage('WritingPage', () => import('@/pages/WritingPage')) },
