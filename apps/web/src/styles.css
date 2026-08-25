@@ -270,9 +270,9 @@
 }
 
 .login-point-field__fallback {
-  background-image: radial-gradient(circle, currentColor 0 1.7px, transparent 2.1px);
-  background-position: 5px 5px;
-  background-size: 10px 10px;
+  background-image: radial-gradient(circle, currentColor 0 0.9px, transparent 1.3px);
+  background-position: 2.5px 2.5px;
+  background-size: 5px 5px;
   -webkit-mask-image:
     radial-gradient(ellipse 30% 29% at 20% 75%, #000 0 78%, transparent 100%),
     radial-gradient(ellipse 17% 30% at 31% 50%, #000 0 78%, transparent 100%),
@@ -294,9 +294,9 @@
 
 .login-point-field__pointer {
   z-index: 2;
-  background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 2.4px, transparent 2.9px);
-  background-position: 5px 5px;
-  background-size: 10px 10px;
+  background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 1.3px, transparent 1.7px);
+  background-position: 2.5px 2.5px;
+  background-size: 5px 5px;
   -webkit-mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
   mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
   mix-blend-mode: multiply;
@@ -307,12 +307,31 @@
 .login-point-field__pointer::after {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 2.5px, transparent 3px);
-  background-position: 5px 5px;
-  background-size: 10px 10px;
+  background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 1.4px, transparent 1.8px);
+  background-position: 2.5px 2.5px;
+  background-size: 5px 5px;
   -webkit-mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
   mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
   content: '';
+}
+
+.login-point-field__pointer::before {
+  position: absolute;
+  inset: 0;
+  background-image: radial-gradient(circle, rgb(52 32 255 / 0.82) 0 1.1px, transparent 1.6px);
+  background-position: 2.5px 2.5px;
+  background-size: 5px 5px;
+  -webkit-mask-image: radial-gradient(circle 8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), transparent 0 56%, #000 58% 64%, transparent 67%);
+  mask-image: radial-gradient(circle 8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), transparent 0 56%, #000 58% 64%, transparent 67%);
+  content: '';
+  opacity: 0;
+  transform: scale(0.72);
+  transform-origin: var(--pointer-x, 22%) var(--pointer-y, 72%);
+}
+
+.login-point-field[data-pointer-active='true']:not([data-gpu-ready='true']) .login-point-field__pointer::before {
+  animation: login-point-field-ripple 1.8s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+  opacity: 1;
 }
 
 .login-point-field__canvas {
@@ -333,6 +352,10 @@
   opacity: 0.96;
 }
 
+.login-point-field[data-gpu-ready='true'] .login-point-field__pointer {
+  opacity: 0;
+}
+
 @keyframes login-point-field-drift {
   0% {
     transform: translate3d(-6px, 2px, 0);
@@ -342,6 +365,17 @@
   }
   100% {
     transform: translate3d(7px, 4px, 0);
+  }
+}
+
+@keyframes login-point-field-ripple {
+  0% {
+    opacity: 0.72;
+    transform: scale(0.66);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1.38);
   }
 }
 
@@ -375,6 +409,7 @@
   .login-page__form-wrap,
   .login-point-field__fallback,
   .login-point-field__pointer,
+  .login-point-field__pointer::before,
   .login-point-field__canvas {
     animation: none;
     transition: none;
