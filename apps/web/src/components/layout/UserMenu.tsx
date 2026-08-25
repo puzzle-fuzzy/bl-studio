@@ -34,7 +34,7 @@ export function UserMenu() {
 
   if (status !== 'authenticated' || user === null) {
     return (
-      <Button variant="ghost" size="sm" aria-label="登录" title="登录" className="w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!" onClick={() => openAuth('login')}>
+      <Button variant="ghost" size="sm" aria-label="登录" title="登录" className="w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!" onClick={() => openAuth('login')}>
         <LogIn data-icon aria-hidden="true" />
         <span className="group-data-[collapsible=icon]:hidden">登录</span>
       </Button>
@@ -49,7 +49,7 @@ export function UserMenu() {
         <DropdownMenuTrigger asChild>
           <SidebarMenuButton
             aria-label={`账户：${user.displayName ?? user.email}`}
-            className="h-auto w-full min-w-0 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!"
+            className="h-auto w-full min-w-0 group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!"
             title="账户"
           >
             <UserAvatar userId={user.id} name={user.displayName} className="size-7 shrink-0 group-data-[collapsible=icon]:size-8!" />

@@ -42,7 +42,7 @@ export function NotificationMenu() {
         {/* 侧栏底部整行触发器：铃铛 + 通知 + 未读徽标 */}
         <SidebarMenuButton
           aria-label="通知"
-          className="relative w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!"
+          className="relative w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!"
           title="通知"
         >
           <Bell className="size-4" />

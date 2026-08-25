@@ -30,7 +30,7 @@ export function CreditsBadge({ layout = 'badge' }: { layout?: 'badge' | 'row' })
     return (
       <SidebarMenuButton
         aria-label={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
-        className="h-10 w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!"
+        className="h-10 w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:rounded-xl group-data-[collapsible=icon]:bg-sidebar-accent/50 group-data-[collapsible=icon]:px-0!"
         title={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
         tooltip={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
       >
