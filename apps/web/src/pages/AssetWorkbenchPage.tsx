@@ -188,7 +188,7 @@ export function AssetWorkbenchPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Select value={projectId ?? 'all'} onValueChange={handleProjectChange}>
-                <SelectTrigger className="h-[42px] data-[size=default]:h-[42px] w-40 bg-background/80" title="按项目筛选素材">
+                <SelectTrigger className="w-40 bg-background/80" title="按项目筛选素材">
                   <FolderKanban className="size-4 text-muted-foreground" />
                   <SelectValue placeholder="全部项目" />
                 </SelectTrigger>
@@ -201,11 +201,11 @@ export function AssetWorkbenchPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" className="h-[42px]" onClick={() => navigate('/projects')} title="前往项目管理">
+              <Button variant="outline" onClick={() => navigate('/projects')} title="前往项目管理">
                 <Plus className="size-4" />
                 新建项目
               </Button>
-              <Button className="h-[42px]" onClick={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)} title="打开素材生成页">
+              <Button onClick={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)} title="打开素材生成页">
                 <Sparkles className="size-4" />
                 生成素材
               </Button>
@@ -224,7 +224,7 @@ export function AssetWorkbenchPage() {
                 onChange={event => setSearchInput(event.target.value)}
                 placeholder="搜索素材、项目或提示词"
                 title="搜索素材、项目或提示词"
-                className="h-[42px] bg-background/80 pl-9 pr-9"
+                className="bg-background/80 pl-9 pr-9"
               />
               {searchInput && (
                 <button
@@ -239,11 +239,11 @@ export function AssetWorkbenchPage() {
               )}
             </div>
             <div className="flex items-center gap-2 lg:ml-auto">
-              <Button variant="outline" className="h-[42px]" onClick={() => setUploadOpen(true)} title="上传素材到素材库">
+              <Button variant="outline" onClick={() => setUploadOpen(true)} title="上传素材到素材库">
                 <Upload className="size-4" />
                 上传素材
               </Button>
-              <fieldset className="flex h-[42px] shrink-0 items-center rounded-lg border border-border bg-background/70 p-1">
+              <fieldset className="flex shrink-0 items-center rounded-lg border border-border bg-background/70 p-1">
                 <legend className="sr-only">视图切换</legend>
                 <ViewButton active={view === 'grid'} label="网格视图" onClick={() => setParam('view', 'grid')}>
                   <Grid2X2 className="size-4" />
