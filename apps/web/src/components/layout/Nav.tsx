@@ -1,7 +1,5 @@
-import { useEffect } from 'react'
 import { Boxes, Clapperboard, FolderKanban, History, LayoutDashboard, LibraryBig, Sparkles, Wrench } from 'lucide-react'
-import { NavLink, useLocation, useNavigate, useSearchParams } from 'react-router'
-import type { CreativeProject } from '@bailian-studio/api-client'
+import { NavLink, useLocation } from 'react-router'
 import {
   Sidebar,
   SidebarContent,
@@ -16,12 +14,10 @@ import {
   SidebarRail,
   SidebarSeparator,
 } from '@/components/ui/sidebar'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { LoginWordmark } from '@/components/auth/LoginWordmark'
 import { NotificationMenu } from '@/components/layout/NotificationMenu'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
-import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
 
 const NAV_GROUPS = [
   {
@@ -49,48 +45,6 @@ const NAV_GROUPS = [
   },
 ] as const
 
-function ProjectSwitcher() {
-  const navigate = useNavigate()
-  const location = useLocation()
-  const [searchParams] = useSearchParams()
-  const projectId = searchParams.get('projectId') ?? 'all'
-  const load = useCreativeProjectsStore(state => state.load)
-  const query = useCreativeProjectsStore(state => state.queries[creativeProjectQueryKey()])
-
-  useEffect(() => {
-    void load()
-  }, [load])
-
-  function selectProject(nextProjectId: string) {
-    const nextParams = new URLSearchParams(location.search)
-    if (nextProjectId === 'all') nextParams.delete('projectId')
-    else nextParams.set('projectId', nextProjectId)
-    const search = nextParams.toString()
-    navigate(`${location.pathname}${search ? `?${search}` : ''}`)
-  }
-
-  const projects: CreativeProject[] = query?.items ?? []
-
-  return (
-    <div className="px-2 pt-1 group-data-[collapsible=icon]:hidden">
-      <p className="mb-1 px-2 text-[10px] font-medium uppercase tracking-[0.16em] text-muted-foreground">当前项目</p>
-      <Select value={projectId} onValueChange={selectProject}>
-        <SelectTrigger className="h-9 w-full bg-background/70 text-xs" aria-label="选择当前项目">
-          <SelectValue placeholder="所有项目" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">所有项目</SelectItem>
-          {projects.map(project => (
-            <SelectItem key={project.id} value={project.id}>
-              {project.title}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    </div>
-  )
-}
-
 /** 主导航侧栏：工作区优先，项目上下文与业务资源分层。 */
 export function Nav() {
   const { pathname } = useLocation()
@@ -107,7 +61,6 @@ export function Nav() {
           </div>
           <span className="sr-only">Bailian Studio</span>
         </div>
-        <ProjectSwitcher />
       </SidebarHeader>
       <SidebarContent>
         {NAV_GROUPS.map((group, index) => (
