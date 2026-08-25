@@ -25,7 +25,7 @@ export function AppShell() {
       <SidebarInset>
         <div className="flex min-h-svh flex-col">
           <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center border-b border-border/70 bg-background/90 px-4 backdrop-blur md:px-6">
-            <SidebarTrigger aria-label="展开或收起侧边栏" title="展开或收起侧边栏" className="size-9" />
+            <SidebarTrigger aria-label="展开或收起侧边栏" title="展开或收起侧边栏" className="p-0!" />
           </header>
           <div className="flex-1 overflow-auto p-4 md:p-6">
             <ErrorBoundary>

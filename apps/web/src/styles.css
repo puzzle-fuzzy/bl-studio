@@ -234,7 +234,17 @@
 .login-wordmark--sidebar {
   --wordmark-ink: var(--sidebar-foreground);
   --wordmark-accent: color-mix(in srgb, #b978e6 68%, var(--sidebar-foreground));
+  padding: 0.42rem 0.65rem 0.52rem 0.52rem;
   transform: skewX(-7deg) rotate(-1deg);
+}
+
+.login-wordmark--sidebar .login-wordmark__word {
+  font-size: 2.05rem;
+}
+
+.login-wordmark--sidebar .login-wordmark__word--studio {
+  margin-left: 0.82rem;
+  font-size: 1.72rem;
 }
 
 .login-wordmark--sidebar::before {

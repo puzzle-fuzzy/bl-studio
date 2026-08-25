@@ -97,7 +97,7 @@ export function Nav() {
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader>
-        <div className="flex min-h-14 items-center px-2 py-1 group-data-[collapsible=icon]:justify-center">
+        <div className="flex min-h-14 w-full items-center justify-center px-2 py-1">
           <div className="group-data-[collapsible=icon]:hidden" aria-hidden="true">
             <LoginWordmark className="login-wordmark--sidebar" />
           </div>
