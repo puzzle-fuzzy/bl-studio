@@ -203,7 +203,7 @@ export function AssetWorkbenchPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2">
               <Select value={projectId ?? 'all'} onValueChange={handleProjectChange}>
-                <SelectTrigger className="w-40 bg-background/80">
+                <SelectTrigger className="w-40 bg-background/80" title="按项目筛选素材">
                   <FolderKanban className="size-4 text-muted-foreground" />
                   <SelectValue placeholder="全部项目" />
                 </SelectTrigger>
@@ -216,11 +216,11 @@ export function AssetWorkbenchPage() {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={() => setCreateProjectOpen(true)}>
+              <Button variant="outline" onClick={() => setCreateProjectOpen(true)} title="新建创作项目">
                 <Plus className="size-4" />
                 新建项目
               </Button>
-              <Button onClick={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}>
+              <Button onClick={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)} title="打开素材生成页">
                 <Sparkles className="size-4" />
                 生成素材
               </Button>
@@ -238,21 +238,23 @@ export function AssetWorkbenchPage() {
                 value={searchInput}
                 onChange={event => setSearchInput(event.target.value)}
                 placeholder="搜索素材、项目或提示词"
+                title="搜索素材、项目或提示词"
                 className="h-11 bg-background/80 pl-9 pr-9"
               />
               {searchInput && (
                 <button
                   type="button"
                   aria-label="清除搜索"
+                  title="清除搜索"
                   onClick={() => setSearchInput('')}
                   className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
-                  <X className="size-4" />
+                  <X className="size-4" aria-hidden="true" />
                 </button>
               )}
             </div>
             <div className="flex items-center gap-2 lg:ml-auto">
-              <Button variant="outline" onClick={() => setUploadOpen(true)}>
+              <Button variant="outline" onClick={() => setUploadOpen(true)} title="上传素材到素材库">
                 <Upload className="size-4" />
                 上传素材
               </Button>
@@ -271,11 +273,12 @@ export function AssetWorkbenchPage() {
 
         <nav className="-mb-1 flex gap-1 overflow-x-auto pb-1" aria-label="素材类型">
           {ASSET_TABS.map(item => (
-            <button
-              key={item.value}
-              type="button"
-              onClick={() => handleTabChange(item.value)}
-              aria-current={tab === item.value ? 'page' : undefined}
+              <button
+                key={item.value}
+                type="button"
+                onClick={() => handleTabChange(item.value)}
+                aria-current={tab === item.value ? 'page' : undefined}
+                title={`查看${item.label}`}
               className={[
                 'shrink-0 rounded-lg px-3 py-2 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 tab === item.value
@@ -371,6 +374,7 @@ function ViewButton({
     <button
       type="button"
       aria-label={label}
+      title={label}
       aria-pressed={active}
       onClick={onClick}
       className={[
@@ -494,6 +498,7 @@ function CreativeAssetTile({ asset }: { asset: CreativeAssetSummary }) {
     <button
       type="button"
       onClick={() => navigate(`/assets/${encodeURIComponent(asset.id)}`)}
+      title={`打开素材：${asset.name}`}
       className="group overflow-hidden rounded-xl border border-border bg-card text-left transition-[border-color,transform,box-shadow] duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-[0_8px_24px_rgb(0_0_0_/_0.12)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <CreativeAssetPreview asset={asset} previewUrl={previewUrl} />
@@ -520,6 +525,7 @@ function CreativeAssetRow({ asset }: { asset: CreativeAssetSummary }) {
     <button
       type="button"
       onClick={() => navigate(`/assets/${encodeURIComponent(asset.id)}`)}
+      title={`打开素材：${asset.name}`}
       className="grid w-full grid-cols-1 gap-2 border-b border-border px-4 py-3 text-left transition-colors last:border-b-0 hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:grid-cols-[minmax(0,1.8fr)_120px_140px_140px] sm:items-center sm:gap-4"
     >
       <span className="flex min-w-0 items-center gap-3">
@@ -584,7 +590,7 @@ function ProjectGrid({
   return (
     <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
       {projects.map(project => (
-        <button key={project.id} type="button" onClick={() => onSelect(project)} className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <button key={project.id} type="button" onClick={() => onSelect(project)} title={`打开项目：${project.title}`} className="group relative overflow-hidden rounded-xl border border-border bg-card p-5 text-left transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
           <div className="absolute top-0 right-0 h-32 w-32 translate-x-8 -translate-y-8 rounded-full bg-primary/10 blur-2xl transition-opacity group-hover:opacity-100" />
           <div className="relative flex items-start gap-3">
             <div className="flex size-11 shrink-0 items-center justify-center rounded-xl border border-border bg-muted/60 text-primary"><FolderKanban className="size-5" /></div>

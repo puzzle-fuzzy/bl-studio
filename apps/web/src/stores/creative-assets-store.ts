@@ -1,6 +1,7 @@
 import { create } from 'zustand'
 import type { CreativeAssetDetail, CreativeAssetSummary, CreativeAssetType, CreativeAssetVersionStatus } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
+import { diffCreativeAssetMemberships } from '@/lib/creative-asset-memberships'
 import { registerPrivateDataReset } from './auth-store'
 
 export interface CreativeAssetQuery {
@@ -35,6 +36,7 @@ interface CreativeAssetsState {
   load(query: CreativeAssetQuery, force?: boolean): Promise<void>
   loadMore(query: CreativeAssetQuery): Promise<void>
   loadDetail(assetId: string, force?: boolean): Promise<void>
+  syncProjectMemberships(assetId: string, projectIds: string[]): Promise<void>
   clear(): void
 }
 
@@ -204,6 +206,23 @@ export const useCreativeAssetsStore = create<CreativeAssetsState>((set, get) => 
 
     pendingDetails.set(assetId, task)
     return task
+  },
+
+  async syncProjectMemberships(assetId, projectIds) {
+    const asset = get().details[assetId]?.asset
+    if (asset === null || asset === undefined) throw new Error('素材详情尚未加载完成')
+    const currentProjectIds = asset.projects.map(project => project.projectId)
+    const diff = diffCreativeAssetMemberships(currentProjectIds, projectIds)
+    try {
+      for (const projectId of diff.attachProjectIds) {
+        await apiClient.attachCreativeAssetToProject(projectId, { assetId })
+      }
+      for (const projectId of diff.detachProjectIds) {
+        await apiClient.detachCreativeAssetFromProject(projectId, assetId)
+      }
+    } finally {
+      await get().loadDetail(assetId, true)
+    }
   },
 
   clear() {

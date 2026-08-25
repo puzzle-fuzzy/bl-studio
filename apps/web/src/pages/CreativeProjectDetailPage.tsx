@@ -234,13 +234,13 @@ export function CreativeProjectDetailPage() {
             </div>
             <div className="flex flex-wrap items-center gap-2 lg:shrink-0">
               <Button asChild variant="outline">
-                <Link to="/assets"><ArrowLeft className="size-4" />返回素材库</Link>
+                <Link to="/assets" title="返回素材库"><ArrowLeft className="size-4" />返回素材库</Link>
               </Button>
-              <Button variant="outline" disabled={isArchived || isMutating} onClick={() => setPickerOpen(true)}>
+              <Button variant="outline" disabled={isArchived || isMutating} onClick={() => setPickerOpen(true)} title="从素材库添加已有素材">
                 <Plus className="size-4" />添加已有素材
               </Button>
               <Button asChild disabled={isMutating}>
-                <Link to={`/create?projectId=${encodeURIComponent(project.id)}`}><Sparkles className="size-4" />生成素材</Link>
+                <Link to={`/create?projectId=${encodeURIComponent(project.id)}`} title="在当前项目中生成素材"><Sparkles className="size-4" />生成素材</Link>
               </Button>
             </div>
           </div>
@@ -257,23 +257,23 @@ export function CreativeProjectDetailPage() {
           <div className="relative min-w-0 flex-1 lg:max-w-xl">
             <label htmlFor="project-asset-search" className="sr-only">搜索项目素材</label>
             <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input id="project-asset-search" value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="搜索项目内素材" className="h-11 bg-background/80 pl-9 pr-9" />
+            <Input id="project-asset-search" value={searchInput} onChange={event => setSearchInput(event.target.value)} placeholder="搜索项目内素材" title="搜索项目内素材" className="h-11 bg-background/80 pl-9 pr-9" />
             {searchInput && (
-              <button type="button" aria-label="清除搜索" onClick={() => setSearchInput('')} className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-                <X className="size-4" />
+              <button type="button" aria-label="清除搜索" title="清除搜索" onClick={() => setSearchInput('')} className="absolute top-1/2 right-3 -translate-y-1/2 rounded-md p-1 text-muted-foreground hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <X className="size-4" aria-hidden="true" />
               </button>
             )}
           </div>
           <div className="flex items-center gap-2 lg:ml-auto">
             <Select value={type ?? 'all'} onValueChange={value => setParam('type', value)}>
-              <SelectTrigger className="w-32 bg-background/80"><SelectValue placeholder="全部类型" /></SelectTrigger>
+              <SelectTrigger className="w-32 bg-background/80" title="筛选素材类型"><SelectValue placeholder="全部类型" /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">全部类型</SelectItem>
                 {ASSET_TYPES.map(assetType => <SelectItem key={assetType} value={assetType}>{creativeAssetTypeLabel(assetType)}</SelectItem>)}
               </SelectContent>
             </Select>
             <Select value={versionStatus} onValueChange={value => setParam('status', value)}>
-              <SelectTrigger className="w-32 bg-background/80"><SelectValue placeholder="全部状态" /></SelectTrigger>
+              <SelectTrigger className="w-32 bg-background/80" title="筛选版本状态"><SelectValue placeholder="全部状态" /></SelectTrigger>
               <SelectContent>
                 {CREATIVE_ASSET_VERSION_FILTERS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
               </SelectContent>
@@ -301,9 +301,9 @@ export function CreativeProjectDetailPage() {
             <span className="text-sm font-medium text-primary">已选择 {selectedAssets.length} 个素材</span>
             <span className="hidden text-xs text-muted-foreground sm:inline">批量移出只会解除项目归属，不会删除素材。</span>
             <div className="ml-auto flex items-center gap-2">
-              <Button variant="ghost" size="sm" disabled={isMutating} onClick={() => setSelectedIds(new Set())}>清空选择</Button>
-              <Button variant="destructive" size="sm" disabled={isArchived || isMutating} onClick={() => void handleDetach()}>
-                {isMutating ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+              <Button variant="ghost" size="sm" disabled={isMutating} onClick={() => setSelectedIds(new Set())} title="清空已选择的素材">清空选择</Button>
+              <Button variant="destructive" size="sm" disabled={isArchived || isMutating} onClick={() => void handleDetach()} title="将所选素材移出当前项目">
+                {isMutating ? <Loader2 className="size-4 animate-spin" aria-hidden="true" /> : <Trash2 className="size-4" aria-hidden="true" />}
                 移出项目
               </Button>
             </div>
@@ -332,7 +332,7 @@ export function CreativeProjectDetailPage() {
 }
 
 function ViewButton({ active, label, onClick, children }: { active: boolean; label: string; onClick: () => void; children: React.ReactNode }) {
-  return <button type="button" aria-label={label} aria-pressed={active} onClick={onClick} className={`rounded-md p-2 text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'bg-primary/10 text-primary' : 'hover:bg-muted hover:text-foreground'}`}>{children}</button>
+  return <button type="button" aria-label={label} title={label} aria-pressed={active} onClick={onClick} className={`rounded-md p-2 text-muted-foreground transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${active ? 'bg-primary/10 text-primary' : 'hover:bg-muted hover:text-foreground'}`}>{children}</button>
 }
 
 function ProjectAssetTile({ asset, selected, disabled, onToggle }: { asset: CreativeAssetSummary; selected: boolean; disabled: boolean; onToggle: () => void }) {

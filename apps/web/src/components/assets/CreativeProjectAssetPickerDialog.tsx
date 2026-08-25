@@ -93,16 +93,19 @@ export function CreativeProjectAssetPickerDialog({
         <div className="space-y-4">
           <div className="flex flex-col gap-2 sm:flex-row">
             <div className="relative min-w-0 flex-1">
+              <label htmlFor="project-asset-picker-search" className="sr-only">搜索可添加素材</label>
               <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
+                id="project-asset-picker-search"
                 value={query}
                 onChange={event => setQuery(event.target.value)}
                 placeholder="搜索素材名称或描述"
                 className="pl-9"
+                title="搜索可添加素材"
               />
             </div>
             <Select value={type} onValueChange={value => setType(value as CreativeAssetType | 'all')}>
-              <SelectTrigger className="sm:w-36">
+              <SelectTrigger className="sm:w-36" title="筛选素材类型">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -114,15 +117,15 @@ export function CreativeProjectAssetPickerDialog({
           </div>
 
           {selectedAssets.length > 0 && (
-            <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5">
+            <div className="flex items-center justify-between gap-3 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2.5" aria-live="polite">
               <span className="text-sm text-primary">已选择 {selectedAssets.length} 个素材</span>
-              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedAssets([])}>清空选择</Button>
+              <Button type="button" variant="ghost" size="sm" onClick={() => setSelectedAssets([])} title="清空已选择的素材">清空选择</Button>
             </div>
           )}
 
           {isLoading ? (
-            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground">
-              <Loader2 className="mr-2 size-4 animate-spin" />正在读取素材库
+            <div className="flex h-72 items-center justify-center text-sm text-muted-foreground" role="status" aria-label="正在读取素材库">
+              <Loader2 className="mr-2 size-4 animate-spin" aria-hidden="true" />正在读取素材库
             </div>
           ) : error !== null ? (
             <div className="flex min-h-40 flex-col items-center justify-center gap-3 rounded-lg border border-destructive/20 bg-destructive/5 p-6 text-center">
@@ -145,6 +148,8 @@ export function CreativeProjectAssetPickerDialog({
                     key={item.id}
                     type="button"
                     aria-pressed={isSelected}
+                    aria-label={`${isSelected ? '取消选择' : '选择'}素材 ${item.name}`}
+                    title={`${isSelected ? '取消选择' : '选择'}素材：${item.name}`}
                     onClick={() => toggle(item)}
                     className={`group relative overflow-hidden rounded-xl border text-left transition-[border-color,transform,box-shadow] hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${isSelected ? 'border-primary ring-2 ring-primary/30' : 'border-border hover:border-primary/50'}`}
                   >
@@ -152,7 +157,7 @@ export function CreativeProjectAssetPickerDialog({
                       {previewUrl ? (
                         <img src={resolveApiUrl(previewUrl)} alt={`${item.name}预览`} className="size-full object-cover" />
                       ) : (
-                        <div className="flex size-full items-center justify-center"><ImageIcon className="size-7 text-muted-foreground" /></div>
+                        <div className="flex size-full items-center justify-center"><ImageIcon className="size-7 text-muted-foreground" aria-hidden="true" /></div>
                       )}
                     </div>
                     <div className="space-y-1 p-3">
@@ -166,7 +171,7 @@ export function CreativeProjectAssetPickerDialog({
                     </div>
                     {isSelected && (
                       <span className="absolute top-2 right-2 flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground shadow-sm">
-                        <Check className="size-3.5" />
+                        <Check className="size-3.5" aria-hidden="true" />
                       </span>
                     )}
                   </button>
@@ -177,8 +182,8 @@ export function CreativeProjectAssetPickerDialog({
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>取消</Button>
-          <Button type="button" onClick={handleConfirm} disabled={selectedAssets.length === 0}>
+          <Button type="button" variant="outline" onClick={() => onOpenChange(false)} title="取消添加素材">取消</Button>
+          <Button type="button" onClick={handleConfirm} disabled={selectedAssets.length === 0} title="将已选择的素材添加到项目">
             添加所选素材（{selectedAssets.length}）
           </Button>
         </DialogFooter>

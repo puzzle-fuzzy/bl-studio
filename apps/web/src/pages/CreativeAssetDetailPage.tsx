@@ -1,14 +1,16 @@
 import { useEffect, useMemo, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Check, CheckCircle2, Image as ImageIcon, Layers3, Loader2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
+import { Link, useNavigate, useParams } from 'react-router'
+import { ArrowLeft, Check, CheckCircle2, FolderKanban, Image as ImageIcon, Layers3, Loader2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import type {
   AssetItem,
   CreativeAssetReference,
   CreativeAssetReferenceRole,
+  CreativeProject,
   CreativeAssetType,
   CreativeAssetVersion,
 } from '@bailian-studio/api-client'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
+import { CreativeAssetProjectDialog } from '@/components/assets/CreativeAssetProjectDialog'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -16,6 +18,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { useCreativeAssetsStore } from '@/stores/creative-assets-store'
+import { creativeProjectQueryKey, useCreativeProjectsStore } from '@/stores/creative-projects-store'
 import { useNotificationsStore } from '@/stores/notifications-store'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { creativeAssetReferenceRoleLabel, creativeAssetStatusLabel, creativeAssetTypeLabel, creativeAssetVersionStatusLabel } from '@/lib/labels'
@@ -33,15 +36,24 @@ export function CreativeAssetDetailPage() {
   const navigate = useNavigate()
   const detail = useCreativeAssetsStore(state => (id ? state.details[id] : undefined))
   const loadDetail = useCreativeAssetsStore(state => state.loadDetail)
+  const syncProjectMemberships = useCreativeAssetsStore(state => state.syncProjectMemberships)
+  const projectQuery = useCreativeProjectsStore(state => state.queries[creativeProjectQueryKey()])
+  const loadProjects = useCreativeProjectsStore(state => state.load)
   const showMessage = useNotificationsStore(state => state.showMessage)
   const [busyVersionId, setBusyVersionId] = useState<string | null>(null)
   const [busyReferenceId, setBusyReferenceId] = useState<string | null>(null)
   const [referenceVersion, setReferenceVersion] = useState<CreativeAssetVersion | null>(null)
   const [addReferenceOpen, setAddReferenceOpen] = useState(false)
+  const [projectDialogOpen, setProjectDialogOpen] = useState(false)
+  const [isSyncingProjects, setIsSyncingProjects] = useState(false)
 
   useEffect(() => {
     if (id) void loadDetail(id)
   }, [id, loadDetail])
+
+  useEffect(() => {
+    void loadProjects()
+  }, [loadProjects])
 
   if (!id) return <DetailState title="缺少素材标识" description="请从素材库重新打开一个素材。" />
   if (detail?.isLoading && detail.asset === null) return <DetailState title="正在加载素材详情" description="正在读取版本和引用关系。" loading />
@@ -50,6 +62,7 @@ export function CreativeAssetDetailPage() {
 
   const assetId = id
   const asset = detail.asset
+  const projects: CreativeProject[] = projectQuery?.items ?? []
   const approvedVersion = asset.versions.find(version => version.id === asset.approvedVersionId)
   const previewVersion = approvedVersion ?? asset.versions[0]
 
@@ -104,10 +117,23 @@ export function CreativeAssetDetailPage() {
     }
   }
 
+  async function updateProjectMemberships(projectIds: string[]) {
+    setIsSyncingProjects(true)
+    try {
+      await syncProjectMemberships(assetId, projectIds)
+      showMessage({ title: '项目归属已更新', tone: 'success' })
+    } catch (error) {
+      showMessage({ title: userErrorMessage(error), tone: 'warning' })
+      throw error
+    } finally {
+      setIsSyncingProjects(false)
+    }
+  }
+
   return (
     <div className="mx-auto flex w-full max-w-[1400px] flex-col gap-5">
       <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
-        <Button variant="ghost" size="sm" onClick={() => navigate('/assets')}><ArrowLeft className="size-4" />返回素材库</Button>
+        <Button variant="ghost" size="sm" onClick={() => navigate('/assets')} title="返回素材库"><ArrowLeft className="size-4" />返回素材库</Button>
         <span aria-hidden="true">/</span>
         <span>{creativeAssetTypeLabel(asset.type)}</span>
         <span aria-hidden="true">/</span>
@@ -124,10 +150,28 @@ export function CreativeAssetDetailPage() {
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">{asset.description || '用版本保存主体、场景、道具或风格的稳定参考，不把某一张图片误当成资产本身。'}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => navigate(`/create?creativeAssetId=${encodeURIComponent(asset.id)}`)}><Sparkles className="size-4" />在生成页引用</Button>
-          <Button onClick={() => navigate(`/create?creativeAssetId=${encodeURIComponent(asset.id)}`)}>生成新版本</Button>
+          <Button variant="outline" onClick={() => navigate(`/create?creativeAssetId=${encodeURIComponent(asset.id)}`)} title="在生成页引用当前资产"><Sparkles className="size-4" />在生成页引用</Button>
+          <Button onClick={() => navigate(`/create?creativeAssetId=${encodeURIComponent(asset.id)}`)} title="基于当前资产生成新版本">生成新版本</Button>
         </div>
       </header>
+
+      <section aria-labelledby="creative-asset-projects-title" className="rounded-xl border border-border bg-card/70 p-4">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h2 id="creative-asset-projects-title" className="flex items-center gap-2 text-base font-semibold"><FolderKanban className="size-4 text-primary" aria-hidden="true" />所属项目</h2>
+            <p className="mt-1 text-sm text-muted-foreground">一个素材可以被多个项目复用，项目归属不会改变素材版本。</p>
+          </div>
+          <Button variant="outline" size="sm" onClick={() => setProjectDialogOpen(true)} disabled={isSyncingProjects} title="管理当前资产所属的项目"><FolderKanban className="size-4" aria-hidden="true" />整理项目</Button>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-2" aria-live="polite">
+          {asset.projects.length === 0 ? <span className="text-sm text-muted-foreground">暂未归入项目</span> : asset.projects.map(membership => {
+            const project = projects.find(item => item.id === membership.projectId)
+            const projectTitle = project?.title ?? `项目 ${membership.projectId.slice(0, 8)}`
+            return <Link key={membership.id} to={`/assets/projects/${encodeURIComponent(membership.projectId)}`} className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border bg-background px-3 py-1.5 text-sm transition-colors hover:border-primary/50 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title={`打开项目：${projectTitle}`}><FolderKanban className="size-3.5 shrink-0" aria-hidden="true" /><span className="truncate">{projectTitle}</span></Link>
+          })}
+          {projectQuery?.isLoading && <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" role="status"><Loader2 className="size-3 animate-spin" aria-hidden="true" />正在加载项目名称</span>}
+        </div>
+      </section>
 
       <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(420px,0.9fr)]">
         <section className="relative min-h-[32rem] overflow-hidden rounded-xl border border-border bg-card">
@@ -183,6 +227,16 @@ export function CreativeAssetDetailPage() {
         onOpenChange={open => { setAddReferenceOpen(open); if (!open) setReferenceVersion(null) }}
         onSubmit={input => void addReference(input)}
       />
+      <CreativeAssetProjectDialog
+        open={projectDialogOpen}
+        onOpenChange={setProjectDialogOpen}
+        projects={projects}
+        initialProjectIds={asset.projects.map(membership => membership.projectId)}
+        isLoadingProjects={projectQuery?.isLoading ?? false}
+        projectError={projectQuery?.error ?? null}
+        onRetryProjects={() => void loadProjects({}, true)}
+        onSubmit={updateProjectMemberships}
+      />
     </div>
   )
 }
@@ -226,11 +280,11 @@ function VersionReviewCard({
       </div>
       {version.references.length > 0 && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          {version.references.map(reference => (
-            <div key={reference.id} className="flex items-center gap-2 rounded-md border border-border/70 bg-background/50 p-2">
-              <ReferenceThumb reference={reference} />
-              <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{creativeAssetReferenceRoleLabel(reference.role)} · 槽位 {reference.position + 1}</p><p className="truncate text-[11px] text-muted-foreground">{reference.userAssetId}</p></div>
-              {version.status === 'draft' && <button type="button" className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`移除${creativeAssetReferenceRoleLabel(reference.role)}参考图`} onClick={() => onRemoveReference(reference)} disabled={busyReferenceId === reference.id}>{busyReferenceId === reference.id ? <Loader2 className="size-3.5 animate-spin" /> : <Trash2 className="size-3.5" />}</button>}
+              {version.references.map(reference => (
+                <div key={reference.id} className="flex items-center gap-2 rounded-md border border-border/70 bg-background/50 p-2">
+                  <ReferenceThumb reference={reference} />
+                  <div className="min-w-0 flex-1"><p className="truncate text-xs font-medium">{creativeAssetReferenceRoleLabel(reference.role)} · 槽位 {reference.position + 1}</p><p className="truncate text-[11px] text-muted-foreground">{reference.userAssetId}</p></div>
+                  {version.status === 'draft' && <button type="button" className="rounded p-1 text-muted-foreground hover:bg-destructive/10 hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`移除${creativeAssetReferenceRoleLabel(reference.role)}参考图`} title={`移除${creativeAssetReferenceRoleLabel(reference.role)}参考图`} onClick={() => onRemoveReference(reference)} disabled={busyReferenceId === reference.id}>{busyReferenceId === reference.id ? <Loader2 className="size-3.5 animate-spin" aria-hidden="true" /> : <Trash2 className="size-3.5" aria-hidden="true" />}</button>}
             </div>
           ))}
         </div>
@@ -252,7 +306,7 @@ function StatusPill({ status }: { status: CreativeAssetVersion['status'] }) {
 
 function ReferenceThumb({ reference }: { reference: CreativeAssetReference }) {
   const previewUrl = reference.preview?.thumbnailUrl ?? reference.preview?.url
-  return <div className="size-9 shrink-0 overflow-hidden rounded bg-muted">{previewUrl ? <img src={resolveApiUrl(previewUrl)} alt="" className="size-full object-cover" /> : <ImageIcon className="m-2 size-5 text-muted-foreground" />}</div>
+  return <div className="size-9 shrink-0 overflow-hidden rounded bg-muted">{previewUrl ? <img src={resolveApiUrl(previewUrl)} alt={`${creativeAssetReferenceRoleLabel(reference.role)}参考图`} className="size-full object-cover" /> : <ImageIcon className="m-2 size-5 text-muted-foreground" aria-hidden="true" />}</div>
 }
 
 function AddReferenceDialog({
@@ -299,13 +353,13 @@ function AddReferenceDialog({
           <DialogHeader><DialogTitle>添加参考图</DialogTitle><DialogDescription>只修改当前草稿版本；版本进入确认队列后，参考图槽位会被冻结。</DialogDescription></DialogHeader>
           <div className="space-y-4">
             <div className="grid gap-4 sm:grid-cols-[1fr_120px]">
-              <div className="space-y-2"><Label>参考图角色</Label><Select value={role} onValueChange={value => setRole(value as CreativeAssetReferenceRole)}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{REFERENCE_ROLES[assetType].map(item => <SelectItem key={item} value={item}>{creativeAssetReferenceRoleLabel(item)}</SelectItem>)}</SelectContent></Select></div>
-              <div className="space-y-2"><Label htmlFor="reference-position">槽位</Label><Input id="reference-position" type="number" min={0} step={1} value={position} onChange={event => setPosition(event.target.value)} /></div>
+              <div className="space-y-2"><Label htmlFor="reference-role">参考图角色</Label><Select value={role} onValueChange={value => setRole(value as CreativeAssetReferenceRole)}><SelectTrigger id="reference-role" title="选择参考图角色"><SelectValue /></SelectTrigger><SelectContent>{REFERENCE_ROLES[assetType].map(item => <SelectItem key={item} value={item}>{creativeAssetReferenceRoleLabel(item)}</SelectItem>)}</SelectContent></Select></div>
+              <div className="space-y-2"><Label htmlFor="reference-position">槽位</Label><Input id="reference-position" title="设置参考图槽位" type="number" min={0} step={1} value={position} onChange={event => setPosition(event.target.value)} /></div>
             </div>
-            <div className="space-y-2"><Label>图片</Label>{selected ? <div className="flex items-center gap-3 rounded-lg border p-2"><div className="size-10 shrink-0 overflow-hidden rounded bg-muted"><img src={resolveApiUrl(selected.thumbnailUrl ?? selected.url)} alt="" className="size-full object-cover" /></div><span className="min-w-0 flex-1 truncate text-sm">{selected.fileName ?? selected.id}</span><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(null)}>更换</Button></div> : <Button type="button" variant="outline" className="w-full" onClick={() => setPickerOpen(true)}><Plus className="size-4" />从资产库选择图片</Button>}</div>
+            <div className="space-y-2"><Label>图片</Label>{selected ? <div className="flex items-center gap-3 rounded-lg border p-2"><div className="size-10 shrink-0 overflow-hidden rounded bg-muted"><img src={resolveApiUrl(selected.thumbnailUrl ?? selected.url)} alt={selected.fileName ?? '已选择参考图'} className="size-full object-cover" /></div><span className="min-w-0 flex-1 truncate text-sm">{selected.fileName ?? selected.id}</span><Button type="button" size="sm" variant="ghost" onClick={() => setSelected(null)} title="更换已选择的参考图">更换</Button></div> : <Button type="button" variant="outline" className="w-full" onClick={() => setPickerOpen(true)} title="从资产库选择参考图"><Plus className="size-4" />从资产库选择图片</Button>}</div>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
-          <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>取消</Button><Button onClick={submit} disabled={selected === null}>加入草稿版本</Button></DialogFooter>
+          <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)} title="取消添加参考图">取消</Button><Button onClick={submit} disabled={selected === null} title="将参考图加入当前草稿版本">加入草稿版本</Button></DialogFooter>
         </DialogContent>
       </Dialog>
       <AssetPickerDialog open={pickerOpen} onOpenChange={setPickerOpen} mediaKind="image" multiple={false} onSelect={assets => setSelected(assets[0] ?? null)} />
