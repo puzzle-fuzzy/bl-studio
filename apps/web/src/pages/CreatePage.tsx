@@ -1,11 +1,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ArrowUp, Check, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
+import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Plus, Sparkles, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuGroup,
+  DropdownMenuLabel,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Separator } from '@/components/ui/separator'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
 import { ModelSelector } from '@/components/create/ModelSelector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -30,7 +42,7 @@ import {
 import { buildSubmitPayload, buildValidationParams } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
-import { firstEnabledModel, isModelEnabled, modelNameZh, SUB_MODE_LABELS, subModeOf } from '@/lib/model-modes'
+import { firstEnabledModel, isModelEnabled, modelNameZh, SUB_MODE_LABELS, subModeOf, type SubMode } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
@@ -847,27 +859,7 @@ function CharacterCreationWorkspace({
   onSelectRecord,
   onApplyPromptGuide,
 }: CharacterCreationWorkspaceProps) {
-  const [activePopover, setActivePopover] = useState<CharacterPopover>(null)
-  const composerRef = useRef<HTMLDivElement>(null)
   const selectedRecord = records.find(record => record.id === selectedRecordId) ?? records[0]
-
-  useEffect(() => {
-    if (activePopover === null) return
-    const handlePointerDown = (event: PointerEvent) => {
-      if (!(event.target instanceof Node) || composerRef.current?.contains(event.target) !== true) {
-        setActivePopover(null)
-      }
-    }
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') setActivePopover(null)
-    }
-    document.addEventListener('pointerdown', handlePointerDown)
-    document.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.removeEventListener('pointerdown', handlePointerDown)
-      document.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [activePopover])
 
   return (
     <form
@@ -916,82 +908,76 @@ function CharacterCreationWorkspace({
         </aside>
       </div>
 
-      <div ref={composerRef} className="relative shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
-        {activePopover === 'mode' && (
-          <CharacterGenerationModePopover models={availableModels} selectedId={modelId} onSelect={modelId => {
-            onModelSelect(modelId)
-            setActivePopover(null)
-          }} />
-        )}
-        {activePopover === 'model' && (
-          <CharacterModelPopover models={availableModels} selectedId={modelId} onSelect={modelId => {
-            onModelSelect(modelId)
-            setActivePopover(null)
-          }} />
-        )}
-        {activePopover === 'settings' && (
-          <CharacterSettingsPopover
-            basicSettingsFields={basicSettingsFields}
-            advancedSettingsFields={advancedSettingsFields}
-            values={values}
-            fieldErrors={fieldErrors}
-            onValueChange={onValueChange}
-          />
-        )}
-        {activePopover === 'reference' && (
-          <CharacterReferencePopover
-            mediaFields={mediaFields}
-            creativeMediaField={creativeMediaField}
-            creativeAssets={creativeAssets}
-            values={values}
-            fieldErrors={fieldErrors}
-            onValueChange={onValueChange}
-            onOpenCreativePicker={() => {
-              setActivePopover(null)
-              onOpenCreativePicker()
-            }}
-            onRemoveCreativeAsset={onRemoveCreativeAsset}
-          />
-        )}
-
+      <div className="shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
         <div className="mx-auto max-w-5xl rounded-[22px] border border-border bg-card px-4 pt-3 shadow-[0_10px_30px_rgb(0_0_0_/_0.08)] transition-shadow focus-within:shadow-[0_12px_36px_rgb(0_0_0_/_0.12)]">
           <div className="flex min-h-[7.5rem] gap-3">
-            <CharacterReferenceSlot
-              asset={referencePool[0]}
-              active={activePopover === 'reference'}
-              onOpen={() => setActivePopover(current => current === 'reference' ? null : 'reference')}
-            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <CharacterReferenceSlot asset={referencePool[0]} />
+              </DropdownMenuTrigger>
+              <CharacterReferencePopover
+                mediaFields={mediaFields}
+                creativeMediaField={creativeMediaField}
+                creativeAssets={creativeAssets}
+                values={values}
+                fieldErrors={fieldErrors}
+                onValueChange={onValueChange}
+                onOpenCreativePicker={onOpenCreativePicker}
+                onRemoveCreativeAsset={onRemoveCreativeAsset}
+              />
+            </DropdownMenu>
             <div className="min-w-0 flex-1">
-            <PromptInput
-              value={typeof values.prompt === 'string' ? values.prompt : ''}
-              refs={referencePool}
-              onChange={text => onValueChange('prompt', text)}
-              placeholder="上传参考图、输入文字或 @ 主体，描述你想生成的人物。"
-              disabled={isSubmitting || isRestoring || model === undefined}
-              supportsReferences={model?.referenceFormat !== undefined}
-              className="min-h-[7.5rem] rounded-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0"
-            />
+              <PromptInput
+                value={typeof values.prompt === 'string' ? values.prompt : ''}
+                refs={referencePool}
+                onChange={text => onValueChange('prompt', text)}
+                placeholder="上传参考图、输入文字或 @ 主体，描述你想生成的人物。"
+                disabled={isSubmitting || isRestoring || model === undefined}
+                supportsReferences={model?.referenceFormat !== undefined}
+                className="min-h-[7.5rem] rounded-none border-0 bg-transparent px-0 py-1 shadow-none focus-visible:border-0 focus-visible:ring-0"
+              />
             </div>
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 pt-2">
             <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-              <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs text-primary" onClick={() => setActivePopover(current => current === 'mode' ? null : 'mode')} aria-expanded={activePopover === 'mode'}>
-                <ImagePlus className="size-3.5" />
-                图片生成
-                <ChevronDown className="size-3.5" />
-              </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button type="button" variant="outline" size="sm" className="h-8 gap-1 text-xs text-primary">
+                    <ImagePlus data-icon="inline-start" />
+                    图片生成
+                    <ChevronDown data-icon="inline-end" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <CharacterGenerationModePopover models={availableModels} selectedId={modelId} onSelect={onModelSelect} />
+              </DropdownMenu>
               {model !== undefined && (
-                <Button type="button" variant="outline" size="sm" className="h-8 max-w-44 gap-1.5 text-xs" onClick={() => setActivePopover(current => current === 'model' ? null : 'model')} aria-expanded={activePopover === 'model'}>
-                  <Sparkles className="size-3.5" />
-                  <span className="truncate">{modelNameZh(model)}</span>
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="h-8 max-w-44 gap-1.5 text-xs">
+                      <Sparkles data-icon="inline-start" />
+                      <span className="truncate">{modelNameZh(model)}</span>
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <CharacterModelPopover models={availableModels} selectedId={modelId} onSelect={onModelSelect} />
+                </DropdownMenu>
               )}
               {basicSettingsFields.length > 0 && (
-                <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs" onClick={() => setActivePopover(current => current === 'settings' ? null : 'settings')} aria-expanded={activePopover === 'settings'}>
-                  <span className="truncate">{characterSettingsSummary(basicSettingsFields, values)}</span>
-                  <ChevronDown className="size-3.5" />
-                </Button>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button type="button" variant="outline" size="sm" className="h-8 max-w-52 gap-1.5 text-xs">
+                      <span className="truncate">{characterSettingsSummary(basicSettingsFields, values)}</span>
+                      <ChevronDown data-icon="inline-end" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <CharacterSettingsPopover
+                    basicSettingsFields={basicSettingsFields}
+                    advancedSettingsFields={advancedSettingsFields}
+                    values={values}
+                    fieldErrors={fieldErrors}
+                    onValueChange={onValueChange}
+                  />
+                </DropdownMenu>
               )}
               <Button type="button" variant="outline" size="icon-sm" className="text-xs font-semibold" onClick={onApplyPromptGuide} disabled={isSubmitting || model === undefined} aria-label="插入人物提示词模板">
                 T
@@ -1023,16 +1009,12 @@ function CharacterCreationWorkspace({
   )
 }
 
-type CharacterPopover = 'mode' | 'model' | 'settings' | 'reference' | null
-
-function CharacterReferenceSlot({ asset, active, onOpen }: { asset: AssetItem | undefined; active: boolean; onOpen: () => void }) {
+function CharacterReferenceSlot({ asset }: { asset: AssetItem | undefined }) {
   return (
     <button
       type="button"
-      onClick={onOpen}
-      className={cn('relative mt-1 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted/70 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', active && 'ring-2 ring-primary/40')}
+      className="relative mt-1 flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-muted/70 text-muted-foreground transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       aria-label={asset === undefined ? '上传参考图' : '添加或更换参考图'}
-      aria-expanded={active}
     >
       {asset === undefined ? <Plus className="size-5" /> : <AssetThumbnail kind={asset.kind} url={asset.url} thumbnailUrl={asset.thumbnailUrl} />}
       {asset !== undefined && (
@@ -1068,24 +1050,33 @@ function CharacterGenerationModePopover({
   const modes = [...new Set(models.map(model => subModeOf(model)))]
 
   return (
-    <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(18rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-border bg-popover p-2 shadow-2xl shadow-black/15">
-      <p className="px-3 py-2 text-xs text-muted-foreground">选择图片生成方式</p>
-      {modes.map(mode => {
-        const modeModel = firstEnabledModel(models, 'image', mode)
-        const selectedMode = selected !== undefined && subModeOf(selected) === mode
-        if (modeModel === undefined) return null
-        return (
-          <button key={mode} type="button" onClick={() => onSelect(modeModel.id)} className={cn('flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70', selectedMode && 'bg-muted')}>
-            <ImagePlus className="size-4 shrink-0 text-primary" />
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium">{SUB_MODE_LABELS[mode]}</span>
-              <span className="mt-0.5 block truncate text-xs text-muted-foreground">{modelNameZh(modeModel)}</span>
-            </span>
-            {selectedMode && <Check className="size-4 shrink-0" />}
-          </button>
-        )
-      })}
-    </div>
+    <DropdownMenuContent side="top" align="start" className="w-[min(18rem,calc(100vw-2rem))]">
+      <DropdownMenuLabel>选择图片生成方式</DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuRadioGroup
+          value={selected === undefined ? '' : subModeOf(selected)}
+          onValueChange={mode => {
+            const modeModel = firstEnabledModel(models, 'image', mode as SubMode)
+            if (modeModel !== undefined) onSelect(modeModel.id)
+          }}
+        >
+          {modes.map(mode => {
+            const modeModel = firstEnabledModel(models, 'image', mode)
+            if (modeModel === undefined) return null
+            return (
+              <DropdownMenuRadioItem key={mode} value={mode} className="items-start py-2.5">
+                <ImagePlus data-icon="inline-start" className="mt-0.5 text-primary" />
+                <span className="min-w-0">
+                  <span className="block text-sm font-medium">{SUB_MODE_LABELS[mode]}</span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">{modelNameZh(modeModel)}</span>
+                </span>
+              </DropdownMenuRadioItem>
+            )
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
   )
 }
 
@@ -1101,43 +1092,34 @@ function CharacterModelPopover({
   const selected = models.find(model => model.id === selectedId)
 
   return (
-    <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(32rem,calc(100vw-2rem))] -translate-x-1/2 overflow-hidden rounded-2xl border border-border bg-popover shadow-2xl shadow-black/15">
-      <div className="border-b border-border/70 px-4 py-3">
-        <p className="text-xs text-muted-foreground">选择模型</p>
-        <p className="mt-1 truncate text-sm font-medium">{selected === undefined ? '图片生成' : `${modelNameZh(selected)} · ${selected.displayName}`}</p>
-      </div>
-      <div className="max-h-[min(58svh,25rem)] overflow-y-auto p-2">
-        {models.map(candidate => {
-          const selected = candidate.id === selectedId
-          const enabled = isModelEnabled(candidate)
-          return (
-            <button
-              key={candidate.id}
-              type="button"
-              disabled={!enabled}
-              onClick={() => onSelect(candidate.id)}
-              className={cn(
-                'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors hover:bg-muted/70 disabled:cursor-not-allowed disabled:opacity-45',
-                selected && 'bg-muted',
-              )}
-              aria-pressed={selected}
-            >
-              <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-background text-foreground">
-                <Sparkles className="size-4" />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="flex items-center gap-2">
-                  <span className="truncate text-sm font-medium">{modelNameZh(candidate)}</span>
-                  {candidate.availability?.notActivated !== undefined && <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">{candidate.availability.notActivated}</span>}
+    <DropdownMenuContent side="top" align="center" className="w-[min(32rem,calc(100vw-2rem))]">
+      <DropdownMenuLabel>
+        <span className="block">选择模型</span>
+        <span className="mt-1 block truncate text-sm font-medium text-foreground">{selected === undefined ? '图片生成' : `${modelNameZh(selected)} · ${selected.displayName}`}</span>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
+      <DropdownMenuGroup>
+        <DropdownMenuRadioGroup value={selectedId ?? ''} onValueChange={onSelect}>
+          {models.map(candidate => {
+            const enabled = isModelEnabled(candidate)
+            return (
+              <DropdownMenuRadioItem key={candidate.id} value={candidate.id} disabled={!enabled} className="items-start py-2.5">
+                <span className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/80 bg-background text-foreground">
+                  <Sparkles data-icon="inline-start" />
                 </span>
-                <span className="mt-0.5 block truncate text-xs text-muted-foreground">{candidate.description ?? candidate.displayName}</span>
-              </span>
-              {selected && <Check className="size-4 shrink-0" />}
-            </button>
-          )
-        })}
-      </div>
-    </div>
+                <span className="min-w-0">
+                  <span className="flex items-center gap-2">
+                    <span className="truncate text-sm font-medium">{modelNameZh(candidate)}</span>
+                    {candidate.availability?.notActivated !== undefined && <span className="shrink-0 rounded bg-muted px-1 text-[10px] text-muted-foreground">{candidate.availability.notActivated}</span>}
+                  </span>
+                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">{candidate.description ?? candidate.displayName}</span>
+                </span>
+              </DropdownMenuRadioItem>
+            )
+          })}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuGroup>
+    </DropdownMenuContent>
   )
 }
 
@@ -1160,20 +1142,22 @@ function CharacterSettingsPopover({
   const remainingFields = allFields.filter(field => field !== sizeField && field !== countField)
 
   return (
-    <div className="absolute bottom-full left-1/2 z-30 mb-3 w-[min(31rem,calc(100vw-2rem))] -translate-x-1/2 overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
-      <div className="mb-4">
-        <p className="text-xs text-muted-foreground">输出设置</p>
-        <p className="mt-1 text-sm font-medium">比例、分辨率和生成数量</p>
-      </div>
+    <DropdownMenuContent side="top" align="center" className="w-[min(31rem,calc(100vw-2rem))] p-4">
+      <DropdownMenuLabel className="px-0">
+        <span className="block">输出设置</span>
+        <span className="mt-1 block text-sm font-medium text-foreground">比例、分辨率和生成数量</span>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
       {sizeField !== undefined && <CharacterSizeControl field={sizeField} value={values[sizeField.parameter.name]} onChange={value => onValueChange(sizeField.parameter.name, value)} />}
       {countField !== undefined && <CharacterCountControl field={countField} value={values[countField.parameter.name]} onChange={value => onValueChange(countField.parameter.name, value)} />}
       {remainingFields.length > 0 && (
-        <section className="mt-4 border-t border-border/70 pt-4">
+        <section className="mt-4 space-y-3">
+          <Separator />
           <p className="mb-3 text-xs font-medium text-muted-foreground">更多参数</p>
           <ParameterForm fields={remainingFields} values={values} onChange={onValueChange} errors={fieldErrors} layout="grid" />
         </section>
       )}
-    </div>
+    </DropdownMenuContent>
   )
 }
 
@@ -1195,16 +1179,38 @@ function CharacterSizeControl({ field, value, onChange }: { field: FormField; va
       {ratios.length > 0 && (
         <div className="space-y-1.5">
           <p className="text-xs text-muted-foreground">选择比例</p>
-          <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
-            {ratios.map(ratio => <button key={ratio} type="button" onClick={() => selectChoice('ratio', ratio)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', selected?.ratio === ratio ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{ratio}</button>)}
-          </div>
+          <ToggleGroup
+            type="single"
+            value={selected?.ratio ?? ''}
+            onValueChange={next => {
+              if (next !== '') selectChoice('ratio', next)
+            }}
+            variant="outline"
+            size="sm"
+            spacing={0}
+            className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1"
+            aria-label="选择比例"
+          >
+            {ratios.map(ratio => <ToggleGroupItem key={ratio} value={ratio} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{ratio}</ToggleGroupItem>)}
+          </ToggleGroup>
         </div>
       )}
       <div className="space-y-1.5">
         <p className="text-xs text-muted-foreground">选择分辨率</p>
-        <div className="grid grid-cols-4 gap-1 rounded-xl bg-muted/60 p-1">
-          {resolutions.map(resolution => <button key={resolution} type="button" onClick={() => selectChoice('resolution', resolution)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', selected?.resolution === resolution ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{resolution}</button>)}
-        </div>
+        <ToggleGroup
+          type="single"
+          value={selected?.resolution ?? ''}
+          onValueChange={next => {
+            if (next !== '') selectChoice('resolution', next)
+          }}
+          variant="outline"
+          size="sm"
+          spacing={0}
+          className="grid w-full grid-cols-4 rounded-xl bg-muted/60 p-1"
+          aria-label="选择分辨率"
+        >
+          {resolutions.map(resolution => <ToggleGroupItem key={resolution} value={resolution} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{resolution}</ToggleGroupItem>)}
+        </ToggleGroup>
       </div>
       <p className="text-[11px] text-muted-foreground">当前尺寸：{selected?.label ?? '—'}</p>
     </div>
@@ -1220,9 +1226,20 @@ function CharacterCountControl({ field, value, onChange }: { field: FormField; v
   return (
     <div className="mt-4 space-y-1.5">
       <p className="text-xs text-muted-foreground">选择生成数量</p>
-      <div className="grid grid-cols-6 gap-1 rounded-xl bg-muted/60 p-1">
-        {counts.map(count => <button key={count} type="button" onClick={() => onChange(count)} className={cn('rounded-lg px-2 py-2 text-xs transition-colors', current === count ? 'bg-background font-medium shadow-sm' : 'text-muted-foreground hover:text-foreground')}>{count}</button>)}
-      </div>
+      <ToggleGroup
+        type="single"
+        value={String(current)}
+        onValueChange={next => {
+          if (next !== '') onChange(Number(next))
+        }}
+        variant="outline"
+        size="sm"
+        spacing={0}
+        className="grid w-full grid-cols-6 rounded-xl bg-muted/60 p-1"
+        aria-label="选择生成数量"
+      >
+        {counts.map(count => <ToggleGroupItem key={count} value={String(count)} className="rounded-lg border-0 px-2 py-2 text-xs shadow-none data-[state=on]:bg-background data-[state=on]:font-medium data-[state=on]:shadow-sm">{count}</ToggleGroupItem>)}
+      </ToggleGroup>
     </div>
   )
 }
@@ -1247,21 +1264,23 @@ function CharacterReferencePopover({
   onRemoveCreativeAsset: (assetId: string) => void
 }) {
   return (
-    <div className="absolute bottom-full left-0 z-30 mb-3 w-[min(32rem,calc(100vw-2rem))] overflow-y-auto rounded-2xl border border-border bg-popover p-4 shadow-2xl shadow-black/15">
-      <div className="mb-4">
-        <p className="text-xs text-muted-foreground">参考图与素材</p>
-        <p className="mt-1 text-sm font-medium">上传图片，或引用已确认的创意资产</p>
-      </div>
+    <DropdownMenuContent side="top" align="start" className="w-[min(32rem,calc(100vw-2rem))] p-4">
+      <DropdownMenuLabel className="px-0">
+        <span className="block">参考图与素材</span>
+        <span className="mt-1 block text-sm font-medium text-foreground">上传图片，或引用已确认的创意资产</span>
+      </DropdownMenuLabel>
+      <DropdownMenuSeparator />
       {creativeMediaField !== undefined && <CreativeAssetReferencePanel assets={creativeAssets} onOpen={onOpenCreativePicker} onRemove={onRemoveCreativeAsset} />}
       {mediaFields.length > 0 ? (
-        <div className={cn(creativeMediaField !== undefined && 'mt-4 border-t border-border/70 pt-4')}>
+        <div className={cn(creativeMediaField !== undefined && 'mt-4 space-y-3')}>
+          {creativeMediaField !== undefined && <Separator />}
           <p className="mb-3 text-xs font-medium text-muted-foreground">上传参考图 / 素材</p>
           <ParameterForm fields={mediaFields} values={values} onChange={onValueChange} errors={fieldErrors} />
         </div>
       ) : (
         <p className="rounded-xl bg-muted/50 px-3 py-4 text-xs text-muted-foreground">当前模型不需要参考素材。</p>
       )}
-    </div>
+    </DropdownMenuContent>
   )
 }
 
