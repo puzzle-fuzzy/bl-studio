@@ -72,12 +72,14 @@ const fragmentSource = `#version 300 es
 
     float time = u_time;
 
-    // 主平流明确从左向右输送；局部摆动叠加在输送之上，避免“果冻式原地变形”。
-    vec2 rightwardDrift = vec2(
+    // 主平流沿一条倒 U 形路线前进：左上进入，向下穿过，再抬升到右上离开。
+    // 相位和横向位移绑定，让路线不会变成上下原地摆动。
+    float routePhase = time * (6.2831853 * 0.42 / max(aspect, 0.75));
+    vec2 routeDrift = vec2(
       time * 0.42,
-      sin(time * 0.42) * 0.035 + cos(time * 0.23) * 0.018
+      0.40 * cos(routePhase) + 0.035 * sin(routePhase * 2.0)
     );
-    vec2 q = p - rightwardDrift;
+    vec2 q = p - routeDrift;
 
     // 两层域扭曲制造液体卷动，避免只是平移一张噪声贴图。
     vec2 warpA = vec2(
