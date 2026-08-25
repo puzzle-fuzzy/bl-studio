@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Paperclip, Plus, SlidersHorizontal, Sparkles, UserRound, X } from 'lucide-react'
+import { ArrowUp, ChevronDown, Image as ImageIcon, ImagePlus, Info, Loader2, Paperclip, Plus, SlidersHorizontal, Sparkles, X } from 'lucide-react'
 import type { AssetItem, CreativeAssetDetail, GenerationEstimate, GenerationRecord, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
@@ -35,6 +35,7 @@ import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-form
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { notifyError } from '@/lib/toast'
 import { buildCreativeGenerationContext, creativeAssetReferencesToAssetItems } from '@/lib/creative-generation'
 import { cn } from '@/lib/utils'
 import { relativeTime } from '@/components/generations/GenerationListItem'
@@ -375,7 +376,7 @@ export function CreatePage() {
         code: 'REQUIRED',
         message: `${field.parameter.label}为必填`,
       }])))
-      setSubmitError('请先补全必填项')
+      notifyError('请先补全必填项')
       return
     }
     // 提交前用 model-core 实时校验：范围/步长/条件上限/media 数量/文本长度等，与服务端
@@ -384,7 +385,7 @@ export function CreatePage() {
     const validation = validateModelParams(model, buildValidationParams(model, values))
     if (!validation.valid) {
       setFieldErrors(parameterIssuesToFieldErrors(validation.errors))
-      setSubmitError('请修正参数后再提交')
+      notifyError('请修正参数后再提交')
       return
     }
     setFieldErrors(new Map())
@@ -407,7 +408,7 @@ export function CreatePage() {
       // 保留模型、参考图和其它参数；人物提示词已在上面按一次生成语义清空。
       setEstimate(null)
     } catch (error) {
-      setSubmitError(userErrorMessage(error))
+      notifyError(error)
       setFieldErrors(readParameterValidationErrors(error))
     } finally {
       setIsSubmitting(false)
@@ -718,7 +719,6 @@ export function CreatePage() {
 
             <div className="space-y-2 pt-1">
               <EstimateSummary estimate={estimate} estimating={estimating} />
-              {submitError !== null && <p className="text-sm text-destructive">{submitError}</p>}
               <Button type="submit" size="lg" className="w-full" disabled={isSubmitting || isRestoring || model === undefined}>
                 {isSubmitting ? '提交中…' : isRestoring ? '正在还原参数…' : '开始生成'}
               </Button>
@@ -812,12 +812,6 @@ export function CreatePage() {
   )
 }
 
-const CHARACTER_STARTERS = [
-  '一位二十多岁的东方女性，短银发，琥珀色眼睛，穿深蓝色飞行夹克，气质冷静坚定。',
-  '一位住在海边小城的年轻修复师，棕色卷发，旧帆布围裙，温柔但有一点倔强。',
-  '一个来自废土时代的少年侦察员，黑色蓬松短发，轻型护甲，眼神警觉，带着旧相机。',
-] as const
-
 type CharacterCreationWorkspaceProps = {
   availableModels: readonly ModelCatalogItem[]
   model: ModelCatalogItem | undefined
@@ -897,25 +891,6 @@ function CharacterCreationWorkspace({
       onSubmit={onSubmit}
       className="mx-auto flex h-[calc(100svh-5rem)] min-h-[620px] w-full max-w-[1500px] flex-col gap-4 md:h-[calc(100svh-6rem)]"
     >
-      <header className="flex shrink-0 items-center justify-between gap-4 border-b border-border/70 pb-4">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary ring-1 ring-primary/15">
-            <UserRound className="size-5" />
-          </div>
-          <div className="min-w-0">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-xl font-semibold tracking-tight md:text-2xl">创建人物</h1>
-              <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">角色设定工作台</span>
-            </div>
-            <p className="mt-1 truncate text-sm text-muted-foreground">一条提示词生成一版四视图，之后由你决定下一次要补充的视角或细节。</p>
-          </div>
-        </div>
-        <div className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
-          <span className="size-1.5 rounded-full bg-emerald-500" />
-          <span>图片模型已就绪</span>
-        </div>
-      </header>
-
       <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto lg:grid-cols-[minmax(0,1fr)_20rem] lg:overflow-hidden">
         <section aria-labelledby="character-history-title" className="flex min-h-[28rem] min-w-0 flex-col lg:pr-2">
           <div className="flex shrink-0 items-end justify-between gap-3 pb-3">
@@ -930,9 +905,7 @@ function CharacterCreationWorkspace({
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto pr-1">
-            {records.length === 0 ? (
-              <CharacterCreationEmptyState onChooseStarter={prompt => onValueChange('prompt', prompt)} />
-            ) : (
+            {records.length > 0 && (
               <div className="space-y-3 pb-2">
                 {records.map(record => (
                   <CharacterPromptRow
@@ -947,10 +920,9 @@ function CharacterCreationWorkspace({
           </div>
         </section>
 
-        <aside aria-labelledby="character-preview-title" className="flex min-h-[20rem] min-w-0 flex-col border-t border-border/70 pt-4 lg:min-h-0 lg:border-l lg:border-t-0 lg:pl-6 lg:pt-0">
+        <aside aria-labelledby="character-preview-title" className="flex min-h-[20rem] min-w-0 flex-col lg:min-h-0 lg:border-l lg:border-border lg:pl-6">
           <div className="flex shrink-0 items-center justify-between pb-3">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Visual reference</p>
               <h2 id="character-preview-title" className="mt-1 text-sm font-semibold">生成缩略图</h2>
             </div>
             {records.length > 0 && <span className="text-xs text-muted-foreground">{records.reduce((total, record) => total + characterMediaArtifacts(record).length, 0)} 张</span>}
@@ -961,7 +933,7 @@ function CharacterCreationWorkspace({
         </aside>
       </div>
 
-      <div className="shrink-0 border-t border-border/70 bg-background/95 pt-3 backdrop-blur-sm">
+      <div className="shrink-0 bg-background/95 pt-3 backdrop-blur-sm">
         {showControls && (
           <CharacterControlsPanel
             availableModels={availableModels}
@@ -1040,8 +1012,8 @@ function CharacterCreationWorkspace({
               </Button>
             </div>
           </div>
-          {submitError !== null && <p className="px-4 pb-3 text-xs text-destructive">{submitError}</p>}
         </div>
+        {submitError !== null && <p className="mx-auto mt-2 max-w-5xl text-xs text-destructive">{submitError}</p>}
       </div>
     </form>
   )
@@ -1163,32 +1135,12 @@ function CharacterControlsPanel({
   )
 }
 
-function CharacterCreationEmptyState({ onChooseStarter }: { onChooseStarter: (prompt: string) => void }) {
-  return (
-    <div className="flex min-h-full flex-col justify-center rounded-2xl border border-dashed border-border bg-muted/10 px-5 py-8 md:px-8">
-      <div className="mb-5 flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
-        <Sparkles className="size-5" />
-      </div>
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Start with a prompt</p>
-      <h3 className="mt-2 text-lg font-semibold tracking-tight">先写一条人物描述</h3>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">点击“确定生成”后会立即产出一版四视图。生成完成后输入框会清空，你可以自己选择下一次要生成的视角、服装或细节。</p>
-      <div className="mt-6 flex flex-wrap gap-2">
-        {CHARACTER_STARTERS.map(prompt => (
-          <button key={prompt} type="button" onClick={() => onChooseStarter(prompt)} className="rounded-xl border bg-background px-3 py-2 text-left text-xs leading-5 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
-            {prompt}
-          </button>
-        ))}
-      </div>
-    </div>
-  )
-}
-
 function CharacterPromptRow({ record, selected, onSelect }: { record: GenerationRecord; selected: boolean; onSelect: () => void }) {
   const prompt = typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '未填写人物提示词'
   const artifacts = characterMediaArtifacts(record)
 
   return (
-    <article className={cn('overflow-hidden rounded-2xl border bg-card transition-[border-color,box-shadow,background-color]', selected ? 'border-primary/60 bg-primary/[0.025] shadow-sm' : 'border-border hover:border-primary/30')}>
+    <article className={cn('overflow-hidden rounded-2xl py-2 transition-colors', selected ? 'bg-primary/[0.025]' : 'hover:bg-muted/20')}>
       <button type="button" onClick={onSelect} className="flex w-full items-start gap-3 px-4 py-3 text-left">
         <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-foreground text-[11px] font-semibold text-background">我</span>
         <span className="min-w-0 flex-1">
@@ -1199,11 +1151,11 @@ function CharacterPromptRow({ record, selected, onSelect }: { record: Generation
           <span className="mt-1.5 block line-clamp-2 text-sm leading-6 text-foreground">{prompt}</span>
         </span>
       </button>
-      <div className="border-t border-border/70 px-3 py-3">
+      <div className="px-3 py-3">
         {artifacts.length > 0 ? (
           <div className="grid grid-cols-4 gap-2">
             {artifacts.slice(0, 4).map((artifact, index) => (
-              <button key={`${record.id}-${index}`} type="button" onClick={onSelect} className="group relative aspect-[3/4] overflow-hidden rounded-xl border bg-muted/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`查看第 ${index + 1} 张人物设定图`}>
+              <button key={`${record.id}-${index}`} type="button" onClick={onSelect} className="group relative aspect-[3/4] overflow-hidden rounded-xl bg-muted/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`查看第 ${index + 1} 张人物设定图`}>
                 <AssetThumbnail kind={artifact.kind} url={artifact.sourceUrl} thumbnailUrl={artifact.thumbnailUrl} className="transition-transform duration-300 group-hover:scale-105" />
                 {index === 3 && artifacts.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-medium text-white">+{artifacts.length - 4}</span>}
               </button>
@@ -1231,24 +1183,12 @@ function CharacterPreviewPanel({
 }) {
   const completedArtifacts = records.flatMap(record => characterMediaArtifacts(record).map((artifact, index) => ({ artifact, index, record })))
 
-  if (records.length === 0) {
-    return (
-      <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.10),transparent_58%)] px-6 text-center">
-        <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
-          <ImagePlus className="size-5" />
-        </div>
-        <p className="text-sm font-medium">生成后缩略图会出现在这里</p>
-        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">每次生成的图片都会按时间顺序纵向排列，方便快速挑选。</p>
-      </div>
-    )
-  }
+  if (records.length === 0) return null
 
   if (completedArtifacts.length === 0) {
     return (
-      <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/10 px-6 text-center">
-        <Loader2 className="mb-3 size-6 animate-spin text-primary" />
-        <p className="text-sm font-medium">人物设定图正在生成</p>
-        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">完成后缩略图会自动回填到右侧。</p>
+      <div className="flex h-full min-h-64 items-center justify-center">
+        <Loader2 className="size-6 animate-spin text-primary" />
       </div>
     )
   }
@@ -1261,7 +1201,7 @@ function CharacterPreviewPanel({
             key={`${record.id}-preview-${index}`}
             type="button"
             onClick={() => onSelectRecord(record.id)}
-            className={cn('group relative block aspect-square w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition-[border-color,box-shadow,opacity]', selectedRecordId === record.id ? 'border-primary/70 ring-2 ring-primary/20' : 'border-border opacity-80 hover:opacity-100')}
+            className={cn('group relative block aspect-square w-full overflow-hidden rounded-xl bg-muted/30 text-left transition-[box-shadow,opacity]', selectedRecordId === record.id ? 'ring-2 ring-primary/30' : 'opacity-80 hover:opacity-100')}
             aria-label={`查看 ${typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '人物设定'} 的第 ${index + 1} 张缩略图`}
             title={typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '人物设定图'}
           >
