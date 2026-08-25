@@ -95,105 +95,113 @@ export function LoginPage() {
             <LoginWordmark />
           </div>
           <Card className="login-card w-full max-w-sm">
-            <CardHeader className="pb-1">
-              <CardTitle className="text-xl">{mode === 'login' ? '登录' : '注册'}</CardTitle>
-              {mode === 'register' && <CardDescription>注册后请前往邮箱完成验证</CardDescription>}
+            <CardHeader className="gap-2 pb-5">
+              <CardTitle className="text-xl">{mode === 'login' ? '账户访问' : '创建账户'}</CardTitle>
+              <CardDescription>
+                {mode === 'login' ? '登录工作台，继续整理你的短剧素材。' : '创建账户，开始管理你的短剧素材。'}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSubmit} className="space-y-4">
-            {mode === 'register' && (
-              <div className="space-y-1.5">
-                <Label htmlFor="login-display-name">昵称（可选）</Label>
-                <Input
-                  id="login-display-name"
-                  maxLength={100}
-                  className="h-10 bg-white/70"
-                  value={displayName}
-                  onChange={event => setDisplayName(event.target.value)}
-                />
-              </div>
-            )}
-            <div className="space-y-1.5">
-              <Label htmlFor="login-email">邮箱</Label>
-              <Input
-                id="login-email"
-                type="email"
-                autoComplete="email"
-                className="h-10 bg-white/70"
-                value={email}
-                onChange={event => setEmail(event.target.value)}
-                required
-              />
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="login-password">密码</Label>
-              <Input
-                id="login-password"
-                type="password"
-                autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                minLength={8}
-                maxLength={256}
-                className="h-10 bg-white/70"
-                value={password}
-                onChange={event => setPassword(event.target.value)}
-                required
-              />
-            </div>
-            {(error !== null || oauthError !== null) && (
-              <p className="text-sm text-destructive">{error ?? oauthError}</p>
-            )}
-            {showResend && (
-              <Button type="button" variant="outline" className="w-full" disabled={isResending} onClick={() => void handleResend()}>
-                {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
-              </Button>
-            )}
-            <Button type="submit" className="w-full" disabled={isPending}>
-              {isPending ? '请稍候…' : mode === 'login' ? '登录' : '注册'}
-            </Button>
-            {mode === 'login' && (
-              <>
-                <div className="flex items-center gap-3">
-                  <Separator className="flex-1" />
-                  <span className="text-xs text-muted-foreground">或</span>
-                  <Separator className="flex-1" />
+              <form onSubmit={handleSubmit} className="space-y-5">
+                {mode === 'register' && (
+                  <div className="space-y-2">
+                    <Label htmlFor="login-display-name">昵称（可选）</Label>
+                    <Input
+                      id="login-display-name"
+                      maxLength={100}
+                      className="h-11"
+                      value={displayName}
+                      onChange={event => setDisplayName(event.target.value)}
+                    />
+                  </div>
+                )}
+                <div className="space-y-2">
+                  <Label htmlFor="login-email">邮箱地址</Label>
+                  <Input
+                    id="login-email"
+                    type="email"
+                    autoComplete="email"
+                    className="h-11"
+                    value={email}
+                    onChange={event => setEmail(event.target.value)}
+                    required
+                  />
                 </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  className="w-full"
-                  disabled={isPending}
-                  onClick={() => window.location.assign('/api/auth/github')}
-                >
-                  <GithubMark data-icon />
-                  使用 GitHub 登录
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <Label htmlFor="login-password">密码</Label>
+                    {mode === 'login' && (
+                      <Link
+                        to="/auth/forgot-password"
+                        title="找回密码"
+                        className="text-xs font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        忘记密码？
+                      </Link>
+                    )}
+                  </div>
+                  <Input
+                    id="login-password"
+                    type="password"
+                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
+                    minLength={8}
+                    maxLength={256}
+                    className="h-11"
+                    value={password}
+                    onChange={event => setPassword(event.target.value)}
+                    required
+                  />
+                </div>
+                {(error !== null || oauthError !== null) && (
+                  <p role="alert" className="text-sm text-destructive">{error ?? oauthError}</p>
+                )}
+                {showResend && (
+                  <Button type="button" variant="outline" className="h-10 w-full" disabled={isResending} onClick={() => void handleResend()}>
+                    {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
+                  </Button>
+                )}
+                <Button type="submit" className="h-11 w-full" disabled={isPending}>
+                  {isPending ? '请稍候…' : mode === 'login' ? '登录工作台' : '创建账户'}
                 </Button>
-              </>
-            )}
-            {mode === 'login' && (
-              <p className="text-center text-sm text-muted-foreground">
-                <Link to="/auth/forgot-password" className="hover:text-foreground">
-                  忘记密码？
-                </Link>
-              </p>
-            )}
-            <p className="text-center text-sm text-muted-foreground">
-              {mode === 'login' ? '还没有账号？' : '已有账号？'}
-              <button
-                type="button"
-                className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-                onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-              >
-                {mode === 'login' ? '去注册' : '去登录'}
-              </button>
-            </p>
-            {mode === 'register' && (
-              <p className="text-center text-xs leading-5 text-muted-foreground">
-                注册即表示你同意
-                <Link to="/terms" className="mx-1 underline underline-offset-2">服务条款</Link>
-                和
-                <Link to="/privacy" className="ml-1 underline underline-offset-2">隐私政策</Link>。
-              </p>
-            )}
+                {mode === 'login' && (
+                  <>
+                    <div className="flex items-center gap-3">
+                      <Separator className="flex-1" />
+                      <span className="text-xs text-muted-foreground">或</span>
+                      <Separator className="flex-1" />
+                    </div>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-11 w-full"
+                      title="使用 GitHub 登录"
+                      disabled={isPending}
+                      onClick={() => window.location.assign('/api/auth/github')}
+                    >
+                      <GithubMark data-icon />
+                      使用 GitHub 登录
+                    </Button>
+                  </>
+                )}
+                <p className="text-center text-sm text-muted-foreground">
+                  {mode === 'login' ? '还没有账号？' : '已有账号？'}
+                  <button
+                    type="button"
+                    title={mode === 'login' ? '切换到注册' : '切换到登录'}
+                    className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
+                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                  >
+                    {mode === 'login' ? '去注册' : '去登录'}
+                  </button>
+                </p>
+                {mode === 'register' && (
+                  <p className="text-center text-xs leading-5 text-muted-foreground">
+                    注册即表示你同意
+                    <Link to="/terms" title="服务条款" className="mx-1 underline underline-offset-2">服务条款</Link>
+                    和
+                    <Link to="/privacy" title="隐私政策" className="ml-1 underline underline-offset-2">隐私政策</Link>。
+                  </p>
+                )}
               </form>
             </CardContent>
           </Card>
