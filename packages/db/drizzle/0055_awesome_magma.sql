@@ -1,0 +1,3 @@
+ALTER TABLE "creative_generation_contexts" ADD COLUMN "project_id" text;--> statement-breakpoint
+ALTER TABLE "creative_generation_contexts" ADD CONSTRAINT "creative_generation_contexts_project_id_creative_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."creative_projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "creative_generation_contexts_project_created_idx" ON "creative_generation_contexts" USING btree ("project_id","created_at");

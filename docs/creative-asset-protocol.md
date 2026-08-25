@@ -6,6 +6,10 @@
 
 - `user_assets` 是物理媒体文件：图片、视频、音频或其他上传/生成文件。
 - `creative_assets` 是可复用的语义实体：`character`、`environment`、`prop`、`style`。
+- `creative_projects` 是用户整理素材的项目边界，例如一部短剧、一个 IP 或一组
+  独立创作任务；它未来可以承载剧本，但当前不承载分镜和剪辑时间线。
+- `creative_project_assets` 是项目与资产的多对多整理关系。同一个资产可以被多个项目
+  复用，项目删除或移除资产不会删除资产实体。
 - `creative_asset_versions` 是不可变的资产版本。一个资产在未软删除范围内最多有一个 `approved` 版本，作为 canonical version。
 - `creative_asset_references` 把物理媒体绑定到资产版本，并用 `role` 表达正面、侧面、全身、环境全景等语义。
 - `creative_generation_contexts` 是 generation record 在创意资产域的快照，保存协议版本、用途、提示词、配方和模型能力快照。
@@ -13,12 +17,16 @@
 
 资产域不包含剧本、分集、镜头排序或最终剪辑时间线。`shot_image` / `shot_video` 只表示“一次单镜头生成请求”。
 
+项目只是检索和组织边界，不是资产所有权边界。服务端必须同时校验当前用户对项目和资产
+的所有权，不能仅凭客户端传入的 `projectId` 或 `assetId` 建立跨用户关系。
+
 ## 引用结构
 
 ```json
 {
   "protocolVersion": 1,
   "purpose": "shot_video",
+  "projectId": "project-night-runner",
   "prompt": "角色走进医院走廊，镜头缓慢向前推进",
   "negativePrompt": "脸部变形，服装变化，多余人物",
   "modelId": "video-model-id",
@@ -68,7 +76,8 @@
 
 ```text
 draft -> generating -> candidate -> approved -> archived
-                         \-> rejected -> draft
+                         \-> rejected
 ```
 
 `approved` 不是“模型保证绝对一致”，而是平台认可的稳定引用基准。实际生成结果仍然需要由用户比较、取舍和剪辑。
+`rejected` 版本保留为历史记录；重新生成或修改身份时创建新的版本，不重新打开旧版本。

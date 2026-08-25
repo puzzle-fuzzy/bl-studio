@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   CreativeGenerationContextSchema,
   CreateCreativeAssetSchema,
+  CreateCreativeProjectAssetSchema,
+  CreateCreativeProjectSchema,
   CreateGenerationSchema,
   isCreativeAssetReferenceRoleCompatible,
   normalizeCreativeGenerationContext,
@@ -11,6 +13,7 @@ describe('creative asset protocol', () => {
   it('accepts a typed shot context with ordered asset bindings', () => {
     const context = CreativeGenerationContextSchema.parse({
       purpose: 'shot_video',
+      projectId: 'project-1',
       prompt: '角色走进医院走廊',
       assetBindings: [
         {
@@ -27,6 +30,7 @@ describe('creative asset protocol', () => {
     })
 
     expect(context.protocolVersion).toBe(1)
+    expect(context.projectId).toBe('project-1')
     expect(context.assetBindings[1]?.position).toBe(0)
   })
 
@@ -64,6 +68,18 @@ describe('creative asset protocol', () => {
       type: 'prop',
       name: '   ',
     })).toThrow()
+  })
+
+  it('models project organization separately from reusable asset identity', () => {
+    expect(CreateCreativeProjectSchema.parse({ title: '夜行者' })).toEqual({ title: '夜行者' })
+    expect(CreateCreativeProjectAssetSchema.parse({
+      projectId: 'project-1',
+      assetId: 'character-1',
+    })).toMatchObject({
+      projectId: 'project-1',
+      assetId: 'character-1',
+      sortOrder: 0,
+    })
   })
 
   it('keeps creative context as a backward-compatible generation input extension', () => {

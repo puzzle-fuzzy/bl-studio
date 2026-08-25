@@ -510,12 +510,13 @@ export const generationInputAssets = pgTable('generation_input_assets', {
 ])
 
 /**
- * 创意资产包 —— 只负责整理素材，不代表剧本、分集或剪辑工程。
+ * 创意资产项目 —— 负责给素材提供可检索的工作边界，不代表剧本、分集或剪辑工程。
  *
- * packId 在 creative_assets 中是可选的：用户可以先做个人资产，也可以把
- * 一组角色/场景/道具归入某个短剧素材包。这样资产域不会被导演流程绑定。
+ * 项目与资产通过 creativeProjectAssets 多对多关联：同一个角色、场景或道具可以
+ * 被多个短剧/IP 项目复用；项目只是组织关系，不拥有资产本身。未来剧本和剧本分析
+ * 可以挂在项目上，但不改变资产域的复用模型。
  */
-export const creativeAssetPacks = pgTable('creative_asset_packs', {
+export const creativeProjects = pgTable('creative_projects', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   title: text('title').notNull(),
@@ -528,16 +529,15 @@ export const creativeAssetPacks = pgTable('creative_asset_packs', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
 }, table => [
-  check('creative_asset_packs_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
-  index('creative_asset_packs_user_created_idx').on(table.userId, table.createdAt, table.id),
-  index('creative_asset_packs_user_updated_idx').on(table.userId, table.updatedAt),
+  check('creative_projects_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
+  index('creative_projects_user_created_idx').on(table.userId, table.createdAt, table.id),
+  index('creative_projects_user_updated_idx').on(table.userId, table.updatedAt),
 ])
 
 /** 创意资产实体：角色、环境、道具或风格，不是某一张图片。 */
 export const creativeAssets = pgTable('creative_assets', {
   id: text('id').primaryKey(),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
-  packId: text('pack_id').references(() => creativeAssetPacks.id, { onDelete: 'set null' }),
   type: text('type').notNull(),
   name: text('name').notNull(),
   description: text('description').notNull().default(''),
@@ -553,8 +553,31 @@ export const creativeAssets = pgTable('creative_assets', {
   check('creative_assets_type_check', sql`${table.type} in ('character', 'environment', 'prop', 'style')`),
   check('creative_assets_status_check', sql`${table.status} in ('draft', 'active', 'archived')`),
   index('creative_assets_user_type_created_idx').on(table.userId, table.type, table.createdAt),
-  index('creative_assets_pack_created_idx').on(table.packId, table.createdAt),
   index('creative_assets_user_updated_idx').on(table.userId, table.updatedAt),
+])
+
+/**
+ * 项目-资产整理关系。关系本身可软删除，便于用户把资产移出项目后再次加入，
+ * 也为未来增加项目内排序、置顶或备注保留稳定的扩展点。
+ */
+export const creativeProjectAssets = pgTable('creative_project_assets', {
+  id: text('id').primaryKey(),
+  projectId: text('project_id').notNull().references(() => creativeProjects.id, { onDelete: 'cascade' }),
+  assetId: text('asset_id').notNull().references(() => creativeAssets.id, { onDelete: 'cascade' }),
+  sortOrder: integer('sort_order').notNull().default(0),
+  createdBy: text('created_by').notNull().default('system'),
+  updatedBy: text('updated_by').notNull().default('system'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
+  deletedBy: text('deleted_by'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull(),
+}, table => [
+  check('creative_project_assets_sort_order_check', sql`${table.sortOrder} >= 0`),
+  uniqueIndex('creative_project_assets_project_asset_idx')
+    .on(table.projectId, table.assetId)
+    .where(sql`${table.deletedAt} is null`),
+  index('creative_project_assets_project_order_idx').on(table.projectId, table.sortOrder, table.createdAt),
+  index('creative_project_assets_asset_idx').on(table.assetId),
 ])
 
 /**
@@ -630,6 +653,7 @@ export const creativeGenerationContexts = pgTable('creative_generation_contexts'
   id: text('id').primaryKey(),
   generationId: text('generation_id').notNull().references(() => generationRecords.id, { onDelete: 'cascade' }),
   userId: text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  projectId: text('project_id').references(() => creativeProjects.id, { onDelete: 'set null' }),
   protocolVersion: integer('protocol_version').notNull().default(1),
   purpose: text('purpose').notNull(),
   fingerprint: text('fingerprint').notNull(),
@@ -649,6 +673,7 @@ export const creativeGenerationContexts = pgTable('creative_generation_contexts'
     sql`${table.purpose} in ('asset_reference_sheet', 'asset_variant', 'shot_image', 'shot_video', 'utility')`,
   ),
   uniqueIndex('creative_generation_contexts_generation_idx').on(table.generationId),
+  index('creative_generation_contexts_project_created_idx').on(table.projectId, table.createdAt),
   index('creative_generation_contexts_user_created_idx').on(table.userId, table.createdAt),
   index('creative_generation_contexts_purpose_created_idx').on(table.purpose, table.createdAt),
 ])

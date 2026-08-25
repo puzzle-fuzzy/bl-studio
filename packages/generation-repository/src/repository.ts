@@ -40,6 +40,7 @@ import {
   creativeAssetReferences,
   creativeAssetVersions,
   creativeAssets,
+  creativeProjects,
   creativeGenerationContextAssets,
   creativeGenerationContextReferences,
   creativeGenerationContexts,
@@ -361,7 +362,10 @@ function invalidCreativeContext(
   )
 }
 
-function normalizeCreativeContextInput(input: CreativeGenerationContext | undefined): CreativeGenerationContext | undefined {
+function normalizeCreativeContextInput(
+  input: CreativeGenerationContext | undefined,
+  modelId: string,
+): CreativeGenerationContext | undefined {
   if (input === undefined) return undefined
   const parsed = CreativeGenerationContextSchema.safeParse(input)
   if (!parsed.success) {
@@ -372,7 +376,18 @@ function normalizeCreativeContextInput(input: CreativeGenerationContext | undefi
       '创意资产引用上下文无效',
     )
   }
-  return normalizeCreativeGenerationContext(parsed.data)
+  const normalized = normalizeCreativeGenerationContext(parsed.data)
+  if (normalized.modelId !== undefined && normalized.modelId !== modelId) {
+    invalidCreativeContext(
+      'creativeContext.modelId',
+      'Creative context modelId must match the generation modelId',
+      '创意资产上下文的模型 ID 必须与生成请求的模型 ID 一致',
+    )
+  }
+  return {
+    ...normalized,
+    modelId,
+  }
 }
 
 function fingerprintCreativeContext(context: CreativeGenerationContext | undefined): string | undefined {
@@ -392,7 +407,35 @@ async function lockAndValidateCreativeContext(
   },
 ): Promise<void> {
   const context = input.context
-  if (context === undefined || context.assetBindings.length === 0) return
+  if (context === undefined) return
+
+  if (context.projectId !== undefined) {
+    const [project] = await tx
+      .select({
+        id: creativeProjects.id,
+        userId: creativeProjects.userId,
+        status: creativeProjects.status,
+        deletedAt: creativeProjects.deletedAt,
+      })
+      .from(creativeProjects)
+      .where(eq(creativeProjects.id, context.projectId))
+      .for('update')
+
+    if (
+      project === undefined
+      || project.userId !== input.userId
+      || (!input.allowDeleted && project.deletedAt !== null)
+      || (!input.allowDeleted && project.status === 'archived')
+    ) {
+      invalidCreativeContext(
+        'projectId',
+        'The selected creative project is unavailable',
+        '所选创意项目不可用',
+      )
+    }
+  }
+
+  if (context.assetBindings.length === 0) return
 
   const assetVersionIds = [...new Set(context.assetBindings.map(binding => binding.assetVersionId))]
   const versionRows = await tx
@@ -492,6 +535,7 @@ async function persistCreativeGenerationContext(
     id: contextId,
     generationId: input.generationId,
     userId: input.userId,
+    projectId: input.context.projectId ?? null,
     protocolVersion: input.context.protocolVersion,
     purpose: input.context.purpose,
     fingerprint: fingerprintCreativeContext(input.context) as string,
@@ -1516,6 +1560,7 @@ async function readCreativeGenerationContext(
     protocolVersion: 1 as const,
     purpose: row.purpose,
     prompt: row.prompt,
+    ...(row.projectId !== null ? { projectId: row.projectId } : {}),
     ...(row.negativePrompt !== null ? { negativePrompt: row.negativePrompt } : {}),
     ...(row.modelId !== null ? { modelId: row.modelId } : {}),
     assetBindings: assetRows.map(asset => ({
@@ -2025,7 +2070,7 @@ export function createGenerationRepository(options: CreateGenerationRepositoryOp
      * catch 到唯一冲突后再做一次幂等查询返回既有结果，保证调用方拿到稳定输出。
      */
     async createGeneration(input) {
-      const creativeContext = normalizeCreativeContextInput(input.creativeContext)
+      const creativeContext = normalizeCreativeContextInput(input.creativeContext, input.modelId)
       const creativeContextFingerprint = fingerprintCreativeContext(creativeContext)
       const { estimate, prepared } = prepareGenerationRequest({
         modelId: input.modelId,

@@ -5,13 +5,14 @@ import {
   createDb,
   creditAccounts,
   creditLedgerEntries,
-  creativeAssetPacks,
   creativeAssets,
   creativeAssetReferences,
   creativeAssetVersions,
   creativeGenerationContexts,
   creativeGenerationContextAssets,
   creativeGenerationContextReferences,
+  creativeProjects,
+  creativeProjectAssets,
   generationArtifacts,
   generationInputAssets,
   generationRecords,
@@ -104,12 +105,14 @@ describe('db schema exports', () => {
   })
 
   it('exports typed creative asset tables and preserves canonical-version uniqueness', () => {
-    expect(creativeAssetPacks.title).toBeDefined()
+    expect(creativeProjects.title).toBeDefined()
     expect(creativeAssets.type).toBeDefined()
-    expect(creativeAssets.packId).toBeDefined()
+    expect(creativeProjectAssets.projectId).toBeDefined()
+    expect(creativeProjectAssets.assetId).toBeDefined()
     expect(creativeAssetVersions.semanticSpecJson).toBeDefined()
     expect(creativeAssetReferences.role).toBeDefined()
     expect(creativeGenerationContexts.protocolVersion).toBeDefined()
+    expect(creativeGenerationContexts.projectId).toBeDefined()
     expect(creativeGenerationContexts.fingerprint).toBeDefined()
     expect(creativeGenerationContextAssets.assetVersionId).toBeDefined()
     expect(creativeGenerationContextReferences.referenceId).toBeDefined()

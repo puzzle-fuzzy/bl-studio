@@ -27,6 +27,10 @@ export const CREATIVE_ASSET_VERSION_STATUSES = [
 export const CreativeAssetVersionStatusSchema = z.enum(CREATIVE_ASSET_VERSION_STATUSES)
 export type CreativeAssetVersionStatus = z.infer<typeof CreativeAssetVersionStatusSchema>
 
+export const CREATIVE_PROJECT_STATUSES = ['draft', 'active', 'archived'] as const
+export const CreativeProjectStatusSchema = z.enum(CREATIVE_PROJECT_STATUSES)
+export type CreativeProjectStatus = z.infer<typeof CreativeProjectStatusSchema>
+
 /**
  * 参考图的语义角色。角色和环境使用的 role 集合不同，但统一存储，
  * 使资产引用可以被 provider adapter 按需翻译，而不依赖文件名或数组顺序。
@@ -95,14 +99,20 @@ export const CreativeAssetReferenceMetadataSchema = z.object({
 }).catchall(z.unknown())
 export type CreativeAssetReferenceMetadata = z.infer<typeof CreativeAssetReferenceMetadataSchema>
 
-export const CreateCreativeAssetPackSchema = z.object({
+export const CreateCreativeProjectSchema = z.object({
   title: z.string().trim().min(1).max(120),
   description: z.string().trim().max(2_000).optional(),
 }).strict()
-export type CreateCreativeAssetPackInput = z.infer<typeof CreateCreativeAssetPackSchema>
+export type CreateCreativeProjectInput = z.infer<typeof CreateCreativeProjectSchema>
+
+export const CreateCreativeProjectAssetSchema = z.object({
+  projectId: z.string().trim().min(1).max(256),
+  assetId: z.string().trim().min(1).max(256),
+  sortOrder: z.number().int().nonnegative().max(1_000_000).default(0),
+}).strict()
+export type CreateCreativeProjectAssetInput = z.infer<typeof CreateCreativeProjectAssetSchema>
 
 export const CreateCreativeAssetSchema = z.object({
-  packId: z.string().trim().min(1).max(256).nullable().optional(),
   type: CreativeAssetTypeSchema,
   name: z.string().trim().min(1).max(160),
   description: z.string().trim().max(4_000).optional(),
@@ -162,6 +172,8 @@ export const CreativeGenerationBindingsSchema = z.array(CreativeGenerationBindin
 export const CreativeGenerationContextSchema = z.object({
   protocolVersion: z.literal(CREATIVE_ASSET_PROTOCOL_VERSION).default(CREATIVE_ASSET_PROTOCOL_VERSION),
   purpose: CreativeGenerationPurposeSchema,
+  /** 用于在项目工作区中检索这次生成；不改变资产跨项目复用能力。 */
+  projectId: z.string().trim().min(1).max(256).optional(),
   prompt: z.string().trim().max(8_000).default(''),
   negativePrompt: z.string().trim().max(4_000).optional(),
   modelId: z.string().trim().min(1).max(256).optional(),

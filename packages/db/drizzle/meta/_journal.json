@@ -379,6 +379,20 @@
       "when": 1787623098772,
       "tag": "0053_zippy_madripoor",
       "breakpoints": true
+    },
+    {
+      "idx": 54,
+      "version": "7",
+      "when": 1787624615685,
+      "tag": "0054_safe_union_jack",
+      "breakpoints": true
+    },
+    {
+      "idx": 55,
+      "version": "7",
+      "when": 1787624728099,
+      "tag": "0055_awesome_magma",
+      "breakpoints": true
     }
   ]
 }
