@@ -136,8 +136,8 @@
   display: flex;
   min-height: 100svh;
   align-items: center;
-  justify-content: flex-end;
-  padding: 2rem clamp(1rem, 6vw, 6.5rem) 2rem clamp(1rem, 8vw, 8rem);
+  justify-content: center;
+  padding: 2rem clamp(1rem, 6vw, 6.5rem);
 }
 
 .login-page__form-wrap {
