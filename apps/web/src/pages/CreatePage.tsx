@@ -42,7 +42,7 @@ import {
 import { buildSubmitPayload, buildValidationParams } from '@/lib/generation-submit'
 import { idempotencyKeyFor, clearIdempotencyKey } from '@/lib/idempotency'
 import { rememberRecentModelId } from '@/lib/creation-presets'
-import { firstEnabledModel, isModelEnabled, modelNameZh, SUB_MODE_LABELS, subModeOf, type SubMode } from '@/lib/model-modes'
+import { firstEnabledInCategory, firstEnabledModel, isModelEnabled, modelNameZh, SUB_MODE_LABELS, subModeOf, type SubMode } from '@/lib/model-modes'
 import { formatCents } from '@/lib/money'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
@@ -171,6 +171,19 @@ export function CreatePage() {
   useEffect(() => {
     void loadModels()
   }, [loadModels])
+
+  // 人物工作台没有单独展示级联选择器，进入页面时仍要选中一个可用图片模型，
+  // 这样模型 manifest 的尺寸/数量默认值才能写入表单，而不是只在控件里回退展示。
+  useEffect(() => {
+    if (creationType !== 'character' || availableModels.length === 0) return
+    if (model !== undefined && isModelEnabled(model)) return
+    const first = firstEnabledInCategory(availableModels, 'image')
+    if (first === undefined || first.id === modelId) return
+    setModelId(first.id)
+    const next = new URLSearchParams(searchParams)
+    next.set('select', first.id)
+    setSearchParams(next, { replace: true })
+  }, [availableModels, creationType, model, modelId, searchParams, setSearchParams])
 
   // 三种结构化创作是独立工作流：从侧栏切换时不继承上一种工作流的模型、参数和对比列表。
   useEffect(() => {
