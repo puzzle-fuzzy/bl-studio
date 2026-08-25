@@ -57,6 +57,7 @@ const ESTIMATE_DEBOUNCE_MS = 350
 
 /** 不常用的输出参数，收进「高级设置」折叠，默认隐藏。 */
 const ADVANCED_PARAM_NAMES = ['watermark', 'seed']
+const CHARACTER_HIDDEN_PARAM_NAMES = new Set(['negativePrompt', 'promptExtend', 'watermark', 'seed'])
 
 const CREATION_INTENTS = {
   asset: {
@@ -246,6 +247,16 @@ export function CreatePage() {
       const defaults: Record<string, unknown> = {}
       for (const parameter of model.parameters) {
         if (parameter.defaultValue !== undefined) defaults[parameter.name] = parameter.defaultValue
+      }
+      if (creationType === 'character') {
+        const sizeParameter = model.parameters.find(parameter => parameter.name === 'size')
+        if (defaults.size === undefined && sizeParameter?.options?.[0] !== undefined) {
+          defaults.size = sizeParameter.options[0].value
+        }
+        const countParameter = model.parameters.find(parameter => parameter.name === 'n')
+        if (defaults.n === undefined && countParameter !== undefined) {
+          defaults.n = countParameter.min ?? 1
+        }
       }
       setValues(defaults)
     }
@@ -543,12 +554,6 @@ export function CreatePage() {
           records={characterRecords}
           selectedRecordId={selectedCharacterRecordId}
           onSelectRecord={setSelectedCharacterRecordId}
-          onApplyPromptGuide={() => setValues(current => ({
-            ...current,
-            prompt: typeof current.prompt === 'string' && current.prompt.trim().length > 0
-              ? `${current.prompt.trim()}\n${creationIntent.promptGuide?.template ?? ''}`
-              : creationIntent.promptGuide?.template,
-          }))}
         />
         <CreativeAssetPickerDialog
           open={creativePickerOpen}
@@ -830,7 +835,6 @@ type CharacterCreationWorkspaceProps = {
   records: readonly GenerationRecord[]
   selectedRecordId: string | undefined
   onSelectRecord: (recordId: string) => void
-  onApplyPromptGuide: () => void
 }
 
 function CharacterCreationWorkspace({
@@ -857,7 +861,6 @@ function CharacterCreationWorkspace({
   records,
   selectedRecordId,
   onSelectRecord,
-  onApplyPromptGuide,
 }: CharacterCreationWorkspaceProps) {
   const selectedRecord = records.find(record => record.id === selectedRecordId) ?? records[0]
 
@@ -979,20 +982,6 @@ function CharacterCreationWorkspace({
                   />
                 </DropdownMenu>
               )}
-              <Button type="button" variant="outline" size="icon-sm" className="text-xs font-semibold" onClick={onApplyPromptGuide} disabled={isSubmitting || model === undefined} aria-label="插入人物提示词模板">
-                T
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon-sm"
-                className="text-sm font-semibold"
-                onClick={() => onValueChange('prompt', `${typeof values.prompt === 'string' ? values.prompt : ''}@`)}
-                disabled={isSubmitting || isRestoring || model === undefined}
-                aria-label="引用主体"
-              >
-                @
-              </Button>
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs tabular-nums text-muted-foreground">
@@ -1136,7 +1125,9 @@ function CharacterSettingsPopover({
   fieldErrors: ReadonlyMap<string, FieldIssue>
   onValueChange: (name: string, value: unknown) => void
 }) {
-  const allFields = [...basicSettingsFields, ...advancedSettingsFields]
+  const allFields = [...basicSettingsFields, ...advancedSettingsFields].filter(
+    field => !CHARACTER_HIDDEN_PARAM_NAMES.has(field.parameter.name),
+  )
   const sizeField = allFields.find(field => field.parameter.name === 'size')
   const countField = allFields.find(field => field.parameter.name === 'n')
   const remainingFields = allFields.filter(field => field !== sizeField && field !== countField)
