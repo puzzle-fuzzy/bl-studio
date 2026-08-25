@@ -399,10 +399,12 @@ export function CreatePage() {
       if (creationType === 'character') {
         setCharacterSessionRecords(current => [created.record, ...current.filter(record => record.id !== created.record.id)])
         setSelectedCharacterRecordId(created.record.id)
+        // 人物创建是一条提示词一次生成；生成成功后清空输入，让用户自行决定下一次要补哪一部分。
+        setValues(current => ({ ...current, prompt: undefined }))
       }
       void refreshGenerations()
       showMessage({ title: '已提交生成任务', tone: 'success' })
-      // 保留参数，便于连续创作；只清空预估
+      // 保留模型、参考图和其它参数；人物提示词已在上面按一次生成语义清空。
       setEstimate(null)
     } catch (error) {
       setSubmitError(userErrorMessage(error))
@@ -459,13 +461,16 @@ export function CreatePage() {
       }
     }
     if (submitted > 0) {
+      if (creationType === 'character') {
+        setValues(current => ({ ...current, prompt: undefined }))
+      }
       void refreshGenerations()
       showMessage({ title: `已提交 ${submitted} 个对比任务`, tone: 'success' })
     }
     setCompareBusy(false)
   }
 
-  // 人物工作台只展示本次对话创建的任务；生成记录 store 会持续回填状态和产物，
+  // 人物工作台只展示本次创建的任务；生成记录 store 会持续回填状态和产物，
   // 因此这里按 id 合并，避免把执行记录误当成新的聊天实体。
   const characterRecords = useMemo(() => {
     const merged = new Map(characterSessionRecords.map(record => [record.id, record]))
@@ -902,7 +907,7 @@ function CharacterCreationWorkspace({
               <h1 className="text-xl font-semibold tracking-tight md:text-2xl">创建人物</h1>
               <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">角色设定工作台</span>
             </div>
-            <p className="mt-1 truncate text-sm text-muted-foreground">通过几轮对话，把一个想法收敛成可复用的人物设定图。</p>
+            <p className="mt-1 truncate text-sm text-muted-foreground">一条提示词生成一版四视图，之后由你决定下一次要补充的视角或细节。</p>
           </div>
         </div>
         <div className="hidden shrink-0 items-center gap-2 text-xs text-muted-foreground sm:flex">
@@ -915,7 +920,7 @@ function CharacterCreationWorkspace({
         <section aria-labelledby="character-history-title" className="flex min-h-[28rem] min-w-0 flex-col lg:pr-2">
           <div className="flex shrink-0 items-end justify-between gap-3 pb-3">
             <div>
-              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">Conversation canvas</p>
+              <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-primary">Generation history</p>
               <div className="mt-1 flex items-center gap-2">
                 <h2 id="character-history-title" className="text-sm font-semibold">创作轨迹</h2>
                 <span className="text-xs text-muted-foreground">{records.length > 0 ? `${records.length} 次生成` : '还没有生成记录'}</span>
@@ -946,12 +951,12 @@ function CharacterCreationWorkspace({
           <div className="flex shrink-0 items-center justify-between pb-3">
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground">Visual reference</p>
-              <h2 id="character-preview-title" className="mt-1 text-sm font-semibold">缩略预览</h2>
+              <h2 id="character-preview-title" className="mt-1 text-sm font-semibold">生成缩略图</h2>
             </div>
-            {selectedRecord !== undefined && <StatusBadge status={selectedRecord.status} />}
+            {records.length > 0 && <span className="text-xs text-muted-foreground">{records.reduce((total, record) => total + characterMediaArtifacts(record).length, 0)} 张</span>}
           </div>
           <div className="min-h-0 flex-1">
-            <CharacterPreviewPanel record={selectedRecord} />
+            <CharacterPreviewPanel records={records} selectedRecordId={selectedRecord?.id} onSelectRecord={onSelectRecord} />
           </div>
         </aside>
       </div>
@@ -991,7 +996,7 @@ function CharacterCreationWorkspace({
               <span className="flex size-6 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
                 <Sparkles className="size-3.5" />
               </span>
-              <span className="truncate">继续完善这个人物</span>
+              <span className="truncate">生成一版人物设定</span>
               {model !== undefined && <span className="hidden truncate text-muted-foreground/60 sm:inline">· {modelNameZh(model)}</span>}
             </div>
             <Button type="button" variant="ghost" size="sm" className="h-7 shrink-0 gap-1.5 text-xs" onClick={() => setShowControls(current => !current)}>
@@ -1023,7 +1028,7 @@ function CharacterCreationWorkspace({
                 <ImagePlus className="size-3.5" />
                 插入四视图模板
               </Button>
-              <span className="hidden text-[11px] text-muted-foreground/70 md:inline">每次生成都会出现在左侧轨迹中</span>
+              <span className="hidden text-[11px] text-muted-foreground/70 md:inline">确定后输入框会清空，可继续输入下一次视角</span>
             </div>
             <div className="flex items-center gap-2">
               <div className="hidden w-48 sm:block">
@@ -1031,7 +1036,7 @@ function CharacterCreationWorkspace({
               </div>
               <Button type="submit" size="sm" className="h-9 rounded-xl px-4" disabled={isSubmitting || isRestoring || model === undefined}>
                 {isSubmitting ? <Loader2 className="size-4 animate-spin" /> : <ArrowUp className="size-4" />}
-                {isSubmitting ? '生成中…' : isRestoring ? '正在还原…' : '生成设定图'}
+                {isSubmitting ? '生成中…' : isRestoring ? '正在还原…' : '确定生成'}
               </Button>
             </div>
           </div>
@@ -1072,7 +1077,7 @@ function CharacterControlsPanel({
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <p className="text-sm font-semibold">模型与生成设置</p>
-          <p className="mt-1 text-xs text-muted-foreground">常用参数收在这里，聊天区只保留人物描述和生成动作。</p>
+          <p className="mt-1 text-xs text-muted-foreground">常用参数收在这里，输入区只保留人物描述和生成动作。</p>
         </div>
         <span className="rounded-full bg-muted px-2 py-1 text-[11px] text-muted-foreground">可随时调整</span>
       </div>
@@ -1164,9 +1169,9 @@ function CharacterCreationEmptyState({ onChooseStarter }: { onChooseStarter: (pr
       <div className="mb-5 flex size-11 items-center justify-center rounded-2xl bg-primary/10 text-primary">
         <Sparkles className="size-5" />
       </div>
-      <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Start with a feeling</p>
-      <h3 className="mt-2 text-lg font-semibold tracking-tight">先说说你想看见谁</h3>
-      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">不用一次写完。先描述身份、气质或一个画面，生成后再继续补充服装、经历和四视图要求。</p>
+      <p className="text-xs font-medium uppercase tracking-[0.16em] text-primary">Start with a prompt</p>
+      <h3 className="mt-2 text-lg font-semibold tracking-tight">先写一条人物描述</h3>
+      <p className="mt-2 max-w-xl text-sm leading-6 text-muted-foreground">点击“确定生成”后会立即产出一版四视图。生成完成后输入框会清空，你可以自己选择下一次要生成的视角、服装或细节。</p>
       <div className="mt-6 flex flex-wrap gap-2">
         {CHARACTER_STARTERS.map(prompt => (
           <button key={prompt} type="button" onClick={() => onChooseStarter(prompt)} className="rounded-xl border bg-background px-3 py-2 text-left text-xs leading-5 text-muted-foreground transition-colors hover:border-primary/40 hover:bg-primary/5 hover:text-foreground">
@@ -1198,7 +1203,7 @@ function CharacterPromptRow({ record, selected, onSelect }: { record: Generation
         {artifacts.length > 0 ? (
           <div className="grid grid-cols-4 gap-2">
             {artifacts.slice(0, 4).map((artifact, index) => (
-              <button key={`${record.id}-${index}`} type="button" onClick={onSelect} className="group relative aspect-square overflow-hidden rounded-xl border bg-muted/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`查看第 ${index + 1} 张人物设定图`}>
+              <button key={`${record.id}-${index}`} type="button" onClick={onSelect} className="group relative aspect-[3/4] overflow-hidden rounded-xl border bg-muted/30 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" aria-label={`查看第 ${index + 1} 张人物设定图`}>
                 <AssetThumbnail kind={artifact.kind} url={artifact.sourceUrl} thumbnailUrl={artifact.thumbnailUrl} className="transition-transform duration-300 group-hover:scale-105" />
                 {index === 3 && artifacts.length > 4 && <span className="absolute inset-0 flex items-center justify-center bg-black/45 text-xs font-medium text-white">+{artifacts.length - 4}</span>}
               </button>
@@ -1215,57 +1220,58 @@ function CharacterPromptRow({ record, selected, onSelect }: { record: Generation
   )
 }
 
-function CharacterPreviewPanel({ record }: { record: GenerationRecord | undefined }) {
-  const [activeIndex, setActiveIndex] = useState(0)
-  const recordId = record?.id
+function CharacterPreviewPanel({
+  records,
+  selectedRecordId,
+  onSelectRecord,
+}: {
+  records: readonly GenerationRecord[]
+  selectedRecordId: string | undefined
+  onSelectRecord: (recordId: string) => void
+}) {
+  const completedArtifacts = records.flatMap(record => characterMediaArtifacts(record).map((artifact, index) => ({ artifact, index, record })))
 
-  useEffect(() => {
-    setActiveIndex(0)
-  }, [recordId])
-
-  if (record === undefined) {
+  if (records.length === 0) {
     return (
       <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-[radial-gradient(circle_at_top,_hsl(var(--primary)/0.10),transparent_58%)] px-6 text-center">
         <div className="mb-4 flex size-12 items-center justify-center rounded-2xl bg-muted text-muted-foreground">
           <ImagePlus className="size-5" />
         </div>
-        <p className="text-sm font-medium">生成后在这里预览</p>
-        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">左侧会保留每一次提示词和图片结果，方便你逐步收敛人物形象。</p>
+        <p className="text-sm font-medium">生成后缩略图会出现在这里</p>
+        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">每次生成的图片都会按时间顺序纵向排列，方便快速挑选。</p>
       </div>
     )
   }
 
-  const artifacts = characterMediaArtifacts(record)
-  const activeArtifact = artifacts[activeIndex] ?? artifacts[0]
-  if (activeArtifact === undefined) {
+  if (completedArtifacts.length === 0) {
     return (
       <div className="flex h-full min-h-64 flex-col items-center justify-center rounded-2xl border border-dashed border-border bg-muted/10 px-6 text-center">
-        {record.status === 'failed' ? <X className="mb-3 size-6 text-destructive" /> : <Loader2 className="mb-3 size-6 animate-spin text-primary" />}
-        <p className="text-sm font-medium">{record.status === 'failed' ? '这次生成失败了' : '人物设定图正在生成'}</p>
-        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">完成后会自动回填到这条提示词下面。</p>
+        <Loader2 className="mb-3 size-6 animate-spin text-primary" />
+        <p className="text-sm font-medium">人物设定图正在生成</p>
+        <p className="mt-2 max-w-52 text-xs leading-5 text-muted-foreground">完成后缩略图会自动回填到右侧。</p>
       </div>
     )
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-3">
-      <div className="relative min-h-0 flex-1 overflow-hidden rounded-2xl border bg-muted/20 shadow-sm">
-        <AssetThumbnail kind={activeArtifact.kind} url={activeArtifact.sourceUrl} thumbnailUrl={activeArtifact.thumbnailUrl} className="size-full object-contain" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-3 pb-3 pt-10 text-xs text-white">
-          第 {activeIndex + 1} 张设定图
-        </div>
-      </div>
-      {artifacts.length > 1 && (
-        <div className="grid grid-cols-4 gap-2">
-          {artifacts.map((artifact, index) => (
-            <button key={`${record.id}-preview-${index}`} type="button" onClick={() => setActiveIndex(index)} className={cn('aspect-square overflow-hidden rounded-lg border bg-muted/30 transition-[border-color,opacity]', index === activeIndex ? 'border-primary ring-2 ring-primary/20' : 'border-border opacity-70 hover:opacity-100')} aria-label={`切换到第 ${index + 1} 张人物设定图`}>
-              <AssetThumbnail kind={artifact.kind} url={artifact.sourceUrl} thumbnailUrl={artifact.thumbnailUrl} />
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="rounded-xl bg-muted/30 px-3 py-2.5">
-        <p className="line-clamp-3 text-xs leading-5 text-muted-foreground">{typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '未填写人物提示词'}</p>
+    <div className="h-full min-h-0 overflow-y-auto pr-1">
+      <div className="space-y-3 pb-2">
+        {completedArtifacts.map(({ artifact, index, record }) => (
+          <button
+            key={`${record.id}-preview-${index}`}
+            type="button"
+            onClick={() => onSelectRecord(record.id)}
+            className={cn('group relative block aspect-square w-full overflow-hidden rounded-xl border bg-muted/30 text-left transition-[border-color,box-shadow,opacity]', selectedRecordId === record.id ? 'border-primary/70 ring-2 ring-primary/20' : 'border-border opacity-80 hover:opacity-100')}
+            aria-label={`查看 ${typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '人物设定'} 的第 ${index + 1} 张缩略图`}
+            title={typeof record.inputParams.prompt === 'string' ? record.inputParams.prompt : '人物设定图'}
+          >
+            <AssetThumbnail kind={artifact.kind} url={artifact.sourceUrl} thumbnailUrl={artifact.thumbnailUrl} className="transition-transform duration-300 group-hover:scale-105" />
+            <span className="pointer-events-none absolute inset-x-0 bottom-0 flex items-center justify-between bg-gradient-to-t from-black/60 to-transparent px-3 pb-2 pt-8 text-[11px] text-white">
+              <span>第 {index + 1} 张</span>
+              <span>{relativeTime(record.createdAt)}</span>
+            </span>
+          </button>
+        ))}
       </div>
     </div>
   )
