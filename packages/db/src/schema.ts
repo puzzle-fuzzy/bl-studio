@@ -31,7 +31,7 @@
  */
 
 import { sql } from 'drizzle-orm'
-import { boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
+import { boolean, check, foreignKey, index, integer, jsonb, pgTable, text, timestamp, unique, uniqueIndex, type AnyPgColumn } from 'drizzle-orm/pg-core'
 
 /**
  * 用户表 —— 自托管认证的用户主表。
@@ -639,7 +639,7 @@ export const creativeAssetReferences = pgTable('creative_asset_references', {
   uniqueIndex('creative_asset_references_version_role_position_idx')
     .on(table.assetVersionId, table.role, table.position)
     .where(sql`${table.deletedAt} is null`),
-  uniqueIndex('creative_asset_references_version_id_idx').on(table.assetVersionId, table.id),
+  unique('creative_asset_references_version_id_key').on(table.assetVersionId, table.id),
   index('creative_asset_references_user_asset_idx').on(table.userAssetId),
   index('creative_asset_references_version_role_idx').on(table.assetVersionId, table.role),
 ])
@@ -691,7 +691,7 @@ export const creativeGenerationContextAssets = pgTable('creative_generation_cont
   check('creative_generation_context_assets_position_check', sql`${table.position} >= 0`),
   uniqueIndex('creative_generation_context_assets_context_role_position_idx').on(table.contextId, table.role, table.position),
   uniqueIndex('creative_generation_context_assets_context_version_role_idx').on(table.contextId, table.assetVersionId, table.role),
-  uniqueIndex('creative_generation_context_assets_id_version_idx').on(table.id, table.assetVersionId),
+  unique('creative_generation_context_assets_id_version_key').on(table.id, table.assetVersionId),
   index('creative_generation_context_assets_version_idx').on(table.assetVersionId),
 ])
 

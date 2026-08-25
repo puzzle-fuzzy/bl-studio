@@ -109,8 +109,8 @@ CREATE TABLE "creative_generation_contexts" (
 	CONSTRAINT "creative_generation_contexts_purpose_check" CHECK ("creative_generation_contexts"."purpose" in ('asset_reference_sheet', 'asset_variant', 'shot_image', 'shot_video', 'utility'))
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX "creative_asset_references_version_id_idx" ON "creative_asset_references" USING btree ("asset_version_id","id");--> statement-breakpoint
-CREATE UNIQUE INDEX "creative_generation_context_assets_id_version_idx" ON "creative_generation_context_assets" USING btree ("id","asset_version_id");--> statement-breakpoint
+ALTER TABLE "creative_asset_references" ADD CONSTRAINT "creative_asset_references_version_id_key" UNIQUE ("asset_version_id","id");--> statement-breakpoint
+ALTER TABLE "creative_generation_context_assets" ADD CONSTRAINT "creative_generation_context_assets_id_version_key" UNIQUE ("id","asset_version_id");--> statement-breakpoint
 ALTER TABLE "creative_asset_packs" ADD CONSTRAINT "creative_asset_packs_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creative_asset_references" ADD CONSTRAINT "creative_asset_references_asset_version_id_creative_asset_versions_id_fk" FOREIGN KEY ("asset_version_id") REFERENCES "public"."creative_asset_versions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "creative_asset_references" ADD CONSTRAINT "creative_asset_references_user_asset_id_user_assets_id_fk" FOREIGN KEY ("user_asset_id") REFERENCES "public"."user_assets"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint

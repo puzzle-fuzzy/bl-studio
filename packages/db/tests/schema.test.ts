@@ -130,6 +130,24 @@ describe('db schema exports', () => {
     )
     expect(approvedIndex?.config.unique).toBe(true)
     expect(approvedIndex?.config.where).toBeDefined()
+
+    const contextAssetInternals = creativeGenerationContextAssets as unknown as Record<symbol, unknown>
+    const contextAssetBuilder = contextAssetInternals[Symbol.for('drizzle:ExtraConfigBuilder')]
+    const contextAssetColumns = contextAssetInternals[Symbol.for('drizzle:ExtraConfigColumns')]
+    if (typeof contextAssetBuilder !== 'function') {
+      throw new Error('expected creative_generation_context_assets extra config builder')
+    }
+    const contextAssetKeys = contextAssetBuilder(contextAssetColumns) as Array<{ name?: string }>
+    expect(contextAssetKeys.find(index => index.name === 'creative_generation_context_assets_id_version_key')?.name).toBe('creative_generation_context_assets_id_version_key')
+
+    const referenceInternals = creativeAssetReferences as unknown as Record<symbol, unknown>
+    const referenceBuilder = referenceInternals[Symbol.for('drizzle:ExtraConfigBuilder')]
+    const referenceColumns = referenceInternals[Symbol.for('drizzle:ExtraConfigColumns')]
+    if (typeof referenceBuilder !== 'function') {
+      throw new Error('expected creative_asset_references extra config builder')
+    }
+    const referenceKeys = referenceBuilder(referenceColumns) as Array<{ name?: string }>
+    expect(referenceKeys.find(index => index.name === 'creative_asset_references_version_id_key')?.name).toBe('creative_asset_references_version_id_key')
   })
 
   it('exports reusable asset derivatives with one active thumbnail per asset', () => {

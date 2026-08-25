@@ -28,8 +28,9 @@ pnpm run check:manifests  # manifest 一致性
 pnpm run model:acceptance # 所有 enabled 模型的离线请求/响应矩阵
 pnpm run model:acceptance -- --live=<model-id> # 单模型真实供应商 canary（需 DASHSCOPE_API_KEY）
 pnpm run check:db-migrations # schema↔迁移链对账（drizzle-kit generate 离线比较；见 scripts/verify/check-db-migrations.ts）
-# db:push / db:push:test 仅本地开发用（按 schema.ts 现算 diff 直写 dev/test 库；
+# db:push / db:push:test 仅一次性或明确允许重算的临时库使用（按 schema.ts 现算 diff 直写 dev/test 库；
 # 脚本通过 dotenv-cli 注入连接串，兼容 Windows，不要在命令行内联 DATABASE_URL）：
+# 新库初始化和持续升级统一走 `db:migrate` / `db:migrate:test`，避免复合外键与唯一约束的建表顺序差异。
 # 改了 schema.ts 后正式流程是 `pnpm exec drizzle-kit generate --config packages/db/drizzle.config.ts` 提交迁移，
 # 生产/CI 一律走 `db:migrate`（db:migrate:test / db:migrate:production）——push 掩盖漂移正是 P0-06 要堵的。
 ```
@@ -50,7 +51,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 - 运行时用户是 `bun`（无 node 用户）；镜像内 Node ≥24（apt 的 v20 会让 worker 静默退出）。
 - 安全红线：`.env.production` / `.env.prod-infra` gitignored，**绝不打印/提交任何凭据值**。
 
-测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后 `db:push` + `db:push:test`。
+测试环境：dev DB `:55431`（bailian-studio_dev），test DB `:55432`（bailian-studio_test）。改 schema 后生成迁移并执行 `db:migrate` / `db:migrate:test`。
 
 社区化特性（封禁/画廊/提示词库/反馈/成本分析）设计见 `docs/05-community-features.md`。其中**审计动作新增必须在三处同步**：`packages/generation-repository/src/audit-types.ts`、`packages/db/src/schema.ts` 的 `audit_logs_action_check`、`scripts/db/ensure-audit-action-constraint.ts`；drizzle 检测不到已命名 CHECK 表达式变更，迁移里要**手工 DROP/ADD** 该约束。
 
@@ -64,7 +65,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 - **`apps/web` 可以直接 import model-core** 做提交前实时校验（提交 payload 与 `apps/web/src/lib/generation-submit.ts` 的 `buildValidationParams` 保持一致）。
 - 运行时应用**禁止**直接 import `@bailian-studio/db`——持久化走 repository/auth 包的 URL 工厂。
 - `apps/api` 与 `apps/worker` **禁止互相 import**。
-- `@bailian-studio/shared` 是叶子包，不得 import 其它 `@bailian-studio/*`。
+- `@bailian-studio/shared` 只允许依赖 `@bailian-studio/creative-asset-contracts` 作为领域协议叶子；不得依赖数据库、Provider 或运行时应用。
 
 改跨包 import 后必须 `pnpm run check:boundaries`。
 
@@ -72,7 +73,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 
 | 包 | 职责 |
 |---|---|
-| shared | 叶子：logger（敏感 key 脱敏）、metrics、错误基类、进程原语（spawn/sleep） |
+| shared | 通用基础：logger（敏感 key 脱敏）、metrics、错误基类、运行时校验；仅依赖 creative-asset-contracts |
 | model-core | **唯一数据源**：51 个 manifest（39 启用 / 12 个 vidu 暂未开通；深冻结）+ 纯函数校验/定价/状态分类（前后端共享） |
 | event-bus | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |
@@ -83,7 +84,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 | provider-dashscope | DashScope 协议执行（仅 worker 消费） |
 | task-engine | 纯任务状态机 + 退避 |
 | credit-ledger | 积分账本（冻结/结算/释放） |
-| api-client | 前端共享的 zod 契约层（零 `as`） |
+| api-client | 前端共享的 zod 传输契约层（零 `as`），创意资产协议直接依赖 contracts |
 | design-tokens | CSS 设计令牌 |
 
 ## 模型知识维护工作流

@@ -115,7 +115,9 @@ export const rules: Array<{
 }> = [
   {
     scope: 'packages/shared',
-    banned: [/@bailian-studio\/(?!shared\b)[a-z-]+/],
+    // 通用校验可以依赖创意资产协议的叶子 contracts 包；shared 不得反向依赖
+    // API、数据库、Provider 或运行时应用。
+    banned: [/@bailian-studio\/(?!shared\b|creative-asset-contracts\b)[a-z-]+/],
   },
   {
     scope: 'packages/model-core',
@@ -156,10 +158,10 @@ export const rules: Array<{
   {
     scope: 'packages/api-client',
     banned: [
-      // P1-40：api-client 是纯 zod 契约层（schemas.ts 注释自称只依赖 shared+zod，
-      // 实际零 workspace 依赖）。禁入任何 @bailian-studio 包——用 importSpecifier
+      // P1-40：api-client 是纯 zod 传输契约层；创意资产 client 可直接依赖领域
+      // contracts，其余 workspace 包仍然禁止——用 importSpecifier
       // 只匹配真实 import，不误伤源内自我引述的注释。
-      importSpecifier(String.raw`@bailian-studio\/(?!shared\b)[a-z-]+`),
+      importSpecifier(String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b)[a-z-]+`),
       importsApps,
       importsServices,
     ],

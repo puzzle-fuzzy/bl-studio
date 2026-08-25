@@ -195,10 +195,11 @@ describe('package boundary rules', () => {
     }
   })
 
-  it('keeps api-client, storage, and design-tokens as leaves (P1-40)', () => {
-    // api-client 是纯 zod 契约层：零 workspace 依赖。
+  it('keeps api-client, storage, and design-tokens narrow (P1-40)', () => {
+    // api-client 是纯 zod 传输契约层，仅允许直接消费创意资产 contracts。
     expect(matchesRule('packages/api-client', "import { z } from 'zod'")).toBe(false)
     expect(matchesRule('packages/api-client', "import { createLogger } from '@bailian-studio/shared'")).toBe(false)
+    expect(matchesRule('packages/api-client', "import { CreativeAssetTypeSchema } from '@bailian-studio/creative-asset-contracts'")).toBe(false)
     expect(matchesRule('packages/api-client', "import { listModels } from '@bailian-studio/model-core'")).toBe(true)
 
     // storage 只允许叶子 shared。

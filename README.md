@@ -31,8 +31,8 @@ pnpm install
 # 启动依赖：dev/test Postgres + Mailpit
 pnpm run db:up          # dev DB :55431
 pnpm run db:test:up     # test DB :55432
-pnpm run db:push        # 推送 schema 到 dev DB
-pnpm run db:push:test   # 推送 schema 到 test DB
+pnpm run db:migrate     # 首次初始化 dev DB；已有库继续应用新迁移
+pnpm run db:migrate:test # 首次初始化 test DB；已有库继续应用新迁移
 
 # 本地环境文件（gitignored）
 # macOS/Linux:
