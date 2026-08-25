@@ -146,4 +146,27 @@ describe('creative asset api client', () => {
     expect(JSON.parse(calls[3]?.body ?? '{}')).toEqual({ status: 'active' })
     expect(JSON.parse(calls[11]?.body ?? '{}')).toMatchObject({ userAssetId: 'user-image-1', role: 'front' })
   })
+
+  it('collects a stored generation artifact through the dedicated endpoint', async () => {
+    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { asset: detail } })])
+    const client = createApiClient({ baseUrl: 'http://api.test/', fetch })
+
+    await expect(client.createCreativeAssetVersionFromGeneration('asset/1', {
+      sourceGenerationId: 'generation-1',
+      semanticSpec: { identity: { name: '林默' } },
+      generationRecipe: { source: 'generation' },
+      references: [{ artifactId: 'artifact-1', role: 'front', position: 0, metadata: { source: 'generated' } }],
+    })).resolves.toEqual(detail)
+
+    expect(calls).toHaveLength(1)
+    expect(calls[0]).toMatchObject({
+      method: 'POST',
+      url: 'http://api.test/api/creative/assets/asset%2F1/versions/from-generation',
+      credentials: 'include',
+    })
+    expect(JSON.parse(calls[0]?.body ?? '{}')).toMatchObject({
+      sourceGenerationId: 'generation-1',
+      references: [{ artifactId: 'artifact-1', role: 'front', position: 0 }],
+    })
+  })
 })

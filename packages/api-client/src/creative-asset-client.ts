@@ -10,6 +10,7 @@ import type {
   CreateCreativeAssetInput,
   CreateCreativeAssetReferenceInput,
   CreateCreativeAssetVersionInput,
+  CreateCreativeAssetVersionFromGenerationInput,
   CreateCreativeProjectInput,
   CreativeAssetReferenceRole,
   CreativeAssetType,
@@ -20,6 +21,14 @@ import type {
 import { unwrapData } from './http'
 
 const RecordSchema = z.record(z.string(), z.unknown())
+
+const CreativeAssetPreviewSchema = z.object({
+  userAssetId: z.string(),
+  kind: z.enum(['image', 'video', 'audio']),
+  url: z.string().optional(),
+  thumbnailUrl: z.string().optional(),
+  thumbnailStatus: z.enum(['queued', 'processing', 'ready', 'failed']).optional(),
+})
 
 const CreativeProjectSchema = z.object({
   id: z.string(),
@@ -47,6 +56,7 @@ const CreativeAssetReferenceSchema = z.object({
   role: CreativeAssetReferenceRoleSchema,
   position: z.number().int().nonnegative(),
   metadata: RecordSchema,
+  preview: CreativeAssetPreviewSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -81,6 +91,7 @@ const CreativeAssetSummarySchema = z.object({
   metadata: RecordSchema,
   latestVersion: CreativeAssetLatestVersionSchema.optional(),
   approvedVersionId: z.string().optional(),
+  preview: CreativeAssetPreviewSchema.optional(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -109,6 +120,7 @@ export type CreativeProject = z.infer<typeof CreativeProjectSchema>
 export type CreativeProjectAssetMembership = z.infer<typeof CreativeProjectAssetMembershipSchema>
 export type CreativeProjectDetail = z.infer<typeof CreativeProjectDetailSchema>
 export type CreativeAssetReference = z.infer<typeof CreativeAssetReferenceSchema>
+export type CreativeAssetPreview = z.infer<typeof CreativeAssetPreviewSchema>
 export type CreativeAssetVersion = z.infer<typeof CreativeAssetVersionSchema>
 export type CreativeAssetSummary = z.infer<typeof CreativeAssetSummarySchema>
 export type CreativeAssetDetail = z.infer<typeof CreativeAssetDetailSchema>
@@ -129,6 +141,7 @@ export type CreateCreativeAssetRequest = CreateCreativeAssetInput & {
   projectId?: string
 }
 export type CreateCreativeAssetVersionRequest = Omit<CreateCreativeAssetVersionInput, 'assetId'>
+export type CreateCreativeAssetVersionFromGenerationRequest = CreateCreativeAssetVersionFromGenerationInput
 export type AddCreativeAssetReferenceRequest = Omit<CreateCreativeAssetReferenceInput, 'assetVersionId' | 'position' | 'metadata'> & {
   position?: number
   metadata?: CreateCreativeAssetReferenceInput['metadata']
@@ -170,6 +183,7 @@ export interface CreativeAssetApiClient {
   createCreativeAssetVersion(assetId: string, input: CreateCreativeAssetVersionRequest): Promise<CreativeAssetDetail>
   addCreativeAssetReference(versionId: string, input: AddCreativeAssetReferenceRequest): Promise<CreativeAssetDetail>
   transitionCreativeAssetVersion(versionId: string, input: TransitionCreativeAssetVersionRequest): Promise<CreativeAssetDetail>
+  createCreativeAssetVersionFromGeneration(assetId: string, input: CreateCreativeAssetVersionFromGenerationRequest): Promise<CreativeAssetDetail>
 }
 
 function queryString(params: object): string {
@@ -296,6 +310,16 @@ export function createCreativeAssetClient(options: CreativeAssetClientOptions): 
     async createCreativeAssetVersion(assetId, input) {
       const data = await unwrapData(
         `${base}/api/creative/assets/${encodeURIComponent(assetId)}/versions`,
+        jsonInit('POST', input),
+        fetchImpl,
+        CreativeAssetResponseSchema,
+      )
+      return data.asset
+    },
+
+    async createCreativeAssetVersionFromGeneration(assetId, input) {
+      const data = await unwrapData(
+        `${base}/api/creative/assets/${encodeURIComponent(assetId)}/versions/from-generation`,
         jsonInit('POST', input),
         fetchImpl,
         CreativeAssetResponseSchema,

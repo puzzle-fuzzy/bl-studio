@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Download, Eye, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
+import { CollectGenerationAssetDialog } from '@/components/assets/CollectGenerationAssetDialog'
 import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -95,6 +96,7 @@ function DetailContent({
   const [visibility, setVisibility] = useState<'private' | 'public'>(record.visibility ?? 'private')
   const [favorited, setFavorited] = useState(false)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
+  const [collectOpen, setCollectOpen] = useState(false)
 
   // 加载收藏状态（仅本人可见的作品；详情页记录通常对 owner 可见）。
   useEffect(() => {
@@ -253,6 +255,11 @@ function DetailContent({
           <Button variant="outline" size="sm" onClick={() => navigate(`/create?reuse=${id}`)}>
             用同参数新建
           </Button>
+          {record.status === 'succeeded' && (
+            <Button variant="outline" size="sm" onClick={() => setCollectOpen(true)} disabled={busy}>
+              收录为创意资产
+            </Button>
+          )}
           <Button
             variant="ghost"
             size="sm"
@@ -318,6 +325,17 @@ function DetailContent({
       </div>
 
       <DiagnosticsSection recordId={id} />
+
+      <CollectGenerationAssetDialog
+        open={collectOpen}
+        onOpenChange={setCollectOpen}
+        generationId={id}
+        onCreated={asset => {
+          setCollectOpen(false)
+          showMessage({ title: '已建立待确认创意资产版本', tone: 'success' })
+          navigate(`/assets/${encodeURIComponent(asset.id)}`)
+        }}
+      />
     </div>
   )
 }

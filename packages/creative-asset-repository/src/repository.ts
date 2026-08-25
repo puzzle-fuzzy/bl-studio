@@ -4,6 +4,9 @@ import {
   creativeAssets,
   creativeProjectAssets,
   creativeProjects,
+  assetDerivatives,
+  generationArtifacts,
+  generationRecords,
   type BailianStudioDb,
   type BailianStudioDbTransaction,
   userAssets,
@@ -26,10 +29,12 @@ import {
 } from './id'
 import type {
   CreativeAssetDetail,
+  CreativeAssetPreviewSource,
   CreativeAssetReference,
   CreativeAssetRepository,
   CreativeAssetSummary,
   CreativeAssetVersion,
+  CreateCreativeAssetVersionFromGenerationRepositoryInput,
   CreativeProject,
   CreativeProjectAssetMembership,
   CreativeProjectDetail,
@@ -104,7 +109,40 @@ function toMembership(row: typeof creativeProjectAssets.$inferSelect): CreativeP
   }
 }
 
-function toReference(row: typeof creativeAssetReferences.$inferSelect): CreativeAssetReference {
+function mediaKindForPreview(kind: string): CreativeAssetPreviewSource['kind'] | undefined {
+  return kind === 'image' || kind === 'video' || kind === 'audio' ? kind : undefined
+}
+
+function toPreviewSource(input: {
+  userAssetId: string
+  kind: string
+  originalUrl: string | null
+  storageUrl: string | null
+  storageProvider: string | null
+  storageKey: string | null
+  thumbnailStatus: string | null
+  thumbnailStorageProvider: string | null
+  thumbnailStorageKey: string | null
+}): CreativeAssetPreviewSource | undefined {
+  const kind = mediaKindForPreview(input.kind)
+  if (kind === undefined) return undefined
+  return {
+    userAssetId: input.userAssetId,
+    kind,
+    ...(input.originalUrl !== null ? { originalUrl: input.originalUrl } : {}),
+    ...(input.storageUrl !== null ? { storageUrl: input.storageUrl } : {}),
+    ...(input.storageProvider !== null ? { storageProvider: input.storageProvider } : {}),
+    ...(input.storageKey !== null ? { storageKey: input.storageKey } : {}),
+    ...(input.thumbnailStatus !== null ? { thumbnailStatus: input.thumbnailStatus as CreativeAssetPreviewSource['thumbnailStatus'] } : {}),
+    ...(input.thumbnailStorageProvider !== null ? { thumbnailStorageProvider: input.thumbnailStorageProvider } : {}),
+    ...(input.thumbnailStorageKey !== null ? { thumbnailStorageKey: input.thumbnailStorageKey } : {}),
+  }
+}
+
+function toReference(
+  row: typeof creativeAssetReferences.$inferSelect,
+  previewSource?: CreativeAssetPreviewSource,
+): CreativeAssetReference {
   return {
     id: row.id,
     assetVersionId: row.assetVersionId,
@@ -114,6 +152,7 @@ function toReference(row: typeof creativeAssetReferences.$inferSelect): Creative
     metadata: row.metadataJson,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    ...(previewSource === undefined ? {} : { previewSource }),
   }
 }
 
@@ -154,6 +193,7 @@ function summarizeVersions(rows: VersionSummary[]): Map<string, { latestVersion?
 function toSummary(
   row: typeof creativeAssets.$inferSelect,
   versionSummary?: { latestVersion?: VersionSummary; approvedVersionId?: string },
+  previewSource?: CreativeAssetPreviewSource,
 ): CreativeAssetSummary {
   return {
     id: row.id,
@@ -175,6 +215,7 @@ function toSummary(
     ...(versionSummary?.approvedVersionId !== undefined ? { approvedVersionId: versionSummary.approvedVersionId } : {}),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
+    ...(previewSource === undefined ? {} : { previewSource }),
   }
 }
 
@@ -197,7 +238,51 @@ async function summariesForRows(
     ))
     .orderBy(desc(creativeAssetVersions.version), desc(creativeAssetVersions.createdAt))
   const summaries = summarizeVersions(versionRows)
-  return rows.map(row => toSummary(row, summaries.get(row.id)))
+  const previewRows = await db
+    .select({
+      assetId: creativeAssetVersions.assetId,
+      versionStatus: creativeAssetVersions.status,
+      version: creativeAssetVersions.version,
+      role: creativeAssetReferences.role,
+      position: creativeAssetReferences.position,
+      userAssetId: userAssets.id,
+      kind: userAssets.kind,
+      originalUrl: userAssets.originalUrl,
+      storageUrl: userAssets.storageUrl,
+      storageProvider: userAssets.storageProvider,
+      storageKey: userAssets.storageKey,
+      thumbnailStatus: assetDerivatives.status,
+      thumbnailStorageProvider: assetDerivatives.storageProvider,
+      thumbnailStorageKey: assetDerivatives.storageKey,
+    })
+    .from(creativeAssetVersions)
+    .innerJoin(creativeAssetReferences, eq(creativeAssetReferences.assetVersionId, creativeAssetVersions.id))
+    .innerJoin(userAssets, eq(userAssets.id, creativeAssetReferences.userAssetId))
+    .leftJoin(assetDerivatives, and(
+      eq(assetDerivatives.assetId, userAssets.id),
+      eq(assetDerivatives.kind, 'thumbnail'),
+      isNull(assetDerivatives.deletedAt),
+    ))
+    .where(and(
+      inArray(creativeAssetVersions.assetId, rows.map(row => row.id)),
+      isNull(creativeAssetVersions.deletedAt),
+      isNull(creativeAssetReferences.deletedAt),
+      eq(userAssets.status, 'ready'),
+      isNull(userAssets.deletedAt),
+    ))
+    .orderBy(
+      asc(sql`case when ${creativeAssetVersions.status} = 'approved' then 0 else 1 end`),
+      desc(creativeAssetVersions.version),
+      asc(creativeAssetReferences.role),
+      asc(creativeAssetReferences.position),
+    )
+  const previewSources = new Map<string, CreativeAssetPreviewSource>()
+  for (const row of previewRows) {
+    if (previewSources.has(row.assetId)) continue
+    const previewSource = toPreviewSource(row)
+    if (previewSource !== undefined) previewSources.set(row.assetId, previewSource)
+  }
+  return rows.map(row => toSummary(row, summaries.get(row.id), previewSources.get(row.id)))
 }
 
 async function ownedProject(
@@ -272,27 +357,57 @@ async function assetDetail(
   const references = versionRows.length === 0
     ? []
     : await db
-      .select()
+      .select({
+        reference: creativeAssetReferences,
+        userAsset: userAssets,
+        thumbnail: assetDerivatives,
+      })
       .from(creativeAssetReferences)
+      .innerJoin(userAssets, eq(userAssets.id, creativeAssetReferences.userAssetId))
+      .leftJoin(assetDerivatives, and(
+        eq(assetDerivatives.assetId, userAssets.id),
+        eq(assetDerivatives.kind, 'thumbnail'),
+        isNull(assetDerivatives.deletedAt),
+      ))
       .where(and(
         inArray(creativeAssetReferences.assetVersionId, versionRows.map(row => row.id)),
         isNull(creativeAssetReferences.deletedAt),
       ))
       .orderBy(asc(creativeAssetReferences.assetVersionId), asc(creativeAssetReferences.role), asc(creativeAssetReferences.position))
   const referencesByVersion = new Map<string, CreativeAssetReference[]>()
-  for (const reference of references) {
-    const current = referencesByVersion.get(reference.assetVersionId) ?? []
-    current.push(toReference(reference))
-    referencesByVersion.set(reference.assetVersionId, current)
+  for (const row of references) {
+    const current = referencesByVersion.get(row.reference.assetVersionId) ?? []
+    current.push(toReference(row.reference, row.userAsset.status === 'ready' && row.userAsset.deletedAt === null
+      ? toPreviewSource({
+          userAssetId: row.userAsset.id,
+          kind: row.userAsset.kind,
+          originalUrl: row.userAsset.originalUrl,
+          storageUrl: row.userAsset.storageUrl,
+          storageProvider: row.userAsset.storageProvider,
+          storageKey: row.userAsset.storageKey,
+          thumbnailStatus: row.thumbnail?.status ?? null,
+          thumbnailStorageProvider: row.thumbnail?.storageProvider ?? null,
+          thumbnailStorageKey: row.thumbnail?.storageKey ?? null,
+        })
+      : undefined))
+    referencesByVersion.set(row.reference.assetVersionId, current)
   }
   const versions = versionRows.map(row => toVersion(row, referencesByVersion.get(row.id) ?? []))
   const latestVersion = versionRows[0]
+  const preferredVersion = [...versionRows].sort((left, right) => {
+    if (left.status === 'approved' && right.status !== 'approved') return -1
+    if (right.status === 'approved' && left.status !== 'approved') return 1
+    return right.version - left.version
+  })[0]
+  const preferredPreview = preferredVersion === undefined
+    ? undefined
+    : referencesByVersion.get(preferredVersion.id)?.find(reference => reference.previewSource !== undefined)?.previewSource
   const summary = toSummary(asset, {
     ...(latestVersion !== undefined ? { latestVersion } : {}),
     ...(versionRows.find(row => row.status === 'approved')?.id !== undefined
       ? { approvedVersionId: versionRows.find(row => row.status === 'approved')?.id }
       : {}),
-  })
+  }, preferredPreview)
   return {
     ...summary,
     projects: memberships.map(row => toMembership(row.creative_project_assets)),
@@ -498,6 +613,120 @@ function assertVersionTransition(from: CreativeAssetVersionStatus, to: CreativeA
     'CREATIVE_ASSET_VERSION_STATE_INVALID',
     `Invalid creative asset version transition: ${from} -> ${to}`,
   )
+}
+
+async function createVersionFromGeneration(
+  db: BailianStudioDb,
+  input: CreateCreativeAssetVersionFromGenerationRepositoryInput,
+): Promise<CreativeAssetDetail> {
+  const now = nowDate(input.now)
+  await db.transaction(async tx => {
+    const [asset] = await tx
+      .select()
+      .from(creativeAssets)
+      .where(and(
+        eq(creativeAssets.id, input.assetId),
+        eq(creativeAssets.userId, input.userId),
+        isNull(creativeAssets.deletedAt),
+      ))
+      .limit(1)
+      .for('update')
+    if (asset === undefined) {
+      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${input.assetId}`)
+    }
+    if (asset.status === 'archived') {
+      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', `Creative asset is archived: ${input.assetId}`)
+    }
+
+    const [generation] = await tx
+      .select({ id: generationRecords.id, status: generationRecords.status })
+      .from(generationRecords)
+      .where(and(
+        eq(generationRecords.id, input.sourceGenerationId),
+        eq(generationRecords.userId, input.userId),
+        isNull(generationRecords.deletedAt),
+      ))
+      .limit(1)
+    if (generation === undefined) {
+      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', `Source generation not found: ${input.sourceGenerationId}`)
+    }
+    if (generation.status !== 'succeeded') {
+      throw new CreativeAssetRepositoryError(
+        'CREATIVE_ASSET_VERSION_STATE_INVALID',
+        `Only succeeded generations can be collected: ${input.sourceGenerationId}`,
+      )
+    }
+
+    const artifactRows = await tx
+      .select({ artifact: generationArtifacts, userAsset: userAssets })
+      .from(generationArtifacts)
+      .innerJoin(userAssets, eq(userAssets.generationArtifactId, generationArtifacts.id))
+      .where(and(
+        inArray(generationArtifacts.id, input.references.map(reference => reference.artifactId)),
+        eq(generationArtifacts.recordId, input.sourceGenerationId),
+        eq(generationArtifacts.userId, input.userId),
+        eq(generationArtifacts.status, 'stored'),
+        isNull(generationArtifacts.deletedAt),
+        eq(userAssets.userId, input.userId),
+        eq(userAssets.status, 'ready'),
+        isNull(userAssets.deletedAt),
+      ))
+    const artifactsById = new Map(artifactRows.map(row => [row.artifact.id, row] as const))
+    const resolvedReferences = input.references.map((reference, index) => {
+      const row = artifactsById.get(reference.artifactId)
+      if (row === undefined || row.artifact.kind !== 'image' || row.userAsset.kind !== 'image') {
+        throw new CreativeAssetRepositoryError(
+          'CREATIVE_ASSET_REFERENCE_INVALID',
+          `Generation artifact is not an available image: ${reference.artifactId}`,
+          { field: `references.${index}.artifactId`, artifactId: reference.artifactId },
+        )
+      }
+      if (!isCreativeAssetReferenceRoleCompatible(asset.type as CreativeAssetType, reference.role)) {
+        throw new CreativeAssetRepositoryError(
+          'CREATIVE_ASSET_REFERENCE_INVALID',
+          `Reference role '${reference.role}' is incompatible with asset type '${asset.type}'`,
+          { field: `references.${index}.role`, assetType: asset.type, role: reference.role },
+        )
+      }
+      return { reference, row }
+    })
+
+    const [latest] = await tx
+      .select({ version: creativeAssetVersions.version })
+      .from(creativeAssetVersions)
+      .where(and(eq(creativeAssetVersions.assetId, asset.id), isNull(creativeAssetVersions.deletedAt)))
+      .orderBy(desc(creativeAssetVersions.version))
+      .limit(1)
+      .for('update')
+    const versionId = nextCreativeAssetVersionId()
+    await tx.insert(creativeAssetVersions).values({
+      id: versionId,
+      assetId: asset.id,
+      sourceGenerationId: input.sourceGenerationId,
+      version: (latest?.version ?? 0) + 1,
+      status: 'draft',
+      semanticSpecJson: input.semanticSpec,
+      generationRecipeJson: input.generationRecipe,
+      notes: input.notes ?? null,
+      createdBy: input.userId,
+      updatedBy: input.userId,
+      createdAt: now,
+      updatedAt: now,
+    })
+    await tx.insert(creativeAssetReferences).values(resolvedReferences.map(({ reference, row }) => ({
+      id: nextCreativeAssetReferenceId(),
+      assetVersionId: versionId,
+      userAssetId: row.userAsset.id,
+      role: reference.role,
+      position: reference.position,
+      metadataJson: reference.metadata,
+      createdBy: input.userId,
+      updatedBy: input.userId,
+      createdAt: now,
+      updatedAt: now,
+    })))
+  })
+  return assetDetail(db, input.userId, input.assetId)
 }
 
 export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): CreativeAssetRepository {
@@ -770,6 +999,10 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
         })
       })
       return assetDetail(db, input.userId, input.assetId)
+    },
+
+    async createVersionFromGeneration(input) {
+      return createVersionFromGeneration(db, input)
     },
 
     async addReference(input) {

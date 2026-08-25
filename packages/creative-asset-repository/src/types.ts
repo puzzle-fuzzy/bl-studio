@@ -1,6 +1,7 @@
 import type {
   CreateCreativeAssetInput,
   CreateCreativeAssetReferenceInput,
+  CreateCreativeAssetVersionFromGenerationInput,
   CreateCreativeAssetVersionInput,
   CreateCreativeProjectInput,
   CreativeAssetReferenceMetadata,
@@ -42,6 +43,20 @@ export interface CreativeAssetReference {
   metadata: CreativeAssetReferenceMetadata
   createdAt: string
   updatedAt: string
+  /** 内部查询投影；API 层会把它转换成带短期签名 URL 的 preview。 */
+  previewSource?: CreativeAssetPreviewSource
+}
+
+export interface CreativeAssetPreviewSource {
+  userAssetId: string
+  kind: 'image' | 'video' | 'audio'
+  originalUrl?: string
+  storageUrl?: string
+  storageProvider?: string
+  storageKey?: string
+  thumbnailStatus?: 'queued' | 'processing' | 'ready' | 'failed'
+  thumbnailStorageProvider?: string
+  thumbnailStorageKey?: string
 }
 
 export interface CreativeAssetVersion {
@@ -74,6 +89,8 @@ export interface CreativeAssetSummary {
   approvedVersionId?: string
   createdAt: string
   updatedAt: string
+  /** 内部查询投影；API 层会把它转换成带短期签名 URL 的 preview。 */
+  previewSource?: CreativeAssetPreviewSource
 }
 
 export interface CreativeAssetDetail extends CreativeAssetSummary {
@@ -153,6 +170,17 @@ export interface CreateCreativeAssetVersionRepositoryInput extends CreateCreativ
   now?: string
 }
 
+export interface CreateCreativeAssetVersionFromGenerationRepositoryInput {
+  userId: string
+  assetId: string
+  sourceGenerationId: string
+  semanticSpec: CreateCreativeAssetVersionFromGenerationInput['semanticSpec']
+  generationRecipe: CreateCreativeAssetVersionFromGenerationInput['generationRecipe']
+  notes?: string
+  references: CreateCreativeAssetVersionFromGenerationInput['references']
+  now?: string
+}
+
 export interface AddCreativeAssetReferenceRepositoryInput extends CreateCreativeAssetReferenceInput {
   userId: string
   now?: string
@@ -221,6 +249,7 @@ export interface CreativeAssetRepository {
   attachAsset(input: AttachCreativeAssetRepositoryInput): Promise<CreativeAssetDetail>
   detachAsset(input: DetachCreativeAssetRepositoryInput): Promise<CreativeProjectDetail>
   createVersion(input: CreateCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
+  createVersionFromGeneration(input: CreateCreativeAssetVersionFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
   addReference(input: AddCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   transitionVersion(input: TransitionCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   resolveGenerationBindings(input: ResolveCreativeGenerationBindingsRepositoryInput): Promise<ResolvedCreativeGenerationBinding[]>

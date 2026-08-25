@@ -128,6 +128,51 @@ export const CreateCreativeAssetVersionSchema = z.object({
 }).strict()
 export type CreateCreativeAssetVersionInput = z.infer<typeof CreateCreativeAssetVersionSchema>
 
+const CreateCreativeAssetVersionFromGenerationReferenceSchema = z.object({
+  artifactId: z.string().trim().min(1).max(256),
+  role: CreativeAssetReferenceRoleSchema,
+  position: z.number().int().nonnegative().max(100).default(0),
+  metadata: CreativeAssetReferenceMetadataSchema.default({}),
+}).strict()
+
+/**
+ * 把已完成生成的图片产物收录为一个创意资产版本。
+ *
+ * artifactId 必须属于 sourceGenerationId，服务端会在同一事务内解析为
+ * 已持久化且属于当前用户的 user_asset，再创建版本和参考图绑定；客户端
+ * 不需要也不应该猜测 asset_generation_* 的投影 ID。
+ */
+export const CreateCreativeAssetVersionFromGenerationSchema = z.object({
+  sourceGenerationId: z.string().trim().min(1).max(256),
+  semanticSpec: CreativeAssetSemanticSpecSchema.default({}),
+  generationRecipe: z.record(z.string(), z.unknown()).default({}),
+  notes: z.string().trim().max(2_000).optional(),
+  references: z.array(CreateCreativeAssetVersionFromGenerationReferenceSchema).min(1).max(20),
+}).strict().superRefine((input, context) => {
+  const occupiedSlots = new Set<string>()
+  const artifactIds = new Set<string>()
+  for (const [index, reference] of input.references.entries()) {
+    const slot = `${reference.role}:${reference.position}`
+    if (occupiedSlots.has(slot)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['references', index, 'position'],
+        message: `duplicate reference role and position: ${slot}`,
+      })
+    }
+    occupiedSlots.add(slot)
+    if (artifactIds.has(reference.artifactId)) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['references', index, 'artifactId'],
+        message: 'duplicate artifact id',
+      })
+    }
+    artifactIds.add(reference.artifactId)
+  }
+})
+export type CreateCreativeAssetVersionFromGenerationInput = z.infer<typeof CreateCreativeAssetVersionFromGenerationSchema>
+
 export const CreateCreativeAssetReferenceSchema = z.object({
   assetVersionId: z.string().trim().min(1).max(256),
   userAssetId: z.string().trim().min(1).max(256),

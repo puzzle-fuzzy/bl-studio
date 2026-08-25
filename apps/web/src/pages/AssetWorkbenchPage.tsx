@@ -11,6 +11,7 @@ import {
   X,
 } from 'lucide-react'
 import type { CreativeAssetSummary, CreativeAssetType, CreativeProject } from '@bailian-studio/api-client'
+import { UploadCreativeAssetDialog } from '@/components/assets/UploadCreativeAssetDialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
@@ -49,6 +50,8 @@ function isAssetView(value: string | null): value is AssetView {
 }
 
 function previewUrlFromMetadata(asset: CreativeAssetSummary): string | undefined {
+  if (asset.preview?.thumbnailUrl !== undefined) return resolveApiUrl(asset.preview.thumbnailUrl)
+  if (asset.preview?.url !== undefined) return resolveApiUrl(asset.preview.url)
   for (const key of ['previewUrl', 'thumbnailUrl', 'coverUrl']) {
     const value = asset.metadata[key]
     if (typeof value === 'string' && value.trim().length > 0) return resolveApiUrl(value)
@@ -110,6 +113,7 @@ export function AssetWorkbenchPage() {
 
   const [searchInput, setSearchInput] = useState(queryText)
   const [createProjectOpen, setCreateProjectOpen] = useState(false)
+  const [uploadOpen, setUploadOpen] = useState(false)
 
   const loadProjects = useCreativeProjectsStore(state => state.load)
   const projectState = useCreativeProjectsStore(state => state.queries[creativeProjectQueryKey()])
@@ -150,6 +154,9 @@ export function AssetWorkbenchPage() {
   }, [queryText, searchInput, searchParams, setSearchParams])
 
   const activeProject = projects.find(project => project.id === projectId)
+  const defaultUploadType: CreativeAssetType = ASSET_TYPES.includes(tab as CreativeAssetType)
+    ? (tab as CreativeAssetType)
+    : 'character'
 
   function setParam(key: string, value: string | undefined) {
     setSearchParams(updateSearchParams(searchParams, { [key]: value }))
@@ -235,7 +242,7 @@ export function AssetWorkbenchPage() {
               )}
             </div>
             <div className="flex items-center gap-2 lg:ml-auto">
-              <Button variant="outline" disabled title="上传入口将在资产上传协议接入后开放">
+              <Button variant="outline" onClick={() => setUploadOpen(true)}>
                 <Upload className="size-4" />
                 上传素材
               </Button>
@@ -291,6 +298,7 @@ export function AssetWorkbenchPage() {
             onLoadMore={() => void loadMoreAssets(assetQuery)}
             onRetry={() => void loadAssets(assetQuery, true)}
             onCreate={() => navigate(`/create${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`)}
+            onUpload={() => setUploadOpen(true)}
           />
         )}
       </div>
@@ -301,6 +309,19 @@ export function AssetWorkbenchPage() {
         onCreated={project => {
           setCreateProjectOpen(false)
           setSearchParams(updateSearchParams(searchParams, { projectId: project.id, tab: undefined }))
+        }}
+      />
+      <UploadCreativeAssetDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        projects={projects}
+        projectId={projectId}
+        defaultType={defaultUploadType}
+        onCreated={asset => {
+          setUploadOpen(false)
+          void loadAssets(assetQuery, true)
+          void loadProjects({}, true)
+          navigate(`/assets/${encodeURIComponent(asset.id)}`)
         }}
       />
     </div>
@@ -363,6 +384,7 @@ function AssetCollection({
   onLoadMore,
   onRetry,
   onCreate,
+  onUpload,
 }: {
   items: CreativeAssetSummary[]
   view: AssetView
@@ -374,6 +396,7 @@ function AssetCollection({
   onLoadMore: () => void
   onRetry: () => void
   onCreate: () => void
+  onUpload: () => void
 }) {
   if (isLoading && items.length === 0) {
     return <AssetSkeleton view={view} />
@@ -404,7 +427,7 @@ function AssetCollection({
           </div>
           <div className="flex flex-wrap justify-center gap-2">
             <Button onClick={onCreate}><Sparkles className="size-4" />生成素材</Button>
-            <Button variant="outline" disabled><Upload className="size-4" />上传素材</Button>
+            <Button variant="outline" onClick={onUpload}><Upload className="size-4" />上传素材</Button>
           </div>
         </div>
       </div>

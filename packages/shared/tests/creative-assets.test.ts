@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   CreativeGenerationContextSchema,
   CreateCreativeAssetSchema,
+  CreateCreativeAssetVersionFromGenerationSchema,
   CreateCreativeProjectAssetSchema,
   CreateCreativeProjectSchema,
   CreateGenerationSchema,
@@ -93,5 +94,21 @@ describe('creative asset protocol', () => {
     })
 
     expect(parsed.creativeContext?.protocolVersion).toBe(1)
+  })
+
+  it('requires deterministic positions and unique artifacts when collecting generation output', () => {
+    const parsed = CreateCreativeAssetVersionFromGenerationSchema.parse({
+      sourceGenerationId: 'generation-1',
+      references: [{ artifactId: 'artifact-1', role: 'front' }],
+    })
+
+    expect(parsed.references[0]).toMatchObject({ artifactId: 'artifact-1', role: 'front', position: 0 })
+    expect(() => CreateCreativeAssetVersionFromGenerationSchema.parse({
+      sourceGenerationId: 'generation-1',
+      references: [
+        { artifactId: 'artifact-1', role: 'front', position: 0 },
+        { artifactId: 'artifact-1', role: 'side', position: 0 },
+      ],
+    })).toThrow()
   })
 })
