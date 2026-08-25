@@ -90,7 +90,7 @@ export function LoginPage() {
       <div className="login-page__veil" aria-hidden="true" />
       <main className="login-page__content">
         <div className="login-page__form-wrap">
-          <div className="login-wordmark-wrap mb-5 flex justify-center sm:justify-start">
+          <div className="login-wordmark-wrap mb-5 flex justify-center">
             <LoginWordmark />
           </div>
           <Card className="login-card w-full max-w-sm">
