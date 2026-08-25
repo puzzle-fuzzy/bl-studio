@@ -259,4 +259,3 @@ CreativeGenerationRequest
 推荐默认采用本文的两步包拆分：`creative-asset-contracts` + `creative-asset-domain`，随后再加 API service 和 compiler。这样可以先解决“万能 shared”和“route 直接调 repository”两个维护问题，再进入 Provider 映射。
 
 唯一需要用户确认的是：是否接受在下一次代码变更中，把创意资产协议从 `@bailian-studio/shared` 提取为独立包，并同步迁移现有引用。接受后，后续所有资产、场景、道具和未来剧本分析相关协议都以独立 contracts 为唯一来源。
-
