@@ -152,56 +152,58 @@ export function LoginPage() {
                     required
                   />
                 </div>
-                {(error !== null || oauthError !== null) && (
-                  <p role="alert" className="text-sm text-destructive">{error ?? oauthError}</p>
-                )}
-                {showResend && (
-                  <Button type="button" variant="outline" className="h-10 w-full" disabled={isResending} onClick={() => void handleResend()}>
-                    {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
-                  </Button>
-                )}
-                <Button type="submit" className="h-11 w-full" disabled={isPending}>
-                  {isPending ? '请稍候…' : mode === 'login' ? '登录工作台' : '创建账户'}
-                </Button>
-                {mode === 'login' && (
-                  <>
-                    <div className="flex items-center gap-3">
-                      <Separator className="flex-1" />
-                      <span className="text-xs text-muted-foreground">或</span>
-                      <Separator className="flex-1" />
-                    </div>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-11 w-full"
-                      title="使用 GitHub 登录"
-                      disabled={isPending}
-                      onClick={() => window.location.assign('/api/auth/github')}
-                    >
-                      <GithubMark data-icon />
-                      使用 GitHub 登录
+                <div className="login-card__action-zone space-y-5">
+                  {(error !== null || oauthError !== null) && (
+                    <p role="alert" className="text-sm text-destructive">{error ?? oauthError}</p>
+                  )}
+                  {showResend && (
+                    <Button type="button" variant="outline" className="h-10 w-full" disabled={isResending} onClick={() => void handleResend()}>
+                      {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
                     </Button>
-                  </>
-                )}
-                <p className="text-center text-sm text-muted-foreground">
-                  {mode === 'login' ? '还没有账号？' : '已有账号？'}
-                  <button
-                    type="button"
-                    title={mode === 'login' ? '切换到注册' : '切换到登录'}
-                    className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
-                    onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-                  >
-                    {mode === 'login' ? '去注册' : '去登录'}
-                  </button>
-                </p>
-                {mode === 'register' && (
-                  <p className="text-center text-xs leading-5 text-muted-foreground">
-                    注册即表示你同意
-                    <Link to="/terms" title="服务条款" className="mx-1 underline underline-offset-2">服务条款</Link>
-                    和
-                    <Link to="/privacy" title="隐私政策" className="ml-1 underline underline-offset-2">隐私政策</Link>。
+                  )}
+                  <Button type="submit" className="h-11 w-full" disabled={isPending} title={mode === 'login' ? '登录工作台' : '创建账户'}>
+                    {isPending ? '请稍候…' : mode === 'login' ? '登录工作台' : '创建账户'}
+                  </Button>
+                  {mode === 'login' && (
+                    <>
+                      <div className="flex items-center gap-3">
+                        <Separator className="flex-1" />
+                        <span className="text-xs text-muted-foreground">或</span>
+                        <Separator className="flex-1" />
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-11 w-full"
+                        title="使用 GitHub 登录"
+                        disabled={isPending}
+                        onClick={() => window.location.assign('/api/auth/github')}
+                      >
+                        <GithubMark data-icon />
+                        使用 GitHub 登录
+                      </Button>
+                    </>
+                  )}
+                  <p className="text-center text-sm text-muted-foreground">
+                    {mode === 'login' ? '还没有账号？' : '已有账号？'}
+                    <button
+                      type="button"
+                      title={mode === 'login' ? '切换到注册' : '切换到登录'}
+                      className="ml-1 font-medium text-foreground underline-offset-4 hover:underline"
+                      onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
+                    >
+                      {mode === 'login' ? '去注册' : '去登录'}
+                    </button>
                   </p>
-                )}
+                  {mode === 'register' && (
+                    <p className="text-center text-xs leading-5 text-muted-foreground">
+                      注册即表示你同意
+                      <Link to="/terms" title="服务条款" className="mx-1 underline underline-offset-2">服务条款</Link>
+                      和
+                      <Link to="/privacy" title="隐私政策" className="ml-1 underline underline-offset-2">隐私政策</Link>。
+                    </p>
+                  )}
+                </div>
               </form>
             </CardContent>
           </Card>
