@@ -11,7 +11,6 @@ import {
   CreativeProjectStatusSchema,
   validateInput,
 } from '@bailian-studio/shared'
-import { CreativeAssetRepositoryError } from '@bailian-studio/creative-asset-repository'
 import type {
   CreativeAssetDetail,
   CreativeAssetPreviewSource,
@@ -26,6 +25,7 @@ import {
 } from '@bailian-studio/storage'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
+import { createCreativeAssetUseCases } from './service'
 
 const ProjectIdParamsSchema = z.object({ projectId: z.string().trim().min(1).max(256) }).strict()
 const AssetIdParamsSchema = z.object({ assetId: z.string().trim().min(1).max(256) }).strict()
@@ -144,25 +144,13 @@ async function toPublicProject(project: CreativeProjectDetail, storage: StorageA
   }
 }
 
-function requireProject(
-  deps: ApiDependencies,
-  userId: string,
-  projectId: string,
-) {
-  return deps.creativeAssetRepository.getProject({ userId, projectId }).then(project => {
-    if (project === undefined) {
-      throw new CreativeAssetRepositoryError('CREATIVE_PROJECT_NOT_FOUND', `Creative project not found: ${projectId}`)
-    }
-    return project
-  })
-}
-
 export function createCreativeAssetRoutes(deps: ApiDependencies) {
+  const creativeAssets = createCreativeAssetUseCases({ repository: deps.creativeAssetRepository })
   return new Elysia()
     .get('/api/creative/projects', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(ListProjectsQuerySchema, query)
-      const page = await deps.creativeAssetRepository.listProjects({
+      const page = await creativeAssets.listProjects({
         userId: user.id,
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
@@ -173,20 +161,20 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
     .post('/api/creative/projects', async ({ request, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateCreativeProjectSchema, body)
-      const project = await deps.creativeAssetRepository.createProject({ ...input, userId: user.id })
+      const project = await creativeAssets.createProject({ ...input, userId: user.id })
       return { success: true, data: { project: await toPublicProject(project, deps.storage) } }
     })
     .get('/api/creative/projects/:projectId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { projectId } = validateInput(ProjectIdParamsSchema, params)
-      const project = await requireProject(deps, user.id, projectId)
+      const project = await creativeAssets.getProject({ userId: user.id, projectId })
       return { success: true, data: { project: await toPublicProject(project, deps.storage) } }
     })
     .patch('/api/creative/projects/:projectId', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { projectId } = validateInput(ProjectIdParamsSchema, params)
       const input = validateInput(UpdateProjectSchema, body)
-      const project = await deps.creativeAssetRepository.updateProject({
+      const project = await creativeAssets.updateProject({
         userId: user.id,
         projectId,
         patch: input,
@@ -197,7 +185,7 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const { projectId } = validateInput(ProjectIdParamsSchema, params)
       const input = validateInput(AttachAssetSchema, body)
-      const asset = await deps.creativeAssetRepository.attachAsset({
+      const asset = await creativeAssets.attachAsset({
         userId: user.id,
         projectId,
         assetId: input.assetId,
@@ -208,13 +196,13 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
     .delete('/api/creative/projects/:projectId/assets/:assetId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { projectId, assetId } = validateInput(ProjectIdParamsSchema.merge(AssetIdParamsSchema), params)
-      const project = await deps.creativeAssetRepository.detachAsset({ userId: user.id, projectId, assetId })
+      const project = await creativeAssets.detachAsset({ userId: user.id, projectId, assetId })
       return { success: true, data: { project: await toPublicProject(project, deps.storage) } }
     })
     .get('/api/creative/assets', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(ListAssetsQuerySchema, query)
-      const page = await deps.creativeAssetRepository.listAssets({
+      const page = await creativeAssets.listAssets({
         userId: user.id,
         ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
         ...(input.type !== undefined ? { type: input.type } : {}),
@@ -233,49 +221,46 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
     .post('/api/creative/assets', async ({ request, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateAssetRequestSchema, body)
-      const asset = await deps.creativeAssetRepository.createAsset({ ...input, userId: user.id })
+      const asset = await creativeAssets.createAsset({ ...input, userId: user.id })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .get('/api/creative/assets/:assetId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { assetId } = validateInput(AssetIdParamsSchema, params)
-      const asset = await deps.creativeAssetRepository.getAsset({ userId: user.id, assetId })
-      if (asset === undefined) {
-        throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${assetId}`)
-      }
+      const asset = await creativeAssets.getAsset({ userId: user.id, assetId })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .post('/api/creative/assets/:assetId/archive', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { assetId } = validateInput(AssetIdParamsSchema, params)
-      const asset = await deps.creativeAssetRepository.archiveAsset({ userId: user.id, assetId })
+      const asset = await creativeAssets.archiveAsset({ userId: user.id, assetId })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .post('/api/creative/assets/:assetId/versions', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { assetId } = validateInput(AssetIdParamsSchema, params)
       const input = validateInput(CreateVersionBodySchema, body)
-      const asset = await deps.creativeAssetRepository.createVersion({ ...input, assetId, userId: user.id })
+      const asset = await creativeAssets.createVersion({ ...input, assetId, userId: user.id })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .post('/api/creative/assets/:assetId/versions/from-generation', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { assetId } = validateInput(AssetIdParamsSchema, params)
       const input = validateInput(CreateCreativeAssetVersionFromGenerationSchema, body)
-      const asset = await deps.creativeAssetRepository.createVersionFromGeneration({ ...input, assetId, userId: user.id })
+      const asset = await creativeAssets.createVersionFromGeneration({ ...input, assetId, userId: user.id })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .post('/api/creative/assets/versions/:versionId/references', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { versionId } = validateInput(VersionIdParamsSchema, params)
       const input = validateInput(AddReferenceBodySchema, body)
-      const asset = await deps.creativeAssetRepository.addReference({ ...input, assetVersionId: versionId, userId: user.id })
+      const asset = await creativeAssets.addReference({ ...input, assetVersionId: versionId, userId: user.id })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .delete('/api/creative/assets/versions/:versionId/references/:referenceId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { versionId, referenceId } = validateInput(VersionIdParamsSchema.merge(ReferenceIdParamsSchema), params)
-      const asset = await deps.creativeAssetRepository.removeReference({
+      const asset = await creativeAssets.removeReference({
         userId: user.id,
         assetVersionId: versionId,
         referenceId,
@@ -286,7 +271,7 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const { versionId } = validateInput(VersionIdParamsSchema, params)
       const input = validateInput(TransitionVersionBodySchema, body)
-      const asset = await deps.creativeAssetRepository.transitionVersion({
+      const asset = await creativeAssets.transitionVersion({
         userId: user.id,
         assetVersionId: versionId,
         status: input.status,
