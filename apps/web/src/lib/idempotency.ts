@@ -25,11 +25,12 @@ export interface IdempotencyPayload {
   modelId: string
   params: Record<string, unknown>
   assetRefs?: Record<string, unknown>
+  creativeContext?: unknown
 }
 
 /** 生成提交 payload 的指纹。 */
 export function payloadFingerprint(payload: IdempotencyPayload): string {
-  return stableStringify({ modelId: payload.modelId, params: payload.params, assetRefs: payload.assetRefs })
+  return stableStringify({ modelId: payload.modelId, params: payload.params, assetRefs: payload.assetRefs, creativeContext: payload.creativeContext })
 }
 
 const MAX_CACHED = 100

@@ -108,6 +108,20 @@ describe('creative asset routes', () => {
       body: JSON.stringify({ userAssetId: 'api-character-front', role: 'front', position: 0, metadata: {} }),
     }))
     expect(referenceResponse.status).toBe(200)
+    const referenceBody = await referenceResponse.json() as { data: { asset: { versions: Array<{ references: Array<{ id: string }> }> } } }
+    const referenceId = referenceBody.data.asset.versions[0]?.references[0]?.id
+    if (referenceId === undefined) throw new Error('expected reference id')
+    const removeReferenceResponse = await app.handle(authed(`http://localhost/api/creative/assets/versions/${versionId}/references/${referenceId}`, {
+      method: 'DELETE',
+    }))
+    expect(removeReferenceResponse.status).toBe(200)
+
+    const readdReferenceResponse = await app.handle(authed(`http://localhost/api/creative/assets/versions/${versionId}/references`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ userAssetId: 'api-character-front', role: 'front', position: 0, metadata: {} }),
+    }))
+    expect(readdReferenceResponse.status).toBe(200)
 
     for (const status of ['generating', 'candidate', 'approved']) {
       const response = await app.handle(authed(`http://localhost/api/creative/assets/versions/${versionId}/status`, {

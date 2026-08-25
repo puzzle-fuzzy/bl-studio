@@ -28,6 +28,7 @@ export type {
   ResolvedCreativeGenerationReference,
   ListCreativeProjectsRepositoryInput,
   ListCreativeProjectsResult,
+  RemoveCreativeAssetReferenceRepositoryInput,
   TransitionCreativeAssetVersionRepositoryInput,
   UpdateCreativeProjectRepositoryInput,
 } from './types'

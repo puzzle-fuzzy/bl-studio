@@ -47,6 +47,23 @@ export const CREATIVE_ASSET_VERSION_STATUS_LABELS: Record<string, string> = {
   rejected: '已拒绝',
 }
 
+export const CREATIVE_ASSET_REFERENCE_ROLE_LABELS: Record<string, string> = {
+  front: '正面',
+  three_quarter: '三分之四侧面',
+  side: '侧面',
+  back: '背面',
+  full_body: '全身',
+  medium: '中景',
+  face_closeup: '面部特写',
+  wide: '广角',
+  detail: '细节',
+  isolated: '孤立物体',
+  interaction: '交互状态',
+  mask: '遮罩',
+  style_board: '风格板',
+  other: '其他',
+}
+
 export function creativeAssetTypeLabel(type: string | undefined): string {
   return type === undefined ? '素材' : (CREATIVE_ASSET_TYPE_LABELS[type] ?? type)
 }
@@ -57,6 +74,10 @@ export function creativeAssetStatusLabel(status: string | undefined): string {
 
 export function creativeAssetVersionStatusLabel(status: string | undefined): string {
   return status === undefined ? '未生成版本' : (CREATIVE_ASSET_VERSION_STATUS_LABELS[status] ?? status)
+}
+
+export function creativeAssetReferenceRoleLabel(role: string | undefined): string {
+  return role === undefined ? '参考图' : (CREATIVE_ASSET_REFERENCE_ROLE_LABELS[role] ?? role)
 }
 
 export function kindLabel(kind: string | undefined): string {

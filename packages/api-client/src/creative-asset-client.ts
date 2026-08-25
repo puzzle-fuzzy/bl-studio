@@ -182,6 +182,7 @@ export interface CreativeAssetApiClient {
   archiveCreativeAsset(assetId: string): Promise<CreativeAssetDetail>
   createCreativeAssetVersion(assetId: string, input: CreateCreativeAssetVersionRequest): Promise<CreativeAssetDetail>
   addCreativeAssetReference(versionId: string, input: AddCreativeAssetReferenceRequest): Promise<CreativeAssetDetail>
+  removeCreativeAssetReference(versionId: string, referenceId: string): Promise<CreativeAssetDetail>
   transitionCreativeAssetVersion(versionId: string, input: TransitionCreativeAssetVersionRequest): Promise<CreativeAssetDetail>
   createCreativeAssetVersionFromGeneration(assetId: string, input: CreateCreativeAssetVersionFromGenerationRequest): Promise<CreativeAssetDetail>
 }
@@ -331,6 +332,16 @@ export function createCreativeAssetClient(options: CreativeAssetClientOptions): 
       const data = await unwrapData(
         `${base}/api/creative/assets/versions/${encodeURIComponent(versionId)}/references`,
         jsonInit('POST', input),
+        fetchImpl,
+        CreativeAssetResponseSchema,
+      )
+      return data.asset
+    },
+
+    async removeCreativeAssetReference(versionId, referenceId) {
+      const data = await unwrapData(
+        `${base}/api/creative/assets/versions/${encodeURIComponent(versionId)}/references/${encodeURIComponent(referenceId)}`,
+        { method: 'DELETE', credentials: 'include' },
         fetchImpl,
         CreativeAssetResponseSchema,
       )

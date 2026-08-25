@@ -90,6 +90,25 @@ describe('creative asset repository', () => {
       now: now.toISOString(),
     })
     expect(referenced.versions[0]?.references[0]?.role).toBe('front')
+    const draftReferenceId = referenced.versions[0]?.references[0]?.id
+    if (draftReferenceId === undefined) throw new Error('expected draft reference')
+    const withoutReference = await repository.removeReference({
+      userId: ownerId,
+      assetVersionId: versionId,
+      referenceId: draftReferenceId,
+      now: now.toISOString(),
+    })
+    expect(withoutReference.versions[0]?.references).toHaveLength(0)
+    const restoredReference = await repository.addReference({
+      userId: ownerId,
+      assetVersionId: versionId,
+      userAssetId: 'character-front',
+      role: 'front',
+      position: 0,
+      metadata: { source: 'uploaded' },
+      now: now.toISOString(),
+    })
+    expect(restoredReference.versions[0]?.references).toHaveLength(1)
 
     await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'generating', now: now.toISOString() })
     await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'candidate', now: now.toISOString() })
@@ -138,6 +157,11 @@ describe('creative asset repository', () => {
       role: 'three_quarter',
       position: 0,
       metadata: {},
+    })).rejects.toMatchObject({ code: 'CREATIVE_ASSET_VERSION_STATE_INVALID' })
+    await expect(repository.removeReference({
+      userId: ownerId,
+      assetVersionId: versionId,
+      referenceId,
     })).rejects.toMatchObject({ code: 'CREATIVE_ASSET_VERSION_STATE_INVALID' })
   })
 

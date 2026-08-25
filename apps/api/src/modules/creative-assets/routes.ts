@@ -30,6 +30,7 @@ import { requireAuthUser } from '../auth/session'
 const ProjectIdParamsSchema = z.object({ projectId: z.string().trim().min(1).max(256) }).strict()
 const AssetIdParamsSchema = z.object({ assetId: z.string().trim().min(1).max(256) }).strict()
 const VersionIdParamsSchema = z.object({ versionId: z.string().trim().min(1).max(256) }).strict()
+const ReferenceIdParamsSchema = z.object({ referenceId: z.string().trim().min(1).max(256) }).strict()
 
 const ListProjectsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -269,6 +270,16 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
       const { versionId } = validateInput(VersionIdParamsSchema, params)
       const input = validateInput(AddReferenceBodySchema, body)
       const asset = await deps.creativeAssetRepository.addReference({ ...input, assetVersionId: versionId, userId: user.id })
+      return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
+    })
+    .delete('/api/creative/assets/versions/:versionId/references/:referenceId', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const { versionId, referenceId } = validateInput(VersionIdParamsSchema.merge(ReferenceIdParamsSchema), params)
+      const asset = await deps.creativeAssetRepository.removeReference({
+        userId: user.id,
+        assetVersionId: versionId,
+        referenceId,
+      })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
     .post('/api/creative/assets/versions/:versionId/status', async ({ request, params, body }) => {

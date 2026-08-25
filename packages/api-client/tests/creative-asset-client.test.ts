@@ -98,6 +98,7 @@ describe('creative asset api client', () => {
       jsonResponse({ success: true, data: { asset: detail } }),
       jsonResponse({ success: true, data: { asset: detail } }),
       jsonResponse({ success: true, data: { asset: detail } }),
+      jsonResponse({ success: true, data: { asset: detail } }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test/', fetch })
 
@@ -124,6 +125,7 @@ describe('creative asset api client', () => {
       metadata: {},
     })).resolves.toEqual(detail)
     await expect(client.transitionCreativeAssetVersion('version-1', { status: 'approved' })).resolves.toEqual(detail)
+    await expect(client.removeCreativeAssetReference('version-1', 'reference-1')).resolves.toEqual(detail)
 
     expect(calls.map(call => `${call.method} ${call.url}`)).toEqual([
       'GET http://api.test/api/creative/projects?limit=20&cursor=p+1&q=%E5%A4%9C%E8%A1%8C%E8%80%85%261',
@@ -139,6 +141,7 @@ describe('creative asset api client', () => {
       'POST http://api.test/api/creative/assets/asset-1/versions',
       'POST http://api.test/api/creative/assets/versions/version-1/references',
       'POST http://api.test/api/creative/assets/versions/version-1/status',
+      'DELETE http://api.test/api/creative/assets/versions/version-1/references/reference-1',
     ])
     expect(calls.every(call => call.credentials === 'include')).toBe(true)
     expect(JSON.parse(calls[0]?.body ?? '{}')).toEqual({})

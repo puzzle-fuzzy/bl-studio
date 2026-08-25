@@ -35,6 +35,7 @@ import type {
   CreativeAssetSummary,
   CreativeAssetVersion,
   CreateCreativeAssetVersionFromGenerationRepositoryInput,
+  RemoveCreativeAssetReferenceRepositoryInput,
   CreativeProject,
   CreativeProjectAssetMembership,
   CreativeProjectDetail,
@@ -601,7 +602,7 @@ async function attachAssetInTransaction(
 
 function assertVersionTransition(from: CreativeAssetVersionStatus, to: CreativeAssetVersionStatus): void {
   const allowed: Record<CreativeAssetVersionStatus, readonly CreativeAssetVersionStatus[]> = {
-    draft: ['generating', 'archived'],
+    draft: ['generating', 'candidate', 'archived'],
     generating: ['candidate', 'rejected'],
     candidate: ['approved', 'rejected', 'archived'],
     approved: ['archived'],
@@ -1072,6 +1073,48 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
       })
       const version = await db.select({ assetId: creativeAssetVersions.assetId }).from(creativeAssetVersions).where(eq(creativeAssetVersions.id, input.assetVersionId)).limit(1)
       const assetId = version[0]?.assetId
+      if (assetId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Reference asset could not be reloaded')
+      return assetDetail(db, input.userId, assetId)
+    },
+
+    async removeReference(input: RemoveCreativeAssetReferenceRepositoryInput) {
+      const now = nowDate(input.now)
+      let assetId: string | undefined
+      await db.transaction(async tx => {
+        const [reference] = await tx
+          .select({
+            reference: creativeAssetReferences,
+            version: creativeAssetVersions,
+            assetStatus: creativeAssets.status,
+          })
+          .from(creativeAssetReferences)
+          .innerJoin(creativeAssetVersions, eq(creativeAssetVersions.id, creativeAssetReferences.assetVersionId))
+          .innerJoin(creativeAssets, eq(creativeAssets.id, creativeAssetVersions.assetId))
+          .where(and(
+            eq(creativeAssetReferences.id, input.referenceId),
+            eq(creativeAssetReferences.assetVersionId, input.assetVersionId),
+            eq(creativeAssets.userId, input.userId),
+            isNull(creativeAssetReferences.deletedAt),
+            isNull(creativeAssetVersions.deletedAt),
+            isNull(creativeAssets.deletedAt),
+          ))
+          .limit(1)
+          .for('update')
+        if (reference === undefined) {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', `Creative asset reference not found: ${input.referenceId}`)
+        }
+        if (reference.assetStatus === 'archived') {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', 'References cannot be changed on an archived asset')
+        }
+        if (reference.version.status !== 'draft') {
+          throw new CreativeAssetRepositoryError('CREATIVE_ASSET_VERSION_STATE_INVALID', 'References can only be changed on a draft asset version')
+        }
+        assetId = reference.version.assetId
+        await tx
+          .update(creativeAssetReferences)
+          .set({ deletedAt: now, deletedBy: input.userId, updatedBy: input.userId, updatedAt: now })
+          .where(eq(creativeAssetReferences.id, input.referenceId))
+      })
       if (assetId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Reference asset could not be reloaded')
       return assetDetail(db, input.userId, assetId)
     },

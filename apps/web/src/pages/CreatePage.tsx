@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router'
-import { ChevronDown, Info, Loader2, X } from 'lucide-react'
-import type { AssetItem, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
+import { ChevronDown, Image as ImageIcon, Info, Loader2, Sparkles, X } from 'lucide-react'
+import type { AssetItem, CreativeAssetDetail, GenerationEstimate, ModelCatalogItem } from '@bailian-studio/api-client'
 import { validateModelParams } from '@bailian-studio/model-core'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
@@ -11,6 +11,7 @@ import { ModelSelector } from '@/components/create/ModelSelector'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ParameterForm } from '@/components/create/ParameterForm'
 import { PromptInput } from '@/components/create/PromptInput'
+import { CreativeAssetPickerDialog } from '@/components/assets/CreativeAssetPickerDialog'
 import { CreationPresetPanel } from '@/components/create/CreationPresetPanel'
 import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { EstimateSummary } from '@/components/create/EstimateSummary'
@@ -30,8 +31,9 @@ import { rememberRecentModelId } from '@/lib/creation-presets'
 import { modelNameZh } from '@/lib/model-modes'
 import { referenceFormatOf, restorePromptReferences } from '@/lib/reference-format'
 import { decodeDeepLinkParams } from '@/lib/deeplink-params'
-import { apiClient } from '@/lib/api'
+import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
+import { buildCreativeGenerationContext, creativeAssetReferencesToAssetItems } from '@/lib/creative-generation'
 
 const ESTIMATE_DEBOUNCE_MS = 350
 
@@ -64,16 +66,36 @@ export function CreatePage() {
   // 对比生成：同提示词多模型各提交一条（同一 batchId 分组）。
   const [compareModels, setCompareModels] = useState<ModelCatalogItem[]>([])
   const [compareBusy, setCompareBusy] = useState(false)
+  const [creativeAssets, setCreativeAssets] = useState<CreativeAssetDetail[]>([])
+  const [creativePickerOpen, setCreativePickerOpen] = useState(false)
 
   const estimateTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const estimateEpoch = useRef(0)
 
   const model = selectModelById(models, modelId ?? '')
+  const creativeAssetId = searchParams.get('creativeAssetId')
+  const projectId = searchParams.get('projectId') ?? undefined
+  const creativeContext = useMemo(
+    () => (model === undefined
+      ? undefined
+      : buildCreativeGenerationContext({
+          model,
+          prompt: typeof values.prompt === 'string' ? values.prompt : '',
+          negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : undefined,
+          projectId,
+          assets: creativeAssets,
+        })),
+    [creativeAssets, model, projectId, values.negativePrompt, values.prompt],
+  )
 
   // 加载模型目录；默认模型由 ModelSelector 级联下拉负责（视频/首子模式/首模型）。
   useEffect(() => {
     void loadModels()
   }, [loadModels])
+
+  useEffect(() => {
+    if (creativeAssetId !== null) setCreativePickerOpen(true)
+  }, [creativeAssetId])
 
   // `?reuse=<id>` 深链：从历史生成记录还原模型与全部参数（含参考图）。
   // 每个 reuse id 只在首次进入时还原一次：还原完成（或失败）后用 ref 记录，
@@ -113,7 +135,7 @@ export function CreatePage() {
   // 从带深链参数（?reuse= / ?params= / ?edit= / ?ref=）进入 /create 后，再导航到
   // 无参 /create（如点侧栏「创作」）时重置为空白表单。React Router 同路由仅 query
   // 变化不会重挂组件，还原进本地 useState 的内容需显式清空。
-  const deepLinkKeys = ['reuse', 'params', 'edit', 'ref', 'select'] as const
+  const deepLinkKeys = ['reuse', 'params', 'edit', 'ref', 'select', 'creativeAssetId'] as const
   useEffect(() => {
     const hasIntent = deepLinkKeys.some(key => searchParams.get(key) !== null)
     if (hasIntent) return
@@ -194,7 +216,7 @@ export function CreatePage() {
     estimateTimer.current = setTimeout(() => {
       const { params, assetRefs } = buildSubmitPayload(model, values)
       apiClient
-        .estimateGeneration({ modelId: model.id, params, assetRefs })
+        .estimateGeneration({ modelId: model.id, params, assetRefs, ...(creativeContext === undefined ? {} : { creativeContext }) })
         .then(result => {
           if (epoch === estimateEpoch.current) setEstimate(result)
         })
@@ -208,7 +230,7 @@ export function CreatePage() {
     return () => {
       if (estimateTimer.current !== null) clearTimeout(estimateTimer.current)
     }
-  }, [model, values])
+  }, [creativeContext, model, values])
 
   const schema = useMemo(
     () => (model === undefined ? [] : buildParameterFormSchema(model.parameters)),
@@ -227,10 +249,20 @@ export function CreatePage() {
   const mediaFields = inputFields.filter(field => field.control === 'media')
   const textInputFields = inputFields.filter(field => field.control !== 'media')
 
+  const creativeReferenceItems = useMemo(
+    () => creativeAssetReferencesToAssetItems(creativeAssets),
+    [creativeAssets],
+  )
+  const creativeMediaField = mediaFields.find(field => field.parameter.mediaKind === 'image')
   // 提示词 @ 引用的参考池：以 `references` 媒体字段（参考素材）为唯一事实源。
-  const referencePool = Array.isArray(values.references) ? values.references : []
+  const referencePool = creativeReferenceItems.length > 0
+    ? creativeReferenceItems
+    : Array.isArray(values.references) ? values.references : []
 
   const handleValueChange = (name: string, value: unknown) => {
+    if (creativeAssets.length > 0 && mediaFields.some(field => field.parameter.name === name)) {
+      setCreativeAssets([])
+    }
     setValues(current => ({ ...current, [name]: value }))
     // 字段值一旦变化，立即清除该字段的旧校验错误（如选完参考图后「为必填」红字应消失）。
     setFieldErrors(current => {
@@ -278,7 +310,7 @@ export function CreatePage() {
     setIsSubmitting(true)
     try {
       const { params, assetRefs } = buildSubmitPayload(model, values)
-      const payload = { modelId: model.id, params, assetRefs }
+      const payload = { modelId: model.id, params, assetRefs, ...(creativeContext === undefined ? {} : { creativeContext }) }
       const idempotencyKey = idempotencyKeyFor(payload)
       await apiClient.createGeneration({ ...payload, idempotencyKey })
       clearIdempotencyKey(payload)
@@ -313,7 +345,14 @@ export function CreatePage() {
         continue
       }
       const { params, assetRefs } = buildSubmitPayload(compareModel, values)
-      const payload = { modelId: compareModel.id, params, assetRefs }
+      const compareCreativeContext = buildCreativeGenerationContext({
+        model: compareModel,
+        prompt: typeof values.prompt === 'string' ? values.prompt : '',
+        negativePrompt: typeof values.negativePrompt === 'string' ? values.negativePrompt : undefined,
+        projectId,
+        assets: creativeAssets,
+      })
+      const payload = { modelId: compareModel.id, params, assetRefs, ...(compareCreativeContext === undefined ? {} : { creativeContext: compareCreativeContext }) }
       const idempotencyKey = idempotencyKeyFor(payload)
       try {
         await apiClient.createGeneration({ ...payload, idempotencyKey, batchId })
@@ -379,6 +418,17 @@ export function CreatePage() {
             {mediaFields.length > 0 && (
               <div className="space-y-2">
                 <p className="text-sm font-medium">输入参考素材</p>
+                {creativeMediaField !== undefined && (
+                  <CreativeAssetReferencePanel
+                    assets={creativeAssets}
+                    onOpen={() => setCreativePickerOpen(true)}
+                    onRemove={assetId => {
+                      const next = creativeAssets.filter(asset => asset.id !== assetId)
+                      setCreativeAssets(next)
+                      setValues(current => ({ ...current, [creativeMediaField.parameter.name]: creativeAssetReferencesToAssetItems(next) }))
+                    }}
+                  />
+                )}
                 <ParameterForm
                   fields={mediaFields}
                   values={values}
@@ -518,7 +568,39 @@ export function CreatePage() {
           <GenerationsPanel variant="embedded" />
         </div>
       </VirtualScrollArea>
+
+      <CreativeAssetPickerDialog
+        open={creativePickerOpen}
+        onOpenChange={setCreativePickerOpen}
+        {...(creativeAssetId === null ? {} : { initialAssetId: creativeAssetId })}
+        onSelect={assets => {
+          setCreativeAssets(assets)
+          if (creativeMediaField !== undefined) {
+            setValues(current => ({ ...current, [creativeMediaField.parameter.name]: creativeAssetReferencesToAssetItems(assets) }))
+          }
+        }}
+      />
     </form>
+  )
+}
+
+function CreativeAssetReferencePanel({
+  assets,
+  onOpen,
+  onRemove,
+}: {
+  assets: readonly CreativeAssetDetail[]
+  onOpen: () => void
+  onRemove: (assetId: string) => void
+}) {
+  return (
+    <div className="rounded-lg border border-dashed border-primary/30 bg-primary/5 p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div><p className="text-sm font-medium">已确认创意资产</p><p className="mt-1 text-xs text-muted-foreground">引用版本和参考图会写入本次生成快照</p></div>
+        <Button type="button" size="sm" variant="outline" onClick={onOpen}><Sparkles className="size-3.5" />选择主体 / 场景</Button>
+      </div>
+      {assets.length > 0 && <div className="mt-3 flex flex-wrap gap-2">{assets.map(asset => <div key={asset.id} className="inline-flex items-center gap-2 rounded-md border border-primary/20 bg-background/70 px-2 py-1.5"><span className="size-7 overflow-hidden rounded bg-muted">{asset.preview?.thumbnailUrl || asset.preview?.url ? <img src={resolveApiUrl(asset.preview.thumbnailUrl ?? asset.preview.url)} alt="" className="size-full object-cover" /> : <ImageIcon className="m-1.5 size-4 text-muted-foreground" />}</span><span className="max-w-36 truncate text-xs">{asset.name}</span><button type="button" aria-label={`移除${asset.name}`} onClick={() => onRemove(asset.id)} className="rounded p-0.5 text-muted-foreground hover:text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="size-3" /></button></div>)}</div>}
+    </div>
   )
 }
 

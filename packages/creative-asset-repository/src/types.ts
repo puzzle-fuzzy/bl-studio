@@ -186,6 +186,13 @@ export interface AddCreativeAssetReferenceRepositoryInput extends CreateCreative
   now?: string
 }
 
+export interface RemoveCreativeAssetReferenceRepositoryInput {
+  userId: string
+  assetVersionId: string
+  referenceId: string
+  now?: string
+}
+
 export interface TransitionCreativeAssetVersionRepositoryInput {
   userId: string
   assetVersionId: string
@@ -251,6 +258,7 @@ export interface CreativeAssetRepository {
   createVersion(input: CreateCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   createVersionFromGeneration(input: CreateCreativeAssetVersionFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
   addReference(input: AddCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
+  removeReference(input: RemoveCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   transitionVersion(input: TransitionCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   resolveGenerationBindings(input: ResolveCreativeGenerationBindingsRepositoryInput): Promise<ResolvedCreativeGenerationBinding[]>
 }
