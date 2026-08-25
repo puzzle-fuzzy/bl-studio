@@ -303,13 +303,11 @@ export function LiquidSandBackground() {
       field.dataset.pointerActive = inside ? 'true' : 'false'
       field.style.setProperty('--liquid-pointer-x', `${pointer.targetX * 100}%`)
       field.style.setProperty('--liquid-pointer-y', `${(1 - pointer.targetY) * 100}%`)
-      if (reduceMotion.matches) draw()
     }
 
     const releasePointer = () => {
       pointer.targetStrength = 0
       field.dataset.pointerActive = 'false'
-      if (reduceMotion.matches) draw()
     }
 
     const draw = (now = performance.now()) => {
@@ -317,10 +315,9 @@ export function LiquidSandBackground() {
       animationFrame = 0
       resize()
 
-      if (!reduceMotion.matches) {
-        const delta = Math.min((now - previousTime) / 1000, 0.034)
-        elapsed += Math.max(delta, 0)
-      }
+      const delta = Math.min((now - previousTime) / 1000, 0.034)
+      // reduced-motion 下减速而不是冻结，否则背景会退化成静态首帧，无法满足流动背景的基本语义。
+      elapsed += Math.max(delta, 0) * (reduceMotion.matches ? 0.38 : 1)
       previousTime = now
 
       pointer.x += (pointer.targetX - pointer.x) * 0.075
@@ -334,7 +331,7 @@ export function LiquidSandBackground() {
       gl.uniform3f(uniforms.pointer, pointer.x, pointer.y, pointer.strength)
       gl.drawArrays(gl.TRIANGLES, 0, 3)
 
-      if (!reduceMotion.matches && !document.hidden) {
+      if (!document.hidden) {
         animationFrame = window.requestAnimationFrame(draw)
       }
     }
