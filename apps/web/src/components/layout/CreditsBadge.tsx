@@ -3,7 +3,7 @@ import { useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { SidebarMenuButton } from '@/components/ui/sidebar'
 import { useCreditsStore } from '@/stores/credits-store'
-import { formatCentsCompact, formatCentsWithGrouping } from '@/lib/money'
+import { formatCentsWithGrouping } from '@/lib/money'
 
 /**
  * 积分余额。
@@ -30,15 +30,13 @@ export function CreditsBadge({ layout = 'badge' }: { layout?: 'badge' | 'row' })
     return (
       <SidebarMenuButton
         aria-label={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
-        className="h-auto w-full group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-full! group-data-[collapsible=icon]:gap-1! group-data-[collapsible=icon]:px-1!"
+        className="h-10 w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!"
+        title={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
         tooltip={`积分 ${formatCentsWithGrouping(balance.availableCents)}`}
       >
         <Coins className="size-4 text-amber-500" />
         <span className="flex-1 text-left group-data-[collapsible=icon]:hidden">积分</span>
-        <span className="text-xs font-medium tabular-nums group-data-[collapsible=icon]:text-[11px]">
-          <span className="group-data-[collapsible=icon]:hidden">{formatCentsWithGrouping(balance.availableCents)}</span>
-          <span className="hidden group-data-[collapsible=icon]:inline">{formatCentsCompact(balance.availableCents)}</span>
-        </span>
+        <span className="text-xs font-medium tabular-nums group-data-[collapsible=icon]:hidden">{formatCentsWithGrouping(balance.availableCents)}</span>
       </SidebarMenuButton>
     )
   }

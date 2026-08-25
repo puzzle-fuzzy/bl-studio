@@ -15,10 +15,9 @@ import {
   SidebarMenuItem,
   SidebarRail,
   SidebarSeparator,
-  SidebarTrigger,
 } from '@/components/ui/sidebar'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { BrandMark } from '@/components/shared/BrandMark'
+import { LoginWordmark } from '@/components/auth/LoginWordmark'
 import { NotificationMenu } from '@/components/layout/NotificationMenu'
 import { CreditsBadge } from '@/components/layout/CreditsBadge'
 import { UserMenu } from '@/components/layout/UserMenu'
@@ -97,9 +96,16 @@ export function Nav() {
 
   return (
     <Sidebar collapsible="icon">
-      <SidebarTrigger className="absolute top-3 right-2 z-10" />
       <SidebarHeader>
-        <BrandMark className="px-2 py-1" />
+        <div className="flex min-h-14 items-center px-2 py-1 group-data-[collapsible=icon]:justify-center">
+          <div className="group-data-[collapsible=icon]:hidden" aria-hidden="true">
+            <LoginWordmark className="login-wordmark--sidebar" />
+          </div>
+          <div className="hidden group-data-[collapsible=icon]:block" aria-hidden="true">
+            <LoginWordmark compact />
+          </div>
+          <span className="sr-only">Bailian Studio</span>
+        </div>
         <ProjectSwitcher />
       </SidebarHeader>
       <SidebarContent>
@@ -130,8 +136,8 @@ export function Nav() {
           </div>
         ))}
       </SidebarContent>
-      <SidebarFooter className="border-t p-2">
-        <div className="space-y-1">
+      <SidebarFooter className="border-t p-2 group-data-[collapsible=icon]:p-1.5">
+        <div className="space-y-1 group-data-[collapsible=icon]:flex group-data-[collapsible=icon]:flex-col group-data-[collapsible=icon]:items-center">
           <NotificationMenu />
           <CreditsBadge layout="row" />
           <UserMenu />

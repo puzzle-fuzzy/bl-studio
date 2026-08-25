@@ -231,6 +231,93 @@
   letter-spacing: -0.085em;
 }
 
+.login-wordmark--sidebar {
+  --wordmark-ink: var(--sidebar-foreground);
+  --wordmark-accent: color-mix(in srgb, #b978e6 68%, var(--sidebar-foreground));
+  transform: skewX(-7deg) rotate(-1deg);
+}
+
+.login-wordmark--sidebar::before {
+  border-color: color-mix(in srgb, var(--wordmark-accent) 36%, transparent);
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--wordmark-accent) 10%, transparent), transparent 56%),
+    repeating-linear-gradient(90deg, color-mix(in srgb, var(--wordmark-accent) 12%, transparent) 0 1px, transparent 1px 8px);
+}
+
+.login-wordmark--sidebar::after {
+  background: color-mix(in srgb, var(--wordmark-accent) 72%, var(--wordmark-ink));
+}
+
+.login-wordmark--sidebar .login-wordmark__word {
+  text-shadow: 0.11em 0.1em 0 color-mix(in srgb, var(--wordmark-accent) 44%, transparent);
+  -webkit-text-stroke-color: color-mix(in srgb, var(--wordmark-ink) 88%, transparent);
+}
+
+.login-wordmark--sidebar .login-wordmark__word::before {
+  -webkit-text-stroke-color: color-mix(in srgb, var(--wordmark-accent) 78%, transparent);
+}
+
+.login-wordmark--sidebar .login-wordmark__word::after {
+  background: color-mix(in srgb, var(--wordmark-accent) 72%, var(--wordmark-ink));
+}
+
+.login-wordmark--compact {
+  position: relative;
+  display: inline-flex;
+  width: 2.5rem;
+  height: 2.5rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.25rem 0.35rem;
+  transform: skewX(-7deg) rotate(-3deg);
+  transform-origin: center;
+}
+
+.login-wordmark--compact::before {
+  position: absolute;
+  inset: 0.22rem 0.08rem 0.18rem;
+  border: 1px solid color-mix(in srgb, #b978e6 42%, var(--sidebar-foreground));
+  background: linear-gradient(135deg, color-mix(in srgb, #b978e6 12%, transparent), transparent 68%);
+  clip-path: polygon(0 12%, 96% 0, 100% 84%, 8% 100%);
+  content: '';
+}
+
+.login-wordmark--compact::after {
+  position: absolute;
+  right: 0.1rem;
+  bottom: 0.2rem;
+  width: 0.9rem;
+  height: 0.12rem;
+  background: color-mix(in srgb, #b978e6 74%, var(--sidebar-foreground));
+  content: '';
+  transform: rotate(-9deg);
+}
+
+.login-wordmark__compact-primary,
+.login-wordmark__compact-secondary {
+  position: relative;
+  z-index: 1;
+  color: transparent;
+  font-family: Impact, Haettenschweiler, 'Arial Narrow Bold', sans-serif;
+  font-weight: 900;
+  line-height: 0.8;
+  -webkit-text-stroke: 0.9px var(--sidebar-foreground);
+}
+
+.login-wordmark__compact-primary {
+  font-size: 1.45rem;
+  letter-spacing: -0.1em;
+  text-shadow: 0.1em 0.1em 0 color-mix(in srgb, #b978e6 46%, transparent);
+}
+
+.login-wordmark__compact-secondary {
+  margin-top: 0.55rem;
+  margin-left: -0.2rem;
+  font-size: 0.95rem;
+  letter-spacing: -0.08em;
+  -webkit-text-stroke-color: color-mix(in srgb, #b978e6 82%, var(--sidebar-foreground));
+}
+
 .login-page__veil {
   position: absolute;
   z-index: 1;
@@ -340,7 +427,7 @@
     radial-gradient(ellipse at 24% 70%, #0759e8 0 14%, transparent 48%),
     radial-gradient(ellipse at 78% 28%, #7217d4 0 14%, transparent 48%),
     radial-gradient(circle at 50% 48%, #171a24 0%, #0b0c12 38%, #050609 100%);
-  animation: login-liquid-sand-fallback 13s ease-in-out infinite alternate;
+  animation: login-liquid-sand-fallback 7s ease-in-out infinite alternate;
   opacity: 1;
   transition: opacity 500ms ease-out;
 }
@@ -374,10 +461,10 @@
 
 @keyframes login-liquid-sand-fallback {
   0% {
-    transform: scale(1) translate3d(-1%, 1%, 0);
+    transform: scale(1.02) translate3d(-8%, 1%, 0);
   }
   100% {
-    transform: scale(1.08) translate3d(2%, -1%, 0);
+    transform: scale(1.12) translate3d(8%, -2%, 0);
   }
 }
 

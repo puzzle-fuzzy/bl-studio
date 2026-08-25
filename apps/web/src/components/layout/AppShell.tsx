@@ -1,5 +1,5 @@
 import { Outlet } from 'react-router'
-import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar'
+import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 import { Toaster } from '@/components/ui/sonner'
 import { Nav } from '@/components/layout/Nav'
 import { GlobalMessage } from '@/components/shared/GlobalMessage'
@@ -9,8 +9,8 @@ import { useAuthStore } from '@/stores/auth-store'
 import { useGenerationEvents } from '@/hooks/use-generation-events'
 
 /**
- * 已登录应用外壳：侧栏（导航 + 顶部折叠按钮 + 底部通知/积分/账户）+ 内容区。
- * 折叠按钮已移入侧栏（absolute 相对侧边栏），随其收缩移动。无顶栏。
+ * 已登录应用外壳：侧栏（导航 + 底部通知/积分/账户）+ 内容区。
+ * 折叠按钮位于内容区顶部工具条，不遮挡侧栏 Logo，也能在移动端打开侧栏抽屉。
  * 在此层挂载一次 SSE 订阅（跨路由常开）与全局弹层。
  */
 export function AppShell() {
@@ -23,11 +23,16 @@ export function AppShell() {
     <SidebarProvider>
       <Nav />
       <SidebarInset>
-        <main className="flex-1 overflow-auto p-4 md:p-6">
-          <ErrorBoundary>
-            <Outlet />
-          </ErrorBoundary>
-        </main>
+        <div className="flex min-h-svh flex-col">
+          <header className="sticky top-0 z-30 flex h-12 shrink-0 items-center border-b border-border/70 bg-background/90 px-4 backdrop-blur md:px-6">
+            <SidebarTrigger aria-label="展开或收起侧边栏" title="展开或收起侧边栏" className="size-9" />
+          </header>
+          <div className="flex-1 overflow-auto p-4 md:p-6">
+            <ErrorBoundary>
+              <Outlet />
+            </ErrorBoundary>
+          </div>
+        </div>
       </SidebarInset>
       <GlobalMessage />
       <AuthDialog />

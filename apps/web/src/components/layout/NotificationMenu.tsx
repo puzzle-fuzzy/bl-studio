@@ -42,13 +42,13 @@ export function NotificationMenu() {
         {/* 侧栏底部整行触发器：铃铛 + 通知 + 未读徽标 */}
         <SidebarMenuButton
           aria-label="通知"
-          className="relative w-full group-data-[collapsible=icon]:h-10! group-data-[collapsible=icon]:w-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0!"
+          className="relative w-full group-data-[collapsible=icon]:mx-auto! group-data-[collapsible=icon]:size-10! group-data-[collapsible=icon]:justify-center group-data-[collapsible=icon]:gap-0! group-data-[collapsible=icon]:px-0!"
           title="通知"
         >
           <Bell className="size-4" />
           <span className="group-data-[collapsible=icon]:hidden">通知</span>
           {unreadCount > 0 && (
-            <span className="ml-auto flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1">
+            <span className="z-10 ml-auto flex size-4 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground group-data-[collapsible=icon]:absolute group-data-[collapsible=icon]:-right-1 group-data-[collapsible=icon]:-top-1">
               {unreadCount}
             </span>
           )}
@@ -61,6 +61,7 @@ export function NotificationMenu() {
             <button
               type="button"
               className="text-xs text-muted-foreground hover:text-foreground"
+              title="将全部通知标记为已读"
               onClick={() => void markAllRead()}
             >
               全部已读
@@ -92,7 +93,7 @@ export function NotificationMenu() {
 }
 
 function notificationKindIcon(kind: AppNotification['kind']): React.ReactNode {
-  if (kind === 'like') return <Heart data-icon className="size-3.5 shrink-0 text-destructive" />
-  if (kind === 'favorite') return <Bookmark data-icon className="size-3.5 shrink-0 text-primary" />
-  return <Info data-icon className="size-3.5 shrink-0 text-muted-foreground" />
+  if (kind === 'like') return <Heart data-icon aria-hidden="true" className="size-3.5 shrink-0 text-destructive" />
+  if (kind === 'favorite') return <Bookmark data-icon aria-hidden="true" className="size-3.5 shrink-0 text-primary" />
+  return <Info data-icon aria-hidden="true" className="size-3.5 shrink-0 text-muted-foreground" />
 }

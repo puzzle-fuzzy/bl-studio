@@ -1,7 +1,16 @@
-/** 登录页专用空心字标；通用 BrandMark 继续用于应用内导航和法律页。 */
-export function LoginWordmark() {
+/** 登录页空心字标；应用侧栏复用完整字标，并使用同视觉语言的紧凑 BS 标记。 */
+export function LoginWordmark({ compact = false, className }: { compact?: boolean; className?: string }) {
+  if (compact) {
+    return (
+      <div className={`login-wordmark login-wordmark--compact${className ? ` ${className}` : ''}`} role="img" aria-label="Bailian Studio">
+        <span className="login-wordmark__compact-primary" aria-hidden="true">B</span>
+        <span className="login-wordmark__compact-secondary" aria-hidden="true">S</span>
+      </div>
+    )
+  }
+
   return (
-    <div className="login-wordmark" role="img" aria-label="Bailian Studio">
+    <div className={`login-wordmark${className ? ` ${className}` : ''}`} role="img" aria-label="Bailian Studio">
       <span className="login-wordmark__word login-wordmark__word--bailian" data-word="BAILIAN" aria-hidden="true">
         BAILIAN
       </span>
