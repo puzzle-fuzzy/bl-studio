@@ -42,7 +42,7 @@ const createPointFieldFragment = (
 
   let density = clamp(max(max(mainMass, risingMass), max(max(upperMass, bridge), topDrop)), 0.0, 1.0);
   let aspect = max(resolution.x / max(resolution.y, 1.0), 0.5);
-  let cells = vec2f(70.0 * aspect, 70.0);
+  let cells = vec2f(84.0 * aspect, 84.0);
 
   // Stable per-cell phases make the movement feel organic instead of uniform.
   let cell = floor(p * cells);
@@ -70,20 +70,20 @@ const createPointFieldFragment = (
   let local = fract(moved * cells) - vec2f(0.5, 0.5);
   let distanceToDot = length(local);
   let pulse = 0.5 + 0.5 * sin(time * (0.62 + randomA * 0.18) + phaseA);
-  let dotRadius = 0.032 + density * (0.122 + pulse * 0.018) + hover * 0.020;
+  let dotRadius = 0.038 + density * (0.140 + pulse * 0.022) + hover * 0.024;
   let dot = 1.0 - smoothstep(dotRadius * 0.52, dotRadius, distanceToDot);
   let edgeFade = smoothstep(0.015, 0.12, density);
-  let alpha = dot * edgeFade * (0.16 + density * 0.74 + hover * 0.10);
+  let alpha = clamp(dot * edgeFade * (0.34 + density * 0.92 + hover * 0.18), 0.0, 1.0);
 
   let ring = (0.5 + 0.5 * sin(pointerDistance * 52.0 - time * 3.8))
     * (1.0 - smoothstep(0.0, 0.38, pointerDistance))
     * pointer.z;
   let blueInfluence = clamp(hover * 0.92 + ring * 0.16, 0.0, 1.0);
   let darkInfluence = hover * (1.0 - smoothstep(0.025, 0.20, pointerDistance)) * 0.76;
-  let purple = vec3f(0.72, 0.42, 0.80);
+  let purple = vec3f(0.68, 0.32, 0.78);
   let electricBlue = vec3f(0.06, 0.04, 0.82);
   let nearBlack = vec3f(0.025, 0.018, 0.045);
-  let color = mix(purple, electricBlue, blueInfluence);
+  var color = mix(purple, electricBlue, blueInfluence);
   color = mix(color, nearBlack, darkInfluence);
 
   return vec4f(color, alpha);
@@ -182,6 +182,7 @@ export function TypeGpuPointField() {
           fragment: createPointFieldFragment(timeUniform, pointerUniformRef.current, resolutionUniform),
           targets: { format },
         })
+        await pipeline.initAsync()
         const reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches
         const startedAt = performance.now()
 

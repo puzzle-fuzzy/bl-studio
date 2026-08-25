@@ -247,7 +247,7 @@
   inset: 0;
   overflow: hidden;
   pointer-events: none;
-  color: rgb(206 137 222 / 0.75);
+  color: rgb(194 91 214 / 0.86);
 }
 
 .login-point-field__fallback,
@@ -261,9 +261,9 @@
 }
 
 .login-point-field__fallback {
-  background-image: radial-gradient(circle, currentColor 0 2px, transparent 2.4px);
+  background-image: radial-gradient(circle, currentColor 0 1.7px, transparent 2.1px);
   background-position: 0 0;
-  background-size: 12px 12px;
+  background-size: 10px 10px;
   -webkit-mask-image:
     radial-gradient(ellipse 30% 29% at 20% 75%, #000 0 78%, transparent 100%),
     radial-gradient(ellipse 17% 30% at 31% 50%, #000 0 78%, transparent 100%),
@@ -278,15 +278,15 @@
     radial-gradient(ellipse 23% 16% at 40% 57%, #000 0 78%, transparent 100%),
     radial-gradient(ellipse 8% 11% at 31% 5%, #000 0 78%, transparent 100%);
   mask-composite: add;
-  opacity: 0.92;
+  opacity: 0.98;
   animation: login-point-field-drift 15s ease-in-out infinite alternate;
   transition: opacity 500ms ease-out;
 }
 
 .login-point-field__pointer {
-  background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 2.8px, transparent 3.2px);
+  background-image: radial-gradient(circle, rgb(24 8 232 / 0.98) 0 2.4px, transparent 2.9px);
   background-position: 0 0;
-  background-size: 12px 12px;
+  background-size: 10px 10px;
   -webkit-mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
   mask-image: radial-gradient(circle 10.5rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 34%, transparent 100%);
   mix-blend-mode: multiply;
@@ -297,9 +297,9 @@
 .login-point-field__pointer::after {
   position: absolute;
   inset: 0;
-  background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 2.9px, transparent 3.3px);
+  background-image: radial-gradient(circle, rgb(7 3 20 / 0.96) 0 2.5px, transparent 3px);
   background-position: 0 0;
-  background-size: 12px 12px;
+  background-size: 10px 10px;
   -webkit-mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
   mask-image: radial-gradient(circle 5.8rem at var(--pointer-x, 22%) var(--pointer-y, 72%), #000 0 30%, transparent 100%);
   content: '';
@@ -315,7 +315,7 @@
 }
 
 .login-point-field[data-gpu-ready='true'] .login-point-field__canvas {
-  opacity: 0.92;
+  opacity: 1;
 }
 
 .login-point-field[data-pointer-active='true']:not([data-gpu-ready='true']) .login-point-field__pointer {
@@ -356,7 +356,7 @@
   }
 
   .login-point-field {
-    opacity: 0.72;
+    opacity: 0.84;
   }
 }
 
