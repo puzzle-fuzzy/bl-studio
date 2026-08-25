@@ -111,7 +111,7 @@ export function LoginPage() {
                     <Input
                       id="login-display-name"
                       maxLength={100}
-                      className="h-11"
+                      className="h-auto py-2"
                       value={displayName}
                       onChange={event => setDisplayName(event.target.value)}
                     />
@@ -123,7 +123,7 @@ export function LoginPage() {
                     id="login-email"
                     type="email"
                     autoComplete="email"
-                    className="h-11"
+                    className="h-auto py-2"
                     value={email}
                     onChange={event => setEmail(event.target.value)}
                     required
@@ -148,19 +148,19 @@ export function LoginPage() {
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                     minLength={8}
                     maxLength={256}
-                    className="h-11"
+                    className="h-auto py-2"
                     value={password}
                     onChange={event => setPassword(event.target.value)}
                     required
                   />
                 </div>
-                <div className="login-card__action-zone space-y-5">
+                <div className="space-y-5">
                   {showResend && (
-                    <Button type="button" variant="outline" className="h-10 w-full" disabled={isResending} onClick={() => void handleResend()}>
+                    <Button type="button" variant="outline" className="h-auto w-full py-2" disabled={isResending} onClick={() => void handleResend()}>
                       {isResending ? '发送中…' : '如果账号尚未验证，重发验证邮件'}
                     </Button>
                   )}
-                  <Button type="submit" className="h-11 w-full" disabled={isPending} title={mode === 'login' ? '登录工作台' : '创建账户'}>
+                  <Button type="submit" className="h-auto w-full py-2" disabled={isPending} title={mode === 'login' ? '登录工作台' : '创建账户'}>
                     {isPending ? '请稍候…' : mode === 'login' ? '登录工作台' : '创建账户'}
                   </Button>
                   {mode === 'login' && (
@@ -173,7 +173,7 @@ export function LoginPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        className="h-11 w-full"
+                        className="h-auto w-full py-2"
                         title="使用 GitHub 登录"
                         disabled={isPending}
                         onClick={() => window.location.assign('/api/auth/github')}
