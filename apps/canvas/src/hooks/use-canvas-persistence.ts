@@ -89,22 +89,36 @@ export function useCanvasPersistence() {
   const setSaveStatus = useCanvasStore(state => state.setSaveStatus)
   const lastSavedSignature = useRef<string | undefined>(undefined)
   const savingRef = useRef(false)
+  const savePromiseRef = useRef<Promise<void> | undefined>(undefined)
+  const saveTokenRef = useRef<symbol | undefined>(undefined)
+  const operationEpochRef = useRef(0)
   const pendingSaveRef = useRef(false)
   const disposedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const [versions, setVersions] = useState<CanvasVersion[]>([])
   const [saveTick, setSaveTick] = useState(0)
 
+  const invalidatePendingSave = useCallback(() => {
+    operationEpochRef.current += 1
+    pendingSaveRef.current = false
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    timerRef.current = null
+  }, [])
+
   const refreshDocument = useCallback(async () => {
     const id = useCanvasStore.getState().documentId
     if (id === undefined) return
-    if (timerRef.current !== null) clearTimeout(timerRef.current)
-    timerRef.current = null
-    pendingSaveRef.current = false
+    const activeSave = savePromiseRef.current
+    invalidatePendingSave()
+    const operationEpoch = operationEpochRef.current
     setSaveStatus('loading')
     try {
+      // 先等已经发出的保存请求结束，再读取服务器版本，避免刷新拿到旧 revision
+      // 后又被迟到的保存响应覆盖本地状态。
+      if (activeSave !== undefined) await activeSave
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
       const document = await hydrateAssetUrls(await apiClient.getCanvas(id))
-      if (disposedRef.current) return
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
       applyDocument(document)
       lastSavedSignature.current = JSON.stringify(document.snapshot)
       setSaveStatus('saved')
@@ -112,7 +126,7 @@ export function useCanvasPersistence() {
       if (!disposedRef.current) setSaveStatus('error')
       throw error
     }
-  }, [setSaveStatus])
+  }, [invalidatePendingSave, setSaveStatus])
 
   const refreshVersions = useCallback(async () => {
     const id = useCanvasStore.getState().documentId
@@ -123,6 +137,11 @@ export function useCanvasPersistence() {
   }, [])
 
   const restoreVersion = useCallback(async (versionId: string) => {
+    const activeSave = savePromiseRef.current
+    invalidatePendingSave()
+    const operationEpoch = operationEpochRef.current
+    if (activeSave !== undefined) await activeSave
+    if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
     const state = useCanvasStore.getState()
     if (state.documentId === undefined || state.revision === undefined) return
     setSaveStatus('saving')
@@ -130,15 +149,16 @@ export function useCanvasPersistence() {
       versionId,
       expectedRevision: state.revision,
     }))
-    if (disposedRef.current) return
+    if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
     applyDocument(document)
     lastSavedSignature.current = JSON.stringify(document.snapshot)
     setSaveStatus('saved')
     await refreshVersions()
-  }, [refreshVersions, setSaveStatus])
+  }, [invalidatePendingSave, refreshVersions, setSaveStatus])
 
   useEffect(() => {
     disposedRef.current = false
+    const operationEpoch = operationEpochRef.current
     void (async () => {
       try {
         setSaveStatus('loading')
@@ -150,9 +170,9 @@ export function useCanvasPersistence() {
         const document = list.items[0] === undefined
           ? await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
           : await apiClient.getCanvas(list.items[0].id)
-        if (disposedRef.current) return
+        if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
         const hydratedDocument = await hydrateAssetUrls(document)
-        if (disposedRef.current) return
+        if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
         applyDocument(hydratedDocument)
         lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
         setSaveStatus('saved')
@@ -184,7 +204,9 @@ export function useCanvasPersistence() {
       if (savingRef.current) return
       savingRef.current = true
       setSaveStatus('saving')
-      void (async () => {
+      const operationEpoch = operationEpochRef.current
+      const saveToken = Symbol('canvas-save')
+      const savePromise = (async () => {
         try {
           const state = useCanvasStore.getState()
           if (state.documentId === undefined || state.revision === undefined) return
@@ -192,7 +214,7 @@ export function useCanvasPersistence() {
             expectedRevision: state.revision,
             snapshot,
           })
-          if (disposedRef.current) return
+          if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
           useCanvasStore.getState().setRevision(saved.revision)
           lastSavedSignature.current = JSON.stringify(saved.snapshot)
           setSaveStatus('saved')
@@ -203,15 +225,24 @@ export function useCanvasPersistence() {
             setSaveStatus('saving')
           }
         } catch (error) {
-          if (!disposedRef.current) setSaveStatus(error instanceof ApiClientError && error.code === 'CANVAS_REVISION_CONFLICT' ? 'conflict' : 'error')
+          if (!disposedRef.current && operationEpochRef.current === operationEpoch) {
+            setSaveStatus(error instanceof ApiClientError && error.code === 'CANVAS_REVISION_CONFLICT' ? 'conflict' : 'error')
+          }
         } finally {
           savingRef.current = false
-          if (pendingSaveRef.current && !disposedRef.current) {
+          if (saveTokenRef.current === saveToken) {
+            saveTokenRef.current = undefined
+            savePromiseRef.current = undefined
+          }
+          if (pendingSaveRef.current && !disposedRef.current && operationEpochRef.current === operationEpoch) {
             pendingSaveRef.current = false
             setSaveTick(tick => tick + 1)
           }
         }
       })()
+      saveTokenRef.current = saveToken
+      savePromiseRef.current = savePromise
+      void savePromise
     }, SAVE_DEBOUNCE_MS)
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current)

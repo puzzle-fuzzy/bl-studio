@@ -8,6 +8,8 @@
 
 Canvas 不直接把 React Flow 节点交给 provider，也不把一次运行过程写回编辑快照。编辑快照只保留
 提示词、模型、连接关系和稳定资产引用；节点 `status`、错误文本等运行态由当前页面/执行任务恢复。
+Canvas 刷新或恢复版本时会使待执行的 debounce 保存失效，并等待已发出的保存请求结束；保存响应带有
+操作 epoch，过期响应不能重新写入本地节点状态或 revision。
 API 在用户
 请求 `POST /api/canvases/:id/execute` 时，基于当前 `revision` 编译成 provider-neutral 的
 `CanvasExecutionPlan`，再创建一个 `canvas.execute` 任务。

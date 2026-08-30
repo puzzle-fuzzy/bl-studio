@@ -141,6 +141,8 @@ flowchart LR
 - Canvas 的编辑快照和执行状态分离：`canvas_documents` / `canvas_document_versions` 只保存
   用户编辑内容以及稳定的生成/素材资产 ID，不保存 `status`、错误文本等运行态；`canvas.execute` 任务输入保存一次
   编译后的 plan 和可恢复的 `nodeRuns` 游标。
+- Canvas 刷新和版本恢复会先使 debounce 保存失效，并等待已经发出的保存请求结束，再以新的服务端
+  `revision` hydrate；迟到的旧保存响应不能覆盖刷新后的节点状态或 revision，避免恢复流程重新写回过期快照。
 - Canvas 节点卡片保留单节点快捷生成作为试错入口；它直接创建普通 generation，不进入整图 `nodeRuns`
   或运行记录，但会保存 generation ID 并在刷新后恢复轮询；生成完成后按确定性 `asset_generation_<artifactId>`
   回溯输出资产，列表查询只作为兼容回退；没有 ID 的旧“生成中”状态降级为可编辑状态。
