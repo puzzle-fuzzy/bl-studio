@@ -13,7 +13,8 @@
     "node": ">=24.0.0 <26.0.0"
   },
   "scripts": {
-    "dev": "dotenv -e deploy/env/.env.dev -- turbo run dev",
+    "dev": "dotenv -e deploy/env/.env.dev -- turbo run dev --filter=@bailian-studio/api --filter=@bailian-studio/worker --filter=@bailian-studio/studio --filter=@bailian-studio/writer --filter=@bailian-studio/canvas",
+    "dev:admin": "dotenv -e deploy/env/.env.dev -- turbo run dev --filter=@bailian-studio/admin",
     "dev:smoke": "dotenv -e deploy/env/.env.dev -- tsx scripts/verify/dev-smoke.ts",
     "build": "turbo run build",
     "lint": "biome lint .",
