@@ -16,6 +16,10 @@ export {
   type BailianOperationCapability,
 } from './bailian-operations'
 export { assertModelManifestConsistent, assertUniqueModelIds } from './registry-check'
+export type {
+  DashScopeModelManifest,
+  FrozenDashScopeModelManifest,
+} from './types'
 
 export { qwenImage } from './manifests/image/qwen-image'
 export { qwenImage2Pro, qwenImageMax, qwenImage2 } from './manifests/image/qwen-image-2'

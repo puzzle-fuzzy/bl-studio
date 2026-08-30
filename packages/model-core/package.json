@@ -12,7 +12,8 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "author": {
     "name": "烟熏三文鱼",

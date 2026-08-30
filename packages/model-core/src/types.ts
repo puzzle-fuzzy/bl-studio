@@ -233,6 +233,29 @@ export type ModelValidationRule =
     }
 
 /**
+ * Provider 请求描述的最小公共形状。
+ *
+ * 具体 provider 可以在自己的 manifest 包里扩展 kind、bindings 和其它字段；
+ * model-core 的通用契约不再要求所有 provider 共享 DashScope 的请求联合。
+ */
+export interface ProviderRequestContract {
+  kind: string
+  endpoint: string
+  bindings: Readonly<Record<string, unknown>>
+}
+
+/** Provider 输出描述的最小公共形状。 */
+export interface ProviderOutputContract {
+  kind: string
+}
+
+/** Provider 传输描述的最小公共形状。 */
+export interface ProviderTransportContract {
+  mode: string
+  submit: unknown
+}
+
+/**
  * ParameterBinding —— manifest 驱动机制的核心。
  *
  * 描述 manifest 中的某个参数（由 ProviderRequestMapping.bindings 的 key 索引）
@@ -391,31 +414,20 @@ export type ProviderTransport =
   | { mode: 'stream'; submit: ProviderSubmitTransport; stream: ProviderStreamingTransport }
 
 /**
- * ModelManifest —— 整个系统的核心抽象。
+ * Provider-neutral model manifest contract。
  *
- * 一份 manifest 声明式地描述"一个 provider 模型"的全部信息。下游（API / worker /
- * provider runner / UI / 校验 / 定价）都从这一份描述派生行为，而不依赖任何硬编码：
- *  - id：稳定标识，对外出现在 URL / API / share 链接中，registry 内必须唯一
- *  - provider + providerModel：provider 名 + 调用 DashScope 时使用的真实模型名
- *  - category / taskMode / capabilities：决定 UI 分组、调用时序、暴露的输入控件
- *  - parameters：强类型参数表——name 同时是 request.bindings 与 pricing.quantityKey
- *      的引用 key
- *  - request：ProviderRequestMapping，把参数分发到 DashScope 请求体（manifest 驱动
- *      的核心，见 ParameterBinding 如何把字段落到 input.prompt / input.media /
- *      parameters.xxx 等位置）
- *  - output：ProviderOutputMapping，把 provider 响应归一化为 artifact
- *  - pricing：PricingRule，定价规则（官方 rates，整数分 CNY）
- *  - transport：ProviderTransport，提交/轮询/流式端点与请求头
- *  - rules：跨字段校验规则（media 数量组、条件必填、文本长度等），可选
- *  - availability：是否对外启用、稳定度（stable / beta / hidden）
- *
- * 设计原则：manifest 是纯数据，不依赖 DB / provider runner / service。因此
- * 【添加新模型 = 新增一份 manifest 并在 MODEL_REGISTRY 注册】，provider 与 service
- * 代码无需改动。registry.ts 在加载时对每个 manifest 深冻结 + 一致性断言。
+ * provider-specific request/output/transport 描述通过泛型注入，因而第二个 provider
+ * 可以定义自己的 discriminated union，而不需要修改 model-core 的公共契约。当前
+ * `ModelManifest` 仍是 DashScope 兼容别名，给既有调用方保留平滑迁移路径。
  */
-export interface ModelManifest {
+export interface ModelManifestContract<
+  TProvider extends string = string,
+  TRequest extends ProviderRequestContract = ProviderRequestContract,
+  TOutput extends ProviderOutputContract = ProviderOutputContract,
+  TTransport extends ProviderTransportContract = ProviderTransportContract,
+> {
   id: string
-  provider: ModelProvider
+  provider: TProvider
   providerModel: string
   displayName: string
   /** 面向用户的一句话中文介绍（创作页展示在模型名下方）。 */
@@ -426,11 +438,11 @@ export interface ModelManifest {
   parameters: ModelParameter[]
   /** 跨字段校验规则（media 数量组 / 条件必填 / 文本长度等）。 */
   rules?: ModelValidationRule[]
-  request: ProviderRequestMapping
-  output: ProviderOutputMapping
+  request: TRequest
+  output: TOutput
   pricing: PricingRule
   /** provider 传输契约：提交/轮询端点、状态值、请求头。 */
-  transport: ProviderTransport
+  transport: TTransport
   availability: {
     enabled: boolean
     stage: 'stable' | 'beta' | 'hidden'
@@ -454,6 +466,14 @@ export interface ModelManifest {
    */
   sourceRefs?: ModelManifestSourceRefs
 }
+
+/** 当前 DashScope 目录使用的向后兼容 manifest 类型。 */
+export type ModelManifest = ModelManifestContract<
+  ModelProvider,
+  ProviderRequestMapping,
+  ProviderOutputMapping,
+  ProviderTransport
+>
 
 /** manifest 的参数校验样例集。 */
 export interface ModelManifestExamples {
@@ -534,3 +554,11 @@ export type DeepReadonly<T> = T extends (...args: never[]) => unknown
  * 可变的 ModelManifest 值可赋值给该类型（协变），所以调用方传两种形态都能兼容。
  */
 export type FrozenModelManifest = DeepReadonly<ModelManifest>
+
+/** Provider-specific manifest 包可以暴露自己的深只读专用视图。 */
+export type FrozenModelManifestContract<
+  TProvider extends string = string,
+  TRequest extends ProviderRequestContract = ProviderRequestContract,
+  TOutput extends ProviderOutputContract = ProviderOutputContract,
+  TTransport extends ProviderTransportContract = ProviderTransportContract,
+> = DeepReadonly<ModelManifestContract<TProvider, TRequest, TOutput, TTransport>>
