@@ -4,6 +4,8 @@ import type {
 } from '@bailian-studio/audit-repository'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type {
+	AdminGalleryRepository,
+	AdminRepository,
 	AdminTaskRepository,
 	AnalyticsRepository,
 } from '@bailian-studio/admin-repository'
@@ -336,8 +338,11 @@ const app = createTestApp({
   auditRepository: fakeAuditRepository,
   assetRepository: fakeAssetRepository,
   auditOutboxRepository: fakeAuditOutboxRepository,
-  adminTaskRepository: fakeAdminTaskRepository,
-  analyticsRepository: fakeAnalyticsRepository,
+  adminRepository: {
+    gallery: {} as AdminGalleryRepository,
+    tasks: fakeAdminTaskRepository,
+    analytics: fakeAnalyticsRepository,
+  } satisfies AdminRepository,
   storage: fakeStorage,
 }).app
 

@@ -7,12 +7,7 @@
  */
 
 import type { AuditOutboxRepository } from '@bailian-studio/audit-repository'
-import type {
-  AdminGalleryRepository,
-  AdminRepository,
-  AdminTaskRepository,
-  AnalyticsRepository,
-} from '@bailian-studio/admin-repository'
+import type { AdminRepository } from '@bailian-studio/admin-repository'
 import type { AuthService } from '@bailian-studio/auth'
 import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
@@ -51,12 +46,7 @@ function missing<T>(name: string): T {
   ) as T
 }
 
-export type TestAppOverrides = Partial<ApiDependencies> & {
-  /** 兼容既有路由测试的扁平 mock 写法；生产依赖只有 adminRepository。 */
-  adminGalleryRepository?: AdminGalleryRepository
-  adminTaskRepository?: AdminTaskRepository
-  analyticsRepository?: AnalyticsRepository
-}
+export type TestAppOverrides = Partial<ApiDependencies>
 
 export interface TestAppContext {
   readonly app: App
@@ -85,13 +75,7 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
     overrides.feedbackRepository ?? missing<ApiDependencies['feedbackRepository']>('feedbackRepository')
   const contentReportRepository =
     overrides.contentReportRepository ?? missing<ApiDependencies['contentReportRepository']>('contentReportRepository')
-  const adminRepository =
-    overrides.adminRepository ??
-    ({
-      gallery: overrides.adminGalleryRepository ?? missing<AdminGalleryRepository>('adminRepository.gallery'),
-      tasks: overrides.adminTaskRepository ?? missing<AdminTaskRepository>('adminRepository.tasks'),
-      analytics: overrides.analyticsRepository ?? missing<AnalyticsRepository>('adminRepository.analytics'),
-    } satisfies AdminRepository)
+  const adminRepository = overrides.adminRepository ?? missing<AdminRepository>('adminRepository')
   const usageRepository = overrides.usageRepository ?? missing<UsageRepository>('usageRepository')
   const creativeAssetRepository =
     overrides.creativeAssetRepository ?? missing<CreativeAssetRepository>('creativeAssetRepository')

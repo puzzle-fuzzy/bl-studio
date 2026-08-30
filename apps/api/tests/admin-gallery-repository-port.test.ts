@@ -1,10 +1,13 @@
 import type {
-	GenerationRepository,
-} from "@bailian-studio/generation-repository";
-import type { AdminGalleryRepository } from "@bailian-studio/admin-repository";
-import { describe, expect, it } from "vitest";
-import { createTestApp } from "../src/test-app";
-import { createFakeAuthService } from "./fake-auth-service";
+	AdminGalleryRepository,
+	AdminRepository,
+	AnalyticsRepository,
+	AdminTaskRepository,
+} from '@bailian-studio/admin-repository'
+import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import { describe, expect, it } from 'vitest'
+import { createTestApp } from '../src/test-app'
+import { createFakeAuthService } from './fake-auth-service'
 
 const calls: Array<Record<string, unknown>> = [];
 const fakeAdminGalleryRepository = {
@@ -20,6 +23,12 @@ const fakeAdminGalleryRepository = {
 	hideUserPublicWorks: async () => 0,
 } as unknown as AdminGalleryRepository;
 
+const adminRepository = {
+	gallery: fakeAdminGalleryRepository,
+	tasks: {} as AdminTaskRepository,
+	analytics: {} as AnalyticsRepository,
+} satisfies AdminRepository
+
 const app = createTestApp({
 	authService: createFakeAuthService(() => ({
 		id: "admin-1",
@@ -28,7 +37,7 @@ const app = createTestApp({
 		role: "admin" as const,
 	})),
 	generationRepository: {} as GenerationRepository,
-	adminGalleryRepository: fakeAdminGalleryRepository,
+	adminRepository,
 }).app;
 
 describe("admin gallery repository port", () => {
