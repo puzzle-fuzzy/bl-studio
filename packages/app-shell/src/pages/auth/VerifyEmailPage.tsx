@@ -31,7 +31,7 @@ export function VerifyEmailPage() {
   }, [])
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-muted/20 p-4">
+    <div className="auth-page flex min-h-screen flex-col items-center bg-muted/20 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <div className="mb-2 flex justify-center">

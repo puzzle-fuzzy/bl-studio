@@ -31,7 +31,7 @@ export function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center gap-6 bg-muted/20 p-4">
+    <div className="admin-login-page flex min-h-screen flex-col items-center gap-6 bg-muted/20 p-4">
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>管理后台登录</CardTitle>

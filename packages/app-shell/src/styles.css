@@ -157,10 +157,39 @@
     radial-gradient(circle, rgb(228 107 120 / 0.24) 0.8px, transparent 1.35px);
 }
 
+.auth-page {
+  box-sizing: border-box;
+  min-height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.auth-page > [data-slot='card'] {
+  margin-block: auto;
+}
+
+.auth-page [data-slot='input'],
+.auth-page [data-slot='button'],
+.auth-dialog [data-slot='input'],
+.auth-dialog [data-slot='button'] {
+  min-height: var(--rb-control-height);
+}
+
+.auth-page [data-slot='card-description'],
+.auth-dialog [data-slot='dialog-description'] {
+  line-height: var(--rb-line-height-copy);
+}
+
+.auth-dialog {
+  max-height: min(42rem, calc(100svh - 2rem));
+  overflow-y: auto;
+}
+
 .login-page {
   position: relative;
   min-height: 100svh;
-  overflow: hidden;
+  overflow-x: hidden;
+  overflow-y: auto;
   isolation: isolate;
   background: var(--background);
   color: var(--foreground);
@@ -389,6 +418,7 @@
 }
 
 .login-card [data-slot='input'] {
+  min-height: var(--rb-control-height);
   border-color: var(--input);
   background: color-mix(in oklab, var(--background) 72%, var(--card));
   color: var(--foreground);
@@ -402,6 +432,10 @@
 .login-card [data-slot='input']:focus-visible {
   border-color: var(--ring);
   box-shadow: 0 0 0 3px color-mix(in oklab, var(--ring) 28%, transparent), inset 0 1px 0 color-mix(in oklab, var(--foreground) 6%, transparent);
+}
+
+.login-card [data-slot='button'] {
+  min-height: var(--rb-control-height);
 }
 
 .login-card [data-slot='separator'] {

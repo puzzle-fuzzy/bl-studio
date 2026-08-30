@@ -86,7 +86,7 @@ export function AuthDialog() {
 
   return (
     <Dialog open={isOpen || verificationRequired} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-md">
+      <DialogContent className="auth-dialog sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{mode === 'login' ? '登录' : '注册'}</DialogTitle>
           <DialogDescription>

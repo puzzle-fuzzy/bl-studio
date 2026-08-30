@@ -114,3 +114,19 @@
   --sidebar-border: oklch(1 0 0 / 10%);
   --sidebar-ring: oklch(0.556 0 0);
 }
+
+.admin-login-page {
+  box-sizing: border-box;
+  min-height: 100svh;
+  overflow-x: hidden;
+  overflow-y: auto;
+}
+
+.admin-login-page > [data-slot='card'] {
+  margin-block: auto;
+}
+
+.admin-login-page [data-slot='input'],
+.admin-login-page [data-slot='button'] {
+  min-height: var(--rb-control-height);
+}

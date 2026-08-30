@@ -87,7 +87,7 @@ export function LoginPage() {
   const showResend = email.trim() !== '' && verificationResendAvailable
 
   return (
-    <div className="login-page">
+    <div className="login-page auth-page">
       {/* 暂时关闭流动背景，测试完成后可恢复这一行。 */}
       {/* <LiquidSandBackground /> */}
       <div className="login-page__veil" aria-hidden="true" />
