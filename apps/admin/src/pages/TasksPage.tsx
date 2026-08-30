@@ -20,6 +20,7 @@ import { Skeleton } from '@bailian-studio/ui'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
 
 type TaskStatusFilter = 'all' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+type TaskDomainFilter = 'all' | 'generation' | 'artifact' | 'media' | 'director' | 'canvas' | 'system'
 
 const PAGE_SIZE = 20
 
@@ -376,9 +377,10 @@ function TaskDetailDialog({
   )
 }
 
-/** 管理后台任务中心：状态筛选、游标分页和只读任务详情。 */
+/** 管理后台任务中心：域/状态筛选、游标分页和只读任务详情。 */
 export function TasksPage() {
   const [status, setStatus] = useState<TaskStatusFilter>('all')
+  const [domain, setDomain] = useState<TaskDomainFilter>('all')
   const [pageIndex, setPageIndex] = useState(0)
   const [pageCursors, setPageCursors] = useState<Array<string | undefined>>([undefined])
   const [selectedTask, setSelectedTask] = useState<AdminTaskItem | null>(null)
@@ -388,15 +390,16 @@ export function TasksPage() {
 
   const taskRequestSeq = useRef(0)
 
-  // Batch 0c：游标栈保留为导航状态，取数交给 useQuery（键含 状态+页码+游标），
+  // Batch 0c：游标栈保留为导航状态，取数交给 useQuery（键含 域+状态+页码+游标），
   // requestSeq 手写守卫作废。
   const cursor = pageCursors[pageIndex]
   const { data, isPending, error: queryError } = useQuery({
-    queryKey: ['admin', 'tasks', status, pageIndex, cursor],
+    queryKey: ['admin', 'tasks', domain, status, pageIndex, cursor],
     queryFn: () => apiClient.adminListTasks({
       limit: PAGE_SIZE,
       ...(cursor !== undefined ? { cursor } : {}),
       ...(status !== 'all' ? { status } : {}),
+      ...(domain !== 'all' ? { domain } : {}),
     }),
   })
   const items = data?.items ?? []
@@ -425,7 +428,7 @@ export function TasksPage() {
     setTaskRequestError(null)
     setPageIndex(0)
     setPageCursors([undefined])
-  }, [status])
+  }, [domain, status])
 
   const handleNextPage = () => {
     const nextCursor = pageCursors[pageIndex + 1]
@@ -478,21 +481,35 @@ export function TasksPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">任务中心</h1>
-        <Select value={status} onValueChange={value => setStatus(value as TaskStatusFilter)}>
-          <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">全部状态</SelectItem>
-            <SelectItem value="queued">排队中</SelectItem>
-            <SelectItem value="running">执行中</SelectItem>
-            <SelectItem value="succeeded">成功</SelectItem>
-            <SelectItem value="failed">失败</SelectItem>
-            <SelectItem value="cancelled">已取消</SelectItem>
-          </SelectContent>
-        </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <Select value={domain} onValueChange={value => setDomain(value as TaskDomainFilter)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部域</SelectItem>
+              <SelectItem value="generation">生成</SelectItem>
+              <SelectItem value="artifact">产物</SelectItem>
+              <SelectItem value="media">媒体</SelectItem>
+              <SelectItem value="director">导演</SelectItem>
+              <SelectItem value="canvas">画布</SelectItem>
+              <SelectItem value="system">系统</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={status} onValueChange={value => setStatus(value as TaskStatusFilter)}>
+            <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">全部状态</SelectItem>
+              <SelectItem value="queued">排队中</SelectItem>
+              <SelectItem value="running">执行中</SelectItem>
+              <SelectItem value="succeeded">成功</SelectItem>
+              <SelectItem value="failed">失败</SelectItem>
+              <SelectItem value="cancelled">已取消</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <p className="text-xs text-muted-foreground">
-        全量任务（含进行中与已完成），按创建时间倒序；点击任意行查看完整诊断信息。
+        按业务域和状态筛选，结果按创建时间倒序；点击任意行查看完整诊断信息。
       </p>
 
       {error !== null && <p className="text-sm text-destructive">{error}</p>}

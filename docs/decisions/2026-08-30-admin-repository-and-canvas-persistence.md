@@ -18,7 +18,9 @@ Canvas 任务详情继续复用 `AdminTaskRepository` 的请求上下文接缝�
 管理详情复制一张 Canvas 运行态表。
 
 这样做的原因是 admin 查询天然跨越 users、generations、assets 和 tasks；将它们留在生成
-生命周期 repository 会持续扩大核心接口，也会让后台权限边界混入普通生成流程。
+生命周期 repository 会持续扩大核心接口，也会让后台权限边界混入普通生成流程。任务中心在
+此边界上按任务域和状态筛选，Canvas 任务可直接进入节点级只读详情，不需要让前端拼接多个
+业务域的接口。
 
 ### Canvas 文档
 

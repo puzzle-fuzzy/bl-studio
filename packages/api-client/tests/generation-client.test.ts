@@ -342,12 +342,13 @@ describe('createApiClient', () => {
       },
       durationMs: 2_000,
     }
-    const { fetch } = queuedFetch([jsonResponse({ success: true, data: { items: [task] } })])
+    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [task] } })])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     await expect(client.adminListTasks({ domain: 'canvas' })).resolves.toMatchObject({
       items: [{ domain: 'canvas', type: 'canvas.execute', durationMs: 2_000 }],
     })
+    expect(calls[0]?.url).toBe('http://api.test/api/admin/tasks?domain=canvas')
   })
 
   it('parses canvas cost analytics in the admin analytics response', async () => {
