@@ -9,6 +9,7 @@ export {
   type CanvasAspectRatioParameterOption,
   type ResolvedCanvasAspectRatioParameter,
 } from './aspect-ratio'
+export { projectCanvasParameterValues, type CanvasParameterValueDefinition, type CanvasParameterValueOption } from './parameter-values'
 
 const finiteNumber = z.number().finite()
 

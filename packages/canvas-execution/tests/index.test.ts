@@ -121,6 +121,26 @@ describe('compileCanvasGraph', () => {
     expect(result.nodes[0]?.params).toMatchObject({ size: '928*1664' })
   })
 
+  it('projects authored manifest parameters and ignores stale enum values', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot([
+        mediaNode('configured', {
+          parameterValues: {
+            watermark: true,
+            size: '928*1664',
+            obsoleteOption: 'removed',
+          },
+        }),
+      ]),
+    })
+
+    expect(result.nodes[0]?.params).toMatchObject({
+      watermark: true,
+      size: '928*1664',
+    })
+    expect(result.nodes[0]?.params).not.toHaveProperty('obsoleteOption')
+  })
+
   it('keeps an unsupported authored ratio out of the provider params', () => {
     const result = compileCanvasGraph({
       snapshot: snapshot([

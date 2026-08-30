@@ -139,7 +139,7 @@ flowchart LR
 ### 3.3 Canvas 执行生命周期（已实现，2026-08-30）
 
 - Canvas 的编辑快照和执行状态分离：`canvas_documents` / `canvas_document_versions` 只保存
-  用户编辑内容以及稳定的生成/素材资产 ID，不保存 `status`、错误文本等运行态；`canvas.execute` 任务输入保存一次
+  用户编辑内容、模型参数以及稳定的生成/素材资产 ID，不保存 `status`、错误文本等运行态；`canvas.execute` 任务输入保存一次
   编译后的 plan 和可恢复的 `nodeRuns` 游标。
 - Canvas 刷新和版本恢复会先使 debounce 保存失效，并等待已经发出的保存请求结束，再以新的服务端
   `revision` hydrate；迟到的旧保存响应不能覆盖刷新后的节点状态或 revision，避免恢复流程重新写回过期快照。
@@ -154,6 +154,8 @@ flowchart LR
 - Canvas 节点的 `aspectRatio` 只保存画布语义值；前端与纯编译器通过 `canvas-contracts` 的同一映射函数，
   按当前模型 manifest 的 `aspectRatio`、`ratio` 或 `size` 选项生成真实参数。模型未声明可映射的比例时，
   不提交未知 provider 参数，界面不显示不可用选项。
+- 节点的普通模型参数保存在 `parameterValues`，由 manifest 的 `type/options/visibleWhen` 驱动节点面板；
+  编译器只投影当前模型仍声明且枚举值仍有效的字段，模型切换不会把旧模型参数带入新请求。
 - API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、
   缺失/越权素材和不支持的媒体输入；任务提交以 `(user, canvas, idempotencyKey)` 的确定性任务 ID
   提供幂等边界。

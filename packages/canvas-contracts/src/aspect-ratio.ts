@@ -47,7 +47,16 @@ export function resolveCanvasAspectRatioParameter(
   }
 
   const sizeParameter = parameters.find(item => item.name === 'size' && item.type === 'select')
-  const sizeOption = sizeParameter?.options?.find(option => {
+  const sizeOptions = sizeParameter?.options ?? []
+  const sizeRatios = new Set(sizeOptions.flatMap(option => {
+    const ratio = optionAspectRatio(option)
+    return ratio === undefined ? [] : [ratio]
+  }))
+  // 只有 size 同时表达多个画面比例时才由 Canvas 比例语义接管它；例如
+  // 1K/2K 都是方形的模型，size 仍应作为普通分辨率参数交给节点面板编辑。
+  if (sizeRatios.size < 2) return undefined
+
+  const sizeOption = sizeOptions.find(option => {
     const optionRatio = optionAspectRatio(option)
     return optionRatio !== undefined && aspectRatiosEqual(optionRatio, normalizedAspectRatio)
   })

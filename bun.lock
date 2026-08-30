@@ -102,6 +102,7 @@
         "@bailian-studio/app-shell": "workspace:*",
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/lib-client": "workspace:*",
+        "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/ui": "workspace:*",
         "@tanstack/react-query": "catalog:",
         "@xyflow/react": "catalog:",

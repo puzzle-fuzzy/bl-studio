@@ -7,7 +7,7 @@
 ## 决策
 
 Canvas 不直接把 React Flow 节点交给 provider，也不把一次运行过程写回编辑快照。编辑快照只保留
-提示词、模型、连接关系和稳定资产引用；节点 `status`、错误文本等运行态由当前页面/执行任务恢复。
+提示词、模型、连接关系、模型参数值和稳定资产引用；节点 `status`、错误文本等运行态由当前页面/执行任务恢复。
 Canvas 刷新或恢复版本时会使待执行的 debounce 保存失效，并等待已发出的保存请求结束；保存响应带有
 操作 epoch，过期响应不能重新写入本地节点状态或 revision。
 API 在用户
@@ -28,9 +28,10 @@ Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错�
 以及“媒体参数 → 上游节点”的依赖绑定。编译器是纯包 `@bailian-studio/canvas-execution`，
 不读取数据库、环境变量或 URL。
 
-节点保存的 `aspectRatio` 是 Canvas 语义值，不直接等同于某个 provider 字段。前端和编译器通过
+节点保存的 `aspectRatio` 是 Canvas 语义值，普通 manifest 参数则保存在 `parameterValues`，两者都不直接等同于
+某个 provider 字段。前端和编译器通过
 `canvas-contracts` 的纯函数按当前模型 manifest 映射到 `aspectRatio`、`ratio` 或 `size`；
-模型没有对应能力时不提交未知参数，前端也不展示不可用的比例选项。
+普通参数按 manifest 的 `type/options/visibleWhen` 编辑，模型没有对应能力时不提交未知参数，前端也不展示不可用的比例选项。
 
 Worker 把每一个计划节点转换为普通 generation。同一依赖层中满足输入条件的节点会在并发上限内
 并行创建；默认单个 Canvas 任务最多同时运行 4 个节点。节点生成完成后，Worker 等待 artifact persist

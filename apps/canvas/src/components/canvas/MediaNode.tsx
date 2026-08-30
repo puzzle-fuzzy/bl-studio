@@ -1,6 +1,7 @@
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import {
   CANVAS_ASPECT_RATIOS,
+  projectCanvasParameterValues,
   resolveCanvasAspectRatioParameter,
   supportedCanvasAspectRatios,
   type CanvasAspectRatio,
@@ -20,6 +21,7 @@ import {
 } from '@/lib/generation-refs'
 import { useCanvasStore } from '@/stores/canvas-store'
 import { AssetPicker } from './AssetPicker'
+import { NodeParameterFields } from './NodeParameterFields'
 
 /**
  * 画布生成节点（Krea 式）。
@@ -40,6 +42,8 @@ export interface MediaNodeData extends Record<string, unknown> {
   resultUrl?: string
   resultKind?: MediaKind
   resultAssetId?: string
+  /** 按当前模型 manifest 保存的普通参数；prompt/媒体/比例由节点专用字段管理。 */
+  parameterValues?: Record<string, unknown>
   /** 单节点快捷 generation 在页面刷新后的恢复 ID。 */
   generationId?: string
   errorMessage?: string
@@ -105,6 +109,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const referenceUrls = nodeData.referenceUrls ?? []
   const referenceAssetIds = nodeData.referenceAssetIds ?? []
   const referenceAssetKinds = nodeData.referenceAssetKinds ?? {}
+  const parameterValues = nodeData.parameterValues ?? {}
   const aspectRatio = nodeData.aspectRatio ?? '1:1'
   const availableModels = useMemo(
     () => (models ?? []).filter((model: ModelCatalogItem) => (
@@ -124,6 +129,17 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const aspectRatioParameter = useMemo(
     () => resolveCanvasAspectRatioParameter(selectedModel?.parameters ?? [], aspectRatio),
     [aspectRatio, selectedModel],
+  )
+  const aspectParameterNames = useMemo(
+    () => new Set(CANVAS_ASPECT_RATIOS.flatMap(ratio => {
+      const parameter = resolveCanvasAspectRatioParameter(selectedModel?.parameters ?? [], ratio)
+      return parameter === undefined ? [] : [parameter.name]
+    })),
+    [selectedModel],
+  )
+  const generationParameterValues = useMemo(
+    () => projectCanvasParameterValues(selectedModel?.parameters ?? [], parameterValues),
+    [parameterValues, selectedModel],
   )
   const selectableReferenceKinds = useMemo<MediaKind[]>(
     () => [...new Set(mediaParameters.map(parameter => parameter.mediaKind))],
@@ -209,15 +225,26 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
       || referenceError !== undefined
     ) return
 
+    const generationParams = {
+      ...generationParameterValues,
+      ...(aspectRatioParameter === undefined
+        ? {}
+        : { [aspectRatioParameter.name]: aspectRatioParameter.value }),
+    }
     void generate({
       modelId,
       prompt: prompt.trim(),
-      ...(aspectRatioParameter === undefined
-        ? {}
-        : { params: { [aspectRatioParameter.name]: aspectRatioParameter.value } }),
+      ...(Object.keys(generationParams).length > 0 ? { params: generationParams } : {}),
       ...(Object.keys(assetRefs).length > 0 ? { assetRefs } : {}),
     })
-  }, [aspectRatioParameter, assetRefs, generate, modelId, prompt, referenceError])
+  }, [aspectRatioParameter, assetRefs, generate, generationParameterValues, modelId, prompt, referenceError])
+
+  const updateParameterValue = useCallback((name: string, value: unknown) => {
+    const nextValues = { ...parameterValues }
+    if (value === undefined) delete nextValues[name]
+    else nextValues[name] = value
+    updateNodeData(id, { parameterValues: nextValues })
+  }, [id, parameterValues, updateNodeData])
 
   const handleCancelGeneration = useCallback(async () => {
     const generationId = nodeData.generationId
@@ -423,6 +450,14 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
               当前模型未声明可选画面比例
             </p>
           )}
+
+          <NodeParameterFields
+            nodeId={id}
+            parameters={selectedModel?.parameters ?? []}
+            values={parameterValues}
+            excludedNames={aspectParameterNames}
+            onChange={updateParameterValue}
+          />
         </div>
       )}
 

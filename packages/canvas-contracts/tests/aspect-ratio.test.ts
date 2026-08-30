@@ -62,4 +62,17 @@ describe('Canvas aspect ratio mapping', () => {
       { name: 'prompt', type: 'text' },
     ], '4:3')).toBeUndefined()
   })
+
+  it('does not let a ratio control overwrite a size-only resolution setting', () => {
+    expect(resolveCanvasAspectRatioParameter([
+      {
+        name: 'size',
+        type: 'select',
+        options: [
+          { label: '1K (1024×1024)', value: '1K' },
+          { label: '2K (2048×2048)', value: '2K' },
+        ],
+      },
+    ], '1:1')).toBeUndefined()
+  })
 })

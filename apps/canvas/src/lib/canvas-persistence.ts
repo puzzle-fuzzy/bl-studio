@@ -13,6 +13,7 @@ const PERSISTED_DATA_KEYS = new Set([
   'referenceAssetIds',
   'referenceAssetKinds',
   'aspectRatio',
+  'parameterValues',
 ])
 
 function persistedData(data: Record<string, unknown>): Record<string, unknown> {

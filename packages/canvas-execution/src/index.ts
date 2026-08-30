@@ -13,14 +13,15 @@ import {
   type FrozenModelManifest,
   type ModelCategory,
 } from '@bailian-studio/model-core'
-import type {
-  CanvasExecutionPlan,
-  CanvasExecutionPlanNode,
-  CanvasExecutionTaskInput,
-  CanvasNode,
-  CanvasSnapshot,
+import {
+  projectCanvasParameterValues,
+  resolveCanvasAspectRatioParameter,
+  type CanvasExecutionPlan,
+  type CanvasExecutionPlanNode,
+  type CanvasExecutionTaskInput,
+  type CanvasNode,
+  type CanvasSnapshot,
 } from '@bailian-studio/canvas-contracts'
-import { resolveCanvasAspectRatioParameter } from '@bailian-studio/canvas-contracts'
 
 export type CanvasExecutionAssetKind = 'image' | 'video' | 'audio' | 'text' | 'archive'
 
@@ -307,7 +308,11 @@ function compileNode(
   const remaining = [...references]
   const assetRefs: Record<string, string[]> = {}
   const dependencyBindings: Record<string, string[]> = {}
-  const validationParams: Record<string, unknown> = { prompt }
+  const authoredParameterValues = readParameterValues(node)
+  const validationParams: Record<string, unknown> = {
+    ...projectCanvasParameterValues(model.parameters, authoredParameterValues),
+    prompt,
+  }
   const authoredAspectRatio = readString(node.data, 'aspectRatio')
   if (authoredAspectRatio !== undefined) {
     const mappedAspectRatio = resolveCanvasAspectRatioParameter(model.parameters, authoredAspectRatio)
@@ -467,6 +472,17 @@ function readNodeKind(node: CanvasNode): 'image' | 'video' {
 function readString(data: Record<string, unknown>, key: string): string | undefined {
   const value = data[key]
   return typeof value === 'string' && value.trim().length > 0 ? value : undefined
+}
+
+function readParameterValues(node: CanvasNode): Record<string, unknown> {
+  const value = node.data['parameterValues']
+  if (value === undefined) return {}
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw invalidGraph(`Canvas node ${node.id} has invalid parameterValues`, {
+      nodeId: node.id,
+    })
+  }
+  return Object.fromEntries(Object.entries(value))
 }
 
 function readAssetIds(node: CanvasNode): string[] {
