@@ -3,7 +3,12 @@ import { eq } from 'drizzle-orm'
 import { createDb, taskInsertValues, taskRecords, type TaskRecordInput } from '@bailian-studio/db'
 import { createIsolatedTestDb, resetBailianStudioTestDb } from '@bailian-studio/db/test'
 import { transitionTask, type TaskRecord } from '@bailian-studio/task-engine'
-import { createTaskQueueRepository, createTaskQueueTransactionStore, enqueueTask } from '../src/repository'
+import {
+  createTaskQueueReadStore,
+  createTaskQueueRepository,
+  createTaskQueueTransactionStore,
+  enqueueTask,
+} from '../src/repository'
 
 let isolated!: Awaited<ReturnType<typeof createIsolatedTestDb>>
 let db!: ReturnType<typeof createDb>
@@ -164,6 +169,34 @@ describe('task queue repository', () => {
       recordId: 'media-1',
       type: 'media.process',
     })
+  })
+
+  it('provides task read projections without exposing task_records to business repositories', async () => {
+    await seedTask(makeTask({
+      id: 'task-read-queued',
+      recordId: 'read-record',
+      createdAt: '2026-08-30T00:00:01.000Z',
+      updatedAt: '2026-08-30T00:00:01.000Z',
+    }))
+    await seedTask(makeTask({
+      id: 'task-read-failed',
+      recordId: 'read-record',
+      status: 'failed',
+      createdAt: '2026-08-30T00:00:02.000Z',
+      updatedAt: '2026-08-30T00:00:02.000Z',
+    }))
+    await seedTask(makeTask({
+      id: 'task-read-other',
+      recordId: 'other-record',
+      status: 'cancelled',
+    }))
+
+    const store = createTaskQueueReadStore()
+    await expect(store.listTasksForRecord(db, { recordId: 'read-record' })).resolves.toHaveLength(2)
+    await expect(store.listRecordIdsWithTaskStatuses(db, {
+      recordIds: ['read-record', 'other-record'],
+      statuses: ['failed', 'cancelled'],
+    })).resolves.toEqual(expect.arrayContaining(['read-record', 'other-record']))
   })
 
   it('cancels only queued matching tasks through the transaction store', async () => {

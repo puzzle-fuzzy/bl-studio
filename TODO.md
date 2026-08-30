@@ -115,7 +115,8 @@ admin gallery、admin 任务中心和成本/留存分析已分别切换到 `Admi
 
 当前仍由 3 个业务 repository 构造各自领域的 TaskRecord，并由持久化组合根注入同一个
 `TaskQueueTransactionStore`；各 repository 继续把调用方事务传给该 store，这是有意保留的原子性边界。
-`task-repository` 已接管 task_records 的序列化、插入、生命周期和回读，但不接管跨域业务事务的开启。
+`task-repository` 已接管 task_records 的序列化、插入、生命周期和回读，但不接管跨域业务事务的开启；新增
+`TaskQueueReadStore` 后，generation 诊断和恢复扫描也不再直接 import `task_records`。
 业务事务内的简单任务查询与 queued 任务取消也应通过其窄 transaction store；generation 的幂等回读与轮询去重、资产删除时的 thumbnail 取消已迁移。Worker 的僵尸候选扫描已迁移到独立的 `GenerationRecoveryRepository`，只保留最终 `failGeneration` 在生成核心 repository 中；admin 任务跨域投影不迁入 task-repository，待独立 `admin-repository` 契约确定后再做物理拆包。
 
 ### P1-D. API 分层不一致（✅ gallery + admin service 层完成 2026-08-29，其余 11 个渐进迁移）

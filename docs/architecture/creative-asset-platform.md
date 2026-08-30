@@ -133,6 +133,8 @@ flowchart LR
   task row 写入、窄查询和任务状态转换，不负责跨域事务的开启与提交。
 - generation 详情诊断由 `GenerationDiagnosticsRepository` 单独承载，核心
   `GenerationRepository` 只保留生成状态与业务事务能力。
+- 诊断与恢复读模型通过 `TaskQueueReadStore` 获取任务详情/终态记录 ID；业务 repository 不再直接
+  import `task_records`，任务表的 SQL 和领域映射统一归 `task-repository`。
 - Worker 的陈旧 generation 清扫通过独立的 `GenerationRecoveryRepository` 读取；恢复读模型
   与生成核心状态写入分离，Worker 仍显式调用核心 repository 完成最终失败收口。
 

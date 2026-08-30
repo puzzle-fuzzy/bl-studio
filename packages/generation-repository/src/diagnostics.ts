@@ -8,11 +8,11 @@
 import {
 	generationRecords,
 	providerRequestAudits,
-	taskRecords,
 	type BailianStudioDb,
 } from "@bailian-studio/db";
+import type { TaskQueueReadStore } from "@bailian-studio/task-repository";
 import { asc, eq } from "drizzle-orm";
-import { toProviderRequestAudit, toTaskRecord } from "./mappers";
+import { toProviderRequestAudit } from "./mappers";
 import type { GenerationDiagnostics, TaskDiagnostics } from "./types";
 
 export interface GenerationDiagnosticsRepository {
@@ -23,6 +23,7 @@ export interface GenerationDiagnosticsRepository {
 
 export function createGenerationDiagnosticsRepository(
 	db: BailianStudioDb,
+	taskQueueReadStore: TaskQueueReadStore,
 ): GenerationDiagnosticsRepository {
 	return {
 		async getGenerationDiagnostics(id) {
@@ -35,11 +36,7 @@ export function createGenerationDiagnosticsRepository(
 			if (record === undefined) return undefined;
 
 			const [taskRows, auditRows] = await Promise.all([
-				db
-					.select()
-					.from(taskRecords)
-					.where(eq(taskRecords.recordId, id))
-					.orderBy(asc(taskRecords.createdAt), asc(taskRecords.id)),
+				taskQueueReadStore.listTasksForRecord(db, { recordId: id }),
 				db
 					.select()
 					.from(providerRequestAudits)
@@ -50,8 +47,7 @@ export function createGenerationDiagnosticsRepository(
 					),
 			]);
 
-			const tasks: TaskDiagnostics[] = taskRows.map((taskRow) => {
-				const task = toTaskRecord(taskRow);
+			const tasks: TaskDiagnostics[] = taskRows.map((task) => {
 				const error =
 					task.errorJson === undefined
 						? undefined

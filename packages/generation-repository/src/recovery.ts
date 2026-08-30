@@ -6,10 +6,10 @@
  */
 import {
 	generationRecords,
-	taskRecords,
 	type BailianStudioDb,
 } from "@bailian-studio/db";
-import { and, asc, eq, exists, inArray, lt } from "drizzle-orm";
+import type { TaskQueueReadStore } from "@bailian-studio/task-repository";
+import { and, asc, inArray, lt } from "drizzle-orm";
 import { toGenerationRecord } from "./mappers";
 import type { GenerationRecord } from "./types";
 
@@ -29,6 +29,7 @@ export interface GenerationRecoveryRepository {
 
 export function createGenerationRecoveryRepository(
 	db: BailianStudioDb,
+	taskQueueReadStore: TaskQueueReadStore,
 ): GenerationRecoveryRepository {
 	return {
 		async listStuckGenerationRecords(input) {
@@ -36,30 +37,28 @@ export function createGenerationRecoveryRepository(
 			const cutoff = new Date(
 				Date.parse(input?.now ?? new Date().toISOString()) - staleAfterMs,
 			).toISOString();
-			const limit = input?.limit ?? 100;
-			const rows = await db
+			const limit = Math.max(0, Math.trunc(input?.limit ?? 100));
+			if (limit === 0) return [];
+			const candidates = await db
 				.select()
 				.from(generationRecords)
 				.where(
 					and(
 						inArray(generationRecords.status, ["submitting", "processing"]),
 						lt(generationRecords.updatedAt, new Date(cutoff)),
-						exists(
-							db
-								.select({ id: taskRecords.id })
-								.from(taskRecords)
-								.where(
-									and(
-										eq(taskRecords.recordId, generationRecords.id),
-										inArray(taskRecords.status, ["failed", "cancelled"]),
-									),
-								),
-						),
 					),
 				)
 				.orderBy(asc(generationRecords.updatedAt))
-				.limit(limit);
-			return rows.map((row) => toGenerationRecord(row));
+			const terminalRecordIds = new Set(
+				await taskQueueReadStore.listRecordIdsWithTaskStatuses(db, {
+					recordIds: candidates.map((row) => row.id),
+					statuses: ["failed", "cancelled"],
+				}),
+			);
+			return candidates
+				.filter((row) => terminalRecordIds.has(row.id))
+				.slice(0, limit)
+				.map((row) => toGenerationRecord(row));
 		},
 	};
 }

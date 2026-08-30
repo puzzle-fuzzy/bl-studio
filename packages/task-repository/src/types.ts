@@ -106,3 +106,15 @@ export interface TaskQueueTransactionStore {
   findTask(source: TaskQueueQuerySource, input: FindTaskInput): Promise<TaskRecord | undefined>
   cancelQueuedTasks(tx: BailianStudioDbTransaction, input: CancelQueuedTasksInput): Promise<number>
 }
+
+/** 业务读模型访问 task_records 的最小只读端口。 */
+export interface TaskQueueReadStore {
+  listTasksForRecord(
+    source: TaskQueueQuerySource,
+    input: { recordId: string },
+  ): Promise<TaskRecord[]>
+  listRecordIdsWithTaskStatuses(
+    source: TaskQueueQuerySource,
+    input: { recordIds: readonly string[]; statuses: readonly TaskStatus[] },
+  ): Promise<string[]>
+}

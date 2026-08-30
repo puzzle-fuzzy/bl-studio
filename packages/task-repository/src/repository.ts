@@ -17,10 +17,11 @@ import {
   type RenewTaskLockInput,
   type SaveTaskOptions,
   type TaskQueueRepository,
+  type TaskQueueReadStore,
   type TaskQueueTransactionStore,
   type TaskQueueQuerySource,
 } from './types'
-import type { TaskRecord } from '@bailian-studio/task-engine'
+import type { TaskRecord, TaskStatus } from '@bailian-studio/task-engine'
 import { clampTaskLimit, decodeTaskCursor, encodeTaskCursor } from './cursor'
 
 export interface CreateTaskQueueRepositoryOptions {
@@ -58,6 +59,35 @@ async function findTask(source: TaskQueueQuerySource, input: FindTaskInput): Pro
     .limit(1)
 
   return row === undefined ? undefined : toTaskRecord(row)
+}
+
+/** 只读任务详情投影，封闭 task_records 的排序和领域映射。 */
+async function listTasksForRecord(
+  source: TaskQueueQuerySource,
+  input: { recordId: string },
+): Promise<TaskRecord[]> {
+  const rows = await source
+    .select()
+    .from(taskRecords)
+    .where(eq(taskRecords.recordId, input.recordId))
+    .orderBy(asc(taskRecords.createdAt), asc(taskRecords.id))
+  return rows.map(toTaskRecord)
+}
+
+/** 批量返回含指定终态任务的业务记录 ID，供恢复读模型做二阶段筛选。 */
+async function listRecordIdsWithTaskStatuses(
+  source: TaskQueueQuerySource,
+  input: { recordIds: readonly string[]; statuses: readonly TaskStatus[] },
+): Promise<string[]> {
+  if (input.recordIds.length === 0 || input.statuses.length === 0) return []
+  const rows = await source
+    .select({ recordId: taskRecords.recordId })
+    .from(taskRecords)
+    .where(and(
+      inArray(taskRecords.recordId, [...input.recordIds]),
+      inArray(taskRecords.status, [...input.statuses]),
+    ))
+  return [...new Set(rows.flatMap(row => row.recordId === null ? [] : [row.recordId]))]
 }
 
 /** 在调用方事务内按状态机规则取消 queued 任务，避免业务仓储直接更新 task_records。 */
@@ -107,6 +137,11 @@ async function cancelQueuedTasks(tx: BailianStudioDbTransaction, input: CancelQu
  */
 export function createTaskQueueTransactionStore(): TaskQueueTransactionStore {
   return { cancelQueuedTasks, enqueueTask, findTask }
+}
+
+/** 创建业务读模型使用的 task_records 只读端口。 */
+export function createTaskQueueReadStore(): TaskQueueReadStore {
+  return { listRecordIdsWithTaskStatuses, listTasksForRecord }
 }
 
 /**

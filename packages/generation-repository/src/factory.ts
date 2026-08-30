@@ -24,7 +24,10 @@ import { createShareRepository } from './shares'
 import type { PublicShareRepository, ShareRepository } from './share-port'
 import { createSocialRepository, type SocialRepository } from './social'
 import { createUsageRepository, type UsageRepository } from './usage'
-import { createTaskQueueTransactionStore } from '@bailian-studio/task-repository'
+import {
+  createTaskQueueReadStore,
+  createTaskQueueTransactionStore,
+} from '@bailian-studio/task-repository'
 
 export interface CreateGenerationRepositoryFromUrlOptions {
   max?: number
@@ -55,6 +58,7 @@ export function createGenerationRepositoryFromUrl(
   options: CreateGenerationRepositoryFromUrlOptions = {},
 ): GenerationRepositoryHandle {
   const db = createDb({ url, max: options.max ?? 5 })
+  const taskQueueReadStore = createTaskQueueReadStore()
   const taskQueueTransactionStore = createTaskQueueTransactionStore()
   const creativeGenerationContextStore = createCreativeGenerationContextStore()
   const shareRepository = createShareRepository(db)
@@ -67,8 +71,8 @@ export function createGenerationRepositoryFromUrl(
     }),
     assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
     auditRepository: createAuditRepository(db),
-    generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),
-    generationRecoveryRepository: createGenerationRecoveryRepository(db),
+    generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db, taskQueueReadStore),
+    generationRecoveryRepository: createGenerationRecoveryRepository(db, taskQueueReadStore),
     contentReportRepository: createContentReportRepository(db),
     feedbackRepository: createFeedbackRepository(db),
     notificationRepository: createNotificationRepository(db),

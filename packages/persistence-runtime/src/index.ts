@@ -73,6 +73,7 @@ import {
 } from '@bailian-studio/media-repository'
 import {
   createTaskQueueRepository,
+  createTaskQueueReadStore,
   createTaskQueueTransactionStore,
   type TaskQueueRepository,
 } from '@bailian-studio/task-repository'
@@ -151,6 +152,7 @@ export function createApiPersistenceRuntime(
   const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)
   try {
     const close = closeOnce(db)
+    const taskQueueReadStore = createTaskQueueReadStore()
     const taskQueueTransactionStore = createTaskQueueTransactionStore()
     const creativeGenerationContextStore = createCreativeGenerationContextStore()
     const generationRepository = createGenerationRepository({
@@ -169,8 +171,8 @@ export function createApiPersistenceRuntime(
       creditLedger: createCreditLedger({ db }),
       generationRepository,
       generationDiagnosticsRepository:
-        createGenerationDiagnosticsRepository(db),
-      generationRecoveryRepository: createGenerationRecoveryRepository(db),
+        createGenerationDiagnosticsRepository(db, taskQueueReadStore),
+      generationRecoveryRepository: createGenerationRecoveryRepository(db, taskQueueReadStore),
       assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
       shareRepository,
       publicShareRepository: shareRepository,
@@ -203,6 +205,7 @@ export function createWorkerPersistenceRuntime(
   const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)
   try {
     const close = closeOnce(db)
+    const taskQueueReadStore = createTaskQueueReadStore()
     const taskQueueTransactionStore = createTaskQueueTransactionStore()
     const creativeGenerationContextStore = createCreativeGenerationContextStore()
     return {
@@ -213,7 +216,7 @@ export function createWorkerPersistenceRuntime(
         taskQueueTransactionStore,
         creativeGenerationContextStore,
       }),
-      generationRecoveryRepository: createGenerationRecoveryRepository(db),
+      generationRecoveryRepository: createGenerationRecoveryRepository(db, taskQueueReadStore),
       taskQueueRepository: createTaskQueueRepository({ db }),
       assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
       providerRequestAuditRepository: createProviderRequestAuditRepository(db),
