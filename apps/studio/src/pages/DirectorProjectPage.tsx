@@ -21,6 +21,7 @@ import { notifyError } from '@/lib/toast'
 import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
+import { usePhaseReview } from '@/hooks/use-phase-review'
 import { AnalysisReview, applyDirectorVideoProgress, CharactersReview, DirectorContinuityReview, DirectorDialogueReview, DirectorPromptRebuildReview, DirectorVideoShotList, LocationsReview, PhaseStatusPanel, ReferenceEntityGroup, ScreenplayChatWorkspace, StoryboardReview } from '@/components/director/review-components'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
@@ -100,18 +101,6 @@ function statusVariant(status: DirectorProjectDetail['phases'][number]['status']
   return 'outline'
 }
 
-
-/**
- * 阶段审核状态（P0-A：消灭 6 个阶段 × {modelId, text, result, stale} = 24 个重复 useState）。
- * 每个阶段调用一次，通过解构保持原有变量名不变。
- */
-function usePhaseReview<R>() {
-  const [modelId, setModelId] = useState('')
-  const [text, setText] = useState<string>()
-  const [result, setResult] = useState<R>()
-  const [stale, setStale] = useState(false)
-  return { modelId, setModelId, text, setText, result, setResult, stale, setStale }
-}
 
 export function DirectorProjectPage() {
   const navigate = useNavigate()
