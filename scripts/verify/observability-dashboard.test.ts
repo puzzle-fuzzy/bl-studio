@@ -9,6 +9,7 @@ const dashboardDirectory = join(
 const productionComposeFile = join(process.cwd(), 'deploy/docker/compose.prod.yaml')
 const productionDeployScript = join(process.cwd(), 'scripts/deploy/deploy-prod.sh')
 const observabilityDeployScript = join(process.cwd(), 'scripts/deploy/prod-observability.sh')
+const packageFile = join(process.cwd(), 'package.json')
 const dashboardProviderFile = join(
   process.cwd(),
   'deploy/observability/grafana/provisioning/dashboards/provider.yml',
@@ -101,6 +102,7 @@ describe('Grafana observability dashboards', () => {
     const productionCompose = readFileSync(productionComposeFile, 'utf8')
     const productionDeployScriptText = readFileSync(productionDeployScript, 'utf8')
     const observabilityDeployScriptText = readFileSync(observabilityDeployScript, 'utf8')
+    const packageJson = JSON.parse(readFileSync(packageFile, 'utf8')) as { scripts?: Record<string, string> }
     const dashboardProvider = readFileSync(dashboardProviderFile, 'utf8')
 
     expect(productionCompose).toContain(
@@ -119,6 +121,10 @@ describe('Grafana observability dashboards', () => {
       'OBSERVABILITY_SERVICES="loki alloy grafana monitor"',
     )
     expect(observabilityDeployScriptText).toContain('smoke_observability')
+    expect(observabilityDeployScriptText).toContain('BASELINE_LOGQL=')
+    expect(observabilityDeployScriptText).toContain('/loki/api/v1/query_range')
+    expect(observabilityDeployScriptText).toContain('observability-baseline.ts')
+    expect(packageJson.scripts?.['prod:observability:baseline']).toBe('bash scripts/deploy/prod-observability.sh baseline')
     expect(observabilityDeployScriptText).toContain(
       'http://127.0.0.1:3100/ready',
     )

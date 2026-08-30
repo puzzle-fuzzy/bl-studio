@@ -25,4 +25,4 @@ Canvas 暂不直接在仓库中预置“单次失败即告警”的自动规则�
 
 ## 当前边界
 
-Canvas 看板已经纳入 Grafana provisioning，完整生产部署会同步看板，`prod:observability:up` 会在启动后执行端点冒烟；当前仍需要真实目标服务器的 24–72 小时基线，才能合理决定 warning/critical 阈值和通知策略。
+Canvas 看板已经纳入 Grafana provisioning，完整生产部署会同步看板，`prod:observability:up` 会在启动后执行端点冒烟；`prod:observability:baseline` 可从目标机 Loki 输出机器可读基线，但当前仍需要真实目标服务器的 24–72 小时数据，才能合理决定 warning/critical 阈值和通知策略。

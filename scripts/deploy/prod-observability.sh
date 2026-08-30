@@ -27,6 +27,7 @@ DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
 
 COMPOSE="docker compose --env-file $REMOTE_DEPLOY/env/.env.prod --profile observability -f $REMOTE_DEPLOY/docker/compose.prod.yaml"
 OBSERVABILITY_SERVICES="loki alloy grafana monitor"
+BASELINE_LOGQL='{compose_project="bailian-studio-prod",container=~"api|worker"} | json | (msg="canvas.node_failed" or msg="canvas.node_generation_queued" or (msg="task.duration" and taskType="canvas.execute"))'
 
 ssh_cmd() {
   deploy_ssh "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$DEPLOY_HOST" "$1"
@@ -67,6 +68,29 @@ exit 1
 "
 }
 
+collect_baseline() {
+  local hours="$1"
+  [[ "$hours" =~ ^[0-9]+$ ]] || { echo "观测窗口必须是正整数小时" >&2; exit 2; }
+  (( hours >= 1 && hours <= 168 )) || { echo "观测窗口必须是 1 到 168 小时之间" >&2; exit 2; }
+
+  # 先复用完整观测冒烟，避免把服务未就绪误报成“没有 Canvas 流量”。
+  # 冒烟输出转 stderr，stdout 保持为可重定向的 JSON 报告。
+  smoke_observability >&2
+  local baseline_json
+  baseline_json="$(ssh_cmd "
+set -eu
+end=\$(date +%s)
+start=\$((end - ${hours} * 3600))
+curl -fsS --max-time 60 -G http://127.0.0.1:3100/loki/api/v1/query_range \\
+  --data-urlencode 'query=$BASELINE_LOGQL' \\
+  --data-urlencode \"start=\${start}000000000\" \\
+  --data-urlencode \"end=\${end}000000000\" \\
+  --data-urlencode 'direction=forward' \\
+  --data-urlencode 'limit=10000'
+")"
+  printf '%s' "$baseline_json" | bun x tsx "$REPO_ROOT/scripts/deploy/observability-baseline.ts" --hours "$hours"
+}
+
 case "${1:-up}" in
   up)
     # 配置文件通过 bind mount 同步；强制重建观测服务可确保文件/目录类型变更
@@ -83,8 +107,11 @@ case "${1:-up}" in
   smoke)
     smoke_observability
     ;;
+  baseline)
+    collect_baseline "${2:-24}"
+    ;;
   *)
-    echo "用法：prod-observability.sh [up|down|ps|smoke]" >&2
+    echo "用法：prod-observability.sh [up|down|ps|smoke|baseline [hours]]" >&2
     exit 2
     ;;
 esac
