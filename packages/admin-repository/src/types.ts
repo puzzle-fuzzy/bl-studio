@@ -201,3 +201,16 @@ export interface CanvasCostAnalytics {
     accountedCents: number
   }>
 }
+
+/** Canvas 窗口内的执行健康度概览；耗时只来自已有 task 生命周期时间戳。 */
+export interface CanvasOperationsAnalytics {
+  executions: number
+  byStatus: Array<{ status: TaskRecord['status']; count: number }>
+  terminalExecutions: number
+  succeededExecutions: number
+  successRate: number
+  averageDurationMs: number | null
+  p95DurationMs: number | null
+  failureReasons: Array<{ reason: string; count: number }>
+  nodeFailureReasons: Array<{ reason: string; count: number }>
+}

@@ -27,6 +27,7 @@ import {
 import type {
 	CostMarginRow,
 	CanvasCostAnalytics,
+	CanvasOperationsAnalytics,
 	GenerationCallStats,
 	ModelCost,
 	RetentionAnalytics,
@@ -50,6 +51,10 @@ export interface AnalyticsRepository {
 		from: string;
 		to: string;
 	}): Promise<CanvasCostAnalytics>;
+	getCanvasOperationsAnalytics(input: {
+		from: string;
+		to: string;
+	}): Promise<CanvasOperationsAnalytics>;
 }
 
 export function createAnalyticsRepository(
@@ -218,6 +223,98 @@ export function createAnalyticsRepository(
 		};
 	}
 
+	async function getCanvasOperationsAnalytics(input: {
+		from: string;
+		to: string;
+	}): Promise<CanvasOperationsAnalytics> {
+		const rows = await db
+			.select({
+				status: taskRecords.status,
+				startedAt: taskRecords.startedAt,
+				completedAt: taskRecords.completedAt,
+				errorJson: taskRecords.errorJson,
+				input: taskRecords.inputJson,
+			})
+			.from(taskRecords)
+			.where(
+				and(
+					eq(taskRecords.type, "canvas.execute"),
+					eq(taskRecords.domain, "canvas"),
+					gte(taskRecords.createdAt, new Date(input.from)),
+					lt(taskRecords.createdAt, new Date(input.to)),
+					isNull(taskRecords.deletedAt),
+				),
+			);
+		const statusCounts = new Map(
+			CANVAS_TASK_STATUSES.map((status) => [status, 0]),
+		);
+		const durations: number[] = [];
+		const failureReasons = new Map<string, number>();
+		const nodeFailureReasons = new Map<string, number>();
+
+		for (const row of rows) {
+			const status = row.status as CanvasOperationsAnalytics["byStatus"][number]["status"];
+			if (statusCounts.has(status as (typeof CANVAS_TASK_STATUSES)[number])) {
+				const knownStatus = status as (typeof CANVAS_TASK_STATUSES)[number];
+				statusCounts.set(knownStatus, (statusCounts.get(knownStatus) ?? 0) + 1);
+			}
+			if (row.startedAt !== null && row.completedAt !== null) {
+				durations.push(
+					Math.max(0, row.completedAt.getTime() - row.startedAt.getTime()),
+				);
+			}
+			if (status === "failed") {
+				incrementReason(failureReasons, errorReason(row.errorJson));
+			}
+
+			const parsed = CanvasExecutionTaskInputSchema.safeParse(row.input);
+			if (!parsed.success) continue;
+			for (const run of Object.values(parsed.data.nodeRuns)) {
+				if (run.status === "failed") {
+					incrementReason(nodeFailureReasons, run.errorCode ?? "UNKNOWN");
+				}
+			}
+		}
+
+		durations.sort((left, right) => left - right);
+		const succeededExecutions = statusCounts.get("succeeded") ?? 0;
+		const terminalExecutions =
+			succeededExecutions +
+			(statusCounts.get("failed") ?? 0) +
+			(statusCounts.get("cancelled") ?? 0);
+		return {
+			executions: rows.length,
+			byStatus: CANVAS_TASK_STATUSES.map((status) => ({
+				status,
+				count: statusCounts.get(status) ?? 0,
+			})),
+			terminalExecutions,
+			succeededExecutions,
+			successRate:
+				terminalExecutions === 0
+					? 0
+					: succeededExecutions / terminalExecutions,
+			averageDurationMs:
+				durations.length === 0
+					? null
+					: Math.round(
+							durations.reduce((sum, duration) => sum + duration, 0) /
+								durations.length,
+						),
+			p95DurationMs:
+				durations.length === 0
+					? null
+					: durations[
+							Math.min(
+								durations.length - 1,
+								Math.ceil(durations.length * 0.95) - 1,
+							)
+						] ?? null,
+			failureReasons: sortReasons(failureReasons),
+			nodeFailureReasons: sortReasons(nodeFailureReasons),
+		};
+	}
+
 	return {
 		countGenerationCallsBetween,
 		listModelCosts,
@@ -225,7 +322,38 @@ export function createAnalyticsRepository(
 		getCostMarginAnalytics,
 		getRetentionAnalytics,
 		getCanvasCostAnalytics,
+		getCanvasOperationsAnalytics,
 	};
+}
+
+const CANVAS_TASK_STATUSES = [
+	"queued",
+	"running",
+	"succeeded",
+	"failed",
+	"cancelled",
+] as const;
+
+function incrementReason(map: Map<string, number>, reason: string): void {
+	map.set(reason, (map.get(reason) ?? 0) + 1);
+}
+
+function errorReason(error: Record<string, unknown> | null): string {
+	if (typeof error?.code === "string" && error.code.length > 0) {
+		return error.code;
+	}
+	if (typeof error?.category === "string" && error.category.length > 0) {
+		return error.category;
+	}
+	return "UNKNOWN";
+}
+
+function sortReasons(map: Map<string, number>): Array<{ reason: string; count: number }> {
+	return [...map.entries()]
+		.sort(([leftReason, leftCount], [rightReason, rightCount]) =>
+			rightCount - leftCount || leftReason.localeCompare(rightReason),
+		)
+		.map(([reason, count]) => ({ reason, count }));
 }
 
 async function readGenerationCallStats(

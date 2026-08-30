@@ -39,6 +39,19 @@ function canvasInput(cacheHit: boolean): Record<string, unknown> {
   }
 }
 
+function failedCanvasInput(): Record<string, unknown> {
+  return {
+    ...canvasInput(false),
+    nodeRuns: {
+      'node-1': {
+        status: 'failed',
+        errorCode: 'CANVAS_PROVIDER_FAILED',
+        error: 'provider failed',
+      },
+    },
+  }
+}
+
 describe('admin analytics repository', () => {
   beforeAll(async () => {
     isolated = await createIsolatedTestDb()
@@ -65,6 +78,8 @@ describe('admin analytics repository', () => {
         traceId: 'canvas-trace-1',
         userId: USER_ID,
         recordId: 'canvas-1',
+        startedAt: new Date('2026-08-10T00:00:00.000Z'),
+        completedAt: new Date('2026-08-10T00:00:02.000Z'),
         createdAt: new Date('2026-08-10T00:00:00.000Z'),
         updatedAt: new Date('2026-08-10T00:00:00.000Z'),
       },
@@ -81,8 +96,34 @@ describe('admin analytics repository', () => {
         traceId: 'canvas-trace-2',
         userId: USER_ID,
         recordId: 'canvas-1',
+        startedAt: new Date('2026-08-11T00:00:00.000Z'),
+        completedAt: new Date('2026-08-11T00:00:04.000Z'),
         createdAt: new Date('2026-08-11T00:00:00.000Z'),
         updatedAt: new Date('2026-08-11T00:00:00.000Z'),
+      },
+      {
+        id: 'canvas-task-failed',
+        type: 'canvas.execute',
+        domain: 'canvas',
+        status: 'failed',
+        priority: 1,
+        inputJson: failedCanvasInput(),
+        attempts: 3,
+        maxAttempts: 3,
+        nextRunAt: new Date('2026-08-12T00:00:04.000Z'),
+        startedAt: new Date('2026-08-12T00:00:00.000Z'),
+        completedAt: new Date('2026-08-12T00:00:04.000Z'),
+        errorJson: {
+          category: 'provider',
+          message: 'Canvas execution failed',
+          retriable: false,
+          code: 'CANVAS_EXECUTION_FAILED',
+        },
+        traceId: 'canvas-trace-failed',
+        userId: USER_ID,
+        recordId: 'canvas-1',
+        createdAt: new Date('2026-08-12T00:00:00.000Z'),
+        updatedAt: new Date('2026-08-12T00:00:04.000Z'),
       },
       {
         id: 'canvas-task-outside-window',
@@ -168,11 +209,33 @@ describe('admin analytics repository', () => {
     const result = await analytics.getCanvasCostAnalytics({ from: WINDOW_FROM, to: WINDOW_TO })
 
     expect(result).toEqual({
-      executions: 2,
+      executions: 3,
       generationCalls: 1,
       cacheHitNodes: 1,
       accountedCents: 120,
       byModel: [{ modelId: 'qwen-image', calls: 1, accountedCents: 120 }],
+    })
+  })
+
+  it('aggregates Canvas execution health, latency, and failure reasons', async () => {
+    const result = await analytics.getCanvasOperationsAnalytics({ from: WINDOW_FROM, to: WINDOW_TO })
+
+    expect(result).toEqual({
+      executions: 3,
+      byStatus: [
+        { status: 'queued', count: 0 },
+        { status: 'running', count: 0 },
+        { status: 'succeeded', count: 2 },
+        { status: 'failed', count: 1 },
+        { status: 'cancelled', count: 0 },
+      ],
+      terminalExecutions: 3,
+      succeededExecutions: 2,
+      successRate: 2 / 3,
+      averageDurationMs: 3_333,
+      p95DurationMs: 4_000,
+      failureReasons: [{ reason: 'CANVAS_EXECUTION_FAILED', count: 1 }],
+      nodeFailureReasons: [{ reason: 'CANVAS_PROVIDER_FAILED', count: 1 }],
     })
   })
 

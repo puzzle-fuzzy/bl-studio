@@ -15,6 +15,7 @@ export type {
   ArtifactStorageProvider,
   CostMarginRow,
   CanvasCostAnalytics,
+  CanvasOperationsAnalytics,
   GenerationArtifact,
   GenerationCallStats,
   GenerationInputAsset,

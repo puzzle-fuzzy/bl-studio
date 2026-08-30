@@ -1361,6 +1361,20 @@ export const AdminAnalyticsSchema = z.object({
       calls: z.number(),
       accountedCents: z.number(),
     })),
+    operations: z.object({
+      executions: z.number(),
+      byStatus: z.array(z.object({
+        status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
+        count: z.number(),
+      })),
+      terminalExecutions: z.number(),
+      succeededExecutions: z.number(),
+      successRate: z.number(),
+      averageDurationMs: z.number().nullable(),
+      p95DurationMs: z.number().nullable(),
+      failureReasons: z.array(z.object({ reason: z.string(), count: z.number() })),
+      nodeFailureReasons: z.array(z.object({ reason: z.string(), count: z.number() })),
+    }).optional(),
   }).optional(),
 })
 

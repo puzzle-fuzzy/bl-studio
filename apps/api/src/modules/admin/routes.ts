@@ -445,13 +445,17 @@ export function createAdminRoutes(deps: ApiDependencies) {
             : new Date(to.getTime() - (days - 1) * 86_400_000)
         const sinceIso = from.toISOString()
         const toIso = to.toISOString()
-        const [costMargin, retention, canvas, userStats] = await Promise.all([
+        const [costMargin, retention, canvas, canvasOperations, userStats] = await Promise.all([
           deps.adminRepository.analytics.getCostMarginAnalytics({
             from: sinceIso,
             to: toIso,
           }),
           deps.adminRepository.analytics.getRetentionAnalytics({ since: sinceIso }),
           deps.adminRepository.analytics.getCanvasCostAnalytics({
+            from: sinceIso,
+            to: toIso,
+          }),
+          deps.adminRepository.analytics.getCanvasOperationsAnalytics({
             from: sinceIso,
             to: toIso,
           }),
@@ -475,6 +479,7 @@ export function createAdminRoutes(deps: ApiDependencies) {
             retention: { registered, ...retention },
             canvas: {
               ...canvas,
+              operations: canvasOperations,
               byModel: canvas.byModel.map((row) => ({
                 ...row,
                 label: modelLabels.get(row.modelId) ?? row.modelId,

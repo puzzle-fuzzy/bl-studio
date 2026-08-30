@@ -18,6 +18,10 @@ Canvas 任务详情继续复用 `AdminTaskRepository` 的请求上下文接缝�
 输出资产由同一查询批量回溯到 `user_assets`，API 只在响应层生成短期预览 URL，不把存储坐标带
 到 wire；不为管理详情复制一张 Canvas 运行态表。
 
+Canvas 运营健康度另设 `getCanvasOperationsAnalytics` 只读模型，从 `task_records` 的生命周期
+状态/时间戳与已持久化的 `nodeRuns` 聚合状态分布、终态成功率、平均/P95 耗时和失败原因。它
+与成本模型分开，避免把成本核算、任务健康度和 Canvas 文档运行态混成一张可变表。
+
 这样做的原因是 admin 查询天然跨越 users、generations、assets 和 tasks；将它们留在生成
 生命周期 repository 会持续扩大核心接口，也会让后台权限边界混入普通生成流程。任务中心在
 此边界上按任务域和状态筛选，Canvas 任务可直接进入节点级只读详情，不需要让前端拼接多个

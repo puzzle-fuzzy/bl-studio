@@ -364,6 +364,23 @@ describe('createApiClient', () => {
           cacheHitNodes: 1,
           accountedCents: 420,
           byModel: [{ modelId: 'qwen-image', label: '通义万相', calls: 3, accountedCents: 420 }],
+          operations: {
+            executions: 2,
+            byStatus: [
+              { status: 'queued', count: 0 },
+              { status: 'running', count: 0 },
+              { status: 'succeeded', count: 2 },
+              { status: 'failed', count: 0 },
+              { status: 'cancelled', count: 0 },
+            ],
+            terminalExecutions: 2,
+            succeededExecutions: 2,
+            successRate: 1,
+            averageDurationMs: 1_500,
+            p95DurationMs: 2_000,
+            failureReasons: [],
+            nodeFailureReasons: [],
+          },
         },
       },
     })])

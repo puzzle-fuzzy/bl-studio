@@ -118,6 +118,8 @@ export function AnalyticsPage() {
     ]
   }, [analytics])
 
+  const canvasOperations = analytics?.canvas?.operations
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -223,6 +225,16 @@ export function AnalyticsPage() {
               <AnalyticsStatCard label="实际生成调用" value={String(analytics?.canvas?.generationCalls ?? 0)} />
               <AnalyticsStatCard label="命中缓存节点" value={String(analytics?.canvas?.cacheHitNodes ?? 0)} />
               <AnalyticsStatCard label="核算费用" value={`${centsToYuan(analytics?.canvas?.accountedCents ?? 0)} 元`} />
+              <AnalyticsStatCard
+                label="成功率"
+                value={canvasOperations === undefined ? '—' : `${(canvasOperations.successRate * 100).toFixed(1)}%`}
+              />
+              <AnalyticsStatCard label="平均耗时" value={formatDuration(canvasOperations?.averageDurationMs)} />
+              <AnalyticsStatCard label="P95 耗时" value={formatDuration(canvasOperations?.p95DurationMs)} />
+              <AnalyticsStatCard
+                label="失败执行"
+                value={String(canvasOperations?.byStatus.find(row => row.status === 'failed')?.count ?? 0)}
+              />
             </div>
             <Card>
               <CardHeader>
@@ -252,6 +264,34 @@ export function AnalyticsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                )}
+              </CardContent>
+            </Card>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Canvas 执行健康度（近 {days} 天）</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {canvasOperations === undefined ? (
+                  <p className="text-sm text-muted-foreground">当前 API 尚未提供 Canvas 健康度数据。</p>
+                ) : (
+                  <div className="grid gap-6 lg:grid-cols-3">
+                    <div>
+                      <p className="mb-2 text-sm font-medium">状态分布</p>
+                      <Table>
+                        <TableBody>
+                          {canvasOperations.byStatus.map(row => (
+                            <TableRow key={row.status}>
+                              <TableCell>{CANVAS_STATUS_LABELS[row.status]}</TableCell>
+                              <TableCell className="text-right">{row.count}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                    <FailureReasonsTable title="任务失败原因" rows={canvasOperations.failureReasons} />
+                    <FailureReasonsTable title="节点失败原因" rows={canvasOperations.nodeFailureReasons} />
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -286,6 +326,48 @@ export function AnalyticsPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    </div>
+  )
+}
+
+const CANVAS_STATUS_LABELS = {
+  queued: '排队中',
+  running: '执行中',
+  succeeded: '成功',
+  failed: '失败',
+  cancelled: '已取消',
+} as const
+
+function formatDuration(durationMs: number | null | undefined): string {
+  if (durationMs === undefined || durationMs === null) return '—'
+  if (durationMs < 1_000) return `${durationMs}ms`
+  return `${(durationMs / 1_000).toFixed(1)}s`
+}
+
+function FailureReasonsTable({
+  title,
+  rows,
+}: {
+  title: string
+  rows: Array<{ reason: string; count: number }>
+}) {
+  return (
+    <div>
+      <p className="mb-2 text-sm font-medium">{title}</p>
+      {rows.length === 0 ? (
+        <p className="text-sm text-muted-foreground">暂无失败记录</p>
+      ) : (
+        <Table>
+          <TableBody>
+            {rows.map(row => (
+              <TableRow key={row.reason}>
+                <TableCell className="max-w-[220px] truncate font-mono text-xs" title={row.reason}>{row.reason}</TableCell>
+                <TableCell className="text-right">{row.count}</TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      )}
     </div>
   )
 }
