@@ -2,7 +2,7 @@ import type { AssetItem } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@bailian-studio/lib-client'
 import { ImagePlus, Loader2, Search, Video } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState } from 'react'
-import type { MediaKind } from './MediaNode'
+import type { MediaKind } from '@/lib/media-node-data'
 
 interface AssetPickerProps {
   kind: MediaKind

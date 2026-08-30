@@ -9,6 +9,7 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
+import { normalizeStoredCanvasEdge, normalizeStoredCanvasNode } from '@/lib/media-node-data'
 
 /**
  * 画布状态（Krea 式）：节点 + 边 + 服务端持久化，localStorage 仅作离线草稿兜底。
@@ -56,9 +57,20 @@ function loadFromStorage(): { nodes: Node[]; edges: Edge[] } | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (raw === null) return null
-    const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed.nodes) || !Array.isArray(parsed.edges)) return null
-    return parsed
+    const parsed: unknown = JSON.parse(raw)
+    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null
+    const record = Object.fromEntries(Object.entries(parsed))
+    if (!Array.isArray(record.nodes) || !Array.isArray(record.edges)) return null
+    return {
+      nodes: record.nodes.flatMap(node => {
+        const normalized = normalizeStoredCanvasNode(node)
+        return normalized === undefined ? [] : [normalized]
+      }),
+      edges: record.edges.flatMap(edge => {
+        const normalized = normalizeStoredCanvasEdge(edge)
+        return normalized === undefined ? [] : [normalized]
+      }),
+    }
   }
   catch {
     return null

@@ -17,7 +17,7 @@ import type { CanvasPreflightIssue } from '@bailian-studio/canvas-validation'
 import { apiClient } from '@bailian-studio/lib-client'
 import { CircleAlert, History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
-import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
+import { MediaNode } from '../components/canvas/MediaNode'
 import { CanvasExecutionDiagnosticsPanel } from '../components/canvas/CanvasExecutionDiagnosticsPanel'
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
@@ -27,6 +27,11 @@ import { preflightCanvasState } from '../lib/canvas-preflight'
 import {
   getCanvasExecutionAttentionNodes,
 } from '../lib/canvas-execution-diagnostics'
+import {
+  normalizeMediaNodeData,
+  type MediaKind,
+  type MediaNodeData,
+} from '../lib/media-node-data'
 
 const nodeTypes: NodeTypes = { mediaNode: MediaNode }
 
@@ -56,7 +61,7 @@ export function CanvasPage() {
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
   const hasNodeGenerationInFlight = nodes.some(node => (
-    node.data.status === 'generating'
+    normalizeMediaNodeData(node.data).status === 'generating'
   ))
   const selectedNodeId = nodes.find(node => node.selected)?.id
   const documentId = useCanvasStore(state => state.documentId)

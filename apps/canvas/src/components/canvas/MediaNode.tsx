@@ -4,7 +4,6 @@ import {
   projectCanvasParameterValues,
   resolveCanvasAspectRatioParameter,
   supportedCanvasAspectRatios,
-  type CanvasAspectRatio,
 } from '@bailian-studio/canvas-contracts'
 import { cn } from '@bailian-studio/lib-client'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
@@ -20,6 +19,10 @@ import {
   canvasMediaParameters,
   canvasReferenceCapacityByKind,
 } from '@/lib/generation-refs'
+import {
+  normalizeMediaNodeData,
+  type MediaKind,
+} from '@/lib/media-node-data'
 import { useCanvasStore } from '@/stores/canvas-store'
 import { AssetPicker } from './AssetPicker'
 import { NodeParameterFields } from './NodeParameterFields'
@@ -31,31 +34,6 @@ import { NodeParameterFields } from './NodeParameterFields'
  * 连线语义：入边 = 参考图（上游节点产物作为本节点参考输入），出边 = 本节点产物。
  * 手动触发生成，非拓扑执行——用户点击「生成」按钮发起。
  */
-
-export type MediaNodeStatus = 'empty' | 'generating' | 'ready' | 'error'
-export type MediaKind = 'image' | 'video'
-
-export interface MediaNodeData extends Record<string, unknown> {
-  kind: MediaKind
-  status: MediaNodeStatus
-  prompt: string
-  modelId: string
-  resultUrl?: string
-  resultKind?: MediaKind
-  resultAssetId?: string
-  /** 按当前模型 manifest 保存的普通参数；prompt/媒体/比例由节点专用字段管理。 */
-  parameterValues?: Record<string, unknown>
-  /** 单节点快捷 generation 在页面刷新后的恢复 ID。 */
-  generationId?: string
-  errorMessage?: string
-  /** 仅保留旧版本画布数据的兼容展示；新连接使用上游资产 ID。 */
-  referenceUrls: string[]
-  /** 用户从资产库选择的稳定资产 ID；生成时按模型参数映射到 assetRefs。 */
-  referenceAssetIds?: string[]
-  /** 静态资产 ID 对应的媒体类型；用于模型切换和版本恢复时保持参数分配稳定。 */
-  referenceAssetKinds?: Record<string, MediaKind>
-  aspectRatio: CanvasAspectRatio
-}
 
 interface ConnectedReference {
   edgeId: string
@@ -74,7 +52,7 @@ const ASPECT_CLASS: Record<string, string> = {
 }
 
 export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
-  const nodeData = data as MediaNodeData
+  const nodeData = normalizeMediaNodeData(data)
   const [isEditing, setIsEditing] = useState(false)
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false)
   const [isCancelling, setIsCancelling] = useState(false)
@@ -92,7 +70,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
       if (edge.target !== id) return []
       const source = nodes.find(node => node.id === edge.source)
       if (source === undefined) return []
-      const sourceData = source.data as Partial<MediaNodeData>
+      const sourceData = normalizeMediaNodeData(source.data)
       if (sourceData.status !== 'ready' || sourceData.resultUrl === undefined) return []
       return [{
         edgeId: edge.id,
@@ -149,11 +127,13 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     [edges, id, models, nodes],
   )
   const parameterErrors = useMemo(
-    () => new Map(
-      nodePreflightIssues
-        .filter(issue => issue.field !== undefined && issue.field !== 'prompt')
-        .map(issue => [issue.field as string, issue.message]),
-    ),
+    () => {
+      const errors = new Map<string, string>()
+      for (const issue of nodePreflightIssues) {
+        if (issue.field !== undefined && issue.field !== 'prompt') errors.set(issue.field, issue.message)
+      }
+      return errors
+    },
     [nodePreflightIssues],
   )
   const promptError = nodePreflightIssues.find(issue => issue.field === 'prompt')?.message

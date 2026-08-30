@@ -1,5 +1,6 @@
 import type { CanvasEdge, CanvasNode, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
 import type { Edge, Node } from '@xyflow/react'
+import { normalizeMediaNodeData, type MediaNodeData } from './media-node-data'
 
 /** 只持久化编辑恢复所需的稳定字段；运行时状态和临时 read URL 不进入版本历史。 */
 const PERSISTED_DATA_KEYS = new Set([
@@ -23,17 +24,16 @@ function persistedData(data: Record<string, unknown>): Record<string, unknown> {
 }
 
 /** 没有 generationId 的旧“生成中”状态无法恢复轮询，打开时降级为可编辑状态。 */
-function normalizeRestoredNodeData(data: Record<string, unknown>): Record<string, unknown> {
-  const generationId = typeof data.generationId === 'string' && data.generationId.trim().length > 0
-    ? data.generationId
-    : undefined
-  if (data.status === 'generating' && generationId !== undefined) return data
-  if (data.status === 'error' || data.status === 'ready' || data.status === 'empty') return data
+function normalizeRestoredNodeData(data: Record<string, unknown>): MediaNodeData {
+  const normalized = normalizeMediaNodeData(data)
+  const generationId = normalized.generationId
+  if (normalized.status === 'generating' && generationId !== undefined) return normalized
+  if (normalized.status === 'error' || normalized.status === 'ready' || normalized.status === 'empty') return normalized
   return {
-    ...data,
+    ...normalized,
     status: generationId !== undefined
       ? 'generating'
-      : typeof data.resultAssetId === 'string' ? 'ready' : 'empty',
+      : normalized.resultAssetId !== undefined ? 'ready' : 'empty',
   }
 }
 
