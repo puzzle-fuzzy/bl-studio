@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { classifyTaskStatus } from '@bailian-studio/model-core'
+import { classifyTaskStatus } from '../src'
 import { getModelById } from '../src'
 
 describe('classifyTaskStatus', () => {

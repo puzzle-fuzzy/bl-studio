@@ -55,7 +55,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 
 包边界是**可执行的架构**（`scripts/verify/check-package-boundaries.ts`，进 `verify`）：
 
-- **`@bailian-studio/dashscope-manifests` 是 DashScope 模型知识 owner**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 注册表/catalog/一致性门禁；`@bailian-studio/model-core` 只提供 provider-neutral 契约与纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 provider manifest 包，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
+- **`@bailian-studio/dashscope-manifests` 是 DashScope 模型知识 owner**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 注册表/catalog/一致性门禁/response-status 校验；`@bailian-studio/model-core` 只提供 provider-neutral 契约与纯函数校验层（`validateModelParams` / `estimateModelCost`），前后端共享。**改模型知识 = 改 provider manifest 包，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
 - **模型可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`。`notActivated`（如 vidu 全家「暂未开通」——key 已授权但百炼产品卡未开通）必须配 `enabled: false`（registry-check 断言），模型仍投影进前端 catalog 置灰 + 打 tag，但提交/worker 解析经 `getModelById` 一律拒绝。
 - `@bailian-studio/provider-dashscope` 是唯一受边界约束的执行包：**只允许 `apps/worker` 消费**（协议 `workspace:*`）；它是 worker 专属的 DashScope 传输/执行层。
 - **`apps/studio` 可以直接 import model-core** 做提交前实时校验（提交 payload 与 `apps/studio/src/lib/generation-submit.ts` 的 `buildValidationParams` 保持一致）。

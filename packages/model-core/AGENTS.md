@@ -4,7 +4,7 @@ These instructions apply to everything under `packages/model-core`. Read `../../
 
 ## Ownership
 
-This package is the **provider-neutral contract and pure-function layer**: the shared `ModelManifest` shape plus parameter validation, pricing, response-shape checks, task-status classification, and model errors used by API / worker / web. Concrete DashScope model knowledge lives in `@bailian-studio/dashscope-manifests`. Git is the version — there is no external SDK, npm publish, or coverage hash ceremony.
+This package is the **provider-neutral contract and pure-function layer**: the shared `ModelManifest` shape plus parameter validation, pricing, and model errors used by API / worker / web. Concrete DashScope model knowledge and provider-aware response/status checks live in `@bailian-studio/dashscope-manifests`. Git is the version — there is no external SDK, npm publish, or coverage hash ceremony.
 
 ## Hard rules
 

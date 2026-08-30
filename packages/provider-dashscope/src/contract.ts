@@ -1,7 +1,7 @@
 /**
  * provider 执行层与 model-core 纯函数之间的错误映射层。
  *
- * model-core 提供不抛错的纯校验（validateModelParams / assertResponseShape），这里把
+ * model-core 提供不抛错的通用参数校验，DashScope manifest 包提供 response-shape 校验，这里把
  * 它们的"失败"翻译成调用方（worker）依赖的 DashScopeHttpError，并钉住三类错误码：
  *  - DASHSCOPE_*：传输解析失败（工作空间缺失/非法、端点不受信等），由 ModelCoreError
  *    映射而来（见 resolveTransportTarget）；
@@ -12,12 +12,14 @@
  */
 import {
   ModelCoreError,
-  assertResponseShape,
   validateModelParams,
   type FrozenModelManifest,
   type ParameterValidationIssue,
-  type ResponseShapeIssue,
 } from '@bailian-studio/model-core'
+import {
+  assertResponseShape,
+  type ResponseShapeIssue,
+} from '@bailian-studio/dashscope-manifests'
 import { classifyDashScopeError } from './errors'
 import { DashScopeHttpError, withHttpStatus } from './http'
 

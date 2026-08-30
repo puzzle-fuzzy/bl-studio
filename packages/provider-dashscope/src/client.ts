@@ -12,7 +12,7 @@
  * classifyDashScopeError 归一分类，供 worker 决定重试或判失败。
  */
 import type { FrozenModelManifest } from '@bailian-studio/model-core'
-import { classifyTaskStatus } from '@bailian-studio/model-core'
+import { classifyTaskStatus } from '@bailian-studio/dashscope-manifests'
 import { classifyDashScopeError, type ProviderErrorInfo } from './errors'
 import {
   assertProviderResponseContract,

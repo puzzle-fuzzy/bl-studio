@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { assertResponseShape } from '@bailian-studio/model-core'
+import { assertResponseShape } from '../src'
 import { getModelById } from '../src'
 
 const keling = getModelById('keling-text-to-video')

@@ -16,6 +16,12 @@ export {
   type BailianOperationCapability,
 } from './bailian-operations'
 export { assertModelManifestConsistent, assertUniqueModelIds } from './registry-check'
+export { classifyTaskStatus, type TaskLifecycle } from './task-status'
+export {
+  assertResponseShape,
+  type ResponsePhase,
+  type ResponseShapeIssue,
+} from './response-shape'
 export type {
   DashScopeModelManifest,
   FrozenDashScopeModelManifest,

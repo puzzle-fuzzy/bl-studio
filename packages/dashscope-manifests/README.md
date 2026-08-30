@@ -1,8 +1,8 @@
 # @bailian-studio/dashscope-manifests
 
 DashScope-specific model catalog and manifest registry. It owns the concrete
-Bailian model definitions, availability catalog, operation capability map, and
-manifest consistency checks.
+Bailian model definitions, availability catalog, operation capability map,
+manifest consistency checks, and DashScope response/status checks.
 
 - Depends on the provider-neutral `@bailian-studio/model-core` contract and
   pure validation/pricing functions.

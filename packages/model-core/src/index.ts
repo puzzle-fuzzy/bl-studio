@@ -21,12 +21,6 @@ export {
 } from './pricing'
 export { getModelAuditMetadata, type ModelAuditMetadata } from './metadata'
 export { applyDefaults, validateModelParams } from './validation'
-export { classifyTaskStatus, type TaskLifecycle } from './task-status'
-export {
-  assertResponseShape,
-  type ResponsePhase,
-  type ResponseShapeIssue,
-} from './response-shape'
 export { ModelCoreError } from './errors'
 export { isModelParameterVisible } from './parameter-visibility'
 export { modelValuesEqual } from './value-equality'
