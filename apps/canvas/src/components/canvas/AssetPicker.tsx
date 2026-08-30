@@ -1,7 +1,7 @@
 import type { AssetItem } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@bailian-studio/lib-client'
 import { ImagePlus, Loader2, Search, Video } from 'lucide-react'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import type { MediaKind } from './MediaNode'
 
 interface AssetPickerProps {
@@ -12,6 +12,18 @@ interface AssetPickerProps {
   selectedKinds: Readonly<Record<string, MediaKind>>
   onChange: (ids: string[], kinds: Record<string, MediaKind>) => void
   onClose: () => void
+}
+
+const ASSET_PAGE_SIZE = 50
+
+function sortAssets(assets: readonly AssetItem[]): AssetItem[] {
+  return [...assets].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+}
+
+function mergeAssets(current: readonly AssetItem[], additions: readonly AssetItem[]): AssetItem[] {
+  const byId = new Map(current.map(asset => [asset.id, asset]))
+  for (const asset of additions) byId.set(asset.id, asset)
+  return sortAssets([...byId.values()])
 }
 
 /** 画布节点的素材选择器：写入稳定资产 ID 与媒体类型，URL 仅用于当前预览。 */
@@ -26,34 +38,99 @@ export function AssetPicker({
 }: AssetPickerProps) {
   const [assets, setAssets] = useState<AssetItem[]>([])
   const [query, setQuery] = useState('')
+  const [activeQuery, setActiveQuery] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState<string | undefined>()
+  const [nextCursors, setNextCursors] = useState<Partial<Record<MediaKind, string>>>({})
+  const requestKeyRef = useRef(0)
   const mediaKinds = useMemo(
     () => [...new Set(allowedKinds.length > 0 ? allowedKinds : [kind])],
     [allowedKinds, kind],
   )
 
+  // 搜索走服务端，避免只在当前已加载的 50 条素材中查找；延迟一点请求，
+  // 防止用户连续输入时每个字符都重置分页。
+  useEffect(() => {
+    const timer = setTimeout(() => setActiveQuery(query.trim()), 250)
+    return () => clearTimeout(timer)
+  }, [query])
+
   useEffect(() => {
     let disposed = false
+    const requestKey = requestKeyRef.current + 1
+    requestKeyRef.current = requestKey
     setLoading(true)
+    setLoadingMore(false)
     setError(undefined)
-    void Promise.all(mediaKinds.map(mediaKind => apiClient.listAssets({ kind: mediaKind, limit: 50, sort: 'time' })))
+    setAssets([])
+    setNextCursors({})
+    void Promise.all(mediaKinds.map(async mediaKind => ({
+      kind: mediaKind,
+      result: await apiClient.listAssets({
+        kind: mediaKind,
+        limit: ASSET_PAGE_SIZE,
+        sort: 'time',
+        ...(activeQuery.length > 0 ? { q: activeQuery } : {}),
+      }),
+    })))
       .then(results => {
-        if (disposed) return
-        const byId = new Map<string, AssetItem>()
-        for (const result of results) {
-          for (const asset of result.items) byId.set(asset.id, asset)
-        }
-        setAssets([...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)))
+        if (disposed || requestKeyRef.current !== requestKey) return
+        setAssets(mergeAssets([], results.flatMap(result => result.result.items)))
+        setNextCursors(Object.fromEntries(
+          results.flatMap(result => result.result.nextCursor === undefined
+            ? []
+            : [[result.kind, result.result.nextCursor] as const]),
+        ))
       })
       .catch(() => {
-        if (!disposed) setError('素材库加载失败')
+        if (!disposed && requestKeyRef.current === requestKey) setError('素材库加载失败')
       })
       .finally(() => {
-        if (!disposed) setLoading(false)
+        if (!disposed && requestKeyRef.current === requestKey) setLoading(false)
       })
     return () => { disposed = true }
-  }, [mediaKinds])
+  }, [activeQuery, mediaKinds])
+
+  const hasMore = Object.keys(nextCursors).length > 0
+
+  const loadMore = async () => {
+    if (loadingMore || !hasMore) return
+    const requestKey = requestKeyRef.current
+    setLoadingMore(true)
+    setError(undefined)
+    try {
+      const results = await Promise.all(
+        mediaKinds.flatMap(mediaKind => {
+          const cursor = nextCursors[mediaKind]
+          if (cursor === undefined) return []
+          return [apiClient.listAssets({
+            kind: mediaKind,
+            cursor,
+            limit: ASSET_PAGE_SIZE,
+            sort: 'time',
+            ...(activeQuery.length > 0 ? { q: activeQuery } : {}),
+          }).then(result => ({ kind: mediaKind, result }))]
+        }),
+      )
+      if (requestKeyRef.current !== requestKey) return
+      setAssets(current => mergeAssets(current, results.flatMap(result => result.result.items)))
+      setNextCursors(current => {
+        const next = { ...current }
+        for (const result of results) {
+          if (result.result.nextCursor === undefined) delete next[result.kind]
+          else next[result.kind] = result.result.nextCursor
+        }
+        return next
+      })
+    }
+    catch {
+      if (requestKeyRef.current === requestKey) setError('更多素材加载失败，请重试')
+    }
+    finally {
+      if (requestKeyRef.current === requestKey) setLoadingMore(false)
+    }
+  }
 
   // 模型切换后，历史快照中的素材可能不再属于当前允许类型；仍按 ID 读取它们，
   // 让用户可以在选择器中移除无效绑定，而不是被不可见的旧状态卡住。
@@ -77,7 +154,7 @@ export function AssetPicker({
       setAssets(current => {
         const byId = new Map(current.map(asset => [asset.id, asset]))
         for (const asset of additions) byId.set(asset.id, asset)
-        return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+        return sortAssets([...byId.values()])
       })
     })
 
@@ -192,6 +269,16 @@ export function AssetPicker({
           )
         })}
       </div>
+      {!loading && hasMore && (
+        <button
+          type="button"
+          className="flex w-full items-center justify-center rounded-md border py-1 text-[10px] text-muted-foreground transition hover:border-primary/60 hover:text-foreground disabled:cursor-not-allowed disabled:opacity-60"
+          disabled={loadingMore}
+          onClick={() => void loadMore()}
+        >
+          {loadingMore ? '加载中…' : '加载更多素材'}
+        </button>
+      )}
     </div>
   )
 }

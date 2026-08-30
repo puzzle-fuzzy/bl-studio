@@ -68,6 +68,20 @@ test.beforeAll(async () => {
       ${'e2e'}, ${'e2e'}, ${now}, ${now}
     )
   `
+  for (let index = 0; index < 51; index += 1) {
+    const createdAt = new Date(now.getTime() - (index + 1) * 1_000)
+    await sql`
+      insert into user_assets (
+        id, user_id, kind, source, file_name, original_url, mime_type, status,
+        created_by, updated_by, created_at, updated_at
+      )
+      values (
+        ${`${referenceAssetId}_page_${index}`}, ${userId}, ${'image'}, ${'link'},
+        ${`canvas-pagination-${index}.png`}, ${`https://example.test/canvas-pagination-${index}.png`}, ${'image/png'}, ${'ready'},
+        ${'e2e'}, ${'e2e'}, ${createdAt}, ${createdAt}
+      )
+    `
+  }
 })
 
 test.afterAll(async () => {
@@ -233,4 +247,8 @@ test('canvas persistence loop: save → versions → restore → reject stale re
   await page.getByRole('button', { name: '图片' }).first().click()
   await expect(page.getByText('点击配置生成')).toBeVisible()
   await expect(page.getByText('从资产库选择参考素材')).toBeVisible()
+  await page.getByRole('button', { name: '从资产库选择参考素材' }).click()
+  await expect(page.getByRole('button', { name: '加载更多素材' })).toBeVisible()
+  await page.getByRole('button', { name: '加载更多素材' }).click()
+  await expect(page.getByRole('button', { name: '加载更多素材' })).toHaveCount(0)
 })
