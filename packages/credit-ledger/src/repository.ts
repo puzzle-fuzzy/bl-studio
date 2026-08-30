@@ -526,6 +526,10 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
                 )),
             ),
           ))
+          // P2-10：与 generation 的结算/退款事务按同一条 generation 行串行化。
+          // 否则候选查询可能在终态事务提交前看到“尚无 settle/refund”，随后把
+          // 同一笔 reserve 当成陈旧预留回收。
+          .for('update', { of: generationRecords })
         const candidates = rows.map(row => row.entry)
 
         if (!input.confirm) {
@@ -536,8 +540,23 @@ export function createCreditLedger(options: CreateCreditLedgerOptions): CreditLe
         for (const entry of candidates) {
           const reservedCents = entry.reservedDeltaCents
           if (reservedCents <= 0 || entry.generationId === null) continue
+
+          // 账户锁是第二道护栏：settle/refund 的公共事务函数也会先锁账户。
+          // 在拿到锁后重新检查，避免一个未锁 generation 行的调用方在候选查询
+          // 之后完成结算时，让清扫误报失败或重复释放。
+          const account = await findLockedAccount(tx, entry.userId)
+          const [settledEntry] = await tx
+            .select({ id: creditLedgerEntries.id })
+            .from(creditLedgerEntries)
+            .where(and(
+              eq(creditLedgerEntries.generationId, entry.generationId),
+              inArray(creditLedgerEntries.kind, ['settle', 'refund']),
+            ))
+            .limit(1)
+          if (settledEntry !== undefined) continue
+
           const result = await appendMutation(tx, {
-            account: await findLockedAccount(tx, entry.userId),
+            account,
             userId: entry.userId,
             generationId: entry.generationId,
             kind: 'refund',

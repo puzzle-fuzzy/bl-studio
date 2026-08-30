@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { eq } from 'drizzle-orm'
 import { createDb, creditAccounts, generationRecords, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
-import { CreditLedgerError, createCreditLedger, reserveCreditsInTransaction } from '../src'
+import { CreditLedgerError, createCreditLedger, reserveCreditsInTransaction, settleCreditsInTransaction } from '../src'
 
 let isolated!: IsolatedTestDb
 let db!: BailianStudioDb
@@ -131,5 +131,41 @@ describe('credit ledger repository', () => {
     await expect(ledger.releaseStaleReservations({ olderThan: new Date('2026-02-01T00:00:00.000Z'), confirm: true }))
       .resolves.toMatchObject({ candidates: 0, released: 0 })
     await expect(ledger.getBalance({ userId })).resolves.toMatchObject({ availableCents: 300, reservedCents: 0 })
+  })
+
+  it('does not release a reservation when settlement races with the stale sweep', async () => {
+    const { userId, adminId } = await createUsers('stale-race')
+    const ledger = createCreditLedger({ db })
+    await ledger.grant({ userId, actorUserId: adminId, amountCents: 300, reason: 'seed', idempotencyKey: 'stale-race-seed' })
+    const old = new Date('2026-01-01T00:00:00.000Z')
+    await db.insert(generationRecords).values({
+      id: 'generation-stale-race', userId, modelId: 'qwen-image', provider: 'dashscope',
+      providerModel: 'qwen-image', category: 'image', inputParamsJson: { prompt: 'stale race' },
+      status: 'failed', costEstimate: 100, providerCancelStatus: 'not_requested', createdAt: old, updatedAt: old,
+    })
+    await db.transaction(tx => reserveCreditsInTransaction(tx, {
+      userId, generationId: 'generation-stale-race', amountCents: 100,
+      idempotencyKey: 'stale-race-reserve', now: old,
+    }))
+
+    let accountLocked!: () => void
+    const accountLockReady = new Promise<void>(resolve => { accountLocked = resolve })
+    const settleTransaction = db.transaction(async tx => {
+      await tx.select().from(creditAccounts).where(eq(creditAccounts.userId, userId)).for('update')
+      accountLocked()
+      await settleCreditsInTransaction(tx, {
+        userId, generationId: 'generation-stale-race', reservedCents: 100, finalCents: 100,
+        idempotencyKey: 'stale-race-settle', now: new Date('2026-01-02T00:00:00.000Z'),
+      })
+    })
+    await accountLockReady
+
+    const sweep = ledger.releaseStaleReservations({
+      olderThan: new Date('2026-02-01T00:00:00.000Z'), confirm: true,
+    })
+    await settleTransaction
+
+    await expect(sweep).resolves.toMatchObject({ released: 0, skipped: false })
+    await expect(ledger.getBalance({ userId })).resolves.toMatchObject({ availableCents: 200, reservedCents: 0 })
   })
 })
