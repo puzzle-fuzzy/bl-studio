@@ -120,6 +120,8 @@ export const generationRecords = pgTable('generation_records', {
   index('generation_records_public_gallery_idx').on(table.visibility, table.status, table.deletedAt, table.createdAt),
   // 对比批次反查：一次对比生成的 N 条记录分组。
   index('generation_records_batch_id_idx').on(table.batchId),
+  // Canvas 管理成本分析按父任务 traceId 关联子 generation，单独索引该横切关联键。
+  index('generation_records_trace_idx').on(table.traceId),
 ])
 
 /**

@@ -442,6 +442,13 @@
       "when": 1788076810001,
       "tag": "0062_purple_marvel_apes",
       "breakpoints": true
+    },
+    {
+      "idx": 63,
+      "version": "7",
+      "when": 1788095785802,
+      "tag": "0063_perfect_namora",
+      "breakpoints": true
     }
   ]
 }

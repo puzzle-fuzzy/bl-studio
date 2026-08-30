@@ -159,6 +159,10 @@ export const taskRecords = pgTable(
     index('task_records_record_idx').on(table.recordId),
     // 管理后台任务中心：keyset (created_at, id) 倒序翻页。
     index('task_records_created_idx').on(table.createdAt, table.id),
+    // Canvas 管理分析：窗口筛选只读取未删除的 canvas.execute 任务，避免随任务总量增长退化为全表扫描。
+    index('task_records_canvas_analytics_idx')
+      .on(table.createdAt, table.id)
+      .where(sql`${table.type} = 'canvas.execute' and ${table.domain} = 'canvas' and ${table.deletedAt} is null`),
   ],
 )
 

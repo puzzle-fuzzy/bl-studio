@@ -1,0 +1,2 @@
+CREATE INDEX "task_records_canvas_analytics_idx" ON "task_records" USING btree ("created_at","id") WHERE "task_records"."type" = 'canvas.execute' and "task_records"."domain" = 'canvas' and "task_records"."deleted_at" is null;--> statement-breakpoint
+CREATE INDEX "generation_records_trace_idx" ON "generation_records" USING btree ("trace_id");
