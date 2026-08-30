@@ -16,7 +16,6 @@ import type {
   AnalyticsRepository,
   AuditRepository,
   GenerationRepository,
-  GenerationUsage,
   UsageRepository,
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
@@ -48,10 +47,6 @@ function missing<T>(name: string): T {
   ) as T
 }
 
-function legacy<T>(repository: GenerationRepository): T {
-  return repository as unknown as T
-}
-
 export type TestAppOverrides = Partial<ApiDependencies>
 
 export interface TestAppContext {
@@ -69,31 +64,31 @@ export function createTestApp(
     missing<GenerationRepository>('generationRepository')
   const auditRepository =
     overrides.auditRepository ??
-    legacy<AuditRepository>(generationRepository)
+    missing<AuditRepository>('auditRepository')
   const assetRepository =
-    overrides.assetRepository ?? legacy<NonNullable<ApiDependencies['assetRepository']>>(generationRepository)
+    overrides.assetRepository ?? missing<ApiDependencies['assetRepository']>('assetRepository')
   const shareRepository =
-    overrides.shareRepository ?? legacy<NonNullable<ApiDependencies['shareRepository']>>(generationRepository)
+    overrides.shareRepository ?? missing<ApiDependencies['shareRepository']>('shareRepository')
   const publicShareRepository =
-    overrides.publicShareRepository ?? legacy<NonNullable<ApiDependencies['publicShareRepository']>>(generationRepository)
+    overrides.publicShareRepository ?? missing<ApiDependencies['publicShareRepository']>('publicShareRepository')
   const socialRepository =
     overrides.socialRepository ??
-    legacy<NonNullable<ApiDependencies['socialRepository']>>(generationRepository)
+    missing<ApiDependencies['socialRepository']>('socialRepository')
   const notificationRepository =
     overrides.notificationRepository ??
-    legacy<NonNullable<ApiDependencies['notificationRepository']>>(generationRepository)
+    missing<ApiDependencies['notificationRepository']>('notificationRepository')
   const promptLibraryRepository =
     overrides.promptLibraryRepository ??
-    legacy<NonNullable<ApiDependencies['promptLibraryRepository']>>(generationRepository)
+    missing<ApiDependencies['promptLibraryRepository']>('promptLibraryRepository')
   const feedbackRepository =
     overrides.feedbackRepository ??
-    legacy<NonNullable<ApiDependencies['feedbackRepository']>>(generationRepository)
+    missing<ApiDependencies['feedbackRepository']>('feedbackRepository')
   const contentReportRepository =
     overrides.contentReportRepository ??
-    legacy<NonNullable<ApiDependencies['contentReportRepository']>>(generationRepository)
+    missing<ApiDependencies['contentReportRepository']>('contentReportRepository')
   const adminGalleryRepository =
     overrides.adminGalleryRepository ??
-    legacy<NonNullable<ApiDependencies['adminGalleryRepository']>>(generationRepository)
+    missing<ApiDependencies['adminGalleryRepository']>('adminGalleryRepository')
   const adminTaskRepository =
     overrides.adminTaskRepository ??
     missing<AdminTaskRepository>('adminTaskRepository')
@@ -102,7 +97,7 @@ export function createTestApp(
     missing<AnalyticsRepository>('analyticsRepository')
   const usageRepository =
     overrides.usageRepository ??
-    createLegacyUsageRepository(generationRepository)
+    missing<UsageRepository>('usageRepository')
   const creativeAssetRepository =
     overrides.creativeAssetRepository ??
     missing<CreativeAssetRepository>('creativeAssetRepository')
@@ -175,25 +170,4 @@ export function createTestApp(
   }
 
   return { app: createApp({ dependencies }), dependencies, generationSseHub }
-}
-
-function createLegacyUsageRepository(
-  generationRepository: GenerationRepository,
-): UsageRepository {
-  const legacyRepository = legacy<Partial<UsageRepository>>(generationRepository)
-  return {
-    getGenerationUsage: async (input: {
-      userId: string
-      since: string
-      until: string
-    }): Promise<GenerationUsage> =>
-      legacyRepository.getGenerationUsage?.(input) ?? {
-        attemptCount: 0,
-        successfulCount: 0,
-        generationCount: 0,
-        estimatedCents: 0,
-        chargedCents: 0,
-        providerCostCents: 0,
-      },
-  }
 }
