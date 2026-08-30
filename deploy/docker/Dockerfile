@@ -52,6 +52,7 @@ COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
 COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-compiler/
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
+COPY packages/dashscope-manifests/package.json ./packages/dashscope-manifests/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
 COPY packages/director-contracts/package.json ./packages/director-contracts/
@@ -100,6 +101,7 @@ COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
 COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-compiler/
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
+COPY packages/dashscope-manifests/package.json ./packages/dashscope-manifests/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
 COPY packages/director-contracts/package.json ./packages/director-contracts/

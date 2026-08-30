@@ -11,6 +11,7 @@
     "test": "vitest run tests"
   },
   "dependencies": {
+    "@bailian-studio/dashscope-manifests": "workspace:*",
     "@bailian-studio/model-core": "workspace:*"
   },
   "devDependencies": {

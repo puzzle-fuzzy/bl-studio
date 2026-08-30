@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GenerationInputAsset } from '@bailian-studio/generation-repository'
-import { getModelById } from '@bailian-studio/model-core'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 import type {
   StorageAdapter,
   StorageReadUrlInput,

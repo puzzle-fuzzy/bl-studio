@@ -97,6 +97,21 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
     allowedConsumerScopes: ['apps/api', 'apps/worker'],
     dependencyProtocol: 'workspace:*',
   },
+  {
+    packageName: '@bailian-studio/dashscope-manifests',
+    ownerScope: 'packages/dashscope-manifests',
+    allowedConsumerScopes: [
+      'apps/api',
+      'apps/worker',
+      'packages/canvas-execution',
+      'packages/canvas-validation',
+      'packages/creative-asset-compiler',
+      'packages/generation-repository',
+      'packages/provider-dashscope',
+      'scripts',
+    ],
+    dependencyProtocol: 'workspace:*',
+  },
 ] as const
 
 function isWithinScope(relativePath: string, scope: string): boolean {
@@ -191,9 +206,19 @@ export const rules: Array<{
   {
     scope: 'packages/model-core',
     banned: [
-      /@bailian-studio\/(db|storage|provider-dashscope)\b/,
+      importSpecifier(String.raw`@bailian-studio\/(db|storage|provider-dashscope|dashscope-manifests)\b`),
       importsApps,
       importsServices,
+    ],
+  },
+  {
+    scope: 'packages/dashscope-manifests',
+    banned: [
+      importSpecifier(String.raw`@bailian-studio\/(?!model-core\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsElysia,
+      importsReact,
     ],
   },
   {

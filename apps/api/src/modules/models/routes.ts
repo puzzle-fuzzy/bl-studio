@@ -2,7 +2,7 @@ import { Elysia } from 'elysia'
 import {
   getModelCatalogItemById,
   listModelCatalogItems,
-} from '@bailian-studio/model-core'
+} from '@bailian-studio/dashscope-manifests'
 import { requestErrorResponseBody } from '../../lib/http-errors'
 
 export const modelRoutes = new Elysia({ prefix: '/api/models' })

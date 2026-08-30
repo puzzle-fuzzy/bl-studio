@@ -11,11 +11,10 @@ import { ValidationError } from '@bailian-studio/shared'
 import { DirectorRepositoryError, type DirectorProjectRepositoryDetail, type DirectorRepository } from '@bailian-studio/director-repository'
 import {
   estimatePriceCents,
-  getBailianOperationCapability,
-  getModelById,
   validateModelParams,
   type FrozenModelManifest,
 } from '@bailian-studio/model-core'
+import { getBailianOperationCapability, getModelById } from '@bailian-studio/dashscope-manifests'
 
 export interface DirectorApplicationService {
   requestScriptChat(input: {

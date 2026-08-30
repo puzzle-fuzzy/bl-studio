@@ -166,6 +166,39 @@ describe('package boundary rules', () => {
         "import { listModels } from './registry'",
       ),
     ).toBe(false)
+    expect(
+      matchesRule(
+        'packages/model-core',
+        "import { listModels } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toBe(true)
+  })
+
+  it('keeps the DashScope catalog dependent only on model-core', () => {
+    expect(
+      matchesRule(
+        'packages/dashscope-manifests',
+        "import type { ModelManifest } from '@bailian-studio/model-core'",
+      ),
+    ).toBe(false)
+    expect(
+      matchesRule(
+        'packages/dashscope-manifests',
+        "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
+      ),
+    ).toBe(true)
+    expect(
+      matchesRule(
+        'packages/dashscope-manifests',
+        "import { createDb } from '@bailian-studio/db'",
+      ),
+    ).toBe(true)
+    expect(
+      matchesRule(
+        'packages/dashscope-manifests',
+        "import { app } from '../../apps/api'",
+      ),
+    ).toBe(true)
   })
 
   it('defines an executable provider-dashscope owner and consumer allowlist', () => {
@@ -220,6 +253,21 @@ describe('package boundary rules', () => {
         packageName: '@bailian-studio/canvas-execution',
         ownerScope: 'packages/canvas-execution',
         allowedConsumerScopes: ['apps/api', 'apps/worker'],
+        dependencyProtocol: 'workspace:*',
+      },
+      {
+        packageName: '@bailian-studio/dashscope-manifests',
+        ownerScope: 'packages/dashscope-manifests',
+        allowedConsumerScopes: [
+          'apps/api',
+          'apps/worker',
+          'packages/canvas-execution',
+          'packages/canvas-validation',
+          'packages/creative-asset-compiler',
+          'packages/generation-repository',
+          'packages/provider-dashscope',
+          'scripts',
+        ],
         dependencyProtocol: 'workspace:*',
       },
     ])

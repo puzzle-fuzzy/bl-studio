@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById, validateModelParams } from '@bailian-studio/model-core'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
+import { validateModelParams } from '@bailian-studio/model-core'
 import type { ModelManifest } from '@bailian-studio/model-core'
 import { buildDashScopeRequest } from '../src/request-builder'
 

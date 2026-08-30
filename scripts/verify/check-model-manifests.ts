@@ -6,9 +6,8 @@ import {
   assertModelManifestConsistent,
   assertUniqueModelIds,
   MODEL_REGISTRY,
-  validateModelParams,
-} from '../../packages/model-core/src/index'
-import type { FrozenModelManifest } from '../../packages/model-core/src/index'
+} from '@bailian-studio/dashscope-manifests'
+import { validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
 
 export interface ModelManifestCheckSummary {
   readonly registeredModels: number
@@ -30,7 +29,7 @@ interface SyncStateDocument {
  * 模型目录的显式顶层入口检查。
  *
  * registry 在模块加载时也会自检，但保留这条显式命令，能让 CI 与开发者工作流
- * 都看到 onboarding 契约。它刻意留在 model-core 内部，绝不 import SDK、
+ * 都看到 onboarding 契约。它刻意留在仓库校验脚本层，绝不 import SDK、
  * adapter、provider、数据库或 service。
  *
  * Batch 4 增强：

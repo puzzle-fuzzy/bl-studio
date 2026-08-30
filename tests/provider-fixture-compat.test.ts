@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 import {
   listModels,
   qwenImage,
-  validateModelParams,
   wanxTextToVideo,
+} from '@bailian-studio/dashscope-manifests'
+import {
+  validateModelParams,
   type DeepReadonly,
   type FrozenModelManifest,
   type ModelParameter,

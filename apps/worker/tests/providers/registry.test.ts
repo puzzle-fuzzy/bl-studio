@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById } from '@bailian-studio/model-core'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 import {
   createProviderRegistry,
   ProviderRegistry,

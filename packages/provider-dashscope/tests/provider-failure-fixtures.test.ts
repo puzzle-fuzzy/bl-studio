@@ -3,7 +3,7 @@ import {
   getModelById,
   qwenImage,
   wanxTextToVideo,
-} from '@bailian-studio/model-core'
+} from '@bailian-studio/dashscope-manifests'
 import {
   createDashScopeClient,
   type DashScopeFetch,

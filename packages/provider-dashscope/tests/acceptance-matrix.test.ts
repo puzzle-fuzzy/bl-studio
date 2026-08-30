@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById, listModels, qwenImage, type FrozenModelManifest } from '@bailian-studio/model-core'
+import { getModelById, listModels, qwenImage } from '@bailian-studio/dashscope-manifests'
+import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import { runOfflineModelAcceptance } from '../src/acceptance'
 
 describe('offline model acceptance matrix', () => {

@@ -345,7 +345,7 @@ CreativeGenerationRequest
 - 模型能力快照和可重放 fingerprint 输入。
 - 结构化的 capability/parameter validation error。
 
-它不包含 DashScope 字段名、HTTP endpoint、密钥、URL 签名和数据库查询。模型能力来自 `model-core` manifest，不能新增第二份模型参数表。
+它不包含 DashScope 字段名、HTTP endpoint、密钥、URL 签名和数据库查询。模型能力来自 provider manifest 包（当前为 `dashscope-manifests`），不能新增第二份模型参数表。
 
 ### 6.6 `packages/api-client`（已实现）
 

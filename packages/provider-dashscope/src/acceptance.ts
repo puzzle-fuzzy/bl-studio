@@ -1,12 +1,12 @@
 import {
   isModelParameterVisible,
-  listModels,
   validateModelParams,
   type DeepReadonly,
   type FrozenModelManifest,
   type ModelParameter,
   type ModelRuleCondition,
 } from '@bailian-studio/model-core'
+import { listModels } from '@bailian-studio/dashscope-manifests'
 import { buildDashScopeRequest } from './request-builder'
 import { parseDashScopeOutput } from './response-parser'
 

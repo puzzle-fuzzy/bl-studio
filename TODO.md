@@ -142,6 +142,8 @@ apps/web 18 个测试文件 = 17 个 `src/lib/*` + 1 个 store；components/page
 
 `ModelProvider = 'dashscope'` 单成员联合（types.ts:26）；`ProviderRequestMapping` kind 就是 `'dashscope-chat' | 'dashscope-image-*' | 'dashscope-video-task' | 'dashscope-audio-task'`（270-275）；transport 头引用 `X-DashScope-Async`；9,059 行中 6,549 行是 DashScope manifests。下游（provider-dashscope client、compiler）确实干净，但接第二个 provider 就要改"中立"核心的类型联合与注册表——抽象边界倒置。**方案**：manifests 与 `ProviderRequestMapping` 移入 `dashscope-manifests` 包（或 `kind: string` + provider 域 schema），model-core 收敛为 provider 无关的参数/计价/校验。趁现在便宜，晚了贵。
 
+**进度（2026-08-31）**：第一阶段已开始——DashScope manifest、注册表、catalog、Bailian operation map 与一致性脚本已物理迁入 `packages/dashscope-manifests`；`model-core` 不再加载具体 provider 目录。Provider-specific mapping 类型暂作为兼容层保留，第二阶段继续收敛。
+
 ### P1-H. repository 层五套并行约定（✅ kit 创建 + credit-ledger 示范 2026-08-29）
 
 **已创建** `packages/shared/src/repository-kit.ts`：
@@ -316,7 +318,7 @@ apps/web 18 个测试文件 = 17 个 `src/lib/*` + 1 个 store；components/page
 
 ### 审查基线快照（2026-08-29）
 
-- 代码量：apps+packages 共 ~105k 行 TS/TSX；apps/web 23.3k、apps/admin 5.6k、generation-repository 7.9k+1.6k、model-core 9.1k（其中 6.5k 为 DashScope manifests）。
+- 代码量：apps+packages 共 ~105k 行 TS/TSX；apps/studio 23.3k、apps/admin 5.6k、generation-repository 7.9k+1.6k；DashScope manifest 已迁入 `packages/dashscope-manifests`，`model-core` 保留 provider-neutral 契约与纯函数层。
 - 测试：147 个 vitest 文件（api 35 / worker 27 / web 18 / admin 2 / packages 44 / root+scripts 19）+ 1 个 e2e。
 - 包依赖图无环；web/admin 无法触达 db/仓库层（边界检查器强制）；api 不触达 provider-dashscope/db。
 - 亮点（校准用，非问题）：credit-ledger 行锁 + 幂等键 + 追加式账本 + 对账作业，未发现双花路径；任务认领 `FOR UPDATE SKIP LOCKED` + 僵尸租约回收 + 毒丸隔离；事务性 outbox + LISTEN/NOTIFY + Last-Event-ID 回放；部署脚本 SHA 不可变镜像 + 强制 verify + 预检脚本质量高。

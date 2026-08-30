@@ -7,12 +7,12 @@
  * and creates ordinary generation records for each node.
  */
 import {
-  getModelById as getRegisteredModelById,
   getModelAuditMetadata,
   validateModelParams,
   type FrozenModelManifest,
   type ModelCategory,
 } from '@bailian-studio/model-core'
+import { getModelById as getRegisteredModelById } from '@bailian-studio/dashscope-manifests'
 import {
   projectCanvasParameterValues,
   resolveCanvasAspectRatioParameter,

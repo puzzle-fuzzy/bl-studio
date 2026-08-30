@@ -13,7 +13,7 @@ import {
 	type RetryGenerationInput,
 	type UsageRepository,
 } from "@bailian-studio/generation-repository";
-import { getModelById } from "@bailian-studio/model-core";
+import { getModelById } from "@bailian-studio/dashscope-manifests";
 import type { GenerationLimits } from "../../lib/limits";
 
 export interface CreateGenerationUseCaseResult {

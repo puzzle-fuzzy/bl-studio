@@ -15,6 +15,7 @@
     "@bailian-studio/model-core": "workspace:*"
   },
   "devDependencies": {
+    "@bailian-studio/dashscope-manifests": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

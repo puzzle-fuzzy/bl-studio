@@ -7,7 +7,7 @@ import type { CreateGenerationRequest, ModelCatalogItem } from '@bailian-studio/
  * P0-01 曾因 UI 层把 fun-asr 的媒体参数错写成 audioUrl（manifest 声明为 fileUrls）
  * 导致功能端到端不可用——这个映射必须与 manifest 的媒体参数名对齐，并靠测试锁死。
  *
- * 单一事实源在 model-core 的 manifest（参数 type: 'media' 的 name）。P1-37 把「哪些
+ * 单一事实源在 provider manifest（参数 type: 'media' 的 name）。P1-37 把「哪些
  * 模型是剧本流 / ASR 流」的判定从硬编码 ID 下沉到 manifest capabilities（screenplay /
  * audio_input）：新增剧本/ASR 模型只改 manifest + 按 capability 声明媒体参数名，
  * 不再需要在这里枚举模型 ID。FunctionsPage 用 selectToolModel 按能力选首个已启用模型。

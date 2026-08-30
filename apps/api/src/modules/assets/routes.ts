@@ -7,7 +7,7 @@
  */
 
 import type { UnifiedAssetItem } from "@bailian-studio/generation-repository";
-import { listModels } from "@bailian-studio/model-core";
+import { listModels } from "@bailian-studio/dashscope-manifests";
 import { ValidationError, validateInput } from "@bailian-studio/shared";
 import {
 	assetDownloadFileName,

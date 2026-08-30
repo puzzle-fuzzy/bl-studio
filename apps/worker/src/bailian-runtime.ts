@@ -1,4 +1,4 @@
-import { listModels } from '@bailian-studio/model-core'
+import { listModels } from '@bailian-studio/dashscope-manifests'
 
 export interface BailianRuntimeSnapshot {
   readonly modelCount: number
@@ -8,7 +8,7 @@ export interface BailianRuntimeSnapshot {
 }
 
 /**
- * Worker 启动快照：model-core 是唯一数据源，注册表一致性由 model-core 模块加载时
+ * Worker 启动快照：DashScope manifest 包是模型目录事实源，注册表一致性由其模块加载时
  * 的 assertModelManifestConsistent 保证，这里只返回可记录的只读统计（模型数/启用数），
  * 便于从日志确认生产环境实际加载的目录规模。git 即版本，不再有 SDK 版本/catalog hash。
  */

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById, listModels, MODEL_REGISTRY } from '@bailian-studio/model-core'
+import { getModelById, listModels, MODEL_REGISTRY } from '@bailian-studio/dashscope-manifests'
 
 describe('model registry', () => {
   it('freezes exported registry manifests at the top level', () => {

@@ -10,7 +10,9 @@
         "tsx": "^4.23.5",
       },
       "devDependencies": {
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
+        "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/shared": "workspace:*",
         "@biomejs/biome": "^2.5.7",
         "@node-rs/argon2": "catalog:",
@@ -75,6 +77,7 @@
         "@bailian-studio/creative-asset-contracts": "workspace:*",
         "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
@@ -194,6 +197,7 @@
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/canvas-execution": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
@@ -335,6 +339,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/canvas-contracts": "workspace:*",
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
@@ -363,6 +368,7 @@
         "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -375,6 +381,7 @@
         "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -412,6 +419,17 @@
       },
       "devDependencies": {
         "typescript": "catalog:",
+      },
+    },
+    "packages/dashscope-manifests": {
+      "name": "@bailian-studio/dashscope-manifests",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bailian-studio/model-core": "workspace:*",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
       },
     },
     "packages/db": {
@@ -463,6 +481,7 @@
         "@bailian-studio/creative-asset-contracts": "workspace:*",
         "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/db": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/sse-protocol": "workspace:*",
@@ -540,6 +559,7 @@
       "name": "@bailian-studio/provider-dashscope",
       "version": "0.1.0",
       "dependencies": {
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
@@ -735,6 +755,8 @@
     "@bailian-studio/creative-asset-repository": ["@bailian-studio/creative-asset-repository@workspace:packages/creative-asset-repository"],
 
     "@bailian-studio/credit-ledger": ["@bailian-studio/credit-ledger@workspace:packages/credit-ledger"],
+
+    "@bailian-studio/dashscope-manifests": ["@bailian-studio/dashscope-manifests@workspace:packages/dashscope-manifests"],
 
     "@bailian-studio/db": ["@bailian-studio/db@workspace:packages/db"],
 

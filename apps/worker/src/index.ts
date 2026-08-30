@@ -5,7 +5,7 @@
  * 并一直运行直到收到停止信号。
  */
 
-import { getModelById } from '@bailian-studio/model-core'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 import { createWorkerPersistenceRuntime } from '@bailian-studio/persistence-runtime'
 import { createStorageFromEnv } from '@bailian-studio/storage'
 import { readGenerationLimits } from '@bailian-studio/shared'

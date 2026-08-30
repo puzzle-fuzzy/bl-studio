@@ -1,6 +1,6 @@
 import { AuthError } from '@bailian-studio/auth'
 import type { CreditBalance } from '@bailian-studio/credit-ledger'
-import { listModels } from '@bailian-studio/model-core'
+import { listModels } from '@bailian-studio/dashscope-manifests'
 import { createLogger, validateInput } from '@bailian-studio/shared'
 import { resolveLocalStoragePath } from '@bailian-studio/storage'
 import { Elysia } from 'elysia'

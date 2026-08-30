@@ -5,7 +5,7 @@
  * pricing/parameters）→ `bun run verify` → 部署。git 即版本。
  *
  * 本脚本只做「漂移检测」：抓百炼 OpenAI 兼容面 `GET /compatible-mode/v1/models`
- * （机器可读清单，覆盖 chat / embedding / 第三方模型），与 model-core 的 manifest
+ * （机器可读清单，覆盖 chat / embedding / 第三方模型），与 DashScope manifest 包的目录
  * providerModel 对账，报告：
  *  - official-new：官方有、manifest 没有的模型（新增候选，需要决定是否建模）；
  *  - compatible-retired：chat 面 manifest 的 providerModel 不在官方清单里（可能已
@@ -18,7 +18,7 @@
  * 失败 → `SKIPPED` 并退出 0（不阻塞，但明确报告「未验证」）；网络失败 → 退出非 0。
  */
 
-import { listModels } from '../../packages/model-core/src/index'
+import { listModels } from '@bailian-studio/dashscope-manifests'
 
 const COMPATIBLE_BASE = 'https://dashscope.aliyuncs.com/compatible-mode/v1'
 

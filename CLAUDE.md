@@ -55,7 +55,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 
 包边界是**可执行的架构**（`scripts/verify/check-package-boundaries.ts`，进 `verify`）：
 
-- **`@bailian-studio/model-core` 是唯一数据源**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 manifest，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
+- **`@bailian-studio/dashscope-manifests` 是 DashScope 模型知识 owner**：51 份 manifest（39 启用 / 12 个 vidu 暂未开通；transport/rules/pricing/parameters/availability 全在 manifest 里）+ 注册表/catalog/一致性门禁；`@bailian-studio/model-core` 只提供 provider-neutral 契约与纯函数校验层（`validateModelParams` / `estimateModelCost` / `classifyTaskStatus` / `assertResponseShape`），前后端共享。**改模型知识 = 改 provider manifest 包，git 即版本**——没有外部 SDK、npm 发布或 hash 对账仪式。
 - **模型可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`。`notActivated`（如 vidu 全家「暂未开通」——key 已授权但百炼产品卡未开通）必须配 `enabled: false`（registry-check 断言），模型仍投影进前端 catalog 置灰 + 打 tag，但提交/worker 解析经 `getModelById` 一律拒绝。
 - `@bailian-studio/provider-dashscope` 是唯一受边界约束的执行包：**只允许 `apps/worker` 消费**（协议 `workspace:*`）；它是 worker 专属的 DashScope 传输/执行层。
 - **`apps/studio` 可以直接 import model-core** 做提交前实时校验（提交 payload 与 `apps/studio/src/lib/generation-submit.ts` 的 `buildValidationParams` 保持一致）。
@@ -70,7 +70,8 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 | 包 | 职责 |
 |---|---|
 | shared | 通用基础：logger（敏感 key 脱敏）、metrics、错误基类、运行时校验；仅依赖 creative-asset-contracts |
-| model-core | **唯一数据源**：51 个 manifest（39 启用 / 12 个 vidu 暂未开通；深冻结）+ 纯函数校验/定价/状态分类（前后端共享） |
+| model-core | provider-neutral 模型契约 + 纯函数校验/定价/状态分类（前后端共享） |
+| dashscope-manifests | DashScope 51 个 manifest（39 启用 / 12 个 vidu 暂未开通；深冻结）+ registry/catalog/一致性门禁 |
 | sse-protocol | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |
 | generation-repository | 生成记录/任务/产物/事件的持久化接缝（`FOR UPDATE SKIP LOCKED`） |
@@ -85,7 +86,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 
 ## 模型知识维护工作流
 
-模型知识（transport / rules / pricing / parameters / availability）只存在 `packages/model-core/src/manifests/`。改模型的流程：
+DashScope 模型知识（transport / rules / pricing / parameters / availability）只存在 `packages/dashscope-manifests/src/manifests/`。改模型的流程：
 
 1. **官网变更** → 运行 `bun run sync:bailian-docs` 看漂移报告（兼容面有机器清单；媒体生成面与定价没有，需人工比对官网文档）；
 2. **AI 读官网原文** → 更新对应 manifest（参数约束 / 传输端点 / 定价 rates / rules），保证 `bun run check:manifests` 通过；

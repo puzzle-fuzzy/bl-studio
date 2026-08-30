@@ -5,7 +5,7 @@ AI 媒体生成平台（文生图 / 文生视频 / 音频 / 文本）。
 **本仓库的定位**：
 - 将原有前端重组为四个同源 React app：`studio` 创作工作区、`writer` 剧本台、`canvas` 画布和 `admin` 管理后台；
 - 后端保留已验证的强架构（任务队列 + outbox + SSE、manifest 驱动、包边界门禁），并迁移工具链到 **bun + turbo**；
-- **bailian-hub 已并入本仓库**：`packages/model-core` 的 manifest 是模型唯一数据源，transport/rules/pricing 全在 manifest 里；纯函数校验（`validateModelParams` 等）前后端共享，git 即版本——无外部 SDK、npm 发布或 hash 对账仪式。
+- **bailian-hub 已并入本仓库**：`packages/dashscope-manifests` 持有 DashScope manifest 及目录，`packages/model-core` 提供 provider-neutral 契约与纯函数校验（`validateModelParams` 等），git 即版本——无外部 SDK、npm 发布或 hash 对账仪式。
 
 ## 技术栈
 
@@ -151,8 +151,8 @@ Studio (apps/studio, /)   Writer (apps/writer, /writer)   Canvas (apps/canvas, /
                   api-client / design-tokens）
 ```
 
-- **包边界即架构**：`check:boundaries` 用正则强制执行「谁可以 import 谁」；`provider-dashscope` 是唯一受边界约束的执行包（只被 worker 消费），`model-core` 是前后端共享的纯数据 + 纯函数叶子。
-- **manifest 驱动模型**：`packages/model-core/src/manifests/` 是唯一数据源（含 transport/rules/pricing/parameters），新增模型 = 加一份 manifest + 注册表一行，provider/前端零代码扩展；web 表单用 `validateModelParams` 做提交前实时校验，与服务端等价。
+- **包边界即架构**：`check:boundaries` 用正则强制执行「谁可以 import 谁」；`provider-dashscope` 是唯一受边界约束的执行包（只被 worker 消费），`model-core` 是前后端共享的 provider-neutral 契约 + 纯函数叶子，DashScope 目录由独立 manifest 包拥有。
+- **manifest 驱动模型**：`packages/dashscope-manifests/src/manifests/` 是 DashScope 唯一数据源（含 transport/rules/pricing/parameters），新增模型 = 加一份 manifest + 注册表一行，provider/前端零代码扩展；web 表单用 `validateModelParams` 做提交前实时校验，与服务端等价。
 - **SSE 实时管线**：生成事件以 DB outbox 为事实来源，携带 recordId 作「失效提示」；导演实体审核另发 `director.entities.changed` 实时失效提示（不进入 outbox），前端都只重新查询，不直接写入 SSE payload。
 - **导演逐镜导出**：视频阶段只对当前有效的 `shot_video` 提供逐镜下载，复用用户资产下载 URL；不会把历史视频误当当前版本，也不替代可选的成片合成。
 - **进程资源生命周期**：API/Worker 各自只创建一个共享 PostgreSQL/Drizzle 句柄，repository 与认证/积分服务通过注入复用；`LISTEN/NOTIFY` 监听器保留独立长连接。

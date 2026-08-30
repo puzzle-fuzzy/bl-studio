@@ -1,11 +1,12 @@
 # @bailian-studio/model-core
 
-Declarative product model registry. It owns manifests, parameter validation and
-defaults, provider request/output requirements, pricing estimates, actual usage
-pricing, and registry consistency checks.
+Provider-neutral model contracts and pure functions. It owns parameter
+validation/defaults, pricing estimates, actual usage pricing, response-shape
+checks, and the manifest contract. Concrete provider catalogs live in dedicated
+packages such as `@bailian-studio/dashscope-manifests`.
 
 - Near-leaf package: no DB, provider SDK, runtime app, Elysia, or React imports.
-- Add a model by adding a manifest and registry entry; provider orchestration
-  should not gain model-id-specific branches.
-- Manifests are deep-frozen at load time. Consumers use `getModelById`,
-  `listModels`, validation, and pricing exports from the package root.
+- Provider packages own their manifest registry and deep-freeze policy; adding
+  a second provider does not require adding another provider to this package.
+- Consumers use validation, pricing, and response-check exports from this
+  package root, and import a provider catalog explicitly when they need models.

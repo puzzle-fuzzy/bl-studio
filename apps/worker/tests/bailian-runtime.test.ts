@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { listModels } from '@bailian-studio/model-core'
+import { listModels } from '@bailian-studio/dashscope-manifests'
 import { verifyBailianRuntime } from '../src/bailian-runtime'
 
 describe('Bailian worker runtime gate', () => {
-  it('exposes the model-core catalog stats as the startup snapshot', () => {
+  it('exposes the DashScope catalog stats as the startup snapshot', () => {
     const runtime = verifyBailianRuntime()
     const models = listModels()
     expect(runtime.modelCount).toBe(models.length)

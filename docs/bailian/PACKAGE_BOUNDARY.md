@@ -2,7 +2,7 @@
 
 > 本文件是模型知识归属与包边界的**唯一规范**。`scripts/verify/check-package-boundaries.ts`（`bun run check:boundaries`，进 `verify`）是它的可执行版本：**改包边界必须先改这里，再同步脚本与对应测试。** 各 owner 包与相关路由的 AGENTS.md 均指向本文件。
 >
-> **背景**：bailian-hub 与外部 SDK（`@puzzle-fuzzy/bailian-sdk`）已并入本仓库。模型知识（transport / rules / pricing / parameters）全部收进 `@bailian-studio/model-core` 的 manifest，校验统一为纯函数。**git 即版本**——不再有 npm 发布、精确版本钉死或 coverage hash 对账仪式。
+> **背景**：bailian-hub 与外部 SDK（`@puzzle-fuzzy/bailian-sdk`）已并入本仓库。模型知识（transport / rules / pricing / parameters）由 provider 专属 manifest 包持有，provider-neutral 的契约与纯函数收进 `@bailian-studio/model-core`。**git 即版本**——不再有 npm 发布、精确版本钉死或 coverage hash 对账仪式。
 
 ## 1. 执行层包的所有者与消费者白名单
 
@@ -14,10 +14,11 @@
 | `@bailian-studio/creative-asset-repository` | `packages/creative-asset-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 | `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
+| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-execution` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/generation-repository` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
-- **`@bailian-studio/model-core` 不在此表**：它是被前后端共享的纯数据 + 纯函数叶子（唯一数据源），允许 `apps/studio` / `apps/writer` / `apps/canvas` / `apps/admin`（提交前实时校验）与 `apps/worker` / `generation-repository` / `api` / `provider-dashscope` 消费，不受消费者白名单限制（仅受第 2 节 import 禁令约束）。
+- **`@bailian-studio/model-core` 不在此表**：它是被前后端共享的 provider-neutral 契约 + 纯函数叶子，允许前端和服务端按需消费，不受消费者白名单限制（仅受第 2 节 import 禁令约束）。具体 provider 目录必须通过对应的 manifest 包显式消费。
 - **`@bailian-studio/canvas-validation` 不在执行层白名单表**：它是前后端共享的 Canvas 预检纯函数包，仅依赖 `canvas-contracts` 与 `model-core`，允许 `apps/canvas` 及服务端按需消费。它不负责资产 ownership、revision、任务入队或 provider 请求。
 
 ## 2. 各包 import 禁令（check-package-boundaries.ts 的 rules 表）
@@ -32,7 +33,8 @@ Worker 与前端各自维护不同的 wire schema。
 |---|---|
 | `packages/shared` | 任何其它 `@bailian-studio/*`（叶子包） |
 | `packages/director-contracts` | 任何其它 `@bailian-studio/*`、services、apps、react、elysia |
-| `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope)`、apps、services |
+| `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope\|dashscope-manifests)`、apps、services |
+| `packages/dashscope-manifests` | 除 `@bailian-studio/model-core` 外的其它 workspace 包、apps、services、elysia、react |
 | `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|sse-protocol)`、apps、services、elysia、react |
 | `packages/generation-repository` | `@bailian-studio/provider-dashscope`、直接从 `@bailian-studio/db` 导入创意资产域表、services、apps、react、elysia |
 | `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|sse-protocol)`、services、apps、react、elysia |
@@ -53,12 +55,15 @@ Worker 与前端各自维护不同的 wire schema。
 
 ## 3. Owner 包职责边界
 
-### packages/model-core（唯一数据源 + 纯函数校验层）
-- **拥有**：51 份 model manifest（39 启用 / 12 个 vidu 暂未开通；parameters / rules / transport / pricing / output / request bindings / availability）与纯函数校验/定价/状态分类（`validateModelParams`、`estimateModelCost`、`classifyTaskStatus`、`assertResponseShape`、`ModelCoreError`）。
-- **禁止**：import SDK / adapter / provider-dashscope；加 HTTP 客户端、环境访问、数据库代码、运行时编排、第二份契约/价格表。
-- **可用性语义（`availability`）**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`；`listModelCatalogItems()` 投影全部（含禁用项，前端置灰展示）。`availability.notActivated`（如 vidu 全家「暂未开通」）标注「key 已授权但产品卡未开通」的模型，必须配 `enabled: false`（registry-check 断言）且不能为空串。
-- 每个注册的 manifest 必须在 Bailian operation requirement map 中**恰好出现一次**（含暂未开通的禁用模型——其能力仍投影进 catalog）；未知/退役产品参数必须校验失败，绝不静默丢弃。
-- 改模型知识 = 改 manifest（transport/rules/pricing/availability 与参数同步更新），跑 `bun run check:manifests`。
+### packages/model-core（provider-neutral 契约 + 纯函数校验层）
+- **拥有**：`ModelManifest` 的通用形状、参数/计价/响应校验与任务状态分类（`validateModelParams`、`estimateModelCost`、`classifyTaskStatus`、`assertResponseShape`、`ModelCoreError`）。
+- **禁止**：import SDK / adapter / provider catalog；加 HTTP 客户端、环境访问、数据库代码、运行时编排、第二份契约/价格表。
+
+### packages/dashscope-manifests（DashScope 模型知识 owner）
+- **拥有**：51 份 DashScope/Bailian manifest（39 启用 / 12 个 vidu 暂未开通）、注册表深冻结、catalog 投影、Bailian operation requirement map 与一致性门禁。
+- **依赖方向**：只能依赖 `model-core`；不依赖 provider 执行器、数据库或应用。Provider-specific 的 request/transport 类型仍暂放在 `model-core` 作为兼容层，后续 P1-G 第二阶段再继续收敛。
+- **可用性语义**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`；`listModelCatalogItems()` 投影全部（含禁用项，前端置灰展示）。
+- 改模型知识 = 改此包的 manifest，跑 `bun run check:manifests`。
 
 ### packages/provider-dashscope（协议执行层，worker 专属）
 - **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、provider 响应解析与错误分类。
@@ -125,7 +130,7 @@ Worker 与前端各自维护不同的 wire schema。
 ### apps/api
 - 禁止 `@bailian-studio/db`、`@bailian-studio/provider-dashscope`、deep-import provider 源码、import worker sibling / apps。
 - 持久化通过 `@bailian-studio/persistence-runtime` 取得进程级共享句柄；API 不直接碰 Drizzle，URL 工厂仅用于独立包测试或单模块工具。
-- 模型目录 `/models/catalog` 与 `/models/:id` 直接投影 `model-core` 的 catalog（`listModelCatalogItems`），不在路由里重建模型元数据。
+- 模型目录 `/models/catalog` 与 `/models/:id` 直接投影 `dashscope-manifests` 的 catalog（`listModelCatalogItems`），不在路由里重建模型元数据。
 
 ### apps/worker
 - 禁止 `@bailian-studio/api`、`@bailian-studio/db`、import api sibling / apps、字面 DashScope HTTP 调用。

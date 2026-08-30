@@ -92,7 +92,9 @@
     "tsx": "^4.23.5"
   },
   "devDependencies": {
+    "@bailian-studio/dashscope-manifests": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",
+    "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
     "@biomejs/biome": "^2.5.7",
     "@node-rs/argon2": "catalog:",

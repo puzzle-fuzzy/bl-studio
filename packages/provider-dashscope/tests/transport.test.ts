@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
+import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import {
   isValidDashScopeWorkspaceId,
   resolveDashScopeCancelTarget,

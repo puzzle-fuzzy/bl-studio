@@ -3,7 +3,7 @@ import type { ModelCatalogItem } from '@bailian-studio/api-client'
 /**
  * 生成详情页「以图继续创作」的目标模型派生（P1-12）。
  *
- * 单一数据源是 model-core 的 manifest（category / capabilities / parameters）。
+ * 单一数据源是服务端投影的 provider manifest（category / capabilities / parameters）。
  * 这里不再硬编码 `qwen-image-edit` 之类的模型 id：编辑入口从已启用目录中按
  * capabilities 派生，模型下线/改名后入口自动消失而不是变成死入口。
  */

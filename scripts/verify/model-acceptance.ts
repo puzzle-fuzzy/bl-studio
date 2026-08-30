@@ -3,7 +3,7 @@ import {
   createDashScopeClient,
   runOfflineModelAcceptance,
 } from '../../packages/provider-dashscope/src/index'
-import { getModelById } from '../../packages/model-core/src/index'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 
 const liveModelId = process.argv.find(argument => argument.startsWith('--live='))?.slice('--live='.length)
 const report = runOfflineModelAcceptance()

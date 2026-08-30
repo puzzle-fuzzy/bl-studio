@@ -4,13 +4,13 @@ import {
   ModelParameterSchema,
   ModelValidationRuleSchema,
 } from '../packages/api-client/src/schemas'
-import { listModelCatalogItems } from '../packages/model-core/src/catalog'
+import { listModelCatalogItems } from '@bailian-studio/dashscope-manifests'
 import type { ModelParameter } from '../packages/model-core/src/types'
 
 /**
  * P2-19：catalog → api-client 投影完整性。
  *
- * model-core 是唯一数据源，api-client 的 schema 是手维护的投影白名单——manifest 新增
+ * provider manifest 包是模型目录数据源，api-client 的 schema 是手维护的投影白名单——manifest 新增
  * 参数元数据而 api-client 未同步时，zod `.object()` 会静默剥掉未知字段，前端丢字段。
  * 本测试把「投影字段集合与 manifest 一致」变成断言：
  *  - 类型层：MANIFEST_PARAMETER_FIELDS 必须覆盖 ModelParameter 的全部字段（否则 tsc 红）
