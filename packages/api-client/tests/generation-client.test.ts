@@ -17,14 +17,22 @@ function jsonResponse(body: unknown, status = 200): Response {
 
 interface QueuedFetch {
   fetch: typeof fetch
-  calls: Array<{ url: string; method: string; body: string | undefined; credentials: RequestCredentials | undefined }>
+  calls: Array<{
+    url: string
+    method: string
+    body: string | undefined
+    credentials: RequestCredentials | undefined
+  }>
 }
 
 /** 按 FIFO 顺序返回 Response 的假 fetch，并记录每次调用。 */
 function queuedFetch(responses: Response[]): QueuedFetch {
   const queue = [...responses]
   const calls: QueuedFetch['calls'] = []
-  const core = async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
+  const core = async (
+    input: Parameters<typeof fetch>[0],
+    init?: RequestInit,
+  ): Promise<Response> => {
     calls.push({
       url: typeof input === 'string' ? input : '<non-string-url>',
       method: init?.method ?? 'GET',
@@ -32,7 +40,8 @@ function queuedFetch(responses: Response[]): QueuedFetch {
       credentials: init?.credentials,
     })
     const next = queue.shift()
-    if (next === undefined) throw new Error('queuedFetch: response queue exhausted')
+    if (next === undefined)
+      throw new Error('queuedFetch: response queue exhausted')
     return next
   }
   // 合并到真实 fetch 上，使结果携带 fetch 的静态面（如 preconnect），
@@ -50,8 +59,22 @@ const qwenImage: ModelCatalogItem = {
   taskMode: 'sync',
   capabilities: ['text_prompt'],
   parameters: [
-    { name: 'prompt', label: 'Prompt', type: 'text', required: true, maxLength: 800 },
-    { name: 'n', label: 'Count', type: 'number', defaultValue: 1, min: 1, max: 6, step: 1 },
+    {
+      name: 'prompt',
+      label: 'Prompt',
+      type: 'text',
+      required: true,
+      maxLength: 800,
+    },
+    {
+      name: 'n',
+      label: 'Count',
+      type: 'number',
+      defaultValue: 1,
+      min: 1,
+      max: 6,
+      step: 1,
+    },
   ],
   availability: { enabled: true, stage: 'stable' },
 }
@@ -62,7 +85,12 @@ const fullManifest = {
   ...qwenImage,
   request: { kind: 'dashscope-image-message', endpoint: '/x', bindings: {} },
   output: { kind: 'images-from-message-content' },
-  pricing: { unit: 'per_image', quantityKey: 'n', currency: 'CNY', tiers: [{ condition: {}, priceCents: 20 }] },
+  pricing: {
+    unit: 'per_image',
+    quantityKey: 'n',
+    currency: 'CNY',
+    tiers: [{ condition: {}, priceCents: 20 }],
+  },
 }
 
 const record = {
@@ -97,7 +125,9 @@ const user = {
 
 describe('createApiClient', () => {
   it('lists models from the catalog envelope, stripping unmapped manifest fields', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [fullManifest] } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [fullManifest] } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const models = await client.getModels()
@@ -140,12 +170,20 @@ describe('createApiClient', () => {
       id: 'conditional-media',
       capabilities: ['text_prompt', 'image_input', 'video_input'],
       parameters: [
-        { name: 'featureVideo', label: 'Feature video', type: 'media', mediaKind: 'video' },
+        {
+          name: 'featureVideo',
+          label: 'Feature video',
+          type: 'media',
+          mediaKind: 'video',
+        },
         {
           name: 'duration',
           label: 'Duration',
           type: 'number',
-          conditional: { when: { field: 'featureVideo', present: true }, max: 10 },
+          conditional: {
+            when: { field: 'featureVideo', present: true },
+            max: 10,
+          },
         },
       ],
     }
@@ -156,8 +194,10 @@ describe('createApiClient', () => {
 
     const [model] = await client.getModels()
 
-    expect(model?.parameters.find(parameter => parameter.name === 'duration')?.conditional)
-      .toEqual({ when: { field: 'featureVideo', present: true }, max: 10 })
+    expect(
+      model?.parameters.find((parameter) => parameter.name === 'duration')
+        ?.conditional,
+    ).toEqual({ when: { field: 'featureVideo', present: true }, max: 10 })
   })
 
   it('creates a generation share using the cookie session', async () => {
@@ -169,7 +209,9 @@ describe('createApiClient', () => {
       createdAt: '2026-07-01T00:00:00.000Z',
       updatedAt: '2026-07-01T00:00:00.000Z',
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { share } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { share } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.createGenerationShare('rec_1')
@@ -181,7 +223,12 @@ describe('createApiClient', () => {
   })
 
   it('fetches a public shared generation without credentials', async () => {
-    const publicShare = { id: 'share_1', recordId: 'rec_1', createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z' }
+    const publicShare = {
+      id: 'share_1',
+      recordId: 'rec_1',
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    }
     const publicRecord = {
       id: 'rec_1',
       modelId: 'qwen-image',
@@ -201,7 +248,16 @@ describe('createApiClient', () => {
       readUrl: '/signed/generations/rec_1/artifact_1.png?ttl=3600',
       createdAt: '2026-07-01T00:00:00.000Z',
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { share: publicShare, record: publicRecord, artifacts: [artifact] } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          share: publicShare,
+          record: publicRecord,
+          artifacts: [artifact],
+        },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.getSharedGeneration('share_1')
@@ -215,7 +271,9 @@ describe('createApiClient', () => {
   })
 
   it('fetches a single model', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: fullManifest })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: fullManifest }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const model = await client.getModel('qwen-image')
@@ -259,7 +317,12 @@ describe('createApiClient', () => {
       traceId: 'trace-1',
       author: { id: 'user_1', displayName: null },
       recordContext: { modelId: 'qwen-plus', category: 'text' },
-      error: { category: 'provider', message: 'provider failed', retriable: false, code: 'PROVIDER_ERROR' },
+      error: {
+        category: 'provider',
+        message: 'provider failed',
+        retriable: false,
+        code: 'PROVIDER_ERROR',
+      },
       durationMs: 1000,
     }
     const { fetch, calls } = queuedFetch([
@@ -289,7 +352,12 @@ describe('createApiClient', () => {
       createdAt: '2026-08-30T00:00:00.000Z',
       updatedAt: '2026-08-30T00:00:00.000Z',
     }
-    const accepted = { ...candidate, status: 'accepted', reviewedBy: 'user-1', reviewedAt: '2026-08-30T00:01:00.000Z' }
+    const accepted = {
+      ...candidate,
+      status: 'accepted',
+      reviewedBy: 'user-1',
+      reviewedAt: '2026-08-30T00:01:00.000Z',
+    }
     const { fetch, calls } = queuedFetch([
       jsonResponse({ success: true, data: [candidate] }),
       jsonResponse({ success: true, data: accepted }),
@@ -297,18 +365,36 @@ describe('createApiClient', () => {
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const candidates = await client.listDirectorEntityCandidates('project/1', { status: 'provisional', kind: 'character' })
-    const reviewed = await client.reviewDirectorEntityCandidate('entity/candidate-1', { status: 'accepted' })
+    const candidates = await client.listDirectorEntityCandidates('project/1', {
+      status: 'provisional',
+      kind: 'character',
+    })
+    const reviewed = await client.reviewDirectorEntityCandidate(
+      'entity/candidate-1',
+      { status: 'accepted' },
+    )
     await client.deleteDirectorEntityCandidate('entity/candidate-1')
 
     expect(candidates[0]?.mentions[0]?.text).toBe('林默')
     expect(reviewed.status).toBe('accepted')
-    expect(calls.map(call => [call.method, call.url, call.body])).toEqual([
-      ['GET', 'http://api.test/api/director/projects/project%2F1/entity-candidates?status=provisional&kind=character', undefined],
-      ['PATCH', 'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1', JSON.stringify({ status: 'accepted' })],
-      ['DELETE', 'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1', undefined],
+    expect(calls.map((call) => [call.method, call.url, call.body])).toEqual([
+      [
+        'GET',
+        'http://api.test/api/director/projects/project%2F1/entity-candidates?status=provisional&kind=character',
+        undefined,
+      ],
+      [
+        'PATCH',
+        'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1',
+        JSON.stringify({ status: 'accepted' }),
+      ],
+      [
+        'DELETE',
+        'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1',
+        undefined,
+      ],
     ])
-    expect(calls.every(call => call.credentials === 'include')).toBe(true)
+    expect(calls.every((call) => call.credentials === 'include')).toBe(true)
   })
 
   it('reads request parameters and signed input assets for an admin task', async () => {
@@ -321,16 +407,18 @@ describe('createApiClient', () => {
             modelId: 'wanx2.1-t2i-turbo',
             category: 'image',
             inputParams: { prompt: '一只戴墨镜的柴犬' },
-            inputAssets: [{
-              parameterName: 'reference_images',
-              position: 0,
-              asset: {
-                id: 'asset-reference-1',
-                kind: 'image',
-                source: 'upload',
-                url: 'https://signed.example/reference-1.png',
+            inputAssets: [
+              {
+                parameterName: 'reference_images',
+                position: 0,
+                asset: {
+                  id: 'asset-reference-1',
+                  kind: 'image',
+                  source: 'upload',
+                  url: 'https://signed.example/reference-1.png',
+                },
               },
-            }],
+            ],
           },
         },
       }),
@@ -341,13 +429,22 @@ describe('createApiClient', () => {
 
     expect(context?.inputParams).toEqual({ prompt: '一只戴墨镜的柴犬' })
     expect(context?.inputAssets[0]?.asset.url).toContain('signed.example')
-    expect(calls[0]?.url).toBe('http://api.test/api/admin/tasks/task-1/request-context')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/admin/tasks/task-1/request-context',
+    )
     expect(calls[0]?.credentials).toBe('include')
   })
 
   it('creates a generation with stable asset references and no client-supplied userId', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
+      jsonResponse({
+        success: true,
+        data: {
+          record,
+          task: { id: 'task_1', type: 'generation.submit', status: 'queued' },
+          event: { type: 'generation.status' },
+        },
+      }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -361,17 +458,26 @@ describe('createApiClient', () => {
     expect(result.task.type).toBe('generation.submit')
     expect(calls[0]?.method).toBe('POST')
     // body 中不含 userId —— API 从 session cookie 推导。
-    expect(calls[0]?.body).toEqual(JSON.stringify({
-      modelId: 'qwen-image',
-      params: { prompt: 'lantern' },
-      assetRefs: { image: 'asset_input_1' },
-    }))
+    expect(calls[0]?.body).toEqual(
+      JSON.stringify({
+        modelId: 'qwen-image',
+        params: { prompt: 'lantern' },
+        assetRefs: { image: 'asset_input_1' },
+      }),
+    )
     expect(calls[0]?.credentials).toBe('include')
   })
 
   it('preserves ordered multi-asset references in generation requests', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
+      jsonResponse({
+        success: true,
+        data: {
+          record,
+          task: { id: 'task_1', type: 'generation.submit', status: 'queued' },
+          event: { type: 'generation.status' },
+        },
+      }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -381,16 +487,25 @@ describe('createApiClient', () => {
       assetRefs: { image: ['asset-a', 'asset-b'] },
     })
 
-    expect(calls[0]?.body).toEqual(JSON.stringify({
-      modelId: 'qwen-image-edit',
-      params: { prompt: 'combine' },
-      assetRefs: { image: ['asset-a', 'asset-b'] },
-    }))
+    expect(calls[0]?.body).toEqual(
+      JSON.stringify({
+        modelId: 'qwen-image-edit',
+        params: { prompt: 'combine' },
+        assetRefs: { image: ['asset-a', 'asset-b'] },
+      }),
+    )
   })
 
   it('passes batchId through to the request body for compare-mode grouping', async () => {
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record, task: { id: 'task_1', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
+      jsonResponse({
+        success: true,
+        data: {
+          record,
+          task: { id: 'task_1', type: 'generation.submit', status: 'queued' },
+          event: { type: 'generation.status' },
+        },
+      }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -400,31 +515,42 @@ describe('createApiClient', () => {
       batchId: 'batch_compare_1',
     })
 
-    expect(calls[0]?.body).toEqual(JSON.stringify({
-      modelId: 'qwen-image',
-      params: { prompt: 'lantern' },
-      batchId: 'batch_compare_1',
-    }))
+    expect(calls[0]?.body).toEqual(
+      JSON.stringify({
+        modelId: 'qwen-image',
+        params: { prompt: 'lantern' },
+        batchId: 'batch_compare_1',
+      }),
+    )
   })
 
   it('parses the estimate success envelope used by the API route', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({
-      success: true,
-      data: {
-        estimate: {
-          modelId: 'qwen-image',
-          provider: 'dashscope',
-          providerModel: 'qwen-image',
-          category: 'image',
-          params: { prompt: 'lantern', n: 1, size: '1328*1328' },
-          costEstimate: 20,
-          currency: 'CNY',
-          credits: { availableCents: 100, reservedCents: 0, canAfford: true },
-          usage: { attemptCount: 0, successfulCount: 0, generationCount: 0, estimatedCents: 0, chargedCents: 0, providerCostCents: 0 },
-          limits: { dailyQuotaMode: 'attempts' },
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          estimate: {
+            modelId: 'qwen-image',
+            provider: 'dashscope',
+            providerModel: 'qwen-image',
+            category: 'image',
+            params: { prompt: 'lantern', n: 1, size: '1328*1328' },
+            costEstimate: 20,
+            currency: 'CNY',
+            credits: { availableCents: 100, reservedCents: 0, canAfford: true },
+            usage: {
+              attemptCount: 0,
+              successfulCount: 0,
+              generationCount: 0,
+              estimatedCents: 0,
+              chargedCents: 0,
+              providerCostCents: 0,
+            },
+            limits: { dailyQuotaMode: 'attempts' },
+          },
         },
-      },
-    })])
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const estimate = await client.estimateGeneration({
@@ -439,7 +565,12 @@ describe('createApiClient', () => {
   })
 
   it('lists generations with optional cursor and multi-view filters (no userId)', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [record], nextCursor: 'cur_2' } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: { items: [record], nextCursor: 'cur_2' },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.listGenerations({
@@ -460,23 +591,35 @@ describe('createApiClient', () => {
     const { fetch } = queuedFetch([])
     const client = createApiClient({ baseUrl: 'http://api.test/', fetch })
 
-    expect(client.generationEventsUrl()).toBe('http://api.test/api/generations/events')
+    expect(client.generationEventsUrl()).toBe(
+      'http://api.test/api/generations/events',
+    )
   })
 
   it('throws ApiClientError with the server code on an error envelope', async () => {
     const details = {
-      issues: [{
-        code: 'UNKNOWN_PARAMETER',
-        field: 'retiredSeed',
-        messages: { 'zh-CN': '参数已废弃', 'en-US': 'The parameter is retired' },
-        expected: { 'zh-CN': '请删除该参数', 'en-US': 'Remove this parameter' },
-      }],
+      issues: [
+        {
+          code: 'UNKNOWN_PARAMETER',
+          field: 'retiredSeed',
+          messages: {
+            'zh-CN': '参数已废弃',
+            'en-US': 'The parameter is retired',
+          },
+          expected: {
+            'zh-CN': '请删除该参数',
+            'en-US': 'Remove this parameter',
+          },
+        },
+      ],
     }
-    const { fetch } = queuedFetch([jsonResponse({
-      success: false,
-      error: { code: 'MODEL_NOT_FOUND', message: 'no such model', details },
-      traceId: 'request-42',
-    })])
+    const { fetch } = queuedFetch([
+      jsonResponse({
+        success: false,
+        error: { code: 'MODEL_NOT_FOUND', message: 'no such model', details },
+        traceId: 'request-42',
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     await expect(client.getModel('missing')).rejects.toMatchObject({
@@ -486,15 +629,26 @@ describe('createApiClient', () => {
       details,
       traceId: 'request-42',
     })
-    expect(() => { throw new ApiClientError('X', 'y') }).toThrow(ApiClientError)
+    expect(() => {
+      throw new ApiClientError('X', 'y')
+    }).toThrow(ApiClientError)
   })
 
   it('preserves a sanitized server cause and traceId', async () => {
-    const { fetch } = queuedFetch([jsonResponse({
-      success: false,
-      error: { code: 'INTERNAL_ERROR', message: 'operation failed', cause: 'database unavailable' },
-      traceId: 'request-43',
-    }, 500)])
+    const { fetch } = queuedFetch([
+      jsonResponse(
+        {
+          success: false,
+          error: {
+            code: 'INTERNAL_ERROR',
+            message: 'operation failed',
+            cause: 'database unavailable',
+          },
+          traceId: 'request-43',
+        },
+        500,
+      ),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     await expect(client.getModels()).rejects.toMatchObject({
@@ -505,8 +659,13 @@ describe('createApiClient', () => {
   })
 
   it('throws ApiClientError NETWORK_ERROR when fetch rejects', async () => {
-    const failing: typeof fetch = Object.assign(async () => { throw new TypeError('connection refused') }, fetch)
-    const client = createApiClient({ baseUrl: 'http://api.test', fetch: failing })
+    const failing: typeof fetch = Object.assign(async () => {
+      throw new TypeError('connection refused')
+    }, fetch)
+    const client = createApiClient({
+      baseUrl: 'http://api.test',
+      fetch: failing,
+    })
 
     await expect(client.getModels()).rejects.toMatchObject({
       name: 'ApiClientError',
@@ -523,7 +682,9 @@ describe('createApiClient', () => {
         artifacts: [{ kind: 'image', sourceUrl: 'https://cdn.test/a.png' }],
       },
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: fullRecord })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: fullRecord }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.getGeneration('rec_1')
@@ -531,39 +692,47 @@ describe('createApiClient', () => {
     expect(result.id).toBe('rec_1')
     expect(result.status).toBe('succeeded')
     expect(result.inputParams.prompt).toBe('lantern')
-    expect(result.outputResult?.artifacts[0]?.sourceUrl).toBe('https://cdn.test/a.png')
+    expect(result.outputResult?.artifacts[0]?.sourceUrl).toBe(
+      'https://cdn.test/a.png',
+    )
     expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1')
   })
 
   it('fetches safe generation diagnostics', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({
-      success: true,
-      data: {
-        generationId: 'rec_1',
-        traceId: 'trace_1',
-        generationDurationMs: 1200,
-        tasks: [{
-          id: 'task_1',
-          type: 'generation.submit',
-          status: 'succeeded',
-          attempts: 1,
-          maxAttempts: 3,
-          createdAt: '2026-06-29T00:00:00.000Z',
-          startedAt: '2026-06-29T00:00:00.010Z',
-          completedAt: '2026-06-29T00:00:00.100Z',
-          updatedAt: '2026-06-29T00:00:00.100Z',
-          durationMs: 90,
-        }],
-        providerRequests: [],
-      },
-    })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          generationId: 'rec_1',
+          traceId: 'trace_1',
+          generationDurationMs: 1200,
+          tasks: [
+            {
+              id: 'task_1',
+              type: 'generation.submit',
+              status: 'succeeded',
+              attempts: 1,
+              maxAttempts: 3,
+              createdAt: '2026-06-29T00:00:00.000Z',
+              startedAt: '2026-06-29T00:00:00.010Z',
+              completedAt: '2026-06-29T00:00:00.100Z',
+              updatedAt: '2026-06-29T00:00:00.100Z',
+              durationMs: 90,
+            },
+          ],
+          providerRequests: [],
+        },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.getGenerationDiagnostics('rec_1')
 
     expect(result.traceId).toBe('trace_1')
     expect(result.tasks[0]?.durationMs).toBe(90)
-    expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/diagnostics')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/generations/rec_1/diagnostics',
+    )
   })
 
   it('lists persisted generation artifacts with read URLs', async () => {
@@ -582,14 +751,20 @@ describe('createApiClient', () => {
       createdAt: '2026-06-29T00:00:00.000Z',
       updatedAt: '2026-06-29T00:00:00.000Z',
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [artifact] } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [artifact] } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.listGenerationArtifacts('rec_1')
 
-    expect(result.items[0]?.readUrl).toBe('/signed/generations/rec_1/artifact_1.png?ttl=3600')
+    expect(result.items[0]?.readUrl).toBe(
+      '/signed/generations/rec_1/artifact_1.png?ttl=3600',
+    )
     expect(result.items[0]?.status).toBe('stored')
-    expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/artifacts')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/generations/rec_1/artifacts',
+    )
   })
 
   it('lists library artifacts with optional cursor and kind query params', async () => {
@@ -604,14 +779,25 @@ describe('createApiClient', () => {
       createdAt: '2026-06-29T00:00:00.000Z',
       updatedAt: '2026-06-29T00:00:00.000Z',
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [artifact], nextCursor: 'cur_2' } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: { items: [artifact], nextCursor: 'cur_2' },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const result = await client.listArtifacts({ limit: 20, cursor: 'cur_1', kind: 'image' })
+    const result = await client.listArtifacts({
+      limit: 20,
+      cursor: 'cur_1',
+      kind: 'image',
+    })
 
     expect(result.items).toHaveLength(1)
     expect(result.nextCursor).toBe('cur_2')
-    expect(calls[0]?.url).toBe('http://api.test/api/artifacts?limit=20&cursor=cur_1&kind=image')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/artifacts?limit=20&cursor=cur_1&kind=image',
+    )
     expect(calls[0]?.method).toBe('GET')
     expect(calls[0]?.credentials).toBe('include')
   })
@@ -627,34 +813,49 @@ describe('createApiClient', () => {
       declaredResolution: '1920×1080',
       createdAt: '2026-07-01T00:00:00.000Z',
     }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [asset] } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [asset] } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const result = await client.listAssets({ kind: 'audio', source: 'derived', sort: 'size', q: 'voice & mix' })
+    const result = await client.listAssets({
+      kind: 'audio',
+      source: 'derived',
+      sort: 'size',
+      q: 'voice & mix',
+    })
 
     expect(result.items[0]?.source).toBe('derived')
     expect(result.items[0]?.kind).toBe('audio')
     expect(result.items[0]?.declaredResolution).toBe('1920×1080')
-    expect(calls[0]?.url).toBe('http://api.test/api/assets?kind=audio&source=derived&sort=size&q=voice+%26+mix')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/assets?kind=audio&source=derived&sort=size&q=voice+%26+mix',
+    )
     expect(calls[0]?.credentials).toBe('include')
   })
 
   it('rejects non-string declared resolution asset metadata', async () => {
-    const { fetch } = queuedFetch([jsonResponse({
-      success: true,
-      data: {
-        items: [{
-          id: 'asset_bad_resolution',
-          kind: 'image',
-          source: 'generation',
-          declaredResolution: 1920,
-          createdAt: '2026-07-01T00:00:00.000Z',
-        }],
-      },
-    })])
+    const { fetch } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          items: [
+            {
+              id: 'asset_bad_resolution',
+              kind: 'image',
+              source: 'generation',
+              declaredResolution: 1920,
+              createdAt: '2026-07-01T00:00:00.000Z',
+            },
+          ],
+        },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    await expect(client.listAssets()).rejects.toMatchObject({ code: 'BAD_RESPONSE' })
+    await expect(client.listAssets()).rejects.toMatchObject({
+      code: 'BAD_RESPONSE',
+    })
   })
 
   it('reads asset capabilities and detail, then deletes the owned asset', async () => {
@@ -684,12 +885,12 @@ describe('createApiClient', () => {
     await expect(client.getAsset('asset/video 1')).resolves.toEqual(asset)
     await client.deleteAsset('asset/video 1')
 
-    expect(calls.map(call => [call.method, call.url])).toEqual([
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
       ['GET', 'http://api.test/api/assets/capabilities'],
       ['GET', 'http://api.test/api/assets/asset%2Fvideo%201'],
       ['DELETE', 'http://api.test/api/assets/asset%2Fvideo%201'],
     ])
-    expect(calls.every(call => call.credentials === 'include')).toBe(true)
+    expect(calls.every((call) => call.credentials === 'include')).toBe(true)
   })
 
   it('reports browser upload progress and keeps the session cookie on XMLHttpRequest uploads', async () => {
@@ -757,7 +958,9 @@ describe('createApiClient', () => {
       expect(result).toEqual(asset)
       expect(progress).toEqual([[25, 100]])
       expect(FakeXmlHttpRequest.last?.method).toBe('POST')
-      expect(FakeXmlHttpRequest.last?.url).toBe('http://api.test/api/assets/upload')
+      expect(FakeXmlHttpRequest.last?.url).toBe(
+        'http://api.test/api/assets/upload',
+      )
       expect(FakeXmlHttpRequest.last?.withCredentials).toBe(true)
     } finally {
       Object.defineProperty(globalThis, 'XMLHttpRequest', {
@@ -768,7 +971,12 @@ describe('createApiClient', () => {
   })
 
   it('cancels a generation via POST with credentials', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { record: { ...record, providerCancelStatus: 'requested' } } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: { record: { ...record, providerCancelStatus: 'requested' } },
+      }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.cancelGeneration('rec_1')
@@ -784,18 +992,36 @@ describe('createApiClient', () => {
     const retriedRecord = { ...record, id: 'rec_2', parentRecordId: 'rec_1' }
     // 两次调用：一次带 idempotencyKey（发 JSON body），一次不带（空 POST）。
     const { fetch, calls } = queuedFetch([
-      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
-      jsonResponse({ success: true, data: { record: retriedRecord, task: { id: 'task_2', type: 'generation.submit', status: 'queued' }, event: { type: 'generation.status' } } }),
+      jsonResponse({
+        success: true,
+        data: {
+          record: retriedRecord,
+          task: { id: 'task_2', type: 'generation.submit', status: 'queued' },
+          event: { type: 'generation.status' },
+        },
+      }),
+      jsonResponse({
+        success: true,
+        data: {
+          record: retriedRecord,
+          task: { id: 'task_2', type: 'generation.submit', status: 'queued' },
+          event: { type: 'generation.status' },
+        },
+      }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const withKey = await client.retryGeneration('rec_1', { idempotencyKey: 'retry-1' })
+    const withKey = await client.retryGeneration('rec_1', {
+      idempotencyKey: 'retry-1',
+    })
     const withoutKey = await client.retryGeneration('rec_1')
 
     expect(withKey.record.id).toBe('rec_2')
     expect(withKey.record.parentRecordId).toBe('rec_1')
     expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/retry')
-    expect(calls[0]?.body).toEqual(JSON.stringify({ idempotencyKey: 'retry-1' }))
+    expect(calls[0]?.body).toEqual(
+      JSON.stringify({ idempotencyKey: 'retry-1' }),
+    )
     expect(calls[1]?.body).toBeUndefined()
     expect(withoutKey.record.id).toBe('rec_2')
   })
@@ -813,14 +1039,27 @@ describe('createApiClient', () => {
     const result = await client.setGenerationLibraryState('rec_1', 'hidden')
 
     expect(result.hiddenAt).toBe('2026-07-31T10:00:00.000Z')
-    expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/library-state')
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/generations/rec_1/library-state',
+    )
     expect(calls[0]?.method).toBe('PATCH')
     expect(calls[0]?.credentials).toBe('include')
     expect(calls[0]?.body).toBe(JSON.stringify({ state: 'hidden' }))
   })
 
   it('throws ApiClientError GENERATION_NOT_FOUND on a 404 envelope', async () => {
-    const { fetch } = queuedFetch([jsonResponse({ success: false, error: { code: 'GENERATION_NOT_FOUND', message: 'Generation not found: x' } }, 404)])
+    const { fetch } = queuedFetch([
+      jsonResponse(
+        {
+          success: false,
+          error: {
+            code: 'GENERATION_NOT_FOUND',
+            message: 'Generation not found: x',
+          },
+        },
+        404,
+      ),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     await expect(client.getGeneration('x')).rejects.toMatchObject({
@@ -830,10 +1069,15 @@ describe('createApiClient', () => {
   })
 
   it('logs in via the auth cookie flow and returns the user', async () => {
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { user } })])
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { user } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const result = await client.login({ email: 'a@b.test', password: 'password1' })
+    const result = await client.login({
+      email: 'a@b.test',
+      password: 'password1',
+    })
 
     expect(result).toEqual(user)
     expect(calls[0]?.url).toBe('http://api.test/api/auth/login')
@@ -841,19 +1085,46 @@ describe('createApiClient', () => {
   })
 
   it('returns null from getCurrentUser on a 401, rethrows other errors', async () => {
-    const unauth = queuedFetch([jsonResponse({ success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'no' } }, 401)])
-    const client = createApiClient({ baseUrl: 'http://api.test', fetch: unauth.fetch })
+    const unauth = queuedFetch([
+      jsonResponse(
+        { success: false, error: { code: 'AUTH_UNAUTHORIZED', message: 'no' } },
+        401,
+      ),
+    ])
+    const client = createApiClient({
+      baseUrl: 'http://api.test',
+      fetch: unauth.fetch,
+    })
 
     expect(await client.getCurrentUser()).toBeNull()
 
-    const serverError = queuedFetch([jsonResponse({ success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } }, 500)])
-    const erroring = createApiClient({ baseUrl: 'http://api.test', fetch: serverError.fetch })
-    await expect(erroring.getCurrentUser()).rejects.toMatchObject({ code: 'INTERNAL_ERROR' })
+    const serverError = queuedFetch([
+      jsonResponse(
+        { success: false, error: { code: 'INTERNAL_ERROR', message: 'boom' } },
+        500,
+      ),
+    ])
+    const erroring = createApiClient({
+      baseUrl: 'http://api.test',
+      fetch: serverError.fetch,
+    })
+    await expect(erroring.getCurrentUser()).rejects.toMatchObject({
+      code: 'INTERNAL_ERROR',
+    })
   })
 
   it('fetches a generation share via GET', async () => {
-    const share = { id: 'share_1', recordId: 'rec_1', userId: 'user_1', includeParams: false, createdAt: '2026-07-01T00:00:00.000Z', updatedAt: '2026-07-01T00:00:00.000Z' }
-    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { share } })])
+    const share = {
+      id: 'share_1',
+      recordId: 'rec_1',
+      userId: 'user_1',
+      includeParams: false,
+      createdAt: '2026-07-01T00:00:00.000Z',
+      updatedAt: '2026-07-01T00:00:00.000Z',
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { share } }),
+    ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
     const result = await client.getGenerationShare('rec_1')
@@ -862,6 +1133,43 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/share')
     expect(calls[0]?.method).toBe('GET')
     expect(calls[0]?.credentials).toBe('include')
+  })
+
+  it('starts and reads a canvas execution through the typed client', async () => {
+    const execution = {
+      id: 'canvas_execution_1',
+      documentId: 'canvas_1',
+      documentRevision: 2,
+      status: 'queued' as const,
+      nodeStatuses: [{ nodeId: 'node_1', status: 'queued' as const }],
+      createdAt: '2026-08-30T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:00.000Z',
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { execution } }),
+      jsonResponse({
+        success: true,
+        data: { execution: { ...execution, status: 'running' as const } },
+      }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    expect(
+      await client.executeCanvas('canvas_1', {
+        expectedRevision: 2,
+        idempotencyKey: 'run-1',
+      }),
+    ).toEqual(execution)
+    expect(
+      await client.getCanvasExecution('canvas_1', execution.id),
+    ).toMatchObject({ status: 'running' })
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
+      ['POST', 'http://api.test/api/canvases/canvas_1/execute'],
+      [
+        'GET',
+        'http://api.test/api/canvases/canvas_1/executions/canvas_execution_1',
+      ],
+    ])
   })
 
   it('registers without a session and completes the verified email lifecycle', async () => {
@@ -874,7 +1182,10 @@ describe('createApiClient', () => {
     const { fetch, calls } = queuedFetch([
       jsonResponse({ success: true, data: { registration } }),
       jsonResponse({ success: true, data: { user } }),
-      jsonResponse({ success: true, data: { accepted: true, retryAt: '2026-07-25T00:02:00.000Z' } }),
+      jsonResponse({
+        success: true,
+        data: { accepted: true, retryAt: '2026-07-25T00:02:00.000Z' },
+      }),
       jsonResponse({ success: true, data: { accepted: true } }),
       new Response(null, { status: 204 }),
       jsonResponse({ success: true, data: { user } }),
@@ -882,12 +1193,22 @@ describe('createApiClient', () => {
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
-    const result = await client.register({ email: 'a@b.test', password: 'password1', displayName: 'A' })
+    const result = await client.register({
+      email: 'a@b.test',
+      password: 'password1',
+      displayName: 'A',
+    })
     const verified = await client.verifyEmail({ token: 'verify-token' })
     const resent = await client.resendVerification({ email: 'a@b.test' })
     const forgot = await client.forgotPassword({ email: 'a@b.test' })
-    await client.resetPassword({ token: 'reset-token', newPassword: 'password2' })
-    const changed = await client.changePassword({ currentPassword: 'password2', newPassword: 'password3' })
+    await client.resetPassword({
+      token: 'reset-token',
+      newPassword: 'password2',
+    })
+    const changed = await client.changePassword({
+      currentPassword: 'password2',
+      newPassword: 'password3',
+    })
     await client.logoutAll()
 
     expect(result).toEqual(registration)
@@ -896,8 +1217,14 @@ describe('createApiClient', () => {
     expect(forgot.accepted).toBe(true)
     expect(changed).toEqual(user)
     expect(calls[0]?.url).toBe('http://api.test/api/auth/register')
-    expect(calls[0]?.body).toEqual(JSON.stringify({ email: 'a@b.test', password: 'password1', displayName: 'A' }))
-    expect(calls.map(call => [call.method, call.url])).toEqual([
+    expect(calls[0]?.body).toEqual(
+      JSON.stringify({
+        email: 'a@b.test',
+        password: 'password1',
+        displayName: 'A',
+      }),
+    )
+    expect(calls.map((call) => [call.method, call.url])).toEqual([
       ['POST', 'http://api.test/api/auth/register'],
       ['POST', 'http://api.test/api/auth/verify-email'],
       ['POST', 'http://api.test/api/auth/resend-verification'],
@@ -906,7 +1233,7 @@ describe('createApiClient', () => {
       ['POST', 'http://api.test/api/auth/change-password'],
       ['POST', 'http://api.test/api/auth/logout-all'],
     ])
-    expect(calls.every(call => call.credentials === 'include')).toBe(true)
+    expect(calls.every((call) => call.credentials === 'include')).toBe(true)
   })
 
   it('logs out via the session cookie', async () => {

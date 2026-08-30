@@ -1,0 +1,31 @@
+{
+  "name": "@bailian-studio/canvas-execution",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@bailian-studio/canvas-contracts": "workspace:*",
+    "@bailian-studio/model-core": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  },
+  "author": {
+    "name": "烟熏三文鱼",
+    "email": "18267094443@163.com",
+    "url": "https://github.com/puzzle-fuzzy"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/puzzle-fuzzy/bl-studio"
+  }
+}

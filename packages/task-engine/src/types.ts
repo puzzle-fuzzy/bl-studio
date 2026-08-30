@@ -8,10 +8,21 @@
  */
 
 /** task 的生命周期状态。合法转换图见 state-machine.ts 的 transitionTask。 */
-export type TaskStatus = 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
+export type TaskStatus =
+  | 'queued'
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled'
 
 /** task 所属的顶层业务域。用于按域隔离路由与统计。 */
-export type TaskDomain = 'generation' | 'artifact' | 'media' | 'director' | 'system'
+export type TaskDomain =
+  | 'generation'
+  | 'artifact'
+  | 'media'
+  | 'director'
+  | 'canvas'
+  | 'system'
 
 /** task 的具体类型。每个 type 必须配对固定的 domain（见 state-machine 的校验）。 */
 export type TaskType =
@@ -21,6 +32,7 @@ export type TaskType =
   | 'media.process'
   | 'media.thumbnail'
   | 'director.phase'
+  | 'canvas.execute'
 
 /**
  * 错误分类。用于 worker 侧的统一错误归类与可重试判定，
@@ -68,13 +80,13 @@ export interface TaskRecord {
   priority: number
   input: Record<string, unknown>
   output?: Record<string, unknown>
-   lockedBy?: string
-   lockedUntil?: string
-   /** 最近一次被 worker 执行的开始时间。 */
-   startedAt?: string
-   /** 最近一次执行结束时间；queued/running 任务为空。 */
-   completedAt?: string
-   attempts: number
+  lockedBy?: string
+  lockedUntil?: string
+  /** 最近一次被 worker 执行的开始时间。 */
+  startedAt?: string
+  /** 最近一次执行结束时间；queued/running 任务为空。 */
+  completedAt?: string
+  attempts: number
   maxAttempts: number
   nextRunAt: string
   errorJson?: TaskError

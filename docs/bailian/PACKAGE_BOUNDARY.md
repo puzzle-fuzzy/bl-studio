@@ -10,8 +10,9 @@
 |---|---|---|---|
 | `@bailian-studio/provider-dashscope` | `packages/provider-dashscope` | `apps/worker` | `workspace:*` |
 | `@bailian-studio/persistence-runtime` | `packages/persistence-runtime` | `apps/api` / `apps/worker` | `workspace:*` |
-| `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `packages/admin-repository` / `apps/worker` | `workspace:*` |
+| `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `packages/admin-repository` / `apps/api` / `apps/worker` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
+| `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api` | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
@@ -38,6 +39,7 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/db` | `@bailian-studio/(api\|worker\|task-engine\|event-bus\|model-core\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-engine` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-repository` | 除 `@bailian-studio/(db\|task-engine)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
+| `packages/canvas-execution` | `@bailian-studio/(db\|storage\|provider-dashscope\|generation-repository\|task-repository\|task-engine\|api-client)`、services、apps、react、elysia |
 | `packages/event-bus` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/persistence-runtime` | services、apps、react、elysia；只负责进程级持久化资源组装 |
 | `apps/api` | `@bailian-studio/(db\|provider-dashscope)`、importsApps、worker sibling、provider-dashscope package 路径 |
@@ -102,6 +104,13 @@ Worker 与前端各自维护不同的 wire schema。
 - **拥有**：`task_records` 的 claim、租约续期、状态保存、按 id 读取、业务事务内按关联记录/类型/状态筛选任务，以及 queued 任务取消；负责 Drizzle 行与 task-engine 领域记录之间的日期/JSON 映射。
 - **不拥有**：状态机规则、业务记录 + 初始任务的复合生产事务、Provider 执行或 API 编排；状态转换由 `task-engine` 负责，生产事务暂由各业务 repository 保持原子性。
 - Worker 只依赖这里的最小生命周期 port；generation-repository 不承担任务生命周期 port。
+
+### packages/canvas-execution（Canvas 图编译器）
+- **拥有**：Canvas 快照到执行计划的纯函数编译、DAG 环检测、节点模型/素材输入校验和
+  provider-neutral 的参数/资产绑定；只依赖 `canvas-contracts` 与 `model-core`。
+- **不拥有**：用户鉴权、资产 ownership 查询、任务入队、generation 状态推进、Provider
+  请求和 read URL。API 在调用编译器前解析用户资产种类，Worker 只消费已固化的执行计划。
+- 执行计划只保存稳定资产 ID，不保存签名 URL；这保证任务重试和版本历史不依赖过期地址。
 
 ## 4. 运行时应用
 

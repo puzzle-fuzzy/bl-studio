@@ -4,7 +4,9 @@ import { join, relative } from 'node:path'
 const root = process.cwd()
 
 function importSpecifier(modulePattern: string): RegExp {
-  return new RegExp(String.raw`(?:from\s+|import\s*|import\s*\(\s*|require\s*\(\s*)['"]${modulePattern}(?:\/|['"])`)
+  return new RegExp(
+    String.raw`(?:from\s+|import\s*|import\s*\(\s*|require\s*\(\s*)['"]${modulePattern}(?:\/|['"])`,
+  )
 }
 
 function escapeRegExp(value: string): string {
@@ -15,10 +17,18 @@ const importsApps = importSpecifier(String.raw`(?:\.\.\/)*apps`)
 const importsServices = importSpecifier(String.raw`(?:\.\.\/)*services`)
 const importsReact = importSpecifier('react')
 const importsElysia = importSpecifier('elysia')
-const importsProviderDashScopePackage = importSpecifier(String.raw`(?:\.\.\/)*packages\/provider-dashscope`)
-const importsApiSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:api|apps\/api|services\/api)`)
-const importsWorkerSibling = importSpecifier(String.raw`(?:\.\.\/)*(?:worker|apps\/worker|services\/worker)`)
-export const importsProviderDashScope = importSpecifier(String.raw`@bailian-studio\/provider-dashscope`)
+const importsProviderDashScopePackage = importSpecifier(
+  String.raw`(?:\.\.\/)*packages\/provider-dashscope`,
+)
+const importsApiSibling = importSpecifier(
+  String.raw`(?:\.\.\/)*(?:api|apps\/api|services\/api)`,
+)
+const importsWorkerSibling = importSpecifier(
+  String.raw`(?:\.\.\/)*(?:worker|apps\/worker|services\/worker)`,
+)
+export const importsProviderDashScope = importSpecifier(
+  String.raw`@bailian-studio\/provider-dashscope`,
+)
 
 export interface BailianPackageBoundary {
   readonly packageName: string
@@ -49,13 +59,31 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
   {
     packageName: '@bailian-studio/task-repository',
     ownerScope: 'packages/task-repository',
-    allowedConsumerScopes: ['packages/generation-repository', 'packages/persistence-runtime', 'packages/media-repository', 'packages/director-repository', 'packages/admin-repository', 'apps/worker'],
+    allowedConsumerScopes: [
+      'packages/generation-repository',
+      'packages/persistence-runtime',
+      'packages/media-repository',
+      'packages/director-repository',
+      'packages/admin-repository',
+      'apps/api',
+      'apps/worker',
+    ],
     dependencyProtocol: 'workspace:*',
   },
   {
     packageName: '@bailian-studio/admin-repository',
     ownerScope: 'packages/admin-repository',
-    allowedConsumerScopes: ['apps/api', 'packages/persistence-runtime', 'packages/generation-repository'],
+    allowedConsumerScopes: [
+      'apps/api',
+      'packages/persistence-runtime',
+      'packages/generation-repository',
+    ],
+    dependencyProtocol: 'workspace:*',
+  },
+  {
+    packageName: '@bailian-studio/canvas-execution',
+    ownerScope: 'packages/canvas-execution',
+    allowedConsumerScopes: ['apps/api'],
     dependencyProtocol: 'workspace:*',
   },
 ] as const
@@ -69,8 +97,12 @@ export function isBailianPackageConsumerAllowed(
   boundary: BailianPackageBoundary,
   relativePath: string,
 ): boolean {
-  return isWithinScope(relativePath, boundary.ownerScope)
-    || boundary.allowedConsumerScopes.some(scope => isWithinScope(relativePath, scope))
+  return (
+    isWithinScope(relativePath, boundary.ownerScope) ||
+    boundary.allowedConsumerScopes.some((scope) =>
+      isWithinScope(relativePath, scope),
+    )
+  )
 }
 
 function importsPackageSubpath(packageName: string, source: string): boolean {
@@ -80,7 +112,10 @@ function importsPackageSubpath(packageName: string, source: string): boolean {
   ).test(source)
 }
 
-function importsOwnedSourceDirectly(ownerScope: string, source: string): boolean {
+function importsOwnedSourceDirectly(
+  ownerScope: string,
+  source: string,
+): boolean {
   const ownerDirectory = ownerScope.split('/').at(-1)
   if (!ownerDirectory) return false
   return importSpecifier(
@@ -94,13 +129,17 @@ export function checkBailianPackageSourceBoundary(
 ): string[] {
   const violations: string[] = []
 
-  for (const ownerScope of new Set(bailianPackageBoundaries.map(boundary => boundary.ownerScope))) {
+  for (const ownerScope of new Set(
+    bailianPackageBoundaries.map((boundary) => boundary.ownerScope),
+  )) {
     if (isWithinScope(relativeFile, ownerScope)) continue
     if (!importsOwnedSourceDirectly(ownerScope, source)) continue
 
-    const publicBoundary = bailianPackageBoundaries.find(boundary => (
-      boundary.ownerScope === ownerScope && boundary.packageName.startsWith('@bailian-studio/')
-    ))
+    const publicBoundary = bailianPackageBoundaries.find(
+      (boundary) =>
+        boundary.ownerScope === ownerScope &&
+        boundary.packageName.startsWith('@bailian-studio/'),
+    )
     violations.push(
       `${relativeFile} deep-imports ${ownerScope}; use ${publicBoundary?.packageName ?? 'its package root export'}`,
     )
@@ -109,15 +148,16 @@ export function checkBailianPackageSourceBoundary(
   for (const boundary of bailianPackageBoundaries) {
     if (isWithinScope(relativeFile, boundary.ownerScope)) continue
 
-    const importsPackage = importSpecifier(escapeRegExp(boundary.packageName)).test(source)
+    const importsPackage = importSpecifier(
+      escapeRegExp(boundary.packageName),
+    ).test(source)
     if (!importsPackage) continue
 
     if (!isBailianPackageConsumerAllowed(boundary, relativeFile)) {
       violations.push(
         `${relativeFile} imports ${boundary.packageName} outside its consumer allowlist`,
       )
-    }
-    else if (importsPackageSubpath(boundary.packageName, source)) {
+    } else if (importsPackageSubpath(boundary.packageName, source)) {
       violations.push(
         `${relativeFile} imports a ${boundary.packageName} subpath; use the package root export`,
       )
@@ -139,7 +179,21 @@ export const rules: Array<{
   },
   {
     scope: 'packages/model-core',
-    banned: [/@bailian-studio\/(db|storage|provider-dashscope)\b/, importsApps, importsServices],
+    banned: [
+      /@bailian-studio\/(db|storage|provider-dashscope)\b/,
+      importsApps,
+      importsServices,
+    ],
+  },
+  {
+    scope: 'packages/canvas-execution',
+    banned: [
+      /@bailian-studio\/(db|storage|provider-dashscope|generation-repository|task-repository|task-engine|api-client)\b/,
+      importsApps,
+      importsServices,
+      importsElysia,
+      importsReact,
+    ],
   },
   {
     scope: 'packages/provider-dashscope',
@@ -179,7 +233,9 @@ export const rules: Array<{
       // P1-40：api-client 是纯 zod 传输契约层；创意资产 client 可直接依赖领域
       // contracts，其余 workspace 包仍然禁止——用 importSpecifier
       // 只匹配真实 import，不误伤源内自我引述的注释。
-      importSpecifier(String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b|canvas-contracts\b)[a-z-]+`),
+      importSpecifier(
+        String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b|canvas-contracts\b)[a-z-]+`,
+      ),
       importsApps,
       importsServices,
     ],
@@ -202,7 +258,9 @@ export const rules: Array<{
       // 前端共享客户端工具（API 单例/错误文案/chunk 自愈/通用组件）。
       // 只允许 ui（展示原语）与 api-client（传输契约）；数据库、仓库、provider、
       // 后端服务与 app 运行时一律禁入。
-      importSpecifier(String.raw`@bailian-studio\/(?!lib-client\b|ui\b|api-client\b)[a-z-]+`),
+      importSpecifier(
+        String.raw`@bailian-studio\/(?!lib-client\b|ui\b|api-client\b)[a-z-]+`,
+      ),
       importsApps,
       importsServices,
       importsElysia,
@@ -213,7 +271,9 @@ export const rules: Array<{
     banned: [
       // 认证层共享包：只许依赖展示原语（ui）、传输契约（api-client）与客户端
       // 工具（lib-client）；数据库/仓库/provider/app 运行时禁入。
-      importSpecifier(String.raw`@bailian-studio\/(?!app-shell\b|ui\b|lib-client\b|api-client\b)[a-z-]+`),
+      importSpecifier(
+        String.raw`@bailian-studio\/(?!app-shell\b|ui\b|lib-client\b|api-client\b)[a-z-]+`,
+      ),
       importsApps,
       importsServices,
       importsElysia,
@@ -224,7 +284,9 @@ export const rules: Array<{
     banned: [
       // 创意资产 repository：只许依赖 db（表定义）和 creative-asset-contracts（协议）；
       // 禁入 provider、任务引擎、其他 repository、app 运行时与后端服务。
-      importSpecifier(String.raw`@bailian-studio\/(?!creative-asset-repository\b|creative-asset-contracts\b|db\b)[a-z-]+`),
+      importSpecifier(
+        String.raw`@bailian-studio\/(?!creative-asset-repository\b|creative-asset-contracts\b|db\b)[a-z-]+`,
+      ),
       importsApps,
       importsServices,
       importsElysia,
@@ -235,7 +297,9 @@ export const rules: Array<{
     banned: [
       // 导演 repository：只许依赖 db 和 shared（域契约）；
       // 禁入 provider、任务引擎、其他 repository、app 运行时与后端服务。
-      importSpecifier(String.raw`@bailian-studio\/(?!director-repository\b|shared\b|db\b|task-repository\b)[a-z-]+`),
+      importSpecifier(
+        String.raw`@bailian-studio\/(?!director-repository\b|shared\b|db\b|task-repository\b)[a-z-]+`,
+      ),
       importsApps,
       importsServices,
       importsElysia,
@@ -266,7 +330,7 @@ export const rules: Array<{
     ],
   },
   {
-       scope: 'apps/api',
+    scope: 'apps/api',
     banned: [
       /@bailian-studio\/(db|provider-dashscope)\b/,
       importsApps,
@@ -275,7 +339,7 @@ export const rules: Array<{
     ],
   },
   {
-       scope: 'apps/worker',
+    scope: 'apps/worker',
     banned: [
       /@bailian-studio\/(api|db)\b/,
       importsApiSibling,
@@ -391,7 +455,8 @@ export const rules: Array<{
 function walk(dir: string): string[] {
   let files: string[] = []
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'dist' || entry === '.turbo') continue
+    if (entry === 'node_modules' || entry === 'dist' || entry === '.turbo')
+      continue
     const path = join(dir, entry)
     const stat = statSync(path)
     if (stat.isDirectory()) files = files.concat(walk(path))
@@ -403,7 +468,8 @@ function walk(dir: string): string[] {
 function walkPackageManifests(dir: string): string[] {
   let files: string[] = []
   for (const entry of readdirSync(dir)) {
-    if (entry === 'node_modules' || entry === 'dist' || entry === '.turbo') continue
+    if (entry === 'node_modules' || entry === 'dist' || entry === '.turbo')
+      continue
     const path = join(dir, entry)
     const stat = statSync(path)
     if (stat.isDirectory()) files = files.concat(walkPackageManifests(path))
@@ -412,22 +478,39 @@ function walkPackageManifests(dir: string): string[] {
   return files
 }
 
-export function declaresPackageDependency(manifest: unknown, packageName: string): boolean {
+export function declaresPackageDependency(
+  manifest: unknown,
+  packageName: string,
+): boolean {
   if (typeof manifest !== 'object' || manifest === null) return false
   const record = manifest as Record<string, unknown>
-  return ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']
-    .some((section) => {
-      const dependencies = record[section]
-      return typeof dependencies === 'object'
-        && dependencies !== null
-        && packageName in dependencies
-    })
+  return [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ].some((section) => {
+    const dependencies = record[section]
+    return (
+      typeof dependencies === 'object' &&
+      dependencies !== null &&
+      packageName in dependencies
+    )
+  })
 }
 
-function declaredPackageVersion(manifest: unknown, packageName: string): string | undefined {
+function declaredPackageVersion(
+  manifest: unknown,
+  packageName: string,
+): string | undefined {
   if (typeof manifest !== 'object' || manifest === null) return undefined
   const record = manifest as Record<string, unknown>
-  for (const section of ['dependencies', 'devDependencies', 'peerDependencies', 'optionalDependencies']) {
+  for (const section of [
+    'dependencies',
+    'devDependencies',
+    'peerDependencies',
+    'optionalDependencies',
+  ]) {
     const dependencies = record[section]
     if (typeof dependencies !== 'object' || dependencies === null) continue
     const version = (dependencies as Record<string, unknown>)[packageName]
@@ -443,15 +526,17 @@ export function checkBailianPackageManifestBoundary(
   const violations: string[] = []
 
   for (const boundary of bailianPackageBoundaries) {
-    const declaredVersion = declaredPackageVersion(manifest, boundary.packageName)
+    const declaredVersion = declaredPackageVersion(
+      manifest,
+      boundary.packageName,
+    )
     if (declaredVersion === undefined) continue
 
     if (!isBailianPackageConsumerAllowed(boundary, relativeFile)) {
       violations.push(
         `${relativeFile} declares ${boundary.packageName} outside its consumer allowlist`,
       )
-    }
-    else if (declaredVersion !== boundary.dependencyProtocol) {
+    } else if (declaredVersion !== boundary.dependencyProtocol) {
       violations.push(
         `${relativeFile} must declare ${boundary.packageName} as ${boundary.dependencyProtocol}, got ${declaredVersion}`,
       )
@@ -468,8 +553,7 @@ export function checkPackageBoundaries(): string[] {
     const absScope = join(root, rule.scope)
     try {
       if (!statSync(absScope).isDirectory()) continue
-    }
-    catch {
+    } catch {
       continue
     }
 
@@ -477,7 +561,9 @@ export function checkPackageBoundaries(): string[] {
       const source = readFileSync(file, 'utf8')
       for (const banned of rule.banned) {
         if (banned.test(source)) {
-          violations.push(`${relative(root, file)} violates ${rule.scope}: ${banned}`)
+          violations.push(
+            `${relative(root, file)} violates ${rule.scope}: ${banned}`,
+          )
         }
       }
     }
@@ -487,21 +573,24 @@ export function checkPackageBoundaries(): string[] {
     const absScope = join(root, sourceScope)
     try {
       if (!statSync(absScope).isDirectory()) continue
-    }
-    catch {
+    } catch {
       continue
     }
 
     for (const file of walk(absScope)) {
       const relativeFile = relative(root, file).replaceAll('\\', '/')
       const source = readFileSync(file, 'utf8')
-      violations.push(...checkBailianPackageSourceBoundary(relativeFile, source))
+      violations.push(
+        ...checkBailianPackageSourceBoundary(relativeFile, source),
+      )
     }
 
     for (const file of walkPackageManifests(absScope)) {
       const relativeFile = relative(root, file).replaceAll('\\', '/')
       const manifest = JSON.parse(readFileSync(file, 'utf8')) as unknown
-      violations.push(...checkBailianPackageManifestBoundary(relativeFile, manifest))
+      violations.push(
+        ...checkBailianPackageManifestBoundary(relativeFile, manifest),
+      )
     }
   }
 

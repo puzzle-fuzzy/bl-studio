@@ -12,9 +12,12 @@ import { z } from 'zod'
 import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-contracts'
 import {
   CanvasDocumentResponseSchema,
+  CanvasExecutionTaskResponseSchema,
   CanvasVersionsResponseSchema,
   ListCanvasesResponseSchema,
   type CanvasDocument,
+  type CanvasExecutionTaskSummary,
+  type ExecuteCanvasInput,
   type CanvasVersion,
   type CreateCanvasInput,
   type ListCanvasesResult,
@@ -186,11 +189,7 @@ import type {
 /** 带 JSON content-type 的请求头常量，供带 body 的 POST 复用。 */
 const JSON_HEADERS = { 'content-type': 'application/json' }
 
-function uploadAssetWithProgress(
-  url: string,
-  formData: FormData,
-  input: UploadAssetInput,
-): Promise<AssetItem> {
+function uploadAssetWithProgress(url: string, formData: FormData, input: UploadAssetInput): Promise<AssetItem> {
   return new Promise((resolve, reject) => {
     const xhr = new XMLHttpRequest()
     const abort = () => xhr.abort()
@@ -221,26 +220,26 @@ function uploadAssetWithProgress(
 
       const error = ApiErrorSchema.safeParse(body)
       if (error.success) {
-        reject(new ApiClientError(
-          error.data.error.code,
-          error.data.error.message,
-          xhr.status,
-          error.data.error.details,
-          error.data.traceId,
-        ))
+        reject(
+          new ApiClientError(
+            error.data.error.code,
+            error.data.error.message,
+            xhr.status,
+            error.data.error.details,
+            error.data.traceId,
+          ),
+        )
         return
       }
 
-      const success = z.object({
-        success: z.literal(true),
-        data: AssetResponseSchema,
-      }).safeParse(body)
+      const success = z
+        .object({
+          success: z.literal(true),
+          data: AssetResponseSchema,
+        })
+        .safeParse(body)
       if (!success.success) {
-        reject(new ApiClientError(
-          'BAD_RESPONSE',
-          'Response did not match the expected success envelope',
-          xhr.status,
-        ))
+        reject(new ApiClientError('BAD_RESPONSE', 'Response did not match the expected success envelope', xhr.status))
         return
       }
       resolve(success.data.data.asset)
@@ -351,7 +350,13 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
   /** `GET /api/director/projects/:id/entity-candidates` — 获取剧本实体候选。 */
-  listDirectorEntityCandidates(id: string, params?: { status?: DirectorEntityCandidateStatus; kind?: DirectorEntityCandidateKind }): Promise<DirectorEntityCandidate[]>
+  listDirectorEntityCandidates(
+    id: string,
+    params?: {
+      status?: DirectorEntityCandidateStatus
+      kind?: DirectorEntityCandidateKind
+    },
+  ): Promise<DirectorEntityCandidate[]>
   /** `PATCH /api/director/entity-candidates/:id` — 接受或拒绝一个实体候选。 */
   reviewDirectorEntityCandidate(id: string, input: ReviewDirectorEntityCandidateInput): Promise<DirectorEntityCandidate>
   /** `DELETE /api/director/entity-candidates/:id` — 移除一个实体候选。 */
@@ -377,7 +382,11 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `POST /api/director/projects/:id/phases/assemble/preflight` */
   getDirectorAssemblyPreflight(id: string, input?: CreateDirectorPhaseRunInput): Promise<DirectorAssemblyPreflight>
   /** `POST /api/director/projects/:id/shots/:shotId/video-runs/estimate` — 估算单镜重试成本。 */
-  estimateDirectorShotVideo(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorVideoEstimate>
+  estimateDirectorShotVideo(
+    id: string,
+    shotId: string,
+    input: CreateDirectorPhaseRunInput,
+  ): Promise<DirectorVideoEstimate>
   /** `POST /api/director/projects/:id/shots/:shotId/video-runs` — 为单个失败镜头创建视频任务。 */
   requestDirectorShotVideoRun(id: string, shotId: string, input: CreateDirectorPhaseRunInput): Promise<DirectorPhaseRun>
   /** `GET /api/director/projects/:id/phases/:phase/runs/:runId` — 查询阶段运行状态。 */
@@ -413,7 +422,10 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
    */
   setGenerationLibraryState(id: string, state: GenerationLibraryState): Promise<GenerationRecord>
   /** `POST /api/generations/:id/share` —— 创建/更新分享策略（每个 record 一个活跃 share）。 */
-  createGenerationShare(id: string, input?: { includeParams?: boolean; expiresAt?: string }): Promise<GenerationShareResult>
+  createGenerationShare(
+    id: string,
+    input?: { includeParams?: boolean; expiresAt?: string },
+  ): Promise<GenerationShareResult>
   /** `GET /api/generations/:id/share` —— 获取【所有者】视角下的 share 信息。 */
   getGenerationShare(id: string): Promise<GenerationShareResult>
   /** `DELETE /api/generations/:id/share` —— 撤销当前公开分享。 */
@@ -469,6 +481,10 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   listCanvasVersions(id: string, params?: { limit?: number }): Promise<CanvasVersion[]>
   /** `POST /api/canvases/:id/restore` —— 从历史版本创建新的当前版本。 */
   restoreCanvas(id: string, input: RestoreCanvasInput): Promise<CanvasDocument>
+  /** `POST /api/canvases/:id/execute` —— 按当前版本编译并排入整张画布。 */
+  executeCanvas(id: string, input: ExecuteCanvasInput): Promise<CanvasExecutionTaskSummary>
+  /** `GET /api/canvases/:id/executions/:taskId` —— 查询画布执行状态。 */
+  getCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
   deleteAsset(id: string): Promise<void>
 
   /** `POST /api/auth/logout` —— 注销，服务端软删 session 让 cookie 失效。 */
@@ -517,7 +533,10 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `GET /api/admin/users/:userId/points` —— 指定用户积分余额。 */
   adminGetUserPoints(userId: string): Promise<CreditBalance>
   /** `GET /api/admin/users/:userId/points/ledger` —— 指定用户积分流水。 */
-  adminListUserPointsLedger(userId: string, params?: { limit?: number; cursor?: string }): Promise<ListPointsLedgerResult>
+  adminListUserPointsLedger(
+    userId: string,
+    params?: { limit?: number; cursor?: string },
+  ): Promise<ListPointsLedgerResult>
   /** `POST /api/admin/users/:userId/points/grants` —— 赠送积分。 */
   adminGrantPoints(userId: string, input: GrantPointsInput): Promise<PointsMutationResult>
   /** `POST /api/admin/users/:userId/points/adjustments` —— 积分调整（±）。 */
@@ -542,7 +561,10 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `GET /api/gallery/generations/:id` —— 跨用户画廊详情（脱敏）。 */
   getGalleryGeneration(recordId: string): Promise<GalleryDetail>
   /** `PATCH /api/gallery/generations/:id/visibility` —— 作品公开/私有切换（owner）。 */
-  setGenerationVisibility(recordId: string, visibility: SetVisibilityInput['visibility']): Promise<{ visibility: 'private' | 'public' }>
+  setGenerationVisibility(
+    recordId: string,
+    visibility: SetVisibilityInput['visibility'],
+  ): Promise<{ visibility: 'private' | 'public' }>
   /** `POST /api/gallery/generations/:id/like` —— 点赞公开作品。 */
   likeGeneration(recordId: string): Promise<LikeMutationResult>
   /** `DELETE /api/gallery/generations/:id/like` —— 取消点赞。 */
@@ -619,7 +641,11 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `GET /api/feedback` —— 我的反馈历史（keyset 分页）。 */
   listMyFeedback(params?: { limit?: number; cursor?: string }): Promise<ListFeedbackResult>
   /** `GET /api/admin/feedback` —— admin 列表反馈（状态过滤）。 */
-  adminListFeedback(params?: { limit?: number; cursor?: string; status?: 'open' | 'reviewing' | 'resolved' | 'closed' }): Promise<ListFeedbackResult>
+  adminListFeedback(params?: {
+    limit?: number
+    cursor?: string
+    status?: 'open' | 'reviewing' | 'resolved' | 'closed'
+  }): Promise<ListFeedbackResult>
   /** `PATCH /api/admin/feedback/:id` —— admin 更新反馈状态。 */
   adminUpdateFeedbackStatus(itemId: string, status: UpdateFeedbackStatusInput['status']): Promise<UserFeedback>
   /** `POST /api/reports` —— 对公开作品提交一次内容举报。 */
@@ -715,7 +741,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async createDirectorProject(input) {
       const data = await unwrapData(
         `${base}/api/director/projects`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorProjectResponseSchema,
       )
@@ -748,7 +779,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async reviewDirectorEntityCandidate(id, input) {
       return unwrapData(
         `${base}/api/director/entity-candidates/${encodeURIComponent(id)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorEntityCandidateResponseSchema,
       )
@@ -796,7 +832,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async requestDirectorScriptChat(id, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/script/chat`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorPhaseRunResponseSchema,
       )
@@ -806,7 +847,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async updateDirectorProject(id, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorProjectResponseSchema,
       )
@@ -816,7 +862,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async attachDirectorAsset(id, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/assets`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorAssetResponseSchema,
       )
@@ -836,7 +887,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async updateDirectorShot(id, shotId, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorShotResponseSchema,
       )
@@ -846,7 +902,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async requestDirectorPhaseRun(id, phase, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/phases/${encodeURIComponent(phase)}/runs`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorPhaseRunResponseSchema,
       )
@@ -856,7 +917,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async estimateDirectorVideoPhase(id, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/phases/videos/estimate`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorVideoEstimateResponseSchema,
       )
@@ -866,7 +932,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async estimateDirectorMusic(id, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/phases/bgm/estimate`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorMusicEstimateResponseSchema,
       )
@@ -876,7 +947,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async getDirectorAssemblyPreflight(id, input = {}) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/phases/assemble/preflight`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorAssemblyPreflightResponseSchema,
       )
@@ -886,7 +962,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async estimateDirectorShotVideo(id, shotId, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs/estimate`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorVideoEstimateResponseSchema,
       )
@@ -896,7 +977,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async requestDirectorShotVideoRun(id, shotId, input) {
       const data = await unwrapData(
         `${base}/api/director/projects/${encodeURIComponent(id)}/shots/${encodeURIComponent(shotId)}/video-runs`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         DirectorPhaseRunResponseSchema,
       )
@@ -961,10 +1047,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         {
           method: 'POST',
           credentials: 'include',
-          ...(hasOptions ? {
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(input),
-          } : {}),
+          ...(hasOptions
+            ? {
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify(input),
+              }
+            : {}),
         },
         fetchImpl,
         GenerationShareResponseSchema,
@@ -1060,11 +1148,11 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         `${base}/api/generations/${encodeURIComponent(id)}/retry`,
         hasBody
           ? {
-            method: 'POST',
-            headers: JSON_HEADERS,
-            body: JSON.stringify({ idempotencyKey }),
-            credentials: 'include',
-          }
+              method: 'POST',
+              headers: JSON_HEADERS,
+              body: JSON.stringify({ idempotencyKey }),
+              credentials: 'include',
+            }
           : { method: 'POST', credentials: 'include' },
         fetchImpl,
         RetryGenerationResponseSchema,
@@ -1220,7 +1308,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async createCanvas(input = {}) {
       const data = await unwrapData(
         `${base}/api/canvases`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         CanvasDocumentResponseSchema,
       )
@@ -1240,7 +1333,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async saveCanvas(id, input) {
       const data = await unwrapData(
         `${base}/api/canvases/${encodeURIComponent(id)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         CanvasDocumentResponseSchema,
       )
@@ -1263,11 +1361,41 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async restoreCanvas(id, input) {
       const data = await unwrapData(
         `${base}/api/canvases/${encodeURIComponent(id)}/restore`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         CanvasDocumentResponseSchema,
       )
       return data.document
+    },
+
+    async executeCanvas(id, input) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/execute`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
+        fetchImpl,
+        CanvasExecutionTaskResponseSchema,
+      )
+      return data.execution
+    },
+
+    async getCanvasExecution(id, taskId) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        CanvasExecutionTaskResponseSchema,
+      )
+      return data.execution
     },
 
     async deleteAsset(id) {
@@ -1281,7 +1409,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async register(input) {
       const data = await unwrapData(
         `${base}/api/auth/register`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         RegistrationResponseSchema,
       )
@@ -1291,7 +1424,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async verifyEmail(input) {
       const data = await unwrapData(
         `${base}/api/auth/verify-email`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AuthResponseSchema,
       )
@@ -1301,7 +1439,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async resendVerification(input) {
       return unwrapData(
         `${base}/api/auth/resend-verification`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         EmailActionAcceptedSchema,
       )
@@ -1310,7 +1453,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async forgotPassword(input) {
       return unwrapData(
         `${base}/api/auth/forgot-password`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         EmailActionAcceptedSchema,
       )
@@ -1319,7 +1467,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async resetPassword(input) {
       await requestNoContent(
         `${base}/api/auth/reset-password`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
       )
     },
@@ -1327,7 +1480,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async changePassword(input) {
       const data = await unwrapData(
         `${base}/api/auth/change-password`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AuthResponseSchema,
       )
@@ -1347,7 +1505,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async updateProfile(input) {
       const data = await unwrapData(
         `${base}/api/auth/profile`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AuthResponseSchema,
       )
@@ -1377,17 +1540,18 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     },
 
     async logoutAll() {
-      await requestNoContent(
-        `${base}/api/auth/logout-all`,
-        { method: 'POST', credentials: 'include' },
-        fetchImpl,
-      )
+      await requestNoContent(`${base}/api/auth/logout-all`, { method: 'POST', credentials: 'include' }, fetchImpl)
     },
 
     async login(input) {
       const data = await unwrapData(
         `${base}/api/auth/login`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AuthResponseSchema,
       )
@@ -1395,11 +1559,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     },
 
     async logout() {
-      await requestNoContent(
-        `${base}/api/auth/logout`,
-        { method: 'POST', credentials: 'include' },
-        fetchImpl,
-      )
+      await requestNoContent(`${base}/api/auth/logout`, { method: 'POST', credentials: 'include' }, fetchImpl)
     },
 
     async getCurrentUser() {
@@ -1447,7 +1607,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminCreateUser(input) {
       const data = await unwrapData(
         `${base}/api/admin/users`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AdminUserResponseSchema,
       )
@@ -1466,7 +1631,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminUpdateUser(userId, input) {
       const data = await unwrapData(
         `${base}/api/admin/users/${encodeURIComponent(userId)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         AdminUserResponseSchema,
       )
@@ -1500,7 +1670,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchBanUsers(input) {
       return unwrapData(
         `${base}/api/admin/users/batch-ban`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )
@@ -1509,7 +1684,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchUnbanUsers(input) {
       return unwrapData(
         `${base}/api/admin/users/batch-unban`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )
@@ -1518,7 +1698,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchDeleteUsers(input) {
       return unwrapData(
         `${base}/api/admin/users/batch-delete`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )
@@ -1527,7 +1712,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchGrantPoints(input) {
       return unwrapData(
         `${base}/api/admin/users/batch-grant-points`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchGrantPointsResponseSchema,
       )
@@ -1559,7 +1749,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminGrantPoints(userId, input) {
       return unwrapData(
         `${base}/api/admin/users/${encodeURIComponent(userId)}/points/grants`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         PointsMutationResponseSchema,
       )
@@ -1568,7 +1763,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminAdjustPoints(userId, input) {
       return unwrapData(
         `${base}/api/admin/users/${encodeURIComponent(userId)}/points/adjustments`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         PointsMutationResponseSchema,
       )
@@ -1634,7 +1834,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async setGenerationVisibility(recordId, visibility) {
       return unwrapData(
         `${base}/api/gallery/generations/${encodeURIComponent(recordId)}/visibility`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ visibility }), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ visibility }),
+          credentials: 'include',
+        },
         fetchImpl,
         SetVisibilityResponseSchema,
       )
@@ -1702,7 +1907,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async createPromptLibraryItem(input) {
       const data = await unwrapData(
         `${base}/api/prompt-library`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         PromptLibraryItemResponseSchema,
       )
@@ -1712,7 +1922,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async updatePromptLibraryItem(itemId, input) {
       const data = await unwrapData(
         `${base}/api/prompt-library/${encodeURIComponent(itemId)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         PromptLibraryItemResponseSchema,
       )
@@ -1739,7 +1954,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminUpdateModelCosts(entries) {
       return unwrapData(
         `${base}/api/admin/model-costs`,
-        { method: 'PUT', headers: JSON_HEADERS, body: JSON.stringify({ entries }), credentials: 'include' },
+        {
+          method: 'PUT',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ entries }),
+          credentials: 'include',
+        },
         fetchImpl,
         AdminModelCostsUpdateResponseSchema,
       )
@@ -1762,7 +1982,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async submitFeedback(input) {
       const data = await unwrapData(
         `${base}/api/feedback`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         FeedbackItemResponseSchema,
       )
@@ -1799,7 +2024,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminUpdateFeedbackStatus(itemId, status) {
       const data = await unwrapData(
         `${base}/api/admin/feedback/${encodeURIComponent(itemId)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify({ status }), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify({ status }),
+          credentials: 'include',
+        },
         fetchImpl,
         FeedbackItemResponseSchema,
       )
@@ -1809,7 +2039,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async submitContentReport(input) {
       const data = await unwrapData(
         `${base}/api/reports`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         ContentReportItemResponseSchema,
       )
@@ -1833,7 +2068,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminUpdateContentReport(reportId, input) {
       const data = await unwrapData(
         `${base}/api/admin/reports/${encodeURIComponent(reportId)}`,
-        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'PATCH',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         ContentReportItemResponseSchema,
       )
@@ -1914,7 +2154,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchHideGallery(input) {
       return unwrapData(
         `${base}/api/admin/gallery/batch-hide`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )
@@ -1923,7 +2168,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchUnhideGallery(input) {
       return unwrapData(
         `${base}/api/admin/gallery/batch-unhide`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )
@@ -1932,7 +2182,12 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async adminBatchDeleteGallery(input) {
       return unwrapData(
         `${base}/api/admin/gallery/batch-delete`,
-        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input),
+          credentials: 'include',
+        },
         fetchImpl,
         BatchAffectedResponseSchema,
       )

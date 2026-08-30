@@ -35,7 +35,10 @@ export async function enqueueTask(
     .returning()
 
   if (inserted === undefined) {
-    throw new TaskRepositoryError('DATABASE_ERROR', `Failed to insert task: ${task.id}`)
+    throw new TaskRepositoryError(
+      'DATABASE_ERROR',
+      `Failed to insert task: ${task.id}`,
+    )
   }
 
   return toTaskRecord(inserted)
@@ -47,8 +50,10 @@ async function findTask(
   input: FindTaskInput,
 ): Promise<TaskRecord | undefined> {
   const conditions = []
-  if (input.recordId !== undefined) conditions.push(eq(taskRecords.recordId, input.recordId))
-  if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
+  if (input.recordId !== undefined)
+    conditions.push(eq(taskRecords.recordId, input.recordId))
+  if (input.type !== undefined)
+    conditions.push(eq(taskRecords.type, input.type))
   if (input.statuses !== undefined && input.statuses.length > 0) {
     conditions.push(inArray(taskRecords.status, [...input.statuses]))
   }
@@ -125,12 +130,18 @@ export function createTaskQueueTransactionStore(): TaskQueueTransactionStore {
  * 业务记录与初始任务的复合写入仍由业务 repository 在自己的 transaction 中完成；
  * 本对象负责跨业务域共享的 claim/lease/save 生命周期，避免 Worker 依赖上帝接口。
  */
-export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOptions): TaskQueueRepository {
+export function createTaskQueueRepository(
+  options: CreateTaskQueueRepositoryOptions,
+): TaskQueueRepository {
   const { db } = options
 
   return {
+    async enqueueTask(task) {
+      return db.transaction((tx) => enqueueTask(tx, task))
+    },
+
     async claimNextQueuedTask(input: ClaimNextQueuedTaskInput) {
-      return db.transaction(async tx => {
+      return db.transaction(async (tx) => {
         const rows = await tx.execute<{ id: string }>(sql`
           select *
           from task_records
@@ -151,7 +162,10 @@ export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOpti
           .limit(1)
 
         if (selectedTaskRow === undefined) {
-          throw new TaskRepositoryError('TASK_NOT_FOUND', `Task not found: ${selected.id}`)
+          throw new TaskRepositoryError(
+            'TASK_NOT_FOUND',
+            `Task not found: ${selected.id}`,
+          )
         }
 
         let claimedTask: ReturnType<typeof transitionTask>
@@ -190,7 +204,10 @@ export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOpti
           .returning()
 
         if (savedTask === undefined) {
-          throw new TaskRepositoryError('DATABASE_ERROR', `Failed to claim task: ${claimedTask.id}`)
+          throw new TaskRepositoryError(
+            'DATABASE_ERROR',
+            `Failed to claim task: ${claimedTask.id}`,
+          )
         }
 
         return toTaskRecord(savedTask)
@@ -205,12 +222,14 @@ export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOpti
           updatedAt: new Date(input.now),
           updatedBy: input.workerId,
         })
-        .where(and(
-          eq(taskRecords.id, input.taskId),
-          eq(taskRecords.status, 'running'),
-          eq(taskRecords.lockedBy, input.workerId),
-          gt(taskRecords.lockedUntil, new Date(input.now)),
-        ))
+        .where(
+          and(
+            eq(taskRecords.id, input.taskId),
+            eq(taskRecords.status, 'running'),
+            eq(taskRecords.lockedBy, input.workerId),
+            gt(taskRecords.lockedUntil, new Date(input.now)),
+          ),
+        )
         .returning()
 
       return saved === undefined ? undefined : toTaskRecord(saved)
@@ -225,13 +244,21 @@ export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOpti
 
       const [saved] = await db
         .update(taskRecords)
-        .set(taskInsertValues({ ...task, updatedAt: task.updatedAt ?? new Date().toISOString() }))
+        .set(
+          taskInsertValues({
+            ...task,
+            updatedAt: task.updatedAt ?? new Date().toISOString(),
+          }),
+        )
         .where(and(...conditions))
         .returning()
 
       if (saved === undefined) {
         if (options?.expectedWorkerId !== undefined) return undefined
-        throw new TaskRepositoryError('TASK_NOT_FOUND', `Task not found: ${task.id}`)
+        throw new TaskRepositoryError(
+          'TASK_NOT_FOUND',
+          `Task not found: ${task.id}`,
+        )
       }
 
       return toTaskRecord(saved)

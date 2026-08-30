@@ -136,6 +136,20 @@ flowchart LR
 - Worker 的陈旧 generation 清扫通过独立的 `GenerationRecoveryRepository` 读取；恢复读模型
   与生成核心状态写入分离，Worker 仍显式调用核心 repository 完成最终失败收口。
 
+### 3.3 Canvas 执行生命周期（已实现，2026-08-30）
+
+- Canvas 的编辑快照和执行状态分离：`canvas_documents` / `canvas_document_versions` 只保存
+  用户编辑内容；`canvas.execute` 任务输入保存一次编译后的 plan 和可恢复的 `nodeRuns` 游标。
+- API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、
+  缺失/越权素材和不支持的媒体输入；任务提交以 `(user, canvas, idempotencyKey)` 的确定性任务 ID
+  提供幂等边界。
+- Worker 按拓扑顺序推进节点。每个 Canvas 媒体节点都通过现有 `GenerationRepository` 创建普通
+  generation，因此继续复用额度预留、provider 审计、artifact 持久化和资产投影；上游节点只向下游
+  传递稳定的 `asset_generation_*` ID。
+- Canvas worker 会等待 artifact persist 完成并确认 user asset 投影 ready 后才推进下游；不会把
+  provider 临时 URL 写入任务或画布快照。当前第一版按节点顺序执行，并默认每个上游节点向下游提供
+  第一个输出资产。
+
 ## 4. 领域模型归属
 
 | 概念 | 所属 | 语义 | 不负责什么 |
@@ -375,4 +389,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。下一步是为跨域 admin 读模型定义独立 admin repository 的契约；request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译与 worker 编排的第一版也已落地；下一步应优先补同层并行调度、整图取消、实时进度事件和节点级重跑。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。

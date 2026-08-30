@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@bailian-studio/admin-repository": "workspace:*",
+    "@bailian-studio/canvas-execution": "workspace:*",
     "@bailian-studio/canvas-contracts": "workspace:*",
     "@bailian-studio/canvas-repository": "workspace:*",
     "@elysia/cors": "^1.4.2",
@@ -31,6 +32,8 @@
     "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
     "@bailian-studio/storage": "workspace:*",
+    "@bailian-studio/task-repository": "workspace:*",
+    "@bailian-studio/task-engine": "workspace:*",
     "elysia": "catalog:",
     "nodemailer": "catalog:",
     "zod": "catalog:"

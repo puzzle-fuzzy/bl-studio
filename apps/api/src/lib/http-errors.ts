@@ -5,14 +5,39 @@
  * try/catch + 状态码簿记。
  */
 
-import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
-import { AdminRepositoryError, type AdminRepositoryErrorCode } from '@bailian-studio/admin-repository'
-import { CanvasRepositoryError, type CanvasRepositoryErrorCode } from '@bailian-studio/canvas-repository'
-import { CreativeAssetCompilerError, type CreativeAssetCompilerErrorCode } from '@bailian-studio/creative-asset-compiler'
-import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bailian-studio/director-repository'
-import { CreativeAssetRepositoryError, type CreativeAssetRepositoryErrorCode } from '@bailian-studio/creative-asset-repository'
+import {
+  GenerationRepositoryError,
+  type GenerationRepositoryErrorCode,
+} from '@bailian-studio/generation-repository'
+import {
+  AdminRepositoryError,
+  type AdminRepositoryErrorCode,
+} from '@bailian-studio/admin-repository'
+import {
+  CanvasRepositoryError,
+  type CanvasRepositoryErrorCode,
+} from '@bailian-studio/canvas-repository'
+import {
+  CanvasExecutionError,
+  type CanvasExecutionErrorCode,
+} from '@bailian-studio/canvas-execution'
+import {
+  CreativeAssetCompilerError,
+  type CreativeAssetCompilerErrorCode,
+} from '@bailian-studio/creative-asset-compiler'
+import {
+  DirectorRepositoryError,
+  type DirectorRepositoryErrorCode,
+} from '@bailian-studio/director-repository'
+import {
+  CreativeAssetRepositoryError,
+  type CreativeAssetRepositoryErrorCode,
+} from '@bailian-studio/creative-asset-repository'
 import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
-import { CreditLedgerError, type CreditLedgerErrorCode } from '@bailian-studio/credit-ledger'
+import {
+  CreditLedgerError,
+  type CreditLedgerErrorCode,
+} from '@bailian-studio/credit-ledger'
 import { ValidationError } from '@bailian-studio/shared'
 import { StorageError } from '@bailian-studio/storage'
 import { ZodError } from 'zod'
@@ -65,7 +90,23 @@ const CANVAS_REPOSITORY_STATUS: Record<CanvasRepositoryErrorCode, number> = {
   CANVAS_DATABASE_ERROR: 500,
 }
 
-const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, number> = {
+const CANVAS_EXECUTION_STATUS: Record<CanvasExecutionErrorCode, number> = {
+  CANVAS_EXECUTION_INVALID_GRAPH: 400,
+  CANVAS_EXECUTION_UNSUPPORTED_NODE: 400,
+  CANVAS_EXECUTION_MODEL_NOT_FOUND: 404,
+  CANVAS_EXECUTION_MODEL_KIND_MISMATCH: 400,
+  CANVAS_EXECUTION_PROMPT_REQUIRED: 400,
+  CANVAS_EXECUTION_ASSET_NOT_FOUND: 404,
+  CANVAS_EXECUTION_INPUT_UNSUPPORTED: 400,
+  CANVAS_EXECUTION_REQUIRED_INPUT_MISSING: 400,
+  CANVAS_EXECUTION_MODEL_VALIDATION_FAILED: 400,
+  CANVAS_EXECUTION_INVALID_TASK_INPUT: 500,
+}
+
+const CREATIVE_ASSET_COMPILER_STATUS: Record<
+  CreativeAssetCompilerErrorCode,
+  number
+> = {
   CREATIVE_COMPILER_MODEL_UNAVAILABLE: 409,
   CREATIVE_COMPILER_PROMPT_UNSUPPORTED: 400,
   CREATIVE_COMPILER_PROMPT_REFERENCE_INVALID: 400,
@@ -79,31 +120,35 @@ const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, num
   CREATIVE_COMPILER_MODEL_VALIDATION_FAILED: 400,
 }
 
-const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> = {
-  DIRECTOR_PROJECT_NOT_FOUND: 404,
-  DIRECTOR_SCRIPT_VERSION_NOT_FOUND: 404,
-  DIRECTOR_PHASE_NOT_FOUND: 404,
-  DIRECTOR_PHASE_RUN_NOT_FOUND: 404,
-  DIRECTOR_ASSET_NOT_FOUND: 404,
-  DIRECTOR_ASSET_OWNER_NOT_FOUND: 404,
-  DIRECTOR_ASSET_KIND_NOT_SUPPORTED: 400,
-  DIRECTOR_ASSET_OWNER_INVALID: 400,
-  DIRECTOR_ASSET_ALREADY_ATTACHED: 409,
-  DIRECTOR_SHOT_NOT_FOUND: 404,
-  DIRECTOR_SHOT_LOCKED: 409,
-  DIRECTOR_SHOT_VERSION_CONFLICT: 409,
-  DIRECTOR_SHOT_GENERATING: 409,
-  DIRECTOR_SHOT_REFERENCE_INVALID: 409,
-  DIRECTOR_PHASE_NOT_READY: 409,
-  DIRECTOR_PHASE_INPUT_NOT_READY: 409,
-  DIRECTOR_PHASE_ALREADY_RUNNING: 409,
-  DIRECTOR_PROJECT_ACTIVE_RUN: 409,
-  DIRECTOR_INVALID_CURSOR: 400,
+const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> =
+  {
+    DIRECTOR_PROJECT_NOT_FOUND: 404,
+    DIRECTOR_SCRIPT_VERSION_NOT_FOUND: 404,
+    DIRECTOR_PHASE_NOT_FOUND: 404,
+    DIRECTOR_PHASE_RUN_NOT_FOUND: 404,
+    DIRECTOR_ASSET_NOT_FOUND: 404,
+    DIRECTOR_ASSET_OWNER_NOT_FOUND: 404,
+    DIRECTOR_ASSET_KIND_NOT_SUPPORTED: 400,
+    DIRECTOR_ASSET_OWNER_INVALID: 400,
+    DIRECTOR_ASSET_ALREADY_ATTACHED: 409,
+    DIRECTOR_SHOT_NOT_FOUND: 404,
+    DIRECTOR_SHOT_LOCKED: 409,
+    DIRECTOR_SHOT_VERSION_CONFLICT: 409,
+    DIRECTOR_SHOT_GENERATING: 409,
+    DIRECTOR_SHOT_REFERENCE_INVALID: 409,
+    DIRECTOR_PHASE_NOT_READY: 409,
+    DIRECTOR_PHASE_INPUT_NOT_READY: 409,
+    DIRECTOR_PHASE_ALREADY_RUNNING: 409,
+    DIRECTOR_PROJECT_ACTIVE_RUN: 409,
+    DIRECTOR_INVALID_CURSOR: 400,
     DIRECTOR_ENTITY_CANDIDATE_NOT_FOUND: 404,
-  DIRECTOR_DATABASE_ERROR: 500,
-}
+    DIRECTOR_DATABASE_ERROR: 500,
+  }
 
-const CREATIVE_ASSET_REPOSITORY_STATUS: Record<CreativeAssetRepositoryErrorCode, number> = {
+const CREATIVE_ASSET_REPOSITORY_STATUS: Record<
+  CreativeAssetRepositoryErrorCode,
+  number
+> = {
   CREATIVE_PROJECT_NOT_FOUND: 404,
   CREATIVE_PROJECT_STATE_INVALID: 409,
   CREATIVE_ASSET_NOT_FOUND: 404,
@@ -157,8 +202,12 @@ const STORAGE_STATUS = {
 } as const
 
 export function httpStatusForError(error: unknown): number {
-  if (error instanceof AdminRepositoryError) return ADMIN_REPOSITORY_STATUS[error.code]
-  if (error instanceof CanvasRepositoryError) return CANVAS_REPOSITORY_STATUS[error.code]
+  if (error instanceof AdminRepositoryError)
+    return ADMIN_REPOSITORY_STATUS[error.code]
+  if (error instanceof CanvasRepositoryError)
+    return CANVAS_REPOSITORY_STATUS[error.code]
+  if (error instanceof CanvasExecutionError)
+    return CANVAS_EXECUTION_STATUS[error.code]
   if (requestBodyTooLargeError(error) !== undefined) {
     return 413
   }
@@ -192,7 +241,10 @@ export function httpStatusForError(error: unknown): number {
   return 500
 }
 
-export function errorResponseBody(error: unknown, traceId?: string): ErrorResponseBody {
+export function errorResponseBody(
+  error: unknown,
+  traceId?: string,
+): ErrorResponseBody {
   const body = errorResponseBodyWithoutTrace(error)
   return traceId === undefined ? body : { ...body, traceId }
 }
@@ -231,7 +283,10 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
       error: {
         code: bodyTooLarge.code,
         message: bodyTooLarge.message,
-        details: { bytesRead: bodyTooLarge.bytesRead, limit: bodyTooLarge.limit },
+        details: {
+          bytesRead: bodyTooLarge.bytesRead,
+          limit: bodyTooLarge.limit,
+        },
       },
     }
   }
@@ -325,12 +380,18 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof ValidationError) {
-    const message = error.field !== undefined ? `${error.field}: ${error.message}` : error.message
+    const message =
+      error.field !== undefined
+        ? `${error.field}: ${error.message}`
+        : error.message
     return { success: false, error: { code: 'VALIDATION_ERROR', message } }
   }
 
   if (error instanceof StorageError) {
-    return { success: false, error: { code: error.code, message: error.message } }
+    return {
+      success: false,
+      error: { code: error.code, message: error.message },
+    }
   }
 
   if (error instanceof ZodError) {
@@ -338,9 +399,12 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
     // 让客户端知道是哪个字段校验失败。
     const first = error.issues[0]
     const path = first?.path.join('.') ?? ''
-    const message = first === undefined
-      ? 'Validation error'
-      : path.length > 0 ? `${path}: ${first.message}` : first.message
+    const message =
+      first === undefined
+        ? 'Validation error'
+        : path.length > 0
+          ? `${path}: ${first.message}`
+          : first.message
     return { success: false, error: { code: 'VALIDATION_ERROR', message } }
   }
 
@@ -348,11 +412,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   // message/cause 原文（DB 连接信息、provider 网络错误、被包装的 prompt/签名 URL 片段）
   // 只进服务端日志（经 logger 值级脱敏 + 截断），绝不回传——此前这里把
   // error.message 与 error.cause.message 原样塞进响应，等于把内部细节交给任意客户端。
-  return { success: false, error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } }
+  return {
+    success: false,
+    error: { code: 'INTERNAL_ERROR', message: 'Internal server error' },
+  }
 }
 
-function requestBodyTooLargeError(error: unknown): RequestBodyTooLargeError | undefined {
+function requestBodyTooLargeError(
+  error: unknown,
+): RequestBodyTooLargeError | undefined {
   if (error instanceof RequestBodyTooLargeError) return error
-  if (error instanceof Error && error.cause instanceof RequestBodyTooLargeError) return error.cause
+  if (error instanceof Error && error.cause instanceof RequestBodyTooLargeError)
+    return error.cause
   return undefined
 }

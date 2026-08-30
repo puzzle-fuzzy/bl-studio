@@ -21,6 +21,7 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { StorageAdapter } from '@bailian-studio/storage'
+import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import type { ArtifactConfig } from './lib/artifact-config'
 import type { AssetConfig } from './lib/asset-config'
 import type { GenerationLimits } from './lib/limits'
@@ -80,6 +81,11 @@ export interface ApiDependencies {
   readonly adminRepository: AdminRepository
   /** 当前用户 Canvas 文档、版本和乐观并发控制。 */
   readonly canvasRepository: CanvasRepository
+  /** Canvas 编排任务的独立队列写入/读取端口。 */
+  readonly taskQueueRepository: Pick<
+    TaskQueueRepository,
+    'getTask' | 'enqueueTask'
+  >
   /** 用户用量读模型的窄持久化 port。 */
   readonly usageRepository: UsageRepository
   readonly generationApplicationService: GenerationApplicationService

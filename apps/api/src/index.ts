@@ -68,7 +68,8 @@ async function main(): Promise<void> {
     ...(githubOAuth !== undefined ? { githubOAuth } : {}),
     creditLedger: persistence.creditLedger,
     generationRepository: persistence.generationRepository,
-    generationDiagnosticsRepository: persistence.generationDiagnosticsRepository,
+    generationDiagnosticsRepository:
+      persistence.generationDiagnosticsRepository,
     assetRepository: persistence.assetRepository,
     shareRepository: persistence.shareRepository,
     publicShareRepository: persistence.publicShareRepository,
@@ -79,6 +80,7 @@ async function main(): Promise<void> {
     contentReportRepository: persistence.contentReportRepository,
     adminRepository: persistence.adminRepository,
     canvasRepository: persistence.canvasRepository,
+    taskQueueRepository: persistence.taskQueueRepository,
     usageRepository: persistence.usageRepository,
     generationApplicationService,
     directorRepository: persistence.directorRepository,

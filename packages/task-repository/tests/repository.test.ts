@@ -6,7 +6,10 @@ import {
   taskRecords,
   type TaskRecordInput,
 } from '@bailian-studio/db'
-import { createIsolatedTestDb, resetBailianStudioTestDb } from '@bailian-studio/db/test'
+import {
+  createIsolatedTestDb,
+  resetBailianStudioTestDb,
+} from '@bailian-studio/db/test'
 import { transitionTask, type TaskRecord } from '@bailian-studio/task-engine'
 import {
   createTaskQueueRepository,
@@ -58,7 +61,7 @@ beforeEach(async () => {
 describe('task queue repository', () => {
   it('enqueues a task inside the caller transaction and returns the domain record', async () => {
     const task = makeTask({ id: 'task-enqueued' })
-    const enqueued = await db.transaction(tx => enqueueTask(tx, task))
+    const enqueued = await db.transaction((tx) => enqueueTask(tx, task))
 
     expect(enqueued).toMatchObject({
       id: task.id,
@@ -66,14 +69,48 @@ describe('task queue repository', () => {
       domain: task.domain,
       status: 'queued',
     })
-    expect((await db.select().from(taskRecords).where(eq(taskRecords.id, task.id)))).toHaveLength(1)
+    expect(
+      await db.select().from(taskRecords).where(eq(taskRecords.id, task.id)),
+    ).toHaveLength(1)
+  })
+
+  it('enqueues a standalone canvas orchestration task through the public queue port', async () => {
+    const task = makeTask({
+      id: 'canvas-execution-1',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      input: {
+        documentId: 'canvas-1',
+        documentRevision: 1,
+        plan: { nodes: [] },
+        nodeRuns: {},
+      },
+      recordId: undefined,
+    })
+    const enqueued = await createTaskQueueRepository({ db }).enqueueTask(task)
+
+    expect(enqueued).toMatchObject({
+      id: task.id,
+      type: 'canvas.execute',
+      domain: 'canvas',
+    })
+    await expect(
+      createTaskQueueRepository({ db }).getTask(task.id),
+    ).resolves.toMatchObject({
+      input: task.input,
+    })
   })
 
   it('finds a task through the transaction store without exposing task table details', async () => {
-    const task = makeTask({ id: 'task-find', type: 'media.process', domain: 'media', recordId: 'media-1' })
+    const task = makeTask({
+      id: 'task-find',
+      type: 'media.process',
+      domain: 'media',
+      recordId: 'media-1',
+    })
     await seedTask(task)
 
-    const found = await db.transaction(tx =>
+    const found = await db.transaction((tx) =>
       createTaskQueueTransactionStore().findTask(tx, {
         recordId: 'media-1',
         type: 'media.process',
@@ -81,28 +118,36 @@ describe('task queue repository', () => {
       }),
     )
 
-    expect(found).toMatchObject({ id: task.id, recordId: 'media-1', type: 'media.process' })
+    expect(found).toMatchObject({
+      id: task.id,
+      recordId: 'media-1',
+      type: 'media.process',
+    })
   })
 
   it('cancels only queued matching tasks through the transaction store', async () => {
-    await seedTask(makeTask({
-      id: 'thumbnail-queued',
-      type: 'media.thumbnail',
-      domain: 'media',
-      recordId: 'derivative-1',
-    }))
-    await seedTask(makeTask({
-      id: 'thumbnail-running',
-      type: 'media.thumbnail',
-      domain: 'media',
-      status: 'running',
-      recordId: 'derivative-1',
-      lockedBy: 'worker-1',
-      lockedUntil: new Date(Date.now() + 60_000).toISOString(),
-    }))
+    await seedTask(
+      makeTask({
+        id: 'thumbnail-queued',
+        type: 'media.thumbnail',
+        domain: 'media',
+        recordId: 'derivative-1',
+      }),
+    )
+    await seedTask(
+      makeTask({
+        id: 'thumbnail-running',
+        type: 'media.thumbnail',
+        domain: 'media',
+        status: 'running',
+        recordId: 'derivative-1',
+        lockedBy: 'worker-1',
+        lockedUntil: new Date(Date.now() + 60_000).toISOString(),
+      }),
+    )
 
     const now = new Date().toISOString()
-    const cancelled = await db.transaction(tx =>
+    const cancelled = await db.transaction((tx) =>
       createTaskQueueTransactionStore().cancelQueuedTasks(tx, {
         recordIds: ['derivative-1'],
         type: 'media.thumbnail',
@@ -118,12 +163,16 @@ describe('task queue repository', () => {
     )
 
     expect(cancelled).toBe(1)
-    await expect(createTaskQueueRepository({ db }).getTask('thumbnail-queued')).resolves.toMatchObject({
+    await expect(
+      createTaskQueueRepository({ db }).getTask('thumbnail-queued'),
+    ).resolves.toMatchObject({
       status: 'cancelled',
       completedAt: now,
       errorJson: { code: 'SOURCE_DELETED' },
     })
-    await expect(createTaskQueueRepository({ db }).getTask('thumbnail-running')).resolves.toMatchObject({
+    await expect(
+      createTaskQueueRepository({ db }).getTask('thumbnail-running'),
+    ).resolves.toMatchObject({
       status: 'running',
     })
   })
@@ -136,8 +185,16 @@ describe('task queue repository', () => {
     const now = new Date().toISOString()
     const lockedUntil = new Date(Date.now() + 60_000).toISOString()
     const [first, second] = await Promise.all([
-      repository.claimNextQueuedTask({ workerId: 'worker-a', now, lockedUntil }),
-      repository.claimNextQueuedTask({ workerId: 'worker-b', now, lockedUntil }),
+      repository.claimNextQueuedTask({
+        workerId: 'worker-a',
+        now,
+        lockedUntil,
+      }),
+      repository.claimNextQueuedTask({
+        workerId: 'worker-b',
+        now,
+        lockedUntil,
+      }),
     ])
 
     expect(first?.id).toBeDefined()
@@ -145,7 +202,9 @@ describe('task queue repository', () => {
     expect(first?.id).not.toBe(second?.id)
     expect(first?.status).toBe('running')
     expect(second?.status).toBe('running')
-    expect(new Set([first?.lockedBy, second?.lockedBy])).toEqual(new Set(['worker-a', 'worker-b']))
+    expect(new Set([first?.lockedBy, second?.lockedBy])).toEqual(
+      new Set(['worker-a', 'worker-b']),
+    )
   })
 
   it('renews and saves only while the owner lease is valid', async () => {
@@ -166,24 +225,35 @@ describe('task queue repository', () => {
       now: new Date(now.getTime() + 1_000).toISOString(),
       lockedUntil: new Date(now.getTime() + 120_000).toISOString(),
     })
-    expect(renewed?.lockedUntil).toBe(new Date(now.getTime() + 120_000).toISOString())
+    expect(renewed?.lockedUntil).toBe(
+      new Date(now.getTime() + 120_000).toISOString(),
+    )
 
-    await expect(repository.saveTask(claimed, { expectedWorkerId: 'worker-b' })).resolves.toBeUndefined()
+    await expect(
+      repository.saveTask(claimed, { expectedWorkerId: 'worker-b' }),
+    ).resolves.toBeUndefined()
 
     const completed = transitionTask(renewed ?? claimed, {
       type: 'succeed',
       output: { providerTaskId: 'provider-1' },
       now: new Date(now.getTime() + 2_000).toISOString(),
     })
-    const saved = await repository.saveTask(completed, { expectedWorkerId: 'worker-a' })
+    const saved = await repository.saveTask(completed, {
+      expectedWorkerId: 'worker-a',
+    })
     expect(saved?.status).toBe('succeeded')
     expect(saved?.lockedBy).toBeUndefined()
-    expect((await repository.getTask(claimed.id))?.output).toEqual({ providerTaskId: 'provider-1' })
+    expect((await repository.getTask(claimed.id))?.output).toEqual({
+      providerTaskId: 'provider-1',
+    })
   })
 
   it('quarantines a malformed task instead of blocking the queue', async () => {
     const repository = createTaskQueueRepository({ db })
-    await seedTask({ ...makeTask({ id: 'task-invalid' }), type: 'invalid.task' })
+    await seedTask({
+      ...makeTask({ id: 'task-invalid' }),
+      type: 'invalid.task',
+    })
 
     const claimed = await repository.claimNextQueuedTask({
       workerId: 'worker-a',
@@ -192,23 +262,34 @@ describe('task queue repository', () => {
     })
 
     expect(claimed).toBeUndefined()
-    const [failed] = await db.select().from(taskRecords).where(eq(taskRecords.id, 'task-invalid'))
+    const [failed] = await db
+      .select()
+      .from(taskRecords)
+      .where(eq(taskRecords.id, 'task-invalid'))
     expect(failed?.status).toBe('failed')
-    expect(failed?.errorJson).toMatchObject({ code: 'TASK_CLAIM_INVALID', retriable: false })
+    expect(failed?.errorJson).toMatchObject({
+      code: 'TASK_CLAIM_INVALID',
+      retriable: false,
+    })
   })
 
   it('uses stable repository errors for missing tasks', async () => {
     const repository = createTaskQueueRepository({ db })
 
     await expect(repository.getTask('missing-task')).resolves.toBeUndefined()
-    await expect(repository.saveTask(makeTask({ id: 'missing-task' }))).rejects.toMatchObject({
+    await expect(
+      repository.saveTask(makeTask({ id: 'missing-task' })),
+    ).rejects.toMatchObject({
       code: 'TASK_NOT_FOUND',
     })
   })
 
   it('keeps the domain mapper defensive for malformed error JSON', async () => {
     const repository = createTaskQueueRepository({ db })
-    await seedTask({ ...makeTask({ id: 'task-error-json' }), errorJson: { message: 'not a TaskError' } })
+    await seedTask({
+      ...makeTask({ id: 'task-error-json' }),
+      errorJson: { message: 'not a TaskError' },
+    })
 
     const task = await repository.getTask('task-error-json')
     expect(task?.errorJson).toBeUndefined()

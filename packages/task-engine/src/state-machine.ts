@@ -41,7 +41,10 @@ import type { TaskRecord, TaskTransition } from './types'
  * @returns 转换后的新 task 记录
  * @throws 当 type↔domain 配对错误、状态不在合法转换路径上、或 claim 时机不当时抛错
  */
-export function transitionTask(task: TaskRecord, transition: TaskTransition): TaskRecord {
+export function transitionTask(
+  task: TaskRecord,
+  transition: TaskTransition,
+): TaskRecord {
   assertTaskTypeMatchesDomain(task)
 
   switch (transition.type) {
@@ -104,18 +107,21 @@ export function transitionTask(task: TaskRecord, transition: TaskTransition): Ta
  *
  * 这是状态机的第一道护栏：每种 type 只能属于一个 domain——
  * 'generation.submit' / 'generation.poll' 必须搭配 'generation'，
- * 'artifact.persist' 必须搭配 'artifact'。一旦上游持久化层写入了配对错误
+ * 'artifact.persist' 必须搭配 'artifact'，'canvas.execute' 必须搭配 'canvas'。
+ * 一旦上游持久化层写入了配对错误
  * 的脏数据，这里直接抛错，避免后续按错误的 domain 路由或归档。
  */
 function assertTaskTypeMatchesDomain(task: TaskRecord): void {
-  const expectedDomainByType: Record<TaskRecord['type'], TaskRecord['domain']> = {
-    'artifact.persist': 'artifact',
-    'director.phase': 'director',
-    'generation.poll': 'generation',
-    'generation.submit': 'generation',
-    'media.process': 'media',
-    'media.thumbnail': 'media',
-  }
+  const expectedDomainByType: Record<TaskRecord['type'], TaskRecord['domain']> =
+    {
+      'artifact.persist': 'artifact',
+      'director.phase': 'director',
+      'generation.poll': 'generation',
+      'generation.submit': 'generation',
+      'media.process': 'media',
+      'media.thumbnail': 'media',
+      'canvas.execute': 'canvas',
+    }
 
   const expectedDomain = expectedDomainByType[task.type]
   if (task.domain !== expectedDomain) {
@@ -139,8 +145,13 @@ function claimTask(
   transition: Extract<TaskTransition, { type: 'claim' }>,
 ): TaskRecord {
   if (task.status === 'running') {
-    if (!task.lockedUntil || Date.parse(task.lockedUntil) > Date.parse(transition.now)) {
-      throw new Error(`cannot claim task with status running: lock has not expired`)
+    if (
+      !task.lockedUntil ||
+      Date.parse(task.lockedUntil) > Date.parse(transition.now)
+    ) {
+      throw new Error(
+        `cannot claim task with status running: lock has not expired`,
+      )
     }
     // 僵尸 task 复活：上次认领的 worker 失联（锁已过期），交给新 worker 接手，
     // 不递增 attempts，避免一次 worker 崩溃就白白吃掉一次重试预算。
@@ -197,6 +208,10 @@ function assertCancellable(task: TaskRecord): void {
  * 干净、不带已被释放的锁残留。
  */
 function clearLock(task: TaskRecord): TaskRecord {
-  const { lockedBy: _lockedBy, lockedUntil: _lockedUntil, ...unlockedTask } = task
+  const {
+    lockedBy: _lockedBy,
+    lockedUntil: _lockedUntil,
+    ...unlockedTask
+  } = task
   return unlockedTask
 }

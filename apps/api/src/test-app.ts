@@ -25,6 +25,7 @@ import type {
   UsageRepository,
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
+import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import {
   resolveArtifactLocalRoot,
   type StorageAdapter,
@@ -77,14 +78,16 @@ export function createTestApp(
     overrides.generationDiagnosticsRepository ??
     missing<GenerationDiagnosticsRepository>('generationDiagnosticsRepository')
   const auditRepository =
-    overrides.auditRepository ??
-    missing<AuditRepository>('auditRepository')
+    overrides.auditRepository ?? missing<AuditRepository>('auditRepository')
   const assetRepository =
-    overrides.assetRepository ?? missing<ApiDependencies['assetRepository']>('assetRepository')
+    overrides.assetRepository ??
+    missing<ApiDependencies['assetRepository']>('assetRepository')
   const shareRepository =
-    overrides.shareRepository ?? missing<ApiDependencies['shareRepository']>('shareRepository')
+    overrides.shareRepository ??
+    missing<ApiDependencies['shareRepository']>('shareRepository')
   const publicShareRepository =
-    overrides.publicShareRepository ?? missing<ApiDependencies['publicShareRepository']>('publicShareRepository')
+    overrides.publicShareRepository ??
+    missing<ApiDependencies['publicShareRepository']>('publicShareRepository')
   const socialRepository =
     overrides.socialRepository ??
     missing<ApiDependencies['socialRepository']>('socialRepository')
@@ -93,13 +96,17 @@ export function createTestApp(
     missing<ApiDependencies['notificationRepository']>('notificationRepository')
   const promptLibraryRepository =
     overrides.promptLibraryRepository ??
-    missing<ApiDependencies['promptLibraryRepository']>('promptLibraryRepository')
+    missing<ApiDependencies['promptLibraryRepository']>(
+      'promptLibraryRepository',
+    )
   const feedbackRepository =
     overrides.feedbackRepository ??
     missing<ApiDependencies['feedbackRepository']>('feedbackRepository')
   const contentReportRepository =
     overrides.contentReportRepository ??
-    missing<ApiDependencies['contentReportRepository']>('contentReportRepository')
+    missing<ApiDependencies['contentReportRepository']>(
+      'contentReportRepository',
+    )
   const adminRepository =
     overrides.adminRepository ??
     ({
@@ -114,8 +121,7 @@ export function createTestApp(
         missing<AnalyticsRepository>('adminRepository.analytics'),
     } satisfies AdminRepository)
   const usageRepository =
-    overrides.usageRepository ??
-    missing<UsageRepository>('usageRepository')
+    overrides.usageRepository ?? missing<UsageRepository>('usageRepository')
   const creativeAssetRepository =
     overrides.creativeAssetRepository ??
     missing<CreativeAssetRepository>('creativeAssetRepository')
@@ -165,7 +171,13 @@ export function createTestApp(
     contentReportRepository,
     adminRepository,
     canvasRepository:
-      overrides.canvasRepository ?? missing<CanvasRepository>('canvasRepository'),
+      overrides.canvasRepository ??
+      missing<CanvasRepository>('canvasRepository'),
+    taskQueueRepository:
+      overrides.taskQueueRepository ??
+      missing<Pick<TaskQueueRepository, 'getTask' | 'enqueueTask'>>(
+        'taskQueueRepository',
+      ),
     usageRepository,
     generationApplicationService,
     directorRepository,

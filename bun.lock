@@ -68,6 +68,7 @@
         "@bailian-studio/audit-repository": "workspace:*",
         "@bailian-studio/auth": "workspace:*",
         "@bailian-studio/canvas-contracts": "workspace:*",
+        "@bailian-studio/canvas-execution": "workspace:*",
         "@bailian-studio/canvas-repository": "workspace:*",
         "@bailian-studio/creative-asset-compiler": "workspace:*",
         "@bailian-studio/creative-asset-contracts": "workspace:*",
@@ -81,6 +82,8 @@
         "@bailian-studio/persistence-runtime": "workspace:*",
         "@bailian-studio/shared": "workspace:*",
         "@bailian-studio/storage": "workspace:*",
+        "@bailian-studio/task-engine": "workspace:*",
+        "@bailian-studio/task-repository": "workspace:*",
         "@elysia/cors": "^1.4.2",
         "elysia": "catalog:",
         "nodemailer": "catalog:",
@@ -184,6 +187,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/audit-repository": "workspace:*",
+        "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
@@ -311,6 +315,18 @@
       "version": "0.1.0",
       "dependencies": {
         "zod": "catalog:",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/canvas-execution": {
+      "name": "@bailian-studio/canvas-execution",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bailian-studio/canvas-contracts": "workspace:*",
+        "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
         "typescript": "catalog:",
@@ -669,6 +685,8 @@
     "@bailian-studio/canvas": ["@bailian-studio/canvas@workspace:apps/canvas"],
 
     "@bailian-studio/canvas-contracts": ["@bailian-studio/canvas-contracts@workspace:packages/canvas-contracts"],
+
+    "@bailian-studio/canvas-execution": ["@bailian-studio/canvas-execution@workspace:packages/canvas-execution"],
 
     "@bailian-studio/canvas-repository": ["@bailian-studio/canvas-repository@workspace:packages/canvas-repository"],
 

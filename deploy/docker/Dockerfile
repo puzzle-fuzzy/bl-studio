@@ -60,6 +60,7 @@ COPY packages/generation-repository/package.json ./packages/generation-repositor
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/
 COPY packages/canvas-contracts/package.json ./packages/canvas-contracts/
+COPY packages/canvas-execution/package.json ./packages/canvas-execution/
 COPY packages/canvas-repository/package.json ./packages/canvas-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/
@@ -105,6 +106,7 @@ COPY packages/generation-repository/package.json ./packages/generation-repositor
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/
 COPY packages/canvas-contracts/package.json ./packages/canvas-contracts/
+COPY packages/canvas-execution/package.json ./packages/canvas-execution/
 COPY packages/canvas-repository/package.json ./packages/canvas-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/

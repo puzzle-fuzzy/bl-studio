@@ -9,8 +9,25 @@ export interface ModelRegistryLookup {
 
 /** WorkerLoop 消费的统一任务结果；各任务处理器共享同一判别联合。 */
 export type TaskProcessOutcome =
-  | { status: 'succeeded'; output: NormalizedGenerationOutput }
-  | { status: 'polling'; nextPollAt: string }
-  | { status: 'failed'; error: TaskError }
-  | { status: 'retry'; nextRunAt: string; error: TaskError }
-  | { status: 'cancelled'; error: TaskError }
+  | {
+      status: 'succeeded'
+      output: NormalizedGenerationOutput
+      nextInput?: Record<string, unknown>
+    }
+  | {
+      status: 'polling'
+      nextPollAt: string
+      nextInput?: Record<string, unknown>
+    }
+  | { status: 'failed'; error: TaskError; nextInput?: Record<string, unknown> }
+  | {
+      status: 'retry'
+      nextRunAt: string
+      error: TaskError
+      nextInput?: Record<string, unknown>
+    }
+  | {
+      status: 'cancelled'
+      error: TaskError
+      nextInput?: Record<string, unknown>
+    }

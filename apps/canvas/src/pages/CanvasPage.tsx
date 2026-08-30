@@ -1,4 +1,9 @@
-import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  useCallback,
+  useEffect,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+} from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -12,11 +17,16 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { History, ImagePlus, Loader2, Video } from 'lucide-react'
+import { History, ImagePlus, Loader2, Play, Video } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
-import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
+import {
+  MediaNode,
+  type MediaKind,
+  type MediaNodeData,
+} from '../components/canvas/MediaNode'
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
+import { useCanvasExecution } from '../hooks/use-canvas-execution'
 
 const nodeTypes: NodeTypes = { mediaNode: MediaNode }
 
@@ -32,12 +42,18 @@ interface CanvasMenu {
 
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
-  const { saveStatus, versions, refreshVersions, restoreVersion } = useCanvasPersistence()
-  const nodes = useCanvasStore(state => state.nodes)
-  const edges = useCanvasStore(state => state.edges)
-  const onNodesChange = useCanvasStore(state => state.onNodesChange)
-  const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
-  const onConnect = useCanvasStore(state => state.onConnect)
+  const { saveStatus, versions, refreshVersions, restoreVersion } =
+    useCanvasPersistence()
+  const {
+    execute,
+    status: executionStatus,
+    error: executionError,
+  } = useCanvasExecution()
+  const nodes = useCanvasStore((state) => state.nodes)
+  const edges = useCanvasStore((state) => state.edges)
+  const onNodesChange = useCanvasStore((state) => state.onNodesChange)
+  const onEdgesChange = useCanvasStore((state) => state.onEdgesChange)
+  const onConnect = useCanvasStore((state) => state.onConnect)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [showVersions, setShowVersions] = useState(false)
@@ -47,22 +63,39 @@ export function CanvasPage() {
     if (showVersions) void refreshVersions()
   }, [refreshVersions, showVersions])
 
-  const saveLabel = saveStatus === 'loading'
-    ? '加载中…'
-    : saveStatus === 'saving'
-      ? '保存中…'
-      : saveStatus === 'conflict'
-        ? '版本冲突'
-        : saveStatus === 'error'
-          ? '离线保存'
-          : '已保存'
+  const saveLabel =
+    saveStatus === 'loading'
+      ? '加载中…'
+      : saveStatus === 'saving'
+        ? '保存中…'
+        : saveStatus === 'conflict'
+          ? '版本冲突'
+          : saveStatus === 'error'
+            ? '离线保存'
+            : '已保存'
+  const executionLabel =
+    executionStatus === 'submitting'
+      ? '提交中…'
+      : executionStatus === 'running'
+        ? '执行中…'
+        : executionStatus === 'succeeded'
+          ? '执行完成'
+          : executionStatus === 'failed'
+            ? '执行失败'
+            : executionStatus === 'cancelled'
+              ? '已取消'
+              : '运行画布'
 
   // 点击菜单外部或按 Esc 关闭右键菜单。
   useEffect(() => {
     if (menu === null) return
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target
-      if (target instanceof Element && target.closest('[data-canvas-menu]') !== null) return
+      if (
+        target instanceof Element &&
+        target.closest('[data-canvas-menu]') !== null
+      )
+        return
       setMenu(null)
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -81,7 +114,10 @@ export function CanvasPage() {
     const newNode: Node<MediaNodeData> = {
       id,
       type: 'mediaNode',
-      position: position ?? { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
+      position: position ?? {
+        x: 100 + Math.random() * 300,
+        y: 100 + Math.random() * 200,
+      },
       data: {
         kind,
         status: 'empty',
@@ -96,79 +132,118 @@ export function CanvasPage() {
   }, [])
 
   /** 右键画布/拉线落空：在落点创建空白媒体节点（有来源时自动连线）。 */
-  const addEmptyNode = useCallback((kind: MediaKind) => {
-    if (menu === null) return
-    const nodeId = `media_${Date.now()}_${nextNodeId++}`
-    const newNode: Node<MediaNodeData> = {
-      id: nodeId,
-      type: 'mediaNode',
-      position: menu.flow,
-      data: {
-        kind,
-        status: 'empty',
-        prompt: '',
-        modelId: '',
-        referenceUrls: [],
-        referenceAssetIds: [],
-        aspectRatio: '1:1',
-      },
-    }
-    useCanvasStore.getState().addNode(newNode)
-    if (menu.connectFrom !== undefined) {
-      useCanvasStore.getState().onConnect({
-        source: menu.connectFrom,
-        target: nodeId,
-        sourceHandle: null,
-        targetHandle: null,
-      })
-    }
-    setMenu(null)
-  }, [menu])
+  const addEmptyNode = useCallback(
+    (kind: MediaKind) => {
+      if (menu === null) return
+      const nodeId = `media_${Date.now()}_${nextNodeId++}`
+      const newNode: Node<MediaNodeData> = {
+        id: nodeId,
+        type: 'mediaNode',
+        position: menu.flow,
+        data: {
+          kind,
+          status: 'empty',
+          prompt: '',
+          modelId: '',
+          referenceUrls: [],
+          referenceAssetIds: [],
+          aspectRatio: '1:1',
+        },
+      }
+      useCanvasStore.getState().addNode(newNode)
+      if (menu.connectFrom !== undefined) {
+        useCanvasStore.getState().onConnect({
+          source: menu.connectFrom,
+          target: nodeId,
+          sourceHandle: null,
+          targetHandle: null,
+        })
+      }
+      setMenu(null)
+    },
+    [menu],
+  )
 
-  const onPaneContextMenu = useCallback((event: ReactMouseEvent | MouseEvent) => {
-    event.preventDefault()
-    setMenu({
-      x: Math.min(event.clientX, window.innerWidth - 190),
-      y: Math.min(event.clientY, window.innerHeight - 140),
-      flow: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
-    })
-  }, [screenToFlowPosition])
+  const onPaneContextMenu = useCallback(
+    (event: ReactMouseEvent | MouseEvent) => {
+      event.preventDefault()
+      setMenu({
+        x: Math.min(event.clientX, window.innerWidth - 190),
+        y: Math.min(event.clientY, window.innerHeight - 140),
+        flow: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+      })
+    },
+    [screenToFlowPosition],
+  )
 
   /** 从右桩拉线松手在空白区域：弹出与右键相同的菜单，创建后自动连线。 */
-  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
-    if (state.isValid || state.fromNode?.id === undefined) return
-    const point = 'changedTouches' in event ? event.changedTouches[0] : event
-    if (point === undefined) return
-    setMenu({
-      x: Math.min(point.clientX, window.innerWidth - 190),
-      y: Math.min(point.clientY, window.innerHeight - 140),
-      flow: screenToFlowPosition({ x: point.clientX, y: point.clientY }),
-      connectFrom: state.fromNode.id,
-    })
-  }, [screenToFlowPosition])
+  const onConnectEnd = useCallback(
+    (event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+      if (state.isValid || state.fromNode?.id === undefined) return
+      const point = 'changedTouches' in event ? event.changedTouches[0] : event
+      if (point === undefined) return
+      setMenu({
+        x: Math.min(point.clientX, window.innerWidth - 190),
+        y: Math.min(point.clientY, window.innerHeight - 140),
+        flow: screenToFlowPosition({ x: point.clientX, y: point.clientY }),
+        connectFrom: state.fromNode.id,
+      })
+    },
+    [screenToFlowPosition],
+  )
 
   return (
     <div className="relative h-full min-h-0">
       {/* 工具栏：添加不同类型的节点 */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
-        <Button size="sm" variant="secondary" onClick={() => addMediaNode('image')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addMediaNode('image')}
+        >
           <ImagePlus className="mr-1 size-3.5" aria-hidden />
           图片
         </Button>
-        <Button size="sm" variant="secondary" onClick={() => addMediaNode('video')}>
+        <Button
+          size="sm"
+          variant="secondary"
+          onClick={() => addMediaNode('video')}
+        >
           <Video className="mr-1 size-3.5" aria-hidden />
           视频
         </Button>
       </div>
       <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
-        <span className={`px-2 text-[10px] ${saveStatus === 'conflict' ? 'text-destructive' : 'text-muted-foreground'}`}>
-          {saveStatus === 'saving' || saveStatus === 'loading' ? <Loader2 className="mr-1 inline size-3 animate-spin" aria-hidden /> : null}
+        <span
+          className={`px-2 text-[10px] ${saveStatus === 'conflict' ? 'text-destructive' : 'text-muted-foreground'}`}
+        >
+          {saveStatus === 'saving' || saveStatus === 'loading' ? (
+            <Loader2 className="mr-1 inline size-3 animate-spin" aria-hidden />
+          ) : null}
           {saveLabel}
         </span>
         <Button
           size="sm"
+          variant="secondary"
+          disabled={
+            saveStatus !== 'saved' ||
+            executionStatus === 'submitting' ||
+            executionStatus === 'running'
+          }
+          onClick={() => void execute()}
+          title={executionError}
+        >
+          {executionStatus === 'submitting' || executionStatus === 'running' ? (
+            <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
+          ) : (
+            <Play className="mr-1 size-3.5" aria-hidden />
+          )}
+          {executionLabel}
+        </Button>
+        <Button
+          size="sm"
           variant="ghost"
-          onClick={() => setShowVersions(open => !open)}
+          onClick={() => setShowVersions((open) => !open)}
           aria-expanded={showVersions}
         >
           <History className="mr-1 size-3.5" aria-hidden />
@@ -180,32 +255,43 @@ export function CanvasPage() {
         <div className="absolute top-14 right-3 z-20 w-64 rounded-xl border bg-surface/95 p-2 shadow-lg backdrop-blur">
           <div className="mb-1 flex items-center justify-between px-1">
             <span className="text-xs font-medium">版本历史</span>
-            <span className="text-[10px] text-muted-foreground">恢复会创建新版本</span>
+            <span className="text-[10px] text-muted-foreground">
+              恢复会创建新版本
+            </span>
           </div>
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {versions.length === 0 ? (
-              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无版本</p>
-            ) : versions.map(version => (
-              <div key={version.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-accent">
-                <div>
-                  <div className="text-xs">版本 {version.version}</div>
-                  <div className="text-[10px] text-muted-foreground">{new Date(version.createdAt).toLocaleString()}</div>
-                </div>
-                <Button
-                  size="xs"
-                  variant="outline"
-                  disabled={restoringVersion !== undefined}
-                  onClick={() => {
-                    setRestoringVersion(version.id)
-                    void restoreVersion(version.id)
-                      .catch(() => undefined)
-                      .finally(() => setRestoringVersion(undefined))
-                  }}
+              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">
+                暂无版本
+              </p>
+            ) : (
+              versions.map((version) => (
+                <div
+                  key={version.id}
+                  className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-accent"
                 >
-                  {restoringVersion === version.id ? '恢复中' : '恢复'}
-                </Button>
-              </div>
-            ))}
+                  <div>
+                    <div className="text-xs">版本 {version.version}</div>
+                    <div className="text-[10px] text-muted-foreground">
+                      {new Date(version.createdAt).toLocaleString()}
+                    </div>
+                  </div>
+                  <Button
+                    size="xs"
+                    variant="outline"
+                    disabled={restoringVersion !== undefined}
+                    onClick={() => {
+                      setRestoringVersion(version.id)
+                      void restoreVersion(version.id)
+                        .catch(() => undefined)
+                        .finally(() => setRestoringVersion(undefined))
+                    }}
+                  >
+                    {restoringVersion === version.id ? '恢复中' : '恢复'}
+                  </Button>
+                </div>
+              ))
+            )}
           </div>
         </div>
       )}
@@ -225,7 +311,12 @@ export function CanvasPage() {
         className="bg-canvas"
         proOptions={{ hideAttribution: true }}
       >
-        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border)" />
+        <Background
+          variant={BackgroundVariant.Dots}
+          gap={20}
+          size={1.5}
+          color="var(--border)"
+        />
         <Controls
           className="!bottom-4 !left-4 flex gap-1 rounded-lg border bg-surface p-1 [&>button]:!border-0 [&>button]:!bg-transparent [&>button]:!text-muted-foreground [&>button:hover]:!bg-accent"
           showInteractive={false}

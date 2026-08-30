@@ -5,10 +5,19 @@
  * media 处理分别位于独立模块，避免不同业务生命周期共享一个大型实现文件。
  */
 
-import type { GenerationQuotaLimits, GenerationRepository, ProviderRequestAuditRepository } from '@bailian-studio/generation-repository'
+import type {
+  AssetRepository,
+  GenerationQuotaLimits,
+  GenerationRepository,
+  ProviderRequestAuditRepository,
+} from '@bailian-studio/generation-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
-import { createLogger, MetricsCollector, type Logger } from '@bailian-studio/shared'
+import {
+  createLogger,
+  MetricsCollector,
+  type Logger,
+} from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import { processArtifactPersistTask } from './artifact-task-handler'
@@ -19,12 +28,14 @@ import { processMediaTask } from './media-task-handler'
 import type { MediaProcessor } from './media-processor'
 import type { ProviderRegistry } from './providers'
 import { processThumbnailTask } from './thumbnail-task-handler'
+import { processCanvasExecutionTask } from './canvas-task-handler'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface TaskExecutorDeps {
   readonly repository: GenerationRepository
+  readonly assetRepository?: AssetRepository
   readonly providerRequestAuditRepository: ProviderRequestAuditRepository
   readonly directorRepository?: DirectorRepository
   readonly providerRegistry: ProviderRegistry
@@ -65,20 +76,37 @@ export class TaskExecutor {
       const outcome = await this.executeTask(task)
       this.recordTaskMetrics(task, outcome.status, Date.now() - startedAt)
       return outcome
-    }
-    catch (error) {
+    } catch (error) {
       this.recordTaskMetrics(task, 'threw', Date.now() - startedAt)
       throw error
     }
   }
 
   private async executeTask(task: TaskRecord): Promise<TaskProcessOutcome> {
+    if (task.type === 'canvas.execute') {
+      return processCanvasExecutionTask(task, {
+        repository: this.deps.repository,
+        ...(this.deps.assetRepository === undefined
+          ? {}
+          : { assetRepository: this.deps.assetRepository }),
+        ...(this.deps.generationQuota === undefined
+          ? {}
+          : { generationQuota: this.deps.generationQuota }),
+        logger: this.logger,
+      })
+    }
     if (task.type === 'director.phase') {
       return processDirectorPhaseTask(task, {
         repository: this.deps.repository,
-        ...(this.deps.directorRepository === undefined ? {} : { directorRepository: this.deps.directorRepository }),
-        ...(this.deps.mediaRepository === undefined ? {} : { mediaRepository: this.deps.mediaRepository }),
-        ...(this.deps.generationQuota === undefined ? {} : { generationQuota: this.deps.generationQuota }),
+        ...(this.deps.directorRepository === undefined
+          ? {}
+          : { directorRepository: this.deps.directorRepository }),
+        ...(this.deps.mediaRepository === undefined
+          ? {}
+          : { mediaRepository: this.deps.mediaRepository }),
+        ...(this.deps.generationQuota === undefined
+          ? {}
+          : { generationQuota: this.deps.generationQuota }),
         modelRegistry: this.deps.modelRegistry,
         logger: this.logger,
       })
@@ -131,7 +159,9 @@ export class TaskExecutor {
         ...(this.deps.artifactPersistTimeoutMs === undefined
           ? {}
           : { maxDurationMs: this.deps.artifactPersistTimeoutMs }),
-        ...(this.deps.artifactFetch === undefined ? {} : { artifactFetch: this.deps.artifactFetch }),
+        ...(this.deps.artifactFetch === undefined
+          ? {}
+          : { artifactFetch: this.deps.artifactFetch }),
       })
     }
 
@@ -149,12 +179,18 @@ export class TaskExecutor {
       ...(this.deps.providerAsyncMaxDurationMs === undefined
         ? {}
         : { asyncMaxDurationMs: this.deps.providerAsyncMaxDurationMs }),
-      })
+    })
   }
 
-  private recordTaskMetrics(task: TaskRecord, outcome: string, durationMs: number): void {
+  private recordTaskMetrics(
+    task: TaskRecord,
+    outcome: string,
+    durationMs: number,
+  ): void {
     this.metrics.increment('worker.task', { type: task.type, outcome })
-    this.metrics.timing('worker.task.duration', durationMs, { type: task.type })
+    this.metrics.timing('worker.task.duration', durationMs, {
+      type: task.type,
+    })
     this.logger.info('task.duration', {
       taskId: task.id,
       traceId: task.traceId,

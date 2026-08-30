@@ -8,213 +8,230 @@
  */
 
 import {
-	type AuditOutboxRepository,
-	createAuditOutboxRepository,
-} from "@bailian-studio/audit-repository";
+  type AuditOutboxRepository,
+  createAuditOutboxRepository,
+} from '@bailian-studio/audit-repository'
 import {
-	type AuthService,
-	type AuthServiceOptions,
-	createAuthService,
-} from "@bailian-studio/auth";
+  type AuthService,
+  type AuthServiceOptions,
+  createAuthService,
+} from '@bailian-studio/auth'
 import {
-	type CreativeAssetRepository,
-	createCreativeAssetRepository,
-} from "@bailian-studio/creative-asset-repository";
+  type CreativeAssetRepository,
+  createCreativeAssetRepository,
+} from '@bailian-studio/creative-asset-repository'
 import {
-	type CreditLedger,
-	createCreditLedger,
-} from "@bailian-studio/credit-ledger";
-import { type BailianStudioDb, createDb } from "@bailian-studio/db";
+  type CreditLedger,
+  createCreditLedger,
+} from '@bailian-studio/credit-ledger'
+import { type BailianStudioDb, createDb } from '@bailian-studio/db'
 import {
-	createCanvasRepository,
-	type CanvasRepository,
-} from "@bailian-studio/canvas-repository";
+  createCanvasRepository,
+  type CanvasRepository,
+} from '@bailian-studio/canvas-repository'
 import {
-	createDirectorRepository,
-	type DirectorRepository,
-} from "@bailian-studio/director-repository";
+  createDirectorRepository,
+  type DirectorRepository,
+} from '@bailian-studio/director-repository'
 import {
-	createAdminRepository,
-	type AdminRepository,
-} from "@bailian-studio/admin-repository";
+  createAdminRepository,
+  type AdminRepository,
+} from '@bailian-studio/admin-repository'
 import {
-	type AssetRepository,
-	type AuditRepository,
-	type ContentReportRepository,
-	createAssetRepository,
-	createAuditRepository,
-	createContentReportRepository,
-	createFeedbackRepository,
-	createGenerationRepository,
-	createGenerationDiagnosticsRepository,
-	createGenerationRecoveryRepository,
-	createNotificationRepository,
-	createPromptLibraryRepository,
-	createProviderRequestAuditRepository,
-	createSocialRepository,
-	createShareRepository,
-	createUsageRepository,
-	type FeedbackRepository,
-	type GenerationDiagnosticsRepository,
-	type GenerationRepository,
-	type GenerationRecoveryRepository,
-	type NotificationRepository,
-	type PromptLibraryRepository,
-	type PublicShareRepository,
-	type ProviderRequestAuditRepository,
-	type ShareRepository,
-	type SocialRepository,
-	type UsageRepository,
-} from "@bailian-studio/generation-repository";
+  type AssetRepository,
+  type AuditRepository,
+  type ContentReportRepository,
+  createAssetRepository,
+  createAuditRepository,
+  createContentReportRepository,
+  createFeedbackRepository,
+  createGenerationRepository,
+  createGenerationDiagnosticsRepository,
+  createGenerationRecoveryRepository,
+  createNotificationRepository,
+  createPromptLibraryRepository,
+  createProviderRequestAuditRepository,
+  createSocialRepository,
+  createShareRepository,
+  createUsageRepository,
+  type FeedbackRepository,
+  type GenerationDiagnosticsRepository,
+  type GenerationRepository,
+  type GenerationRecoveryRepository,
+  type NotificationRepository,
+  type PromptLibraryRepository,
+  type PublicShareRepository,
+  type ProviderRequestAuditRepository,
+  type ShareRepository,
+  type SocialRepository,
+  type UsageRepository,
+} from '@bailian-studio/generation-repository'
 import {
-	createMediaRepository,
-	type MediaRepository,
-} from "@bailian-studio/media-repository";
+  createMediaRepository,
+  type MediaRepository,
+} from '@bailian-studio/media-repository'
 import {
-	createTaskQueueRepository,
-	createTaskQueueTransactionStore,
-	type TaskQueueRepository,
-} from "@bailian-studio/task-repository";
+  createTaskQueueRepository,
+  createTaskQueueTransactionStore,
+  type TaskQueueRepository,
+} from '@bailian-studio/task-repository'
 
-const DEFAULT_DATABASE_POOL_MAX = 5;
+const DEFAULT_DATABASE_POOL_MAX = 5
 
 export interface CreateApiPersistenceRuntimeOptions
-	extends Omit<AuthServiceOptions, "db"> {
-	databaseUrl: string;
-	databasePoolMax?: number;
+  extends Omit<AuthServiceOptions, 'db'> {
+  databaseUrl: string
+  databasePoolMax?: number
 }
 
 export interface ApiPersistenceRuntime {
-	readonly auditOutboxRepository: AuditOutboxRepository;
-	readonly auditRepository: AuditRepository;
-	readonly authService: AuthService;
-	readonly creditLedger: CreditLedger;
-	readonly generationRepository: GenerationRepository;
-	readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository;
-	readonly generationRecoveryRepository: GenerationRecoveryRepository;
-	readonly assetRepository: AssetRepository;
-	readonly shareRepository: ShareRepository;
-	readonly publicShareRepository: PublicShareRepository;
-	readonly socialRepository: SocialRepository;
-	readonly notificationRepository: NotificationRepository;
-	readonly promptLibraryRepository: PromptLibraryRepository;
-	readonly feedbackRepository: FeedbackRepository;
-	readonly contentReportRepository: ContentReportRepository;
-	readonly adminRepository: AdminRepository;
-	readonly canvasRepository: CanvasRepository;
-	readonly usageRepository: UsageRepository;
-	readonly directorRepository: DirectorRepository;
-	readonly creativeAssetRepository: CreativeAssetRepository;
-	readonly mediaRepository: MediaRepository;
-	close(): Promise<void>;
+  readonly auditOutboxRepository: AuditOutboxRepository
+  readonly auditRepository: AuditRepository
+  readonly authService: AuthService
+  readonly creditLedger: CreditLedger
+  readonly generationRepository: GenerationRepository
+  readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository
+  readonly generationRecoveryRepository: GenerationRecoveryRepository
+  readonly assetRepository: AssetRepository
+  readonly shareRepository: ShareRepository
+  readonly publicShareRepository: PublicShareRepository
+  readonly socialRepository: SocialRepository
+  readonly notificationRepository: NotificationRepository
+  readonly promptLibraryRepository: PromptLibraryRepository
+  readonly feedbackRepository: FeedbackRepository
+  readonly contentReportRepository: ContentReportRepository
+  readonly adminRepository: AdminRepository
+  readonly canvasRepository: CanvasRepository
+  readonly taskQueueRepository: TaskQueueRepository
+  readonly usageRepository: UsageRepository
+  readonly directorRepository: DirectorRepository
+  readonly creativeAssetRepository: CreativeAssetRepository
+  readonly mediaRepository: MediaRepository
+  close(): Promise<void>
 }
 
 export interface CreateWorkerPersistenceRuntimeOptions {
-	databaseUrl: string;
-	databasePoolMax?: number;
+  databaseUrl: string
+  databasePoolMax?: number
 }
 
 export interface WorkerPersistenceRuntime {
-	readonly auditOutboxRepository: AuditOutboxRepository;
-	readonly creditLedger: CreditLedger;
-	readonly generationRepository: GenerationRepository;
-	readonly generationRecoveryRepository: GenerationRecoveryRepository;
-	readonly taskQueueRepository: TaskQueueRepository;
-	readonly providerRequestAuditRepository: ProviderRequestAuditRepository;
-	readonly directorRepository: DirectorRepository;
-	readonly mediaRepository: MediaRepository;
-	close(): Promise<void>;
+  readonly auditOutboxRepository: AuditOutboxRepository
+  readonly creditLedger: CreditLedger
+  readonly generationRepository: GenerationRepository
+  readonly generationRecoveryRepository: GenerationRecoveryRepository
+  readonly taskQueueRepository: TaskQueueRepository
+  readonly assetRepository: AssetRepository
+  readonly providerRequestAuditRepository: ProviderRequestAuditRepository
+  readonly directorRepository: DirectorRepository
+  readonly mediaRepository: MediaRepository
+  close(): Promise<void>
 }
 
 function createSharedDatabase(
-	url: string,
-	max: number | undefined,
+  url: string,
+  max: number | undefined,
 ): BailianStudioDb {
-	return createDb({ url, max: max ?? DEFAULT_DATABASE_POOL_MAX });
+  return createDb({ url, max: max ?? DEFAULT_DATABASE_POOL_MAX })
 }
 
 function closeOnce(db: BailianStudioDb): () => Promise<void> {
-	let closed = false;
-	return async () => {
-		if (closed) return;
-		closed = true;
-		await db.close();
-	};
+  let closed = false
+  return async () => {
+    if (closed) return
+    closed = true
+    await db.close()
+  }
 }
 
 export function createApiPersistenceRuntime(
-	options: CreateApiPersistenceRuntimeOptions,
+  options: CreateApiPersistenceRuntimeOptions,
 ): ApiPersistenceRuntime {
-	const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax);
-	try {
-		const close = closeOnce(db);
-		const taskQueueTransactionStore = createTaskQueueTransactionStore();
-		const generationRepository = createGenerationRepository({ db, taskQueueTransactionStore });
-		const shareRepository = createShareRepository(db);
-		return {
-			auditOutboxRepository: createAuditOutboxRepository({ db }),
-			auditRepository: createAuditRepository(db),
-			authService: createAuthService({
-				db,
-				...withoutDatabaseRuntimeOptions(options),
-			}),
-			creditLedger: createCreditLedger({ db }),
-			generationRepository,
-			generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),
-			generationRecoveryRepository: createGenerationRecoveryRepository(db),
-			assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
-			shareRepository,
-			publicShareRepository: shareRepository,
-			socialRepository: createSocialRepository(db),
-			notificationRepository: createNotificationRepository(db),
-			promptLibraryRepository: createPromptLibraryRepository(db),
-			feedbackRepository: createFeedbackRepository(db),
-			contentReportRepository: createContentReportRepository(db),
-			adminRepository: createAdminRepository(db),
-			canvasRepository: createCanvasRepository(db),
-			usageRepository: createUsageRepository(db),
-			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
-			creativeAssetRepository: createCreativeAssetRepository({ db }),
-			mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
-			close,
-		};
-	} catch (error) {
-		void db.close();
-		throw error;
-	}
+  const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)
+  try {
+    const close = closeOnce(db)
+    const taskQueueTransactionStore = createTaskQueueTransactionStore()
+    const generationRepository = createGenerationRepository({
+      db,
+      taskQueueTransactionStore,
+    })
+    const shareRepository = createShareRepository(db)
+    return {
+      auditOutboxRepository: createAuditOutboxRepository({ db }),
+      auditRepository: createAuditRepository(db),
+      authService: createAuthService({
+        db,
+        ...withoutDatabaseRuntimeOptions(options),
+      }),
+      creditLedger: createCreditLedger({ db }),
+      generationRepository,
+      generationDiagnosticsRepository:
+        createGenerationDiagnosticsRepository(db),
+      generationRecoveryRepository: createGenerationRecoveryRepository(db),
+      assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
+      shareRepository,
+      publicShareRepository: shareRepository,
+      socialRepository: createSocialRepository(db),
+      notificationRepository: createNotificationRepository(db),
+      promptLibraryRepository: createPromptLibraryRepository(db),
+      feedbackRepository: createFeedbackRepository(db),
+      contentReportRepository: createContentReportRepository(db),
+      adminRepository: createAdminRepository(db),
+      canvasRepository: createCanvasRepository(db),
+      taskQueueRepository: createTaskQueueRepository({ db }),
+      usageRepository: createUsageRepository(db),
+      directorRepository: createDirectorRepository({
+        db,
+        taskQueueTransactionStore,
+      }),
+      creativeAssetRepository: createCreativeAssetRepository({ db }),
+      mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
+      close,
+    }
+  } catch (error) {
+    void db.close()
+    throw error
+  }
 }
 
 export function createWorkerPersistenceRuntime(
-	options: CreateWorkerPersistenceRuntimeOptions,
+  options: CreateWorkerPersistenceRuntimeOptions,
 ): WorkerPersistenceRuntime {
-	const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax);
-	try {
-		const close = closeOnce(db);
-		const taskQueueTransactionStore = createTaskQueueTransactionStore();
-		return {
-			auditOutboxRepository: createAuditOutboxRepository({ db }),
-			creditLedger: createCreditLedger({ db }),
-			generationRepository: createGenerationRepository({ db, taskQueueTransactionStore }),
-			generationRecoveryRepository: createGenerationRecoveryRepository(db),
-			taskQueueRepository: createTaskQueueRepository({ db }),
-			providerRequestAuditRepository: createProviderRequestAuditRepository(db),
-			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
-			mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
-			close,
-		};
-	} catch (error) {
-		void db.close();
-		throw error;
-	}
+  const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)
+  try {
+    const close = closeOnce(db)
+    const taskQueueTransactionStore = createTaskQueueTransactionStore()
+    return {
+      auditOutboxRepository: createAuditOutboxRepository({ db }),
+      creditLedger: createCreditLedger({ db }),
+      generationRepository: createGenerationRepository({
+        db,
+        taskQueueTransactionStore,
+      }),
+      generationRecoveryRepository: createGenerationRecoveryRepository(db),
+      taskQueueRepository: createTaskQueueRepository({ db }),
+      assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
+      providerRequestAuditRepository: createProviderRequestAuditRepository(db),
+      directorRepository: createDirectorRepository({
+        db,
+        taskQueueTransactionStore,
+      }),
+      mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
+      close,
+    }
+  } catch (error) {
+    void db.close()
+    throw error
+  }
 }
 
 function withoutDatabaseRuntimeOptions(
-	options: CreateApiPersistenceRuntimeOptions,
-): Omit<CreateApiPersistenceRuntimeOptions, "databaseUrl" | "databasePoolMax"> {
-	const {
-		databaseUrl: _databaseUrl,
-		databasePoolMax: _databasePoolMax,
-		...authOptions
-	} = options;
-	return authOptions;
+  options: CreateApiPersistenceRuntimeOptions,
+): Omit<CreateApiPersistenceRuntimeOptions, 'databaseUrl' | 'databasePoolMax'> {
+  const {
+    databaseUrl: _databaseUrl,
+    databasePoolMax: _databasePoolMax,
+    ...authOptions
+  } = options
+  return authOptions
 }

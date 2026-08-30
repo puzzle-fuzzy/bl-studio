@@ -16,7 +16,11 @@ import { verifyBailianRuntime } from './bailian-runtime'
 import { readWorkerEnv } from './config'
 
 // 为编程式使用而重新导出。
-export { createTaskExecutor, type TaskProcessOutcome, type ModelRegistryLookup } from './task-executor'
+export {
+  createTaskExecutor,
+  type TaskProcessOutcome,
+  type ModelRegistryLookup,
+} from './task-executor'
 export type { TaskExecutor } from './task-executor'
 export {
   persistArtifactsForRecord,
@@ -58,23 +62,35 @@ export {
   type ProviderError,
   type ProviderRunner,
 } from './providers'
-export { DashScopeProviderRunner, type CreateDashScopeRunnerOptions } from './providers'
+export {
+  DashScopeProviderRunner,
+  type CreateDashScopeRunnerOptions,
+} from './providers'
 export { WorkerLoop, type WorkerLoopConfig } from './worker-loop'
-export { verifyBailianRuntime, type BailianRuntimeSnapshot } from './bailian-runtime'
+export {
+  verifyBailianRuntime,
+  type BailianRuntimeSnapshot,
+} from './bailian-runtime'
 export { readWorkerEnv, type WorkerEnv } from './config'
 
 async function main(): Promise<void> {
   const env = readWorkerEnv()
   const bailianRuntime = verifyBailianRuntime()
 
-  const persistence = createWorkerPersistenceRuntime({ databaseUrl: env.databaseUrl })
+  const persistence = createWorkerPersistenceRuntime({
+    databaseUrl: env.databaseUrl,
+  })
 
   const providerRegistry = createProviderRegistry({
     dashscope: {
       apiKey: env.dashscopeApiKey,
-      ...(env.bailianWorkspaceId === undefined ? {} : { workspaceId: env.bailianWorkspaceId }),
+      ...(env.bailianWorkspaceId === undefined
+        ? {}
+        : { workspaceId: env.bailianWorkspaceId }),
       errorLocale: env.errorLocale,
-      ...(env.dashscopeRequestTimeoutMs === undefined ? {} : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
+      ...(env.dashscopeRequestTimeoutMs === undefined
+        ? {}
+        : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
     },
   })
   const storage = createStorageFromEnv({ env: process.env })
@@ -84,6 +100,7 @@ async function main(): Promise<void> {
     repository: persistence.generationRepository,
     generationRecoveryRepository: persistence.generationRecoveryRepository,
     taskRepository: persistence.taskQueueRepository,
+    assetRepository: persistence.assetRepository,
     providerRequestAuditRepository: persistence.providerRequestAuditRepository,
     auditOutboxRepository: persistence.auditOutboxRepository,
     directorRepository: persistence.directorRepository,
@@ -94,28 +111,51 @@ async function main(): Promise<void> {
     mediaProcessor: createFfmpegMediaProcessor({
       ...(env.ffmpegPath === undefined ? {} : { ffmpegPath: env.ffmpegPath }),
     }),
-    lockDurationMs: env.workerLockDurationMs ?? Math.max(90_000, (env.dashscopeRequestTimeoutMs ?? 60_000) + 15_000),
-    ...(env.generationSubmitTimeoutMs === undefined ? {} : { generationSubmitTimeoutMs: env.generationSubmitTimeoutMs }),
-    ...(env.providerAsyncMaxDurationMs === undefined ? {} : { providerAsyncMaxDurationMs: env.providerAsyncMaxDurationMs }),
-    ...(env.artifactPersistTimeoutMs === undefined ? {} : { artifactPersistTimeoutMs: env.artifactPersistTimeoutMs }),
-    ...((env.artifactFetchMaxBytes === undefined
-      && env.artifactFetchTimeoutMs === undefined
-      && env.artifactFetchMaxRedirects === undefined
-      && env.artifactFetchAllowedHosts === undefined)
+    lockDurationMs:
+      env.workerLockDurationMs ??
+      Math.max(90_000, (env.dashscopeRequestTimeoutMs ?? 60_000) + 15_000),
+    ...(env.generationSubmitTimeoutMs === undefined
+      ? {}
+      : { generationSubmitTimeoutMs: env.generationSubmitTimeoutMs }),
+    ...(env.providerAsyncMaxDurationMs === undefined
+      ? {}
+      : { providerAsyncMaxDurationMs: env.providerAsyncMaxDurationMs }),
+    ...(env.artifactPersistTimeoutMs === undefined
+      ? {}
+      : { artifactPersistTimeoutMs: env.artifactPersistTimeoutMs }),
+    ...(env.artifactFetchMaxBytes === undefined &&
+    env.artifactFetchTimeoutMs === undefined &&
+    env.artifactFetchMaxRedirects === undefined &&
+    env.artifactFetchAllowedHosts === undefined
       ? {}
       : {
           artifactFetch: {
-            ...(env.artifactFetchMaxBytes === undefined ? {} : { maxBytes: env.artifactFetchMaxBytes }),
-            ...(env.artifactFetchTimeoutMs === undefined ? {} : { timeoutMs: env.artifactFetchTimeoutMs }),
-            ...(env.artifactFetchMaxRedirects === undefined ? {} : { maxRedirects: env.artifactFetchMaxRedirects }),
-            ...(env.artifactFetchAllowedHosts === undefined ? {} : { allowedHosts: env.artifactFetchAllowedHosts }),
+            ...(env.artifactFetchMaxBytes === undefined
+              ? {}
+              : { maxBytes: env.artifactFetchMaxBytes }),
+            ...(env.artifactFetchTimeoutMs === undefined
+              ? {}
+              : { timeoutMs: env.artifactFetchTimeoutMs }),
+            ...(env.artifactFetchMaxRedirects === undefined
+              ? {}
+              : { maxRedirects: env.artifactFetchMaxRedirects }),
+            ...(env.artifactFetchAllowedHosts === undefined
+              ? {}
+              : { allowedHosts: env.artifactFetchAllowedHosts }),
           },
         }),
-    ...(env.workerLockHeartbeatMs === undefined ? {} : { lockHeartbeatMs: env.workerLockHeartbeatMs }),
-    ...(env.workerHeartbeatIntervalMs === undefined ? {} : { workerHeartbeatIntervalMs: env.workerHeartbeatIntervalMs }),
+    ...(env.workerLockHeartbeatMs === undefined
+      ? {}
+      : { lockHeartbeatMs: env.workerLockHeartbeatMs }),
+    ...(env.workerHeartbeatIntervalMs === undefined
+      ? {}
+      : { workerHeartbeatIntervalMs: env.workerHeartbeatIntervalMs }),
     ...(env.workerStaleGenerationSweepIntervalMs === undefined
       ? {}
-      : { staleGenerationSweepIntervalMs: env.workerStaleGenerationSweepIntervalMs }),
+      : {
+          staleGenerationSweepIntervalMs:
+            env.workerStaleGenerationSweepIntervalMs,
+        }),
     pollIntervalMs: env.workerPollIntervalMs ?? 100,
     idleSleepMs: env.workerIdleSleepMs ?? 1000,
     // 导演流程在 worker 侧创建 generation，必须与 API 路径共用同一份每日限额，
@@ -135,7 +175,9 @@ async function main(): Promise<void> {
   process.on('SIGTERM', shutdown)
 
   try {
-    console.log(`[${env.workerId}] DashScope runtime: ${bailianRuntime.enabledModelCount}/${bailianRuntime.modelCount} models enabled`)
+    console.log(
+      `[${env.workerId}] DashScope runtime: ${bailianRuntime.enabledModelCount}/${bailianRuntime.modelCount} models enabled`,
+    )
     console.log(`[${env.workerId}] starting`)
     await loop.run()
     console.log(`[${env.workerId}] stopped`)
@@ -146,7 +188,10 @@ async function main(): Promise<void> {
 
 if (import.meta.main) {
   main().catch((error: unknown) => {
-    console.error('Worker failed to start:', error instanceof Error ? error.message : error)
+    console.error(
+      'Worker failed to start:',
+      error instanceof Error ? error.message : error,
+    )
     process.exit(1)
   })
 }

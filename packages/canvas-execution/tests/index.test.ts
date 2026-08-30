@@ -1,0 +1,140 @@
+import { describe, expect, it } from 'vitest'
+import { compileCanvasGraph, CanvasExecutionError } from '../src/index'
+import type { CanvasSnapshot } from '@bailian-studio/canvas-contracts'
+
+function snapshot(
+  nodes: CanvasSnapshot['nodes'],
+  edges: CanvasSnapshot['edges'] = [],
+): CanvasSnapshot {
+  return { nodes, edges }
+}
+
+function mediaNode(
+  id: string,
+  data: Record<string, unknown>,
+): CanvasSnapshot['nodes'][number] {
+  return {
+    id,
+    type: 'mediaNode',
+    position: { x: 0, y: 0 },
+    data: {
+      kind: 'image',
+      status: 'empty',
+      prompt: 'a cinematic scene',
+      modelId: 'qwen-image',
+      referenceAssetIds: [],
+      ...data,
+    },
+  }
+}
+
+function expectExecutionError(run: () => unknown, code: string): void {
+  try {
+    run()
+  } catch (error) {
+    expect(error).toMatchObject({ code })
+    return
+  }
+  throw new Error(`Expected ${code} to be thrown`)
+}
+
+describe('compileCanvasGraph', () => {
+  it('rejects an empty canvas instead of creating an unexecutable task', () => {
+    expectExecutionError(
+      () => compileCanvasGraph({ snapshot: snapshot([]) }),
+      'CANVAS_EXECUTION_INVALID_GRAPH',
+    )
+  })
+
+  it('compiles a deterministic DAG and binds upstream output to a media parameter', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot(
+        [
+          mediaNode('source', { prompt: 'a red fox', modelId: 'qwen-image' }),
+          mediaNode('video', {
+            kind: 'video',
+            modelId: 'wanx-2.7-image-to-video',
+            prompt: 'the fox runs',
+          }),
+        ],
+        [{ id: 'edge_1', source: 'source', target: 'video' }],
+      ),
+    })
+
+    expect(result.nodes.map((node) => node.nodeId)).toEqual(['source', 'video'])
+    expect(result.nodes[0]?.params).not.toHaveProperty('referenceAssetIds')
+    expect(result.nodes[1]).toMatchObject({
+      nodeId: 'video',
+      dependencyBindings: { firstFrame: ['source'] },
+      dependsOn: ['source'],
+    })
+    expect(JSON.stringify(result)).not.toContain('https://')
+  })
+
+  it('resolves static assets by kind and keeps them separate from dependencies', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot([
+        mediaNode('edit', {
+          modelId: 'qwen-image-edit',
+          referenceAssetIds: ['asset_image_1'],
+        }),
+      ]),
+      assetKinds: new Map([['asset_image_1', 'image']]),
+    })
+
+    expect(result.nodes[0]).toMatchObject({
+      assetRefs: { image: ['asset_image_1'] },
+    })
+  })
+
+  it('rejects cycles before creating an execution plan', () => {
+    expect(() =>
+      compileCanvasGraph({
+        snapshot: snapshot(
+          [mediaNode('a', {}), mediaNode('b', {})],
+          [
+            { id: 'ab', source: 'a', target: 'b' },
+            { id: 'ba', source: 'b', target: 'a' },
+          ],
+        ),
+      }),
+    ).toThrowError(
+      new CanvasExecutionError(
+        'CANVAS_EXECUTION_INVALID_GRAPH',
+        'Canvas graph contains a cycle and cannot be executed',
+      ),
+    )
+  })
+
+  it('rejects unsupported model and node combinations', () => {
+    expectExecutionError(
+      () =>
+        compileCanvasGraph({
+          snapshot: snapshot([mediaNode('bad', { modelId: 'not-a-model' })]),
+        }),
+      'CANVAS_EXECUTION_MODEL_NOT_FOUND',
+    )
+
+    expectExecutionError(
+      () =>
+        compileCanvasGraph({
+          snapshot: snapshot([
+            mediaNode('bad_kind', { kind: 'video', modelId: 'qwen-image' }),
+          ]),
+        }),
+      'CANVAS_EXECUTION_MODEL_KIND_MISMATCH',
+    )
+  })
+
+  it('requires the media input declared by an edit model', () => {
+    expectExecutionError(
+      () =>
+        compileCanvasGraph({
+          snapshot: snapshot([
+            mediaNode('edit', { modelId: 'qwen-image-edit' }),
+          ]),
+        }),
+      'CANVAS_EXECUTION_REQUIRED_INPUT_MISSING',
+    )
+  })
+})

@@ -36,12 +36,16 @@ describe("process persistence composition", () => {
 	it("creates one database handle per process runtime and closes it idempotently", () => {
 		expect(runtimeSource.match(/createDb\(/g)).toHaveLength(1);
 		expect(runtimeSource).toContain(
-		"const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)",
+			"const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax)",
 		);
 		expect(runtimeSource).toContain("function closeOnce(db: BailianStudioDb)");
 		expect(runtimeSource).toContain("const taskQueueTransactionStore = createTaskQueueTransactionStore()");
-		expect(runtimeSource).toContain("createGenerationRepository({ db, taskQueueTransactionStore })");
-		expect(runtimeSource).toContain("createDirectorRepository({ db, taskQueueTransactionStore })");
+		expect(runtimeSource).toMatch(
+			/createGenerationRepository\(\{\s*db,\s*taskQueueTransactionStore,?\s*\}\)/s,
+		);
+		expect(runtimeSource).toMatch(
+			/createDirectorRepository\(\{\s*db,\s*taskQueueTransactionStore,?\s*\}\)/s,
+		);
 		expect(runtimeSource).toContain("createCreativeAssetRepository({ db })");
 		expect(runtimeSource).toContain("createMediaRepository({ db, taskQueueTransactionStore })");
 		expect(runtimeSource).toMatch(
