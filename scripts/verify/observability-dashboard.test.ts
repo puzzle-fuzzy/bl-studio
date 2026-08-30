@@ -71,4 +71,22 @@ describe('Grafana observability dashboards', () => {
     expect(expressions).toContain('worker.metrics_snapshot')
     expect(expressions).toContain('unwrap')
   })
+
+  it('keeps the Canvas dashboard tied to stable Worker event fields', () => {
+    const dashboard = readDashboards().find(item => item.file === '05-canvas-operations.json')?.dashboard
+    expect(dashboard).toBeDefined()
+
+    const expressions = (dashboard?.panels ?? [])
+      .flatMap(panel => panel.targets ?? [])
+      .map(target => target.expr ?? '')
+      .join('\n')
+
+    expect(expressions).toContain('task.duration')
+    expect(expressions).toContain('taskType=\"canvas.execute\"')
+    expect(expressions).toContain('canvas.node_succeeded')
+    expect(expressions).toContain('canvas.node_failed')
+    expect(expressions).toContain('canvas.node_generation_queued')
+    expect(expressions).toContain('cacheHit')
+    expect(expressions).toContain('unwrap durationMs')
+  })
 })

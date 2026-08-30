@@ -42,4 +42,4 @@ Worker 已接入一组最小进程内指标，作为后续 Prometheus/Loki 接�
 | `worker.audit_outbox.drain` | `status=completed/error` | 一轮消费是否完成；数据库异常不会打断 generation 消费 |
 | `worker.audit_outbox.drain_ms` | `status=completed/error` | 一轮 claim + 投递的耗时汇总 |
 
-这些指标当前随 Worker 的 `metricsSnapshot()` 和结构化日志存在于进程内，重启后清零；Grafana 的 `审计 Outbox 运营` 仪表盘通过现有 Alloy → Loki 链路读取快照，因此不新增 Prometheus 或独立持久化指标服务。推荐告警门槛为：终态失败量 > 0 立即告警；连续 5 分钟 `drain{status=error}` > 0 告警；`drain_ms` 的 max 超过 5 秒持续 10 分钟告警。若部署侧未来需要 p95，应在外部 exporter 侧使用 histogram，而不是从当前 summary 反推。当前 `audit_event_outbox` 已有并发 claim、幂等投递、租约恢复、指数退避、管理员人工重放和 Grafana 运营视图；后续再根据实际告警噪声决定是否引入专门的指标存储。
+这些指标当前随 Worker 的 `metricsSnapshot()` 和结构化日志存在于进程内，重启后清零；Grafana 的 `审计 Outbox 运营` 仪表盘通过现有 Alloy → Loki 链路读取快照，因此不新增 Prometheus 或独立持久化指标服务。推荐告警门槛为：终态失败量 > 0 立即告警；连续 5 分钟 `drain{status=error}` > 0 告警；`drain_ms` 的 max 超过 5 秒持续 10 分钟告警。若部署侧未来需要 p95，应在外部 exporter 侧使用 histogram，而不是从当前 summary 反推。当前 `audit_event_outbox` 已有并发 claim、幂等投递、租约恢复、指数退避、管理员人工重放和 Grafana 运营视图；Canvas 也通过同一条 Alloy → Loki 链路提供独立的执行结果、耗时、节点失败和缓存命中仪表盘；后续再根据实际告警噪声决定是否引入专门的指标存储。

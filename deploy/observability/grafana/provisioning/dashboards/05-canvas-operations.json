@@ -1,0 +1,175 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (outcome) (count_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | msg=\"task.duration\" | taskType=\"canvas.execute\" [$__auto]))",
+          "legendFormat": "{{outcome}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Canvas 执行结果",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": { "defaults": { "unit": "ms" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["last", "mean"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "avg_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | msg=\"task.duration\" | taskType=\"canvas.execute\" | unwrap durationMs | __error__=\"\" [$__auto])",
+          "legendFormat": "平均耗时",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "max_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | msg=\"task.duration\" | taskType=\"canvas.execute\" | unwrap durationMs | __error__=\"\" [$__auto])",
+          "legendFormat": "最大耗时",
+          "refId": "B"
+        }
+      ],
+      "title": "Canvas 执行耗时",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (msg) (count_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | (msg=\"canvas.node_succeeded\" or msg=\"canvas.node_failed\") [$__auto]))",
+          "legendFormat": "{{msg}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Canvas 节点结果",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (errorCode) (count_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | msg=\"canvas.node_failed\" [$__auto]))",
+          "legendFormat": "{{errorCode}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Canvas 节点失败原因",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 16 },
+      "id": 5,
+      "options": {
+        "legend": { "calcs": ["sum"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (cacheHit) (count_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | msg=\"canvas.node_generation_queued\" [$__auto]))",
+          "legendFormat": "cacheHit={{cacheHit}}",
+          "refId": "A"
+        }
+      ],
+      "title": "Canvas 节点缓存命中/未命中",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 16 },
+      "id": 6,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "preferVisualisationType": "logs",
+        "showCommonLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "{compose_project=\"bailian-studio-prod\",container=~\"$container\"} | json | (msg=\"canvas.node_failed\" or (msg=\"task.duration\" and taskType=\"canvas.execute\"))",
+          "refId": "A"
+        }
+      ],
+      "title": "Canvas 失败与耗时明细",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["bailian-studio", "canvas"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "lokiuid" },
+        "definition": "label_values(container)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Worker",
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": { "query": "label_values(container)", "refId": "container-var" },
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "Canvas 运营",
+  "uid": "bailian-canvas-operations",
+  "version": 1
+}
