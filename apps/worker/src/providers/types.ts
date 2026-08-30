@@ -6,7 +6,7 @@
  * 让 provider 层无需不安全的类型断言即可与 task-engine、generation-repository 组合。
  */
 
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { NormalizedOutput } from '@bailian-studio/provider-dashscope'
 import type { TaskErrorCategory } from '@bailian-studio/task-engine'
 

@@ -6,8 +6,9 @@ import {
   assertModelManifestConsistent,
   assertUniqueModelIds,
   MODEL_REGISTRY,
+  type FrozenModelManifest,
 } from '@bailian-studio/dashscope-manifests'
-import { validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
+import { validateModelParams } from '@bailian-studio/model-core'
 
 export interface ModelManifestCheckSummary {
   readonly registeredModels: number

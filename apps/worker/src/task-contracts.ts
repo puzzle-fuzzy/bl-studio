@@ -1,5 +1,5 @@
 import type { NormalizedGenerationOutput } from '@bailian-studio/generation-repository'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { TaskError } from '@bailian-studio/task-engine'
 
 /** Task executor 对模型目录唯一需要的只读查询能力。 */

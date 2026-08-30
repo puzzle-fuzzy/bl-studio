@@ -7,7 +7,8 @@
  */
 
 import { MODEL_REGISTRY } from './registry'
-import type { FrozenModelManifest, ModelTaskMode } from '@bailian-studio/model-core'
+import type { ModelTaskMode } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from './types'
 
 export type BailianOperationCapability =
   | 'text.chat'

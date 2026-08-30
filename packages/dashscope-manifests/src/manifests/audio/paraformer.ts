@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 /**
  * paraformer-v1 模型 manifest（provider: dashscope，category: audio）。

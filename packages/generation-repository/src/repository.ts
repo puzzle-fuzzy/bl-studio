@@ -55,15 +55,13 @@ import {
 } from "@bailian-studio/db";
 import {
 	estimateModelCost,
-	type FrozenModelManifest,
 	getModelAuditMetadata,
 	type ModelCategory,
-	type ModelManifest,
 	type ModelValidationRule,
-	type ProviderTransport,
 	validateModelParams,
 } from "@bailian-studio/model-core";
-import { getModelById } from "@bailian-studio/dashscope-manifests";
+import { getModelById, type FrozenModelManifest, type ModelManifest } from "@bailian-studio/dashscope-manifests";
+import type { ProviderTransport } from "@bailian-studio/dashscope-manifests";
 import type { TaskError, TaskRecord } from "@bailian-studio/task-engine";
 import {
 	type TaskQueueTransactionStore,

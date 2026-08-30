@@ -11,8 +11,8 @@ import {
   calculateUsageCostCents,
   calculateUsagePriceCents,
   validateModelParams,
-  type FrozenModelManifest,
 } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import {
   createDashScopeClient,
   DashScopeHttpError,

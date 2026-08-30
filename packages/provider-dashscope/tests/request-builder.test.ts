@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { getModelById } from '@bailian-studio/dashscope-manifests'
 import { validateModelParams } from '@bailian-studio/model-core'
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '@bailian-studio/dashscope-manifests'
 import { buildDashScopeRequest } from '../src/request-builder'
 
 const asyncVideoManifest: ModelManifest = {

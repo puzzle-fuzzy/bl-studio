@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 /**
  * Vidu 视频系列 manifest（provider: dashscope，category: video）。

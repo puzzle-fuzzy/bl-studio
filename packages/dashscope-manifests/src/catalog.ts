@@ -3,7 +3,8 @@ import {
   type BailianOperationCapability,
 } from './bailian-operations'
 import { MODEL_REGISTRY } from './registry'
-import type { FrozenModelManifest, ReferenceFormat } from '@bailian-studio/model-core'
+import type { ReferenceFormat } from './contracts'
+import type { FrozenModelManifest } from './types'
 
 export type ModelCatalogItem = FrozenModelManifest & Readonly<{
   operation: BailianOperationCapability

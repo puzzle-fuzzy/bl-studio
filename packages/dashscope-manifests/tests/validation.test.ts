@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { validateModelParams, type ModelManifest } from '@bailian-studio/model-core'
+import { validateModelParams } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../src/types'
 import { getModelById, MODEL_REGISTRY } from '../src'
 
 const manifest: ModelManifest = {

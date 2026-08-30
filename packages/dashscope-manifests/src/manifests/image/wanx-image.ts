@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 /**
  * 万相 2.7 图像系列 manifest（provider: dashscope，category: image）。

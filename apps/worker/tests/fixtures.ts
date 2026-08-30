@@ -60,7 +60,7 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { RenewTaskLockInput, SaveTaskOptions } from '@bailian-studio/task-repository'
 import { getModelById } from '@bailian-studio/dashscope-manifests'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { NormalizedOutput } from '@bailian-studio/provider-dashscope'
 import type { Logger } from '@bailian-studio/shared'
 import type { StorageAdapter, StorageReadInput, StorageReadUrlInput, StorageReadResult, StorageWriteInput, StorageWriteResult } from '@bailian-studio/storage'

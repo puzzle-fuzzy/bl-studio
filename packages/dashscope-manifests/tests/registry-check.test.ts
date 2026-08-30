@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelManifest, ModelValidationRule } from '@bailian-studio/model-core'
+import type { ModelValidationRule } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../src/types'
 import { assertModelManifestConsistent, assertUniqueModelIds } from '../src'
 
 function manifest(overrides: Partial<ModelManifest> = {}): ModelManifest {

@@ -61,7 +61,7 @@ Worker 与前端各自维护不同的 wire schema。
 
 ### packages/dashscope-manifests（DashScope 模型知识 owner）
 - **拥有**：51 份 DashScope/Bailian manifest（39 启用 / 12 个 vidu 暂未开通）、注册表深冻结、catalog 投影、Bailian operation requirement map、一致性门禁，以及 DashScope response/status 纯函数。
-- **依赖方向**：只能依赖 `model-core`；不依赖 provider 执行器、数据库或应用。Provider-specific 的 request/transport 类型仍暂放在 `model-core` 作为兼容层，后续 P1-G 第二阶段再继续收敛。
+- **依赖方向**：只能依赖 `model-core`；不依赖 provider 执行器、数据库或应用。DashScope 的 request/output/transport mapping types 与 response/status 校验均由本包拥有。
 - **可用性语义**：`MODEL_REGISTRY` 含全部 manifest；`listModels()` / `getModelById()` 只返回 `enabled: true`；`listModelCatalogItems()` 投影全部（含禁用项，前端置灰展示）。
 - 改模型知识 = 改此包的 manifest，跑 `bun run check:manifests`。
 

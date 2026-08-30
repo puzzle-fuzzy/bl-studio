@@ -13,11 +13,11 @@
 import {
   ModelCoreError,
   validateModelParams,
-  type FrozenModelManifest,
   type ParameterValidationIssue,
 } from '@bailian-studio/model-core'
 import {
   assertResponseShape,
+  type FrozenModelManifest,
   type ResponseShapeIssue,
 } from '@bailian-studio/dashscope-manifests'
 import { classifyDashScopeError } from './errors'

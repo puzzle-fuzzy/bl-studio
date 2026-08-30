@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 export const qwenOmniScreenplay: ModelManifest = {
   id: 'qwen-omni-screenplay',

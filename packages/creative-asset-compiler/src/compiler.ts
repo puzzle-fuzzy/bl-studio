@@ -1,10 +1,12 @@
 import {
   getModelAuditMetadata,
   validateModelParams,
-  type FrozenModelManifest,
-  type ParameterBinding,
-  type ReferenceFormat,
 } from '@bailian-studio/model-core'
+import type {
+  FrozenModelManifest,
+  ParameterBinding,
+  ReferenceFormat,
+} from '@bailian-studio/dashscope-manifests'
 import {
   CREATIVE_ASSET_PROTOCOL_VERSION,
   CreativeGenerationContextSchema,

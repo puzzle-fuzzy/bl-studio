@@ -1,10 +1,12 @@
 import type {
   FrozenModelManifestContract,
   ModelManifestContract,
+} from '@bailian-studio/model-core'
+import type {
   ProviderOutputMapping,
   ProviderRequestMapping,
   ProviderTransport,
-} from '@bailian-studio/model-core'
+} from './contracts'
 
 /** DashScope manifest 的 provider-specific 组合类型。 */
 export type DashScopeModelManifest = ModelManifestContract<
@@ -21,3 +23,7 @@ export type FrozenDashScopeModelManifest = FrozenModelManifestContract<
   ProviderOutputMapping,
   ProviderTransport
 >
+
+/** Short aliases for code that is entirely scoped to the DashScope catalog. */
+export type ModelManifest = DashScopeModelManifest
+export type FrozenModelManifest = FrozenDashScopeModelManifest

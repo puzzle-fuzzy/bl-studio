@@ -18,7 +18,8 @@
  */
 
 import { assertModelManifestConsistent, assertUniqueModelIds } from './registry-check'
-import type { DeepReadonly, FrozenModelManifest } from '@bailian-studio/model-core'
+import type { DeepReadonly } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from './types'
 import { qwenImage } from './manifests/image/qwen-image'
 import { qwenImage2Pro, qwenImageMax, qwenImage2 } from './manifests/image/qwen-image-2'
 import { wanx27ImagePro, wanx27Image } from './manifests/image/wanx-image'
@@ -40,7 +41,7 @@ import { paraformerV1 } from './manifests/audio/paraformer'
 import { qwenOmniScreenplay } from './manifests/video/qwen-omni-screenplay'
 import { qwenOmniScreenplayFlash } from './manifests/video/qwen-omni-screenplay-flash'
 
-export type { FrozenModelManifest } from '@bailian-studio/model-core'
+export type { FrozenModelManifest } from './types'
 
 /**
  * 递归 Object.freeze。seen 集合用于防循环引用——manifest 理论上是纯数据无环，

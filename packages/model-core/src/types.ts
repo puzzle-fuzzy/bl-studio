@@ -2,28 +2,25 @@
  * manifest 驱动架构的核心类型定义。
  *
  * 整个 Bailian Studio 系统对"一个 provider 模型"的全部认知，都来自 ModelManifest 这一份
- * 声明式描述：能力（capabilities）、强类型参数（parameters）、如何把参数分发到
- * provider 请求体（ProviderRequestMapping 的 ParameterBinding bindings，决定字段
- * 落到 input.prompt / input.media / parameters.xxx 等哪个位置）、如何把 provider
- * 响应归一化为 artifact（ProviderOutputMapping）、定价（PricingRule）、以及 provider
- * 传输契约（ProviderTransport：提交/轮询端点、状态值、请求头）与跨字段校验规则
- * （ModelValidationRule）。
+ * 声明式描述：能力（capabilities）、强类型参数（parameters）、定价（PricingRule）
+ * 与跨字段校验规则（ModelValidationRule）。provider 请求、响应与传输的具体形态
+ * 由 provider manifest 包通过泛型注入。
  *
  * 设计意图：把"模型知识"从"调用 provider 的代码"中彻底抽离。DashScope provider 包
  * 的 buildDashScopeRequest 读取 manifest 的 bindings 决定每个字段落到请求体的哪个
- * 位置；transport 决定提交到哪个端点、如何轮询任务状态；rules 承载 provider 的
- * 跨字段约束。因此【添加一个新模型参数 = 在 manifest 中新增一条 ParameterBinding】、
+ * 位置；rules 承载跨字段约束。因此【添加一个新模型参数 = 在 provider manifest
+ * 中新增一条 binding】、
  * 【新增一个新模型 = 新增一份 manifest 条目并注册】、【官网文档变更 = 改 manifest
  * 数据】，provider 代码无需改动。
  *
  * 本文件是 model-core 的契约层（纯类型，零运行时代码）。model-core 是近 leaf 包——
  * 仅依赖 @bailian-studio/shared，绝不依赖 DB / provider runner / service。下游所有包
- * （task-engine、generation-repository、api、worker、provider-dashscope）都通过
+ * （task-engine、generation-repository、api、worker、provider-dashscope）通过
  * 这些类型与 manifest 交互。
  */
 
-/** 模型所属 provider。当前仅 DashScope（百炼 / Bailian）一家。 */
-export type ModelProvider = 'dashscope'
+/** 模型所属 provider。具体 provider 包可通过 ModelManifestContract 收窄该字符串。 */
+export type ModelProvider = string
 
 /** 模型产出大类：图像 / 视频 / 音频 / 文本。决定 UI 分组与 artifact 解析路径。 */
 export type ModelCategory = 'image' | 'video' | 'audio' | 'text'
@@ -35,14 +32,6 @@ export type ModelCategory = 'image' | 'video' | 'audio' | 'text'
  *  - stream：SSE 流式返回（部分 chat 模型）
  */
 export type ModelTaskMode = 'sync' | 'provider_async' | 'stream'
-
-/**
- * 模型在 prompt 中引用参考图时使用的占位符格式。
- *  - 'angle-bracket'（默认）: <<<image_1>>>
- *  - 'image-bracket': [Image 1]
- *  - 'chinese': 图1
- */
-export type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
 
 /**
  * 模型对外声明的能力集合。UI 据此决定暴露哪些输入控件（如 negative_prompt、
@@ -103,7 +92,7 @@ export interface ParameterConditionalConstraint {
 /**
  * 模型参数的声明式定义。
  *
- * 关键约束：name 同时是 ProviderRequestMapping.bindings 与 PricingRule.quantityKey
+ * 关键约束：name 同时是 provider manifest bindings 与 PricingRule.quantityKey
  * 引用该参数的 key，三者通过 name 串联。required / defaultValue / options / min /
  * max / maxLength 既驱动 validation.ts 的校验，也驱动 UI 的控件渲染。
  */
@@ -239,6 +228,7 @@ export type ModelValidationRule =
  * model-core 的通用契约不再要求所有 provider 共享 DashScope 的请求联合。
  */
 export interface ProviderRequestContract {
+  readonly [key: string]: unknown
   kind: string
   endpoint: string
   bindings: Readonly<Record<string, unknown>>
@@ -246,72 +236,16 @@ export interface ProviderRequestContract {
 
 /** Provider 输出描述的最小公共形状。 */
 export interface ProviderOutputContract {
+  readonly [key: string]: unknown
   kind: string
 }
 
 /** Provider 传输描述的最小公共形状。 */
 export interface ProviderTransportContract {
+  readonly [key: string]: unknown
   mode: string
   submit: unknown
 }
-
-/**
- * ParameterBinding —— manifest 驱动机制的核心。
- *
- * 描述 manifest 中的某个参数（由 ProviderRequestMapping.bindings 的 key 索引）
- * 应当被 provider 请求构建器（DashScope provider 包的 buildDashScopeRequest）
- * 分发到 DashScope 请求体的哪个位置。target 取值决定落点：
- *  - 'input.prompt'             → 写入 body.input.prompt
- *  - 'input.media' + mediaType   → 写入 body.input.media 数组并附带该 mediaType
- *  - 'input.field' + field       → 写入 body.input.<field>（如 neg_prompt）
- *  - 'parameters.field' + field  → 写入 body.parameters.<field>（field 省略时用参数名）
- *  - 'ui.only'                   → 仅前端 UI 使用，不进入 provider 请求
- *
- * 这正是"新增参数无需改 provider 代码"的底层支撑——provider 代码只按 target 分发，
- * 具体有哪些参数完全由 manifest 决定。
- */
-export type ParameterBinding =
-  | { target: 'input.prompt' }
-  | { target: 'input.media'; mediaType: string }
-  | { target: 'input.field'; field: string; wrapInArray?: boolean }
-  | { target: 'parameters.field'; field?: string; wrapInArray?: boolean }
-  | { target: 'ui.only' }
-
-/**
- * 描述如何向 DashScope 构建请求：endpoint、bindings，以及 kind 决定的请求体形态。
- *
- * kind 取值对应不同的请求体结构，由 DashScope provider 包的
- * buildDashScopeRequest 分发处理：
- *  - dashscope-chat：chat completions 风格（prompt 走 messages，可选 stream）
- *  - dashscope-image-message：图像生成（多图，参数走 messages 结构）
- *  - dashscope-image-flat：图像生成（参数扁平落到 input/parameters）
- *  - dashscope-video-task：异步视频任务（mediaMode 决定 media 数组形态）
- *  - dashscope-audio-task：异步音频任务
- *
- * bindings 把 manifest 参数映射到上述请求体的具体位置（见 ParameterBinding）。
- */
-export type ProviderRequestMapping =
-  | { kind: 'dashscope-chat'; endpoint: string; promptParam: string; stream?: boolean; bindings: Record<string, ParameterBinding> }
-  | { kind: 'dashscope-image-message'; endpoint: string; bindings: Record<string, ParameterBinding> }
-  | { kind: 'dashscope-image-flat'; endpoint: string; bindings: Record<string, ParameterBinding> }
-  | { kind: 'dashscope-video-task'; endpoint: string; mediaMode: 'none' | 'single' | 'multi'; bindings: Record<string, ParameterBinding>; referenceFormat?: ReferenceFormat }
-  | { kind: 'dashscope-audio-task'; endpoint: string; bindings: Record<string, ParameterBinding> }
-
-/**
- * 描述如何把 provider 响应归一化为 artifact。kind 决定解析路径：
- *  - images-from-message-content：从 chat message content 提取图像 URL
- *  - video-url：从 output.video_url 取视频地址
- *  - audio-url：从 output.audio.url 取音频地址
- *  - text：从 output.text 取文本
- *  - custom：由 extractor 命名一个自定义解析器
- */
-export type ProviderOutputMapping =
-  | { kind: 'images-from-message-content' }
-  | { kind: 'video-url'; path: 'output.video_url' }
-  | { kind: 'audio-url'; path: 'output.audio.url' }
-  | { kind: 'text'; path: 'output.text' | 'output.choices.0.message.content' }
-  | { kind: 'asr-transcription' }
-  | { kind: 'custom'; extractor: string }
 
 /** 定价计费单位：按图 / 按秒（视频时长）/ 按 token（文本）。 */
 export type PricingUnit = 'per_image' | 'per_second' | 'per_token'
@@ -358,67 +292,10 @@ export interface PricingRule {
 }
 
 /**
- * provider 传输契约 —— 提交/轮询/流式端点与请求头。
- *
- * 由 bailian-hub 契约 transports[] 并入，是"如何调用 provider"的唯一来源。
- * endpointTemplate 使用 `{WorkspaceId}` 占位符，运行时按工作区 ID 替换。
- * 请求头中 value 缺省表示由运行时注入（如 Authorization 签名头）。
- */
-export interface ProviderTransportHeader {
-  name: string
-  /** 固定值（如 Content-Type: application/json、X-DashScope-Async: enable）；缺省 = 运行时注入。 */
-  value?: string
-}
-
-/** 异步任务提交端点。 */
-export interface ProviderSubmitTransport {
-  method: 'POST'
-  /** 完整端点模板（含协议与 {WorkspaceId} 占位符），运行时解析为实际 URL。 */
-  endpointTemplate: string
-  /** 请求体中模型名的 JSON pointer（DashScope 各模型均为 /model）。 */
-  modelFieldPath: string
-  headers: ProviderTransportHeader[]
-}
-
-/** 异步任务轮询端点。 */
-export interface ProviderPollingTransport {
-  method: 'GET'
-  endpointTemplate: string
-  headers: ProviderTransportHeader[]
-  /** 提交响应中任务 ID 的 JSON pointer。 */
-  taskIdPath: string
-  /** 轮询响应中任务状态的 JSON pointer。 */
-  statusPath: string
-  /** 判定任务成功的状态值集合。 */
-  succeededValues: string[]
-  /** 判定任务失败的状态值集合。 */
-  failedValues: string[]
-}
-
-/** 流式响应的传输形态。 */
-export interface ProviderStreamingTransport {
-  /** 期望的响应 Content-Type。 */
-  contentTypes: string[]
-  framing: 'sse'
-  /** 流式请求头（如 X-DashScope-SSE: enable）。 */
-  headers: ProviderTransportHeader[]
-}
-
-/**
- * provider 传输契约。mode 与 manifest.taskMode 对齐（registry-check 强制一致）；
- * sync 模型可额外声明 stream 段表示支持流式输出。
- */
-export type ProviderTransport =
-  | { mode: 'provider_async'; submit: ProviderSubmitTransport; polling: ProviderPollingTransport }
-  | { mode: 'sync'; submit: ProviderSubmitTransport; stream?: ProviderStreamingTransport }
-  | { mode: 'stream'; submit: ProviderSubmitTransport; stream: ProviderStreamingTransport }
-
-/**
  * Provider-neutral model manifest contract。
  *
  * provider-specific request/output/transport 描述通过泛型注入，因而第二个 provider
- * 可以定义自己的 discriminated union，而不需要修改 model-core 的公共契约。当前
- * `ModelManifest` 仍是 DashScope 兼容别名，给既有调用方保留平滑迁移路径。
+ * 可以定义自己的 discriminated union，而不需要修改 model-core 的公共契约。
  */
 export interface ModelManifestContract<
   TProvider extends string = string,
@@ -467,13 +344,8 @@ export interface ModelManifestContract<
   sourceRefs?: ModelManifestSourceRefs
 }
 
-/** 当前 DashScope 目录使用的向后兼容 manifest 类型。 */
-export type ModelManifest = ModelManifestContract<
-  ModelProvider,
-  ProviderRequestMapping,
-  ProviderOutputMapping,
-  ProviderTransport
->
+/** Provider-neutral manifest projection used by shared model-core utilities. */
+export type ModelManifest = ModelManifestContract
 
 /** manifest 的参数校验样例集。 */
 export interface ModelManifestExamples {

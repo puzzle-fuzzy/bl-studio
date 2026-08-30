@@ -7,7 +7,8 @@
  * input.<field>、parameters.<field>、input.media 等）。`async` 标志依据 manifest
  * 的 taskMode 决定是否启用异步提交模式。
  */
-import type { DeepReadonly, FrozenModelManifest, ParameterBinding } from '@bailian-studio/model-core'
+import type { DeepReadonly } from '@bailian-studio/model-core'
+import type { FrozenModelManifest, ParameterBinding } from '@bailian-studio/dashscope-manifests'
 
 /**
  * 构建出的 DashScope 请求：endpoint（相对 /api/v1 的路径）+ 请求体 + 是否异步。

@@ -13,7 +13,7 @@
 import type {
   FrozenModelManifest,
   ProviderTransportHeader,
-} from '@bailian-studio/model-core'
+} from '@bailian-studio/dashscope-manifests'
 import { ModelCoreError } from '@bailian-studio/model-core'
 
 /** 深只读的 async transport polling 段（manifest 冻结后形态）。 */

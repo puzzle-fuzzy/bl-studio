@@ -1,4 +1,5 @@
-import { validateModelParams, type FrozenModelManifest, type ReferenceFormat } from '@bailian-studio/model-core'
+import { validateModelParams } from '@bailian-studio/model-core'
+import type { FrozenModelManifest, ReferenceFormat } from '@bailian-studio/dashscope-manifests'
 import type { DirectorAsset, DirectorShot } from '@bailian-studio/director-contracts'
 
 const REFERENCE_ASSET_KINDS = new Set<DirectorAsset['kind']>([

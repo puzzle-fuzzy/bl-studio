@@ -11,7 +11,7 @@
  * 所有 HTTP 层异常（网络错误、非 2xx）都被包装成 DashScopeHttpError，错误信息经
  * classifyDashScopeError 归一分类，供 worker 决定重试或判失败。
  */
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import { classifyTaskStatus } from '@bailian-studio/dashscope-manifests'
 import { classifyDashScopeError, type ProviderErrorInfo } from './errors'
 import {

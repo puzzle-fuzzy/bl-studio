@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 /**
  * wanx-text-to-video 模型 manifest（provider: dashscope，category: video）。

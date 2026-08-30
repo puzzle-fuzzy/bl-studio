@@ -3,7 +3,7 @@
  * 持有 provider runner 实例，并按 provider id 分发执行。
  */
 
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { ProviderRunner } from './types'
 import { DashScopeProviderRunner, type CreateDashScopeRunnerOptions } from './dashscope-runner'
 

@@ -7,7 +7,7 @@ import {
   qwenImage,
   wanxTextToVideo,
 } from '@bailian-studio/dashscope-manifests'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import {
   DashScopeHttpError,
   createDashScopeClient as createRawDashScopeClient,

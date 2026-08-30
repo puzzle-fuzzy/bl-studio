@@ -9,7 +9,7 @@
  *
  * 无 polling transport 的模型（sync/stream）不会走到这里；防御性返回 'pending'。
  */
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from './types'
 
 export type TaskLifecycle = 'pending' | 'succeeded' | 'failed'
 

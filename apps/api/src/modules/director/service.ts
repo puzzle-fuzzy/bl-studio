@@ -12,9 +12,12 @@ import { DirectorRepositoryError, type DirectorProjectRepositoryDetail, type Dir
 import {
   estimatePriceCents,
   validateModelParams,
-  type FrozenModelManifest,
 } from '@bailian-studio/model-core'
-import { getBailianOperationCapability, getModelById } from '@bailian-studio/dashscope-manifests'
+import {
+  getBailianOperationCapability,
+  getModelById,
+  type FrozenModelManifest,
+} from '@bailian-studio/dashscope-manifests'
 
 export interface DirectorApplicationService {
   requestScriptChat(input: {

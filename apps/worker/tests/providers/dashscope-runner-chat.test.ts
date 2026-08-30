@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest'
 import { DashScopeProviderRunner } from '../../src/providers/dashscope-runner'
 import type { DashScopeClient } from '@bailian-studio/provider-dashscope'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 
 function createMockClient(overrides?: Partial<DashScopeClient>): DashScopeClient {
   return {

@@ -1,4 +1,4 @@
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 interface DeepSeekV4Options {
   id: 'deepseek-v4-pro' | 'deepseek-v4-flash'

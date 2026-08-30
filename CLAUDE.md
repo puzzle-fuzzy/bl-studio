@@ -70,7 +70,7 @@ Windows 开发使用 PowerShell 即可运行安装、数据库、typecheck 和�
 | 包 | 职责 |
 |---|---|
 | shared | 通用基础：logger（敏感 key 脱敏）、metrics、错误基类、运行时校验；仅依赖 creative-asset-contracts |
-| model-core | provider-neutral 模型契约 + 纯函数校验/定价/状态分类（前后端共享） |
+| model-core | provider-neutral 模型契约 + 纯函数校验/定价（前后端共享） |
 | dashscope-manifests | DashScope 51 个 manifest（39 启用 / 12 个 vidu 暂未开通；深冻结）+ registry/catalog/一致性门禁 |
 | sse-protocol | SSE 事件类型与 `encodeSSE` |
 | db | Drizzle schema + outbox NOTIFY 触发器 |

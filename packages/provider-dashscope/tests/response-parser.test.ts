@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '@bailian-studio/dashscope-manifests'
 import { parseDashScopeOutput } from '../src/response-parser'
 
 const baseManifest: ModelManifest = {

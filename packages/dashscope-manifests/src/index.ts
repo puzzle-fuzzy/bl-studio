@@ -25,7 +25,20 @@ export {
 export type {
   DashScopeModelManifest,
   FrozenDashScopeModelManifest,
+  FrozenModelManifest,
+  ModelManifest,
 } from './types'
+export type {
+  ParameterBinding,
+  ProviderOutputMapping,
+  ProviderPollingTransport,
+  ProviderRequestMapping,
+  ProviderStreamingTransport,
+  ProviderSubmitTransport,
+  ProviderTransport,
+  ProviderTransportHeader,
+  ReferenceFormat,
+} from './contracts'
 
 export { qwenImage } from './manifests/image/qwen-image'
 export { qwenImage2Pro, qwenImageMax, qwenImage2 } from './manifests/image/qwen-image-2'
@@ -45,5 +58,3 @@ export { deepseekV4Pro, deepseekV4Flash } from './manifests/text/deepseek-v4'
 export { funMusicV1 } from './manifests/audio/fun-music'
 export { funAsrV1 } from './manifests/audio/fun-asr'
 export { paraformerV1 } from './manifests/audio/paraformer'
-
-export type { FrozenModelManifest } from '@bailian-studio/model-core'

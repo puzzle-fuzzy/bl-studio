@@ -1,5 +1,5 @@
 import type { GenerationInputAsset } from '@bailian-studio/generation-repository'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { ProviderErrorInfo } from '@bailian-studio/provider-dashscope'
 import type { StorageAdapter } from '@bailian-studio/storage'
 

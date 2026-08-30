@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import { buildChatRequest } from '../src/chat-builder'
 
 // 测试用的 manifest stub（P1-37：必须带 screenplay capability 才能进入剧本流传输）

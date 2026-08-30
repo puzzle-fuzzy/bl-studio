@@ -6,7 +6,7 @@
  * ProviderOutputMapping.kind，从原始响应里按对应策略取出 url/text，统一包装为
  * NormalizedArtifact，把 provider 特有的结构差异屏蔽在此处。
  */
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 
 /**
  * 归一化后的单个产出物。kind 标明媒体类型，sourceUrl/text 二者按产出形态提供其一。

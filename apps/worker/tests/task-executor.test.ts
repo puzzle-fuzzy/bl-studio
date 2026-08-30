@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { GenerationInputAsset, GenerationRecord } from '@bailian-studio/generation-repository'
 import { getModelById } from '@bailian-studio/dashscope-manifests'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import { MetricsCollector } from '@bailian-studio/shared'
 import type { TaskError } from '@bailian-studio/task-engine'
 import { createTaskExecutor, type TaskProcessOutcome } from '../src/task-executor'

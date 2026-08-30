@@ -1,4 +1,4 @@
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 
 export interface ChatRequest {
   model: string

@@ -11,12 +11,12 @@
 
 import type {
   DeepReadonly,
-  FrozenModelManifest,
   ModelRuleCondition,
   ModelValidationRule,
   ParameterIssueCode,
 } from '@bailian-studio/model-core'
 import { isNumberStepAligned, modelValuesEqual } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from './types'
 
 /**
  * rule.code 白名单（P2-12）：与 ParameterIssueCode 联合一致。类型层已保证

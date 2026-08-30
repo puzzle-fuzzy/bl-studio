@@ -12,7 +12,7 @@ This package is the protocol execution layer. It owns request construction, HTTP
 - Never deep-import `packages/*/src/*`.
 - Do not depend on DB, repositories, task-engine, sse-protocol, API, Worker, apps, Elysia, or React.
 - Manifest is the single source of truth: endpoint templates, status values, headers, pricing, and parameter constraints all come from the manifest. Do not create parallel tables here.
-- Transport target resolution (`resolveSubmit/Poll/CancelTarget`) and trusted-host assertion live in this package; product defaults and capability classification stay in `model-core`.
+- Transport target resolution (`resolveSubmit/Poll/CancelTarget`) and trusted-host assertion live in this package; product defaults stay in `model-core`, while provider contract/status classification stays in `dashscope-manifests`.
 - Business retries, task terminal decisions, persistence, and final cost writes stay in Worker/Repository.
 - Keep transport injectable for tests. Never send credentials to a URL that has not passed trusted-target validation.
 

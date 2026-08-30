@@ -1,4 +1,4 @@
-import type { ProviderTransportHeader } from '@bailian-studio/model-core'
+import type { ProviderTransportHeader } from '@bailian-studio/dashscope-manifests'
 import { classifyDashScopeError, type ProviderErrorInfo } from './errors'
 
 /** 可注入的 fetch，供测试、代理与私有网络环境复用。 */

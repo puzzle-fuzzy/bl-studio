@@ -11,7 +11,7 @@
  * - q2-pro 支持 1~4 张参考图像 + 0~2 段参考视频（video 参考为可选），
  *   参考视频经 input.media 的 type:'video' 项随图片一并提交。
  */
-import type { ModelManifest } from '@bailian-studio/model-core'
+import type { ModelManifest } from '../../types'
 
 const REFERENCE_TRANSPORT: ModelManifest['transport'] = {
   mode: 'provider_async',

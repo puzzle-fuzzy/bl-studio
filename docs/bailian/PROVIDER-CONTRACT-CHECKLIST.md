@@ -13,7 +13,7 @@ The first two gates are safe to run on Windows and in CI. They do not prove that
 - Check the relevant snapshot under `docs/bailian/official/raw` and its provenance in `docs/bailian/official/registry.json`.
 - Run `pnpm run docs:bailian:snapshot:check` to validate the committed snapshot without network access.
 - For compatible chat models, run `pnpm run sync:bailian-docs` with `DASHSCOPE_API_KEY` available. This checks the machine-readable model list only; it does not validate media models or pricing.
-- Update the manifest transport, request bindings, response normalization, validation rules, and pricing together. Keep `packages/model-core` as the runtime source of truth.
+- Update the provider manifest transport, request bindings, response normalization, validation rules, and pricing together. Keep `packages/dashscope-manifests` as the DashScope model source of truth; shared validation and pricing primitives remain in `packages/model-core`.
 
 ## Offline regression gate
 

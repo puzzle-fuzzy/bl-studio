@@ -10,7 +10,8 @@
  *  - submit / poll / final / stream-event：关键字段缺失 → 阻断（不可重试的集成错误）；
  *  - error 阶段（非 2xx）完全宽容，交由错误分类，不在此拦截。
  */
-import type { FrozenModelManifest, ProviderOutputMapping } from '@bailian-studio/model-core'
+import type { ProviderOutputMapping } from './contracts'
+import type { FrozenModelManifest } from './types'
 
 export type ResponsePhase = 'submit' | 'poll' | 'final' | 'error' | 'stream-event'
 

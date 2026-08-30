@@ -6,7 +6,7 @@ import type {
   CreativeGenerationPurpose,
   CreativeGenerationBindingRole,
 } from '@bailian-studio/creative-asset-contracts'
-import type { FrozenModelManifest } from '@bailian-studio/model-core'
+import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 
 export type CreativeAssetCompilerMediaKind = 'image' | 'video' | 'audio'
 
