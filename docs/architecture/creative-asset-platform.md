@@ -366,7 +366,7 @@ CreativeGenerationRequest
 - 增加 `generations/service.ts` application service，统一估价、提交、取消和重试入口。
 - 增加 `director/service.ts` application service，统一阶段估价、预检、运行创建和单镜头重试入口。
 - 增加 `collect-from-generation` API/client 入口，将生成产物收录为资产、项目关系、版本和参考图的单次事务；通过 `Idempotency-Key` 支持安全重试。
-- 增加 `collect-from-generation/batch` API/client 入口，将多资产收录收敛为批次级 all-or-nothing 事务；Studio 多选 UI 后续接入。
+- 增加 `collect-from-generation/batch` API/client 入口，将多资产收录收敛为批次级 all-or-nothing 事务；Studio 生成详情已接入多选 UI，并限制单批最多 50 个图片产物。
 - 增加 `audit_event_outbox` producer 与 `audit-repository` consumer：Worker 负责并发 claim、幂等投递 `audit_logs`、过期租约恢复、指数退避和终态失败；admin API 提供失败查询和管理员人工重放；Worker 已补失败量/延迟/异常的最小指标契约，并通过现有 Loki/Grafana 观测栈提供运营视图。
 - 让路由只保留认证、输入校验和响应适配。
 - 在 `packages/api-client` 增加项目/资产/版本/参考图 client。
