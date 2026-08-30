@@ -9,10 +9,12 @@ import { apiClient } from '@bailian-studio/lib-client'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { browserDraftStorage, loadCanvasDocumentDraft } from '@/lib/canvas-draft-storage'
 import { selectCanvasDocument } from '@/lib/canvas-document-selection'
+import { mergeCanvasDocumentPage } from '@/lib/canvas-document-directory'
 import { fromCanvasSnapshot, toCanvasSnapshot } from '@/lib/canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
 
 const SAVE_DEBOUNCE_MS = 650
+const CANVAS_DIRECTORY_PAGE_SIZE = 50
 
 function assetUrl(asset: AssetItem): string | undefined {
   return asset.url ?? asset.downloadUrl ?? asset.thumbnailUrl
@@ -133,9 +135,14 @@ export function useCanvasPersistence() {
   const disposedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const versionsRequestRef = useRef(0)
+  const documentDirectoryRequestRef = useRef(0)
+  const documentDirectoryLoadingRef = useRef(false)
   const [documents, setDocuments] = useState<CanvasDocumentSummary[]>([])
   const [documentLoading, setDocumentLoading] = useState(false)
   const [documentError, setDocumentError] = useState<string | undefined>()
+  const [documentNextCursor, setDocumentNextCursor] = useState<string | undefined>()
+  const [documentDirectoryLoading, setDocumentDirectoryLoading] = useState(false)
+  const [documentDirectoryError, setDocumentDirectoryError] = useState<string | undefined>()
   const [versions, setVersions] = useState<CanvasVersion[]>([])
   const [saveTick, setSaveTick] = useState(0)
 
@@ -293,6 +300,36 @@ export function useCanvasPersistence() {
     }
   }, [invalidatePendingSave, setSaveStatus])
 
+  const loadMoreDocuments = useCallback(async (): Promise<boolean> => {
+    const cursor = documentNextCursor
+    if (cursor === undefined || documentDirectoryLoadingRef.current) return false
+    const requestId = documentDirectoryRequestRef.current + 1
+    documentDirectoryRequestRef.current = requestId
+    documentDirectoryLoadingRef.current = true
+    setDocumentDirectoryLoading(true)
+    setDocumentDirectoryError(undefined)
+    try {
+      const page = await apiClient.listCanvases({ limit: CANVAS_DIRECTORY_PAGE_SIZE, cursor })
+      if (
+        disposedRef.current
+        || documentDirectoryRequestRef.current !== requestId
+      ) return false
+      setDocuments(current => mergeCanvasDocumentPage(current, page))
+      setDocumentNextCursor(page.nextCursor)
+      return true
+    } catch (error) {
+      if (!disposedRef.current && documentDirectoryRequestRef.current === requestId) {
+        setDocumentDirectoryError(error instanceof Error ? error.message : '画布目录加载失败')
+      }
+      return false
+    } finally {
+      if (documentDirectoryRequestRef.current === requestId) {
+        documentDirectoryLoadingRef.current = false
+        if (!disposedRef.current) setDocumentDirectoryLoading(false)
+      }
+    }
+  }, [documentNextCursor])
+
   useEffect(() => {
     disposedRef.current = false
     const operationEpoch = operationEpochRef.current
@@ -305,9 +342,16 @@ export function useCanvasPersistence() {
           useCanvasStore.getState().nodes,
           useCanvasStore.getState().edges,
         )
-        const list = await apiClient.listCanvases({ limit: 100 })
+        const requestId = documentDirectoryRequestRef.current + 1
+        documentDirectoryRequestRef.current = requestId
+        documentDirectoryLoadingRef.current = true
+        setDocumentDirectoryLoading(true)
+        setDocumentDirectoryError(undefined)
+        const list = await apiClient.listCanvases({ limit: CANVAS_DIRECTORY_PAGE_SIZE })
         if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+        if (documentDirectoryRequestRef.current !== requestId) return
         setDocuments(list.items)
+        setDocumentNextCursor(list.nextCursor)
         const summary = selectCanvasDocument(list.items, useCanvasStore.getState().documentId)
         if (summary === undefined) {
           const document = await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
@@ -317,6 +361,7 @@ export function useCanvasPersistence() {
           applyDocument(hydratedDocument)
           lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
           setDocuments([summaryOf(hydratedDocument)])
+          setDocumentNextCursor(undefined)
           setSaveStatus('saved')
           return
         }
@@ -355,11 +400,15 @@ export function useCanvasPersistence() {
           setSaveStatus('error')
         }
       } finally {
+        documentDirectoryLoadingRef.current = false
+        if (!disposedRef.current && documentDirectoryRequestRef.current > 0) setDocumentDirectoryLoading(false)
         if (!disposedRef.current && operationEpochRef.current === operationEpoch) setDocumentLoading(false)
       }
     })()
     return () => {
       disposedRef.current = true
+      documentDirectoryRequestRef.current += 1
+      documentDirectoryLoadingRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
     }
   }, [setSaveStatus])
@@ -429,8 +478,12 @@ export function useCanvasPersistence() {
     createDocument,
     documentError,
     documentLoading,
+    documentDirectoryError,
+    documentDirectoryLoading,
+    documentNextCursor,
     documents,
     isDirty,
+    loadMoreDocuments,
     openDocument,
     refreshDocument,
     refreshVersions,

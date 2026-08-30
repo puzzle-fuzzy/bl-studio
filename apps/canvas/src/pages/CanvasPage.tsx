@@ -45,14 +45,20 @@ interface CanvasMenu {
   connectFrom?: string
 }
 
+const LOAD_MORE_DOCUMENTS_VALUE = '__load_more_canvas_documents__'
+
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
   const {
     createDocument,
     documentError,
+    documentDirectoryError,
+    documentDirectoryLoading,
     documentLoading,
+    documentNextCursor,
     documents,
     isDirty,
+    loadMoreDocuments,
     openDocument,
     saveStatus,
     versions,
@@ -146,9 +152,13 @@ export function CanvasPage() {
   }, [isDirty])
 
   const handleDocumentChange = useCallback((nextDocumentId: string) => {
+    if (nextDocumentId === LOAD_MORE_DOCUMENTS_VALUE) {
+      void loadMoreDocuments()
+      return
+    }
     if (nextDocumentId === documentId || !confirmDocumentChange()) return
     void openDocument(nextDocumentId)
-  }, [confirmDocumentChange, documentId, openDocument])
+  }, [confirmDocumentChange, documentId, loadMoreDocuments, openDocument])
 
   const handleCreateDocument = useCallback(() => {
     if (!confirmDocumentChange()) return
@@ -391,6 +401,18 @@ export function CanvasPage() {
                   {document.title}
                 </SelectItem>
               ))}
+              {documentNextCursor !== undefined && (
+                <SelectItem
+                  value={LOAD_MORE_DOCUMENTS_VALUE}
+                  disabled={documentDirectoryLoading}
+                >
+                  {documentDirectoryLoading
+                    ? '加载更多画布…'
+                    : documentDirectoryError === undefined
+                      ? '加载更多画布'
+                      : '加载失败，点击重试'}
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
           <Button
@@ -425,6 +447,11 @@ export function CanvasPage() {
         {documentError !== undefined && (
           <span className="max-w-32 truncate text-[10px] text-destructive" title={documentError}>
             文档加载失败
+          </span>
+        )}
+        {documentDirectoryError !== undefined && (
+          <span className="max-w-32 truncate text-[10px] text-destructive" title={documentDirectoryError}>
+            目录加载失败
           </span>
         )}
         {saveStatus === 'conflict' && (
