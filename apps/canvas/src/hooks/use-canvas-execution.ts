@@ -1,6 +1,7 @@
 import type { AssetItem, CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
 import { CanvasExecutionTaskSummarySchema } from '@bailian-studio/canvas-contracts'
 import { apiClient } from '@bailian-studio/lib-client'
+import { findResumableCanvasExecution } from '@/lib/execution-recovery'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '@/stores/canvas-store'
 
@@ -44,6 +45,7 @@ export function useCanvasExecution() {
   const [status, setStatus] = useState<CanvasExecutionStatus>('idle')
   const [taskId, setTaskId] = useState<string | undefined>()
   const [error, setError] = useState<string | undefined>()
+  const resumedDocumentRef = useRef<string | undefined>(undefined)
 
   const setExecutionStatus = useCallback((next: CanvasExecutionStatus) => {
     setStatus(next)
@@ -292,6 +294,27 @@ export function useCanvasExecution() {
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
   }, [applySummary, documentId, setExecutionStatus, stop])
+
+  // 页面刷新后接管当前 revision 的未结束任务；旧 revision 只保留在历史面板中。
+  useEffect(() => {
+    if (documentId === undefined || revision === undefined || resumedDocumentRef.current === documentId) return
+    resumedDocumentRef.current = documentId
+    const requestRunId = runIdRef.current
+    let disposed = false
+    void (async () => {
+      try {
+        const page = await apiClient.listCanvasExecutions(documentId, { limit: 20 })
+        if (disposed || runIdRef.current !== requestRunId) return
+        const execution = findResumableCanvasExecution(page.items, revision)
+        if (execution === undefined) return
+        await trackExecution(execution, requestRunId, documentId)
+      }
+      catch {
+        // 自动恢复失败不影响页面交互；用户仍可从运行记录手动重新载入。
+      }
+    })()
+    return () => { disposed = true }
+  }, [documentId, revision, trackExecution])
 
   useEffect(() => () => stop(), [stop])
 
