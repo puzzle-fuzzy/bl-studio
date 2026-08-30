@@ -170,6 +170,9 @@ flowchart LR
 - 生成仓储对幂等创建显式返回是否 `reused`；Canvas Worker 把该结果写入节点 `nodeRuns.cacheHit`，并通过
   `worker.canvas.node_cache` 暴露 hit/miss 计数。API 历史摘要和 Canvas 运行记录面板只投影这个可恢复字段，
   不把缓存命中误作 generation 已完成，也兼容尚未带该字段的历史任务。
+- Canvas 节点的静态参考素材同时保存 `referenceAssetIds` 与 `referenceAssetKinds`；前端选择器按照当前模型的
+  media 参数请求允许的图片/视频资产，编译器仍在服务端用资产实际 kind 做最终校验。节点输出类型与参考输入类型
+  不再被错误绑定，首尾帧、图生视频和图像编辑等多输入模型可以共享同一选择器契约。
 
 ## 4. 领域模型归属
 

@@ -12,6 +12,7 @@ const PERSISTED_DATA_KEYS = new Set([
   'errorMessage',
   'referenceUrls',
   'referenceAssetIds',
+  'referenceAssetKinds',
   'aspectRatio',
 ])
 

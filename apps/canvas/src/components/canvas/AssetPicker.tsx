@@ -6,25 +6,36 @@ import type { MediaKind } from './MediaNode'
 
 interface AssetPickerProps {
   kind: MediaKind
+  allowedKinds: readonly MediaKind[]
   selectedIds: readonly string[]
-  onChange: (ids: string[]) => void
+  selectedKinds: Readonly<Record<string, MediaKind>>
+  onChange: (ids: string[], kinds: Record<string, MediaKind>) => void
   onClose: () => void
 }
 
-/** 画布节点的素材选择器：只写入资产 ID，URL 仅用于当前预览。 */
-export function AssetPicker({ kind, selectedIds, onChange, onClose }: AssetPickerProps) {
+/** 画布节点的素材选择器：写入稳定资产 ID 与媒体类型，URL 仅用于当前预览。 */
+export function AssetPicker({ kind, allowedKinds, selectedIds, selectedKinds, onChange, onClose }: AssetPickerProps) {
   const [assets, setAssets] = useState<AssetItem[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | undefined>()
+  const mediaKinds = useMemo(
+    () => [...new Set(allowedKinds.length > 0 ? allowedKinds : [kind])],
+    [allowedKinds, kind],
+  )
 
   useEffect(() => {
     let disposed = false
     setLoading(true)
     setError(undefined)
-    void apiClient.listAssets({ kind, limit: 50, sort: 'time' })
-      .then(result => {
-        if (!disposed) setAssets(result.items)
+    void Promise.all(mediaKinds.map(mediaKind => apiClient.listAssets({ kind: mediaKind, limit: 50, sort: 'time' })))
+      .then(results => {
+        if (disposed) return
+        const byId = new Map<string, AssetItem>()
+        for (const result of results) {
+          for (const asset of result.items) byId.set(asset.id, asset)
+        }
+        setAssets([...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt)))
       })
       .catch(() => {
         if (!disposed) setError('素材库加载失败')
@@ -33,7 +44,7 @@ export function AssetPicker({ kind, selectedIds, onChange, onClose }: AssetPicke
         if (!disposed) setLoading(false)
       })
     return () => { disposed = true }
-  }, [kind])
+  }, [mediaKinds])
 
   const filteredAssets = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
@@ -41,11 +52,16 @@ export function AssetPicker({ kind, selectedIds, onChange, onClose }: AssetPicke
     return assets.filter(asset => (asset.fileName ?? asset.id).toLocaleLowerCase().includes(normalized))
   }, [assets, query])
 
-  const toggle = (id: string) => {
+  const toggle = (asset: AssetItem) => {
+    if (asset.kind !== 'image' && asset.kind !== 'video') return
+    const id = asset.id
     const next = selectedIds.includes(id)
       ? selectedIds.filter(selectedId => selectedId !== id)
       : [...selectedIds, id]
-    onChange(next)
+    const nextKinds = { ...selectedKinds }
+    if (selectedIds.includes(id)) delete nextKinds[id]
+    else nextKinds[id] = asset.kind
+    onChange(next, nextKinds)
   }
 
   return (
@@ -82,7 +98,7 @@ export function AssetPicker({ kind, selectedIds, onChange, onClose }: AssetPicke
               title={asset.fileName ?? asset.id}
               aria-pressed={selected}
               className={`relative aspect-square overflow-hidden rounded-md border bg-muted transition ${selected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/60'}`}
-              onClick={() => toggle(asset.id)}
+              onClick={() => toggle(asset)}
             >
               {previewUrl !== '' && asset.kind === 'image' ? (
                 <img src={previewUrl} alt={asset.fileName ?? '图片素材'} className="h-full w-full object-cover" />

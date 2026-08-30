@@ -87,6 +87,30 @@ describe('compileCanvasGraph', () => {
     })
   })
 
+  it('assigns mixed static media to the model parameters that declare each kind', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot([
+        mediaNode('first-last', {
+          kind: 'video',
+          modelId: 'keling-first-last-frame-video',
+          prompt: 'a lantern brightens',
+          referenceAssetIds: ['asset_first', 'asset_last'],
+        }),
+      ]),
+      assetKinds: new Map([
+        ['asset_first', 'image'],
+        ['asset_last', 'image'],
+      ]),
+    })
+
+    expect(result.nodes[0]).toMatchObject({
+      assetRefs: {
+        firstFrame: ['asset_first'],
+        lastFrame: ['asset_last'],
+      },
+    })
+  })
+
   it('rejects cycles before creating an execution plan', () => {
     expect(() =>
       compileCanvasGraph({

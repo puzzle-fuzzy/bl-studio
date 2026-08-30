@@ -6,7 +6,7 @@ import { cn } from '@bailian-studio/lib-client'
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import { useCanvasGeneration } from '@/hooks/use-canvas-generation'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
-import { buildCanvasAssetRefs, canvasMediaParameters } from '@/lib/generation-refs'
+import { buildCanvasAssetRefs, canvasMediaParameters, type CanvasReferenceAsset } from '@/lib/generation-refs'
 import { useCanvasStore } from '@/stores/canvas-store'
 import { AssetPicker } from './AssetPicker'
 
@@ -34,6 +34,8 @@ export interface MediaNodeData extends Record<string, unknown> {
   referenceUrls: string[]
   /** 用户从资产库选择的稳定资产 ID；生成时按模型参数映射到 assetRefs。 */
   referenceAssetIds?: string[]
+  /** 静态资产 ID 对应的媒体类型；用于模型切换和版本恢复时保持参数分配稳定。 */
+  referenceAssetKinds?: Record<string, MediaKind>
   aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4'
 }
 
@@ -88,6 +90,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const modelId = nodeData.modelId ?? ''
   const referenceUrls = nodeData.referenceUrls ?? []
   const referenceAssetIds = nodeData.referenceAssetIds ?? []
+  const referenceAssetKinds = nodeData.referenceAssetKinds ?? {}
   const aspectRatio = nodeData.aspectRatio ?? '1:1'
   const availableModels = useMemo(
     () => (models ?? []).filter((model: ModelCatalogItem) => (
@@ -100,13 +103,20 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     [modelId, models],
   )
   const mediaParameters = useMemo(() => canvasMediaParameters(selectedModel), [selectedModel])
-  const referenceAssets = useMemo(
+  const selectableReferenceKinds = useMemo<MediaKind[]>(
+    () => [...new Set(mediaParameters.map(parameter => parameter.mediaKind))],
+    [mediaParameters],
+  )
+  const referenceAssets = useMemo<CanvasReferenceAsset[]>(
     () => [...connectedReferences
       .filter((reference): reference is ConnectedReference & { assetId: string } => reference.assetId !== undefined)
       .map(reference => ({ assetId: reference.assetId, kind: reference.kind })),
-      ...referenceAssetIds.map(assetId => ({ assetId, kind: nodeKind })),
+      ...referenceAssetIds.map(assetId => ({
+        assetId,
+        kind: referenceAssetKinds[assetId] ?? nodeKind,
+      })),
     ].filter((reference, index, all) => all.findIndex(item => item.assetId === reference.assetId) === index),
-    [connectedReferences, nodeKind, referenceAssetIds],
+    [connectedReferences, nodeKind, referenceAssetIds, referenceAssetKinds],
   )
   const assetRefs = useMemo(
     () => buildCanvasAssetRefs(mediaParameters, referenceAssets),
@@ -263,8 +273,10 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
           {isAssetPickerOpen && (
             <AssetPicker
               kind={nodeKind}
+              allowedKinds={selectableReferenceKinds}
               selectedIds={referenceAssetIds}
-              onChange={ids => updateNodeData(id, { referenceAssetIds: ids })}
+              selectedKinds={referenceAssetKinds}
+              onChange={(ids, kinds) => updateNodeData(id, { referenceAssetIds: ids, referenceAssetKinds: kinds })}
               onClose={() => setIsAssetPickerOpen(false)}
             />
           )}

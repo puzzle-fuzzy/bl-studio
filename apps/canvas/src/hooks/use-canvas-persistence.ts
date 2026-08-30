@@ -33,6 +33,7 @@ async function hydrateAssetUrls(document: CanvasDocument): Promise<CanvasDocumen
     const url = assetUrl(asset)
     return url === undefined ? [] : [[asset.id, url] as const]
   }))
+  const assetById = new Map(assets.flatMap(asset => asset === undefined ? [] : [[asset.id, asset] as const]))
   return {
     ...document,
     snapshot: {
@@ -40,11 +41,26 @@ async function hydrateAssetUrls(document: CanvasDocument): Promise<CanvasDocumen
       nodes: document.snapshot.nodes.map(node => {
         const data = node.data
         const resultUrl = typeof data.resultAssetId === 'string' ? urls.get(data.resultAssetId) : undefined
+        const storedKinds = data.referenceAssetKinds
+        const referenceAssetKinds: Record<string, 'image' | 'video'> = {}
+        if (storedKinds !== null && typeof storedKinds === 'object' && !Array.isArray(storedKinds)) {
+          for (const [assetId, kind] of Object.entries(storedKinds)) {
+            if (kind === 'image' || kind === 'video') referenceAssetKinds[assetId] = kind
+          }
+        }
+        if (Array.isArray(data.referenceAssetIds)) {
+          for (const assetId of data.referenceAssetIds) {
+            if (typeof assetId !== 'string') continue
+            const asset = assetById.get(assetId)
+            if (asset?.kind === 'image' || asset?.kind === 'video') referenceAssetKinds[assetId] = asset.kind
+          }
+        }
         return {
           ...node,
           data: {
             ...data,
             ...(resultUrl !== undefined ? { resultUrl } : {}),
+            ...(Object.keys(referenceAssetKinds).length > 0 ? { referenceAssetKinds } : {}),
           },
         }
       }),
