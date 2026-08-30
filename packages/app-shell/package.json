@@ -4,7 +4,8 @@
   "type": "module",
   "private": true,
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./styles.css": "./src/styles.css"
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -12,6 +13,7 @@
   },
   "dependencies": {
     "@bailian-studio/api-client": "workspace:*",
+    "@bailian-studio/design-tokens": "workspace:*",
     "@bailian-studio/lib-client": "workspace:*",
     "@bailian-studio/ui": "workspace:*",
     "lucide-react": "catalog:",
