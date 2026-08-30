@@ -137,6 +137,9 @@ export function DirectorProjectPage() {
   const scriptMessagesRequestRef = useRef(0)
   const scriptVersionsRequestRef = useRef(0)
   const scriptVersionRequestRef = useRef(0)
+  const videoEstimateRequestRef = useRef(0)
+  const musicEstimateRequestRef = useRef(0)
+  const assemblyPreflightRequestRef = useRef(0)
   const scriptVersionCacheRef = useRef(new Map<string, DirectorScriptVersion>())
   const { modelId: promptRebuildModelId, setModelId: setPromptRebuildModelId, text: promptRebuildText, setText: setPromptRebuildText, result: promptRebuildResult, setResult: setPromptRebuildResult, stale: promptRebuildStale, setStale: setPromptRebuildStale } = usePhaseReview<DirectorPromptRebuildResult>()
   const [applyingPromptShotId, setApplyingPromptShotId] = useState<string>()
@@ -285,6 +288,28 @@ export function DirectorProjectPage() {
   usePreferredModel(musicModelId, musicModels, setMusicModelId)
 
   useEffect(() => {
+    videoEstimateRequestRef.current += 1
+    musicEstimateRequestRef.current += 1
+    assemblyPreflightRequestRef.current += 1
+    setVideoEstimate(undefined)
+    setVideoConfirmOpen(false)
+    setVideoRetryShotId(undefined)
+    setVideoRetryingShotId(undefined)
+    setVideoEstimating(false)
+    setMusicEstimate(undefined)
+    setMusicConfirmOpen(false)
+    setMusicEstimating(false)
+    setMusicPrompt('')
+    setMusicDuration('60')
+    setAssemblyPreflight(undefined)
+    setAssemblyConfirmOpen(false)
+    setAssemblyPreflighting(false)
+    setAssemblyWidth('1080')
+    setAssemblyHeight('1920')
+    setAssemblyFps('30')
+    setAssemblyAudioVolume('1')
+    setReferencePickerOpen(false)
+    setReferenceTarget(undefined)
     if (id === undefined) return
     const projectId = id
     let cancelled = false
@@ -328,10 +353,6 @@ export function DirectorProjectPage() {
         setDialogueStale(false)
         setAppliedDialogueShotIds(new Set())
         setApplyingDialogueShotId(undefined)
-        setAssemblyPreflight(undefined)
-        setAssemblyConfirmOpen(false)
-        setReferencePickerOpen(false)
-        setReferenceTarget(undefined)
         void reloadScriptMessages(projectId, 'project-load')
         void reloadScriptVersions(projectId, 'project-load')
         const analysisState = next.phases.find(state => state.phase === 'analyze')
@@ -770,6 +791,8 @@ export function DirectorProjectPage() {
   const prepareMusicRun = async () => {
     const duration = Number.parseInt(musicDuration, 10)
     if (id === undefined || musicModelId.length === 0 || musicPrompt.trim().length === 0 || !Number.isInteger(duration) || duration < 1 || dirty || activeRunId !== undefined || musicEstimating || musicConfirmOpen) return
+    const requestSequence = musicEstimateRequestRef.current + 1
+    musicEstimateRequestRef.current = requestSequence
     setMusicEstimating(true)
     try {
       const estimate = await apiClient.estimateDirectorMusic(id, {
@@ -778,12 +801,13 @@ export function DirectorProjectPage() {
         isInstrumental: true,
         duration,
       })
+      if (requestSequence !== musicEstimateRequestRef.current) return
       setMusicEstimate(estimate)
       setMusicConfirmOpen(true)
     } catch {
-      toast.error('无法估算音乐费用，请确认音乐描述和模型配置')
+      if (requestSequence === musicEstimateRequestRef.current) toast.error('无法估算音乐费用，请确认音乐描述和模型配置')
     } finally {
-      setMusicEstimating(false)
+      if (requestSequence === musicEstimateRequestRef.current) setMusicEstimating(false)
     }
   }
 
@@ -831,9 +855,12 @@ export function DirectorProjectPage() {
       if (settings === undefined) toast.error('请检查合成参数范围')
       return
     }
+    const requestSequence = assemblyPreflightRequestRef.current + 1
+    assemblyPreflightRequestRef.current = requestSequence
     setAssemblyPreflighting(true)
     try {
       const preflight = await apiClient.getDirectorAssemblyPreflight(id, { assembly: settings })
+      if (requestSequence !== assemblyPreflightRequestRef.current) return
       setAssemblyPreflight(preflight)
       if (!preflight.ready) {
         toast.error(preflight.issues[0]?.message ?? '当前镜头还不能合成')
@@ -841,9 +868,9 @@ export function DirectorProjectPage() {
       }
       setAssemblyConfirmOpen(true)
     } catch {
-      toast.error('合成预检失败，请确认视频镜头已经完成并重试')
+      if (requestSequence === assemblyPreflightRequestRef.current) toast.error('合成预检失败，请确认视频镜头已经完成并重试')
     } finally {
-      setAssemblyPreflighting(false)
+      if (requestSequence === assemblyPreflightRequestRef.current) setAssemblyPreflighting(false)
     }
   }
 
@@ -900,10 +927,13 @@ export function DirectorProjectPage() {
 
   const prepareVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const requestSequence = videoEstimateRequestRef.current + 1
+    videoEstimateRequestRef.current = requestSequence
     setVideoRetryShotId(undefined)
     setVideoEstimating(true)
     try {
       const estimate = await apiClient.estimateDirectorVideoPhase(id, { modelId: videoModelId })
+      if (requestSequence !== videoEstimateRequestRef.current) return
       setVideoEstimate(estimate)
       if (estimate.shotCount === 0) {
         toast.success('当前没有需要新生成的视频镜头')
@@ -911,25 +941,30 @@ export function DirectorProjectPage() {
         setVideoConfirmOpen(true)
       }
     } catch {
-      toast.error('暂时无法估算视频成本，请确认所有分镜已锁定')
+      if (requestSequence === videoEstimateRequestRef.current) toast.error('暂时无法估算视频成本，请确认所有分镜已锁定')
     } finally {
-      setVideoEstimating(false)
+      if (requestSequence === videoEstimateRequestRef.current) setVideoEstimating(false)
     }
   }
 
   const prepareShotRetry = async (shotId: string) => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined || videoConfirmOpen || videoEstimating || videoRetryingShotId !== undefined) return
+    const requestSequence = videoEstimateRequestRef.current + 1
+    videoEstimateRequestRef.current = requestSequence
     setVideoRetryingShotId(shotId)
     try {
       const estimate = await apiClient.estimateDirectorShotVideo(id, shotId, { modelId: videoModelId })
+      if (requestSequence !== videoEstimateRequestRef.current) return
       setVideoRetryShotId(shotId)
       setVideoEstimate(estimate)
       setVideoConfirmOpen(true)
     } catch {
-      setVideoRetryShotId(undefined)
-      toast.error('暂时无法估算单镜重试成本，请确认镜头仍处于失败状态')
+      if (requestSequence === videoEstimateRequestRef.current) {
+        setVideoRetryShotId(undefined)
+        toast.error('暂时无法估算单镜重试成本，请确认镜头仍处于失败状态')
+      }
     } finally {
-      setVideoRetryingShotId(undefined)
+      if (requestSequence === videoEstimateRequestRef.current) setVideoRetryingShotId(undefined)
     }
   }
 
