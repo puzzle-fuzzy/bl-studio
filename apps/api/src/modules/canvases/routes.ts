@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
-import { encodeSSE } from '@bailian-studio/event-bus'
+import { encodeSSE } from '@bailian-studio/sse-protocol'
 import {
   CreateCanvasInputSchema,
   CanvasExecutionTaskInputSchema,

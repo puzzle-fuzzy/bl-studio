@@ -1,5 +1,5 @@
 import { Elysia } from 'elysia'
-import { makeDirectorEvent } from '@bailian-studio/event-bus'
+import { makeDirectorEvent } from '@bailian-studio/sse-protocol'
 import {
   AttachDirectorAssetSchema,
   CreateDirectorPhaseRunSchema,

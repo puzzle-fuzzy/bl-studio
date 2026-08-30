@@ -209,7 +209,7 @@ export const rules: Array<{
   {
     scope: 'packages/provider-dashscope',
     banned: [
-      /@bailian-studio\/(db|storage|generation-repository|task-engine|event-bus)\b/,
+      /@bailian-studio\/(db|storage|generation-repository|task-engine|sse-protocol)\b/,
       importsApps,
       importsServices,
       importsElysia,
@@ -221,7 +221,7 @@ export const rules: Array<{
     banned: [
       // P1-40：前端运行时禁止直连持久化 / provider 执行 / 后端仓库包
       // （CLAUDE.md「运行时应用禁止直接 import @bailian-studio/db」的可执行化）。
-      // web 合法消费面 = api-client / model-core / shared / design-tokens / event-bus。
+      // web 合法消费面 = api-client / model-core / shared / design-tokens / sse-protocol。
       /@bailian-studio\/(db|provider-dashscope|generation-repository|media-repository|auth|storage|credit-ledger|task-engine)\b/,
       importsApps,
       importsServices,
@@ -387,7 +387,7 @@ export const rules: Array<{
   {
     scope: 'packages/admin-repository',
     banned: [
-      /@bailian-studio\/(provider-dashscope|api|worker|storage|event-bus)\b/,
+      /@bailian-studio\/(provider-dashscope|api|worker|storage|sse-protocol)\b/,
       importsServices,
       importsApps,
       importsReact,
@@ -407,7 +407,7 @@ export const rules: Array<{
   {
     scope: 'packages/media-repository',
     banned: [
-      /@bailian-studio\/(provider-dashscope|generation-repository|model-core|event-bus|storage|auth)\b/,
+      /@bailian-studio\/(provider-dashscope|generation-repository|model-core|sse-protocol|storage|auth)\b/,
       importsServices,
       importsApps,
       importsReact,
@@ -428,7 +428,7 @@ export const rules: Array<{
   {
     scope: 'packages/auth',
     banned: [
-      /@bailian-studio\/(provider-dashscope|generation-repository|model-core|task-engine|event-bus|storage)\b/,
+      /@bailian-studio\/(provider-dashscope|generation-repository|model-core|task-engine|sse-protocol|storage)\b/,
       importsServices,
       importsApps,
       importsReact,
@@ -438,7 +438,7 @@ export const rules: Array<{
   {
     scope: 'packages/db',
     banned: [
-      /@bailian-studio\/(api|worker|task-engine|event-bus|model-core|provider-dashscope)\b/,
+      /@bailian-studio\/(api|worker|task-engine|sse-protocol|model-core|provider-dashscope)\b/,
       importsServices,
       importsApps,
       importsReact,
@@ -466,7 +466,7 @@ export const rules: Array<{
     ],
   },
   {
-    scope: 'packages/event-bus',
+    scope: 'packages/sse-protocol',
     banned: [
       /@bailian-studio\/(db|storage|provider-dashscope)\b/,
       importsServices,

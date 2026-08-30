@@ -1,4 +1,4 @@
-import { generationEventNameForStatus, makeGenerationEvent, type GenerationEventName, type GenerationEventPayload, type BailianStudioSSEEvent } from '@bailian-studio/event-bus'
+import { generationEventNameForStatus, makeGenerationEvent, type GenerationEventName, type GenerationEventPayload, type BailianStudioSSEEvent } from '@bailian-studio/sse-protocol'
 import {
   createGenerationEventListener,
   ensureGenerationEventsTrigger,

@@ -28,7 +28,7 @@ export type StatusTone = 'neutral' | 'info' | 'success' | 'warning' | 'danger'
 /**
  * Generation 状态到 tone 的映射表。
  *
- * 键覆盖 @bailian-studio/event-bus 的 GenerationStatus 联合；注意故意未登记
+ * 键覆盖 @bailian-studio/sse-protocol 的 GenerationStatus 联合；注意故意未登记
  * `processing`（@bailian-studio/generation-repository 内部的中间态，不在
  * GenerationStatus 中）——消费方对该值会落到缺省兜底 `?? 'neutral'`。
  * 消费方取值时务必保留这一兜底，以便后端后续新增状态时 UI 不会崩，

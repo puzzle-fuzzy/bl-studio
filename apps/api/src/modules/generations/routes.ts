@@ -2,7 +2,7 @@ import {
 	encodeSSE,
 	generationEventNameForStatus,
 	makeGenerationEvent,
-} from "@bailian-studio/event-bus";
+} from "@bailian-studio/sse-protocol";
 import type {
 	DailyGenerationUsage,
 	GenerationEstimate,

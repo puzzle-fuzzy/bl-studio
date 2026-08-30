@@ -33,18 +33,18 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/shared` | 任何其它 `@bailian-studio/*`（叶子包） |
 | `packages/director-contracts` | 任何其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope)`、apps、services |
-| `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|event-bus)`、apps、services、elysia、react |
+| `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|sse-protocol)`、apps、services、elysia、react |
 | `packages/generation-repository` | `@bailian-studio/provider-dashscope`、直接从 `@bailian-studio/db` 导入创意资产域表、services、apps、react、elysia |
-| `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|event-bus)`、services、apps、react、elysia |
+| `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|sse-protocol)`、services、apps、react、elysia |
 | `packages/director-repository` | 除 `@bailian-studio/(db\|director-contracts\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/credit-ledger` | 除 `@bailian-studio/(db\|shared)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
-| `packages/media-repository` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|event-bus\|storage\|auth)`、services、apps、react、elysia |
-| `packages/auth` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|task-engine\|event-bus\|storage)`、services、apps、react、elysia |
-| `packages/db` | `@bailian-studio/(api\|worker\|task-engine\|event-bus\|model-core\|provider-dashscope)`、services、apps、react、elysia |
+| `packages/media-repository` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|sse-protocol\|storage\|auth)`、services、apps、react、elysia |
+| `packages/auth` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|task-engine\|sse-protocol\|storage)`、services、apps、react、elysia |
+| `packages/db` | `@bailian-studio/(api\|worker\|task-engine\|sse-protocol\|model-core\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-engine` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-repository` | 除 `@bailian-studio/(db\|task-engine)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/canvas-execution` | `@bailian-studio/(db\|storage\|provider-dashscope\|generation-repository\|task-repository\|task-engine\|api-client)`、services、apps、react、elysia |
-| `packages/event-bus` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
+| `packages/sse-protocol` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/persistence-runtime` | services、apps、react、elysia；只负责进程级持久化资源组装 |
 | `apps/api` | `@bailian-studio/(db\|provider-dashscope)`、importsApps、worker sibling、provider-dashscope package 路径 |
 | `apps/worker` | `@bailian-studio/(api\|db)`、api sibling、importsApps、provider-dashscope package 路径、react、字面 DashScope HTTP 调用（`fetch`/`new Request` 指向 dashscope URL） |
@@ -62,7 +62,7 @@ Worker 与前端各自维护不同的 wire schema。
 
 ### packages/provider-dashscope（协议执行层，worker 专属）
 - **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、provider 响应解析与错误分类。
-- 只经 package root import model-core；禁止 SDK、DB/仓储/task-engine/event-bus/API/Worker/apps/elysia/react。
+- 只经 package root import model-core；禁止 SDK、DB/仓储/task-engine/sse-protocol/API/Worker/apps/elysia/react。
 - 传输层保持可注入以便测试；**绝不向未通过信任校验的 URL 发送凭据**。
 
 ### packages/generation-repository（持久化接缝）

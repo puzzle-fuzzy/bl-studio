@@ -19,7 +19,7 @@
  *  - **任务生命周期**：任务认领、续租与结果保存由 task-repository 独立负责；本包
  *    只在 generation 事务内写入初始任务，避免把队列运行时重新耦合进业务仓储。
  *  - **processing 中间态**：markGenerationProcessing / scheduleGenerationPoll
- *    会把记录翻到 `processing`，这是 repository 内部中间态，不属于 event-bus
+ *    会把记录翻到 `processing`，这是 repository 内部中间态，不属于 sse-protocol
  *    的 GenerationStatus 联合——详见 types.ts 的 RepositoryGenerationStatus。
  *  - **分享的严格只读 scope**：getPublicSharedGeneration 返回的对象经
  *    shares.ts 的 toPublicSharedRecord / toPublicSharedArtifact 严格裁剪，剥除 owner id /
@@ -1839,7 +1839,7 @@ export function createGenerationRepository(
 		/**
 		 * 把记录翻到 `processing`（repository 内部中间态）。
 		 *
-		 * 注意这个状态不属于 event-bus 的 GenerationStatus 联合——它的语义是
+			 * 注意这个状态不属于 sse-protocol 的 GenerationStatus 联合——它的语义是
 		 * 「worker 已经认领了 submit 任务，准备向 provider 提交」，比面向前端的
 		 * `provider_processing` 更靠前。SSE 管线对非终态一视同仁地转发，前端
 		 * 看不到这个内部区分。本方法不涉及任务入队，仅更新记录。

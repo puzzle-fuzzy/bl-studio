@@ -1,4 +1,4 @@
-# @bailian-studio/event-bus
+# @bailian-studio/sse-protocol
 
 Pure domain contracts for generation events and SSE encoding. It defines the
 event map, status vocabulary, channel naming, event construction, and wire

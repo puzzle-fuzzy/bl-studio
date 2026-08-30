@@ -127,7 +127,7 @@
 
 ### 4.1 社交通知（点赞/收藏通知作者）
 
-**现状**：无 notifications 表、无通知 API；`notification` SSE 事件类型在 event-bus 已定义但从未发射，hub 的 `startsWith('generation.')` 过滤器会丢弃；前端通知是本地合成（模型目录/月度用量）。
+**现状**：无 notifications 表、无通知 API；`notification` SSE 事件类型在 sse-protocol 已定义但从未发射，hub 的 `startsWith('generation.')` 过滤器会丢弃；前端通知是本地合成（模型目录/月度用量）。
 
 **方案（标准实现：服务端落库 + API + SSE 实时 + 前端通知中心）**：
 
@@ -138,7 +138,7 @@
 - **点赞/收藏挂钩**（[gallery/routes.ts](apps/api/src/modules/gallery/routes.ts)）：like/favorite **成功后**，若 `owner !== 当前用户`，创建通知（title「收到新点赞/收藏」，body 含动作者昵称与作品 recordId）并向 `deps.generationSseHub` publish `{ event: 'notification', data: { userId: owner, message: 'notification' } }`。重复点赞（onConflictDoNothing 未插入新行）不重复通知。
 - **SSE 扩展**：
   - [sse-hub.ts](apps/api/src/modules/generations/sse-hub.ts) `publish` 过滤从 `startsWith('generation.')` 放宽为 `startsWith('generation.') || event === 'notification'`；
-  - event-bus `NotificationPayload` 加可选 `userId?: string`（供 hub 分桶；通知事件与 generation 事件共用 `generation:<userId>` 频道）；
+  - sse-protocol `NotificationPayload` 加可选 `userId?: string`（供 hub 分桶；通知事件与 generation 事件共用 `generation:<userId>` 频道）；
   - 前端 [use-generation-events.ts](apps/web/src/hooks/use-generation-events.ts) 增加 `notification` 监听器 → 触发 notifications-store `load()`。
 - **API 模块** `apps/api/src/modules/notifications/routes.ts`（注册到 [app.ts](apps/api/src/app.ts)）：
   `GET /api/notifications`、`GET /api/notifications/unread-count`、`POST /api/notifications/:id/read`、`POST /api/notifications/read-all`，均 `requireAuthUser` + 属主校验（只能读/标记自己的）。

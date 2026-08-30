@@ -1,4 +1,4 @@
-import { encodeSSE, generationChannel, type BailianStudioSSEEvent } from '@bailian-studio/event-bus'
+import { encodeSSE, generationChannel, type BailianStudioSSEEvent } from '@bailian-studio/sse-protocol'
 
 type Listener = (chunk: string) => void
 

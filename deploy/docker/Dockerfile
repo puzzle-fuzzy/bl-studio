@@ -56,7 +56,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
 COPY packages/director-contracts/package.json ./packages/director-contracts/
 COPY packages/director-repository/package.json ./packages/director-repository/
-COPY packages/event-bus/package.json ./packages/event-bus/
+COPY packages/sse-protocol/package.json ./packages/sse-protocol/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/
@@ -104,7 +104,7 @@ COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
 COPY packages/director-contracts/package.json ./packages/director-contracts/
 COPY packages/director-repository/package.json ./packages/director-repository/
-COPY packages/event-bus/package.json ./packages/event-bus/
+COPY packages/sse-protocol/package.json ./packages/sse-protocol/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
 COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/

@@ -110,8 +110,8 @@ describe('package boundary rules', () => {
     ).toBe(false)
   })
 
-  it('keeps task-engine and event-bus pure', () => {
-    for (const scope of ['packages/task-engine', 'packages/event-bus']) {
+  it('keeps task-engine and sse-protocol pure', () => {
+    for (const scope of ['packages/task-engine', 'packages/sse-protocol']) {
       expect(
         matchesRule(scope, "import { db } from '@bailian-studio/db'"),
       ).toBe(true)
@@ -637,7 +637,7 @@ describe('package boundary rules', () => {
     expect(
       matchesRule(
         'packages/design-tokens',
-        "import { GenerationStatus } from '@bailian-studio/event-bus'",
+        "import { GenerationStatus } from '@bailian-studio/sse-protocol'",
       ),
     ).toBe(true)
   })

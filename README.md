@@ -145,7 +145,7 @@ Studio (apps/studio, /)   Writer (apps/writer, /writer)   Canvas (apps/canvas, /
               ▼
         apps/worker (任务认领 FOR UPDATE SKIP LOCKED → DashScope → 产物持久化)
               │
-        packages/（shared / model-core / event-bus / db / generation-repository /
+        packages/（shared / model-core / sse-protocol / db / generation-repository /
                   auth / storage / provider-dashscope / task-engine /
                   credit-ledger / media-repository / persistence-runtime /
                   api-client / design-tokens）

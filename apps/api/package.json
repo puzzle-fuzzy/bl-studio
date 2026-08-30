@@ -26,7 +26,7 @@
     "@bailian-studio/creative-asset-repository": "workspace:*",
     "@bailian-studio/director-contracts": "workspace:*",
     "@bailian-studio/director-repository": "workspace:*",
-    "@bailian-studio/event-bus": "workspace:*",
+    "@bailian-studio/sse-protocol": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/media-repository": "workspace:*",
     "@bailian-studio/persistence-runtime": "workspace:*",

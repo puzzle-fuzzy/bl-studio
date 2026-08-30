@@ -6,24 +6,24 @@
  *  - 公开（导出）的 input/output 接口都在这里集中声明，repository.ts 仅消费。
  *
  * 其中两块概念值得特别关注（详见各类型 doc）：
- *  1. `processing` 状态：repository 内部的中间态，不在 event-bus 的
+ *  1. `processing` 状态：repository 内部的中间态，不在 sse-protocol 的
  *     GenerationStatus 联合中；
  *  2. `Public*` 系列：分享页对外只读模型，严格 scope 掉一切 owner / cost /
  *     task / provider / outputResult 等敏感字段。
  */
-import type { GenerationStatus } from '@bailian-studio/event-bus'
+import type { GenerationStatus } from '@bailian-studio/sse-protocol'
 import type { ModelCategory, ModelProvider } from '@bailian-studio/model-core'
 import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-contracts'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 import type { ProviderRequestAudit } from './provider-request-types'
 
 /**
- * Repository 实际使用的状态联合：在 event-bus 公开的状态集合之上，额外加了一个
+ * Repository 实际使用的状态联合：在 sse-protocol 公开的状态集合之上，额外加了一个
  * `processing` 中间态。
  *
  * 注意 `processing` 与 `provider_processing` 不是一回事：
  *  - `processing` 是 repository 内部的「worker 已认领 submit 任务」标志，
- *    仅在本层使用，不属于 event-bus 的 GenerationStatus 联合；
+ *    仅在本层使用，不属于 sse-protocol 的 GenerationStatus 联合；
  *  - `provider_processing` 才是面向前端/事件总线的「provider 正在处理」语义。
  * SSE 管线对非终态状态一视同仁地当作 generation.status 事件转发，所以前端
  * 看不到这个内部区分。
@@ -287,7 +287,7 @@ export interface MarkArtifactFailedInput {
 
 /**
  * 将记录翻到 `processing`（repository 内部中间态）的入参。
- * 不属于 event-bus 的 GenerationStatus 联合——见 RepositoryGenerationStatus。
+ * 不属于 sse-protocol 的 GenerationStatus 联合——见 RepositoryGenerationStatus。
  */
 export interface MarkGenerationProcessingInput {
   recordId: string

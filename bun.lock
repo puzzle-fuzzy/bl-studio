@@ -77,12 +77,12 @@
         "@bailian-studio/credit-ledger": "workspace:*",
         "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
-        "@bailian-studio/event-bus": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
         "@bailian-studio/media-repository": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/persistence-runtime": "workspace:*",
         "@bailian-studio/shared": "workspace:*",
+        "@bailian-studio/sse-protocol": "workspace:*",
         "@bailian-studio/storage": "workspace:*",
         "@bailian-studio/task-engine": "workspace:*",
         "@bailian-studio/task-repository": "workspace:*",
@@ -456,13 +456,6 @@
         "typescript": "catalog:",
       },
     },
-    "packages/event-bus": {
-      "name": "@bailian-studio/event-bus",
-      "version": "0.1.0",
-      "devDependencies": {
-        "typescript": "catalog:",
-      },
-    },
     "packages/generation-repository": {
       "name": "@bailian-studio/generation-repository",
       "version": "0.1.0",
@@ -471,8 +464,8 @@
         "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
         "@bailian-studio/db": "workspace:*",
-        "@bailian-studio/event-bus": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
+        "@bailian-studio/sse-protocol": "workspace:*",
         "@bailian-studio/task-engine": "workspace:*",
         "@bailian-studio/task-repository": "workspace:*",
         "drizzle-orm": "catalog:",
@@ -560,6 +553,13 @@
         "@bailian-studio/creative-asset-contracts": "workspace:*",
         "zod": "catalog:",
       },
+      "devDependencies": {
+        "typescript": "catalog:",
+      },
+    },
+    "packages/sse-protocol": {
+      "name": "@bailian-studio/sse-protocol",
+      "version": "0.1.0",
       "devDependencies": {
         "typescript": "catalog:",
       },
@@ -744,8 +744,6 @@
 
     "@bailian-studio/director-repository": ["@bailian-studio/director-repository@workspace:packages/director-repository"],
 
-    "@bailian-studio/event-bus": ["@bailian-studio/event-bus@workspace:packages/event-bus"],
-
     "@bailian-studio/generation-repository": ["@bailian-studio/generation-repository@workspace:packages/generation-repository"],
 
     "@bailian-studio/lib-client": ["@bailian-studio/lib-client@workspace:packages/lib-client"],
@@ -759,6 +757,8 @@
     "@bailian-studio/provider-dashscope": ["@bailian-studio/provider-dashscope@workspace:packages/provider-dashscope"],
 
     "@bailian-studio/shared": ["@bailian-studio/shared@workspace:packages/shared"],
+
+    "@bailian-studio/sse-protocol": ["@bailian-studio/sse-protocol@workspace:packages/sse-protocol"],
 
     "@bailian-studio/storage": ["@bailian-studio/storage@workspace:packages/storage"],
 

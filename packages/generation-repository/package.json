@@ -16,7 +16,7 @@
     "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/creative-asset-repository": "workspace:*",
     "@bailian-studio/db": "workspace:*",
-    "@bailian-studio/event-bus": "workspace:*",
+    "@bailian-studio/sse-protocol": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/task-repository": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",

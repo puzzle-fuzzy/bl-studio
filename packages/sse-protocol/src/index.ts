@@ -1,5 +1,5 @@
 /**
- * @bailian-studio/event-bus 的公共出口（barrel re-export）。
+ * @bailian-studio/sse-protocol 的公共出口（barrel re-export）。
  *
  * 暴露的公共表面分两类：
  *  - 事件目录与生成事件辅助：GenerationStatus 状态枚举、BailianStudioSSEEventMap 事件目录、

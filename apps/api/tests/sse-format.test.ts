@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { BailianStudioSSEEvent } from '@bailian-studio/event-bus'
+import type { BailianStudioSSEEvent } from '@bailian-studio/sse-protocol'
 import { GenerationSseHub } from '../src/modules/generations/sse-hub'
 
 const generationSseHub = new GenerationSseHub()

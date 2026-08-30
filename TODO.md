@@ -228,7 +228,7 @@ apps/web 18 个测试文件 = 17 个 `src/lib/*` + 1 个 store；components/page
 - [x] **[P2-8→已完成]** `providerCancelStatus` 注释写 `'none'`，代码实写 `'not_requested'/'succeeded'/'unsupported'`，且列无 CHECK（schema.ts:241-242）；`generation_records.status` 同样无 CHECK，与全 schema 惯例不符。方案：下次迁移补 CHECK 并修注释。
 - [x] **[P2-9]** shared 正在重演"万能包"：director 域契约（557 行 director.ts + 162 行 director-assembly.ts，~30 个 zod 导出）挤在 logger/metrics/errors/validation 里——已抽出纯 `director-contracts` 包，并同步 API、Worker、repository、api-client 与边界门禁。
 - [x] **[P2-10]** `credit-ledger.releaseStaleReservations` 候选扫描无锁，与在途 settle 竞态时可能提前释放（CHECK + JS 守卫保证不坏账，但可能 succeeded-but-uncharged 或 settle 假失败）。已通过候选行 `for update` 与账户锁后复查，串行化 settle/refund 线性化点。
-- [ ] **[P2-11]** `event-bus` 名不副实：212 行纯协议（SSE 事件映射 + 编码），真实管道是 outbox+LISTEN 在 generation-repository/api 组装。方案：更名 `sse-protocol` 或并入 shared，避免误导。
+- [x] **[P2-11→已完成 2026-08-31]** 纯 SSE 事件映射与编码包已从 `event-bus` 物理重命名为 `sse-protocol`；真实 outbox+LISTEN 管道仍由 generation-repository/API 组合，包名不再暗示其拥有发布/订阅运行时。
 - [x] **[P2-12→已完成 2026-08-31]** media-repository 的组装输入与 generation-repository 的生成/产物 JSON 回读已统一使用 Zod record/schema 校验；畸形持久化值现在显式抛出 `DATABASE_ERROR`，不再被静默丢弃或以未校验对象返回；同时移除无调用方的 `safeParseJsonRecord`。
 - [ ] **[P2-13]** 15 个 shell 脚本无 shellcheck/shfmt 门禁；`env_value()` awk 解析器复制 6 份（deploy-prod/prod-observability/rollback/prod-web/prod-status/sync-dashscope-key）。这些脚本以 root 经 SSH 跑生产。方案：加 shellcheck 门禁 + 抽公共 sourcing。
 - [ ] **[P2-14]** 指标仅进程内存（重启即失，无 Prometheus 导出）；`/api/metrics` 名字超卖。方案：接 Loki/Prom push 或文档明示为快照语义。

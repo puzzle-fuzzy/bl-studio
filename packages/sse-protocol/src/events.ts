@@ -20,13 +20,13 @@
  *  - `draft`：记录已创建但尚未提交到 provider（提交前的草稿态）。
  *  - `submitting`：已入队 generation.submit 任务，等待 worker 认领并首次调用 provider。
  *  - `processing`：repository 内部中间态——worker 已认领 submit 任务但尚未取得
- *    provider 的 polling 句柄。注意它是 repository 专用的中间值，并非 event-bus
+ *    provider 的 polling 句柄。注意它是 repository 专用的中间值，并非 sse-protocol
  *    在线事件流中独立广播的状态（见下方 GenerationEventPayload.status 说明）。
  *  - `provider_processing`：provider 已接收任务、正在生成（worker 进入轮询阶段）。
  *  - `saving_output`：provider 已返回结果，正在持久化 artifact。
  *  - `succeeded` / `failed` / `cancelled`：三个终态。
  *
- * 注意：event-bus 这一层并不直接依赖此 union 做收发——线上 status 通过 DB 的
+ * 注意：sse-protocol 这一层并不直接依赖此 union 做收发——线上 status 通过 DB 的
  * 文本列经 NOTIFY 流出，消费端按不透明字符串处理（见 GenerationEventPayload.status）。
  */
 export type GenerationStatus =
