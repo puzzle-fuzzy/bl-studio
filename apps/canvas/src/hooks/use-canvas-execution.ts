@@ -60,14 +60,14 @@ export function useCanvasExecution() {
         if (node.status === 'failed') {
           updateNodeData(node.nodeId, {
             status: 'error',
-            errorMessage: node.error ?? '画布节点执行失败',
+            errorMessage: formatNodeError(node.error, node.errorCode, '画布节点执行失败'),
           })
           continue
         }
         if (summary.status === 'cancelled' && node.status !== 'succeeded') {
           updateNodeData(node.nodeId, {
             status: 'error',
-            errorMessage: node.error ?? '画布执行已取消',
+            errorMessage: formatNodeError(node.error, node.errorCode, '画布执行已取消'),
           })
           continue
         }
@@ -288,4 +288,9 @@ export function useCanvasExecution() {
   useEffect(() => () => stop(), [stop])
 
   return { execute, cancel, retryNode, loadExecution, stop, status, taskId, error }
+}
+
+function formatNodeError(error: string | undefined, errorCode: string | undefined, fallback: string): string {
+  const message = error ?? fallback
+  return errorCode === undefined ? message : `${message}（${errorCode}）`
 }

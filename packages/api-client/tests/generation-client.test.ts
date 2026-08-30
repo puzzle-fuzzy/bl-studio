@@ -1076,7 +1076,12 @@ describe('createApiClient', () => {
       documentId: 'canvas_1',
       documentRevision: 2,
       status: 'queued' as const,
-      nodeStatuses: [{ nodeId: 'node_1', status: 'queued' as const }],
+      nodeStatuses: [{
+        nodeId: 'node_1',
+        status: 'queued' as const,
+        startedAt: '2026-08-30T00:00:01.000Z',
+      }],
+      startedAt: '2026-08-30T00:00:01.000Z',
       createdAt: '2026-08-30T00:00:00.000Z',
       updatedAt: '2026-08-30T00:00:00.000Z',
     }
@@ -1088,7 +1093,23 @@ describe('createApiClient', () => {
       }),
       jsonResponse({
         success: true,
-        data: { execution: { ...execution, status: 'cancelled' as const } },
+        data: {
+          execution: {
+            ...execution,
+            status: 'cancelled' as const,
+            completedAt: '2026-08-30T00:00:03.000Z',
+            durationMs: 2_000,
+            errorCode: 'CANVAS_EXECUTION_CANCELLED',
+            nodeStatuses: [{
+              ...execution.nodeStatuses[0],
+              status: 'failed' as const,
+              completedAt: '2026-08-30T00:00:02.000Z',
+              durationMs: 1_000,
+              errorCode: 'CANVAS_GENERATION_CANCELLED',
+              error: 'cancelled',
+            }],
+          },
+        },
       }),
       jsonResponse({
         success: true,

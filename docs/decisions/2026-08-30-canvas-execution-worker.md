@@ -56,4 +56,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
   资产，Worker/API 仍以服务端资产实际类型为最终校验。这样视频节点使用首尾帧图片、参考视频等多输入模型时，
   不会被节点输出类型错误限制，模型切换和版本恢复也不会无声重排素材。
 
-后续可在同一任务输入/历史读模型上继续增加节点耗时和失败诊断，但不复制第二份任务状态表。
+- Worker 在节点 generation 创建时把 `startedAt` 写入 `nodeRuns`，在成功或失败时补齐 `completedAt`、`durationMs` 和稳定
+  `errorCode`；节点等待资产投影时保留开始时间，不会把轮询等待重复计入多个执行区间。
+- API 从 `task_records.startedAt/completedAt/errorJson` 投影整图执行诊断，并从 `nodeRuns` 投影节点诊断；历史读模型和 SSE
+  复用同一套字段，旧任务缺少字段时保持兼容。Canvas 历史面板显示总耗时、失败节点数量和任务错误码，节点错误提示保留错误码。
+- 节点耗时同时进入 Worker 进程内 timing 指标，后续可接入外部指标后端；本阶段不复制第二份任务状态表。

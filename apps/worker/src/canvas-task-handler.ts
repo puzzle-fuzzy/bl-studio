@@ -14,6 +14,18 @@ import type { TaskProcessOutcome } from './task-contracts'
 const NODE_POLL_DELAY_MS = 3_000
 const NODE_ADVANCE_DELAY_MS = 250
 
+function currentIso(): string {
+  return new Date().toISOString()
+}
+
+function durationBetween(startedAt: string | undefined, completedAt: string): number | undefined {
+  if (startedAt === undefined) return undefined
+  const startedMs = Date.parse(startedAt)
+  const completedMs = Date.parse(completedAt)
+  if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs) || completedMs < startedMs) return undefined
+  return completedMs - startedMs
+}
+
 export interface CanvasExecutionTaskHandlerDeps {
   readonly repository: Pick<
     GenerationRepositoryPort,
@@ -65,14 +77,29 @@ export async function processCanvasExecutionTask(
   for (const result of generationResults) {
     if (result.kind === 'succeeded') {
       nextInput = withNodeRun(nextInput, result.nodeId, result.run)
+      if (result.run.durationMs !== undefined) {
+        deps.metrics?.timing('worker.canvas.node_duration', result.run.durationMs, { status: result.run.status })
+      }
       deps.logger.info('canvas.node_succeeded', {
         taskId: task.id,
         nodeId: result.nodeId,
         generationId: result.run.generationId,
         assetIds: result.run.assetIds,
+        durationMs: result.run.durationMs,
       })
     } else if (result.kind === 'failed') {
       nextInput = withNodeRun(nextInput, result.nodeId, result.run)
+      if (result.run.durationMs !== undefined) {
+        deps.metrics?.timing('worker.canvas.node_duration', result.run.durationMs, { status: result.run.status })
+      }
+      deps.logger.error('canvas.node_failed', {
+        taskId: task.id,
+        nodeId: result.nodeId,
+        generationId: result.run.generationId,
+        errorCode: result.run.errorCode,
+        error: result.run.error,
+        durationMs: result.run.durationMs,
+      })
     }
   }
   const waitingResult = generationResults.find(result => result.kind === 'waiting')
@@ -107,12 +134,13 @@ export async function processCanvasExecutionTask(
   if (batch.length > 0) {
     const startResults = await Promise.all(
       batch.map(async node => {
+        const startedAt = currentIso()
         const dependencyResult = resolveDependencyAssetRefs(node, nextInput)
         if (dependencyResult.waiting) {
           return { nodeId: node.nodeId, waiting: true as const }
         }
         if (dependencyResult.error !== undefined) {
-          return { nodeId: node.nodeId, error: dependencyResult.error }
+          return { nodeId: node.nodeId, error: dependencyResult.error, startedAt }
         }
         try {
           const cachePolicy = nextInput.cachePolicy ?? 'reuse'
@@ -145,10 +173,11 @@ export async function processCanvasExecutionTask(
               ...(deps.generationQuota === undefined ? {} : { quota: deps.generationQuota }),
             })
           }
-          return { nodeId: node.nodeId, created }
+          return { nodeId: node.nodeId, created, startedAt }
         } catch (error) {
           return {
             nodeId: node.nodeId,
+            startedAt,
             error: {
               message: error instanceof Error ? error.message : String(error),
               code: 'CANVAS_NODE_GENERATION_CREATE_FAILED',
@@ -168,6 +197,7 @@ export async function processCanvasExecutionTask(
           status: 'generating',
           generationId: result.created.record.id,
           cacheHit,
+          startedAt: result.startedAt,
         })
         deps.metrics?.increment('worker.canvas.node_cache', {
           outcome: cacheHit ? 'hit' : 'miss',
@@ -185,6 +215,8 @@ export async function processCanvasExecutionTask(
         nextInput = withNodeRun(nextInput, result.nodeId, {
           status: 'failed',
           error: result.error.message,
+          errorCode: result.error.code,
+          ...completedNodeTiming(result.startedAt),
         })
       }
     }
@@ -233,26 +265,37 @@ async function inspectGeneratingNode(
 ): Promise<NodeInspectionResult> {
   const generationId = currentRun?.generationId
   if (generationId === undefined) {
-    return {
-      kind: 'failed',
-      nodeId: planNode.nodeId,
-      run: {
-        status: 'failed',
-        error: 'Canvas node is marked generating without a generation ID',
-      },
-    }
+    return failedNodeInspection(
+      planNode.nodeId,
+      undefined,
+      'Canvas node is marked generating without a generation ID',
+      'CANVAS_NODE_GENERATION_ID_MISSING',
+      currentRun,
+    )
   }
 
   const generation = await deps.repository.getGenerationRecord(generationId)
   if (generation === undefined) {
-    return failedNodeInspection(planNode.nodeId, generationId, `Generation record not found: ${generationId}`)
+    return failedNodeInspection(
+      planNode.nodeId,
+      generationId,
+      `Generation record not found: ${generationId}`,
+      'CANVAS_GENERATION_NOT_FOUND',
+      currentRun,
+    )
   }
   if (generation.status === 'failed' || generation.status === 'cancelled') {
     const message =
       typeof generation.errorJson?.['message'] === 'string'
         ? String(generation.errorJson['message'])
         : `Canvas node generation ${generation.status}`
-    return failedNodeInspection(planNode.nodeId, generation.id, message)
+    return failedNodeInspection(
+      planNode.nodeId,
+      generation.id,
+      message,
+      generation.status === 'cancelled' ? 'CANVAS_GENERATION_CANCELLED' : 'CANVAS_GENERATION_FAILED',
+      currentRun,
+    )
   }
   if (generation.status !== 'succeeded') {
     return {
@@ -265,7 +308,13 @@ async function inspectGeneratingNode(
 
   const assetRepository = deps.assetRepository
   if (assetRepository === undefined) {
-    return failedNodeInspection(planNode.nodeId, generation.id, 'Canvas execution asset repository is not configured')
+    return failedNodeInspection(
+      planNode.nodeId,
+      generation.id,
+      'Canvas execution asset repository is not configured',
+      'CANVAS_ASSET_REPOSITORY_MISSING',
+      currentRun,
+    )
   }
 
   const artifacts = (await deps.repository.listArtifactsForRecord(generation.id)).filter(
@@ -273,13 +322,21 @@ async function inspectGeneratingNode(
   )
   const failedArtifact = artifacts.find(artifact => artifact.status === 'failed')
   if (failedArtifact !== undefined) {
-    return failedNodeInspection(planNode.nodeId, generation.id, 'Canvas node artifact persistence failed')
+    return failedNodeInspection(
+      planNode.nodeId,
+      generation.id,
+      'Canvas node artifact persistence failed',
+      'CANVAS_ARTIFACT_FAILED',
+      currentRun,
+    )
   }
   if (artifacts.length === 0) {
     return failedNodeInspection(
       planNode.nodeId,
       generation.id,
       'Canvas node generation completed without a matching media artifact',
+      'CANVAS_ARTIFACT_MISSING',
+      currentRun,
     )
   }
 
@@ -313,20 +370,48 @@ async function inspectGeneratingNode(
   return {
     kind: 'succeeded',
     nodeId: planNode.nodeId,
-    run: {
+    run: completedNodeRun(currentRun, {
       status: 'succeeded',
       generationId: generation.id,
       assetIds,
-      ...(currentRun?.cacheHit === undefined ? {} : { cacheHit: currentRun.cacheHit }),
-    },
+    }),
   }
 }
 
-function failedNodeInspection(nodeId: string, generationId: string, message: string): NodeInspectionResult {
+function completedNodeTiming(startedAt: string | undefined): Pick<CanvasNodeRun, 'startedAt' | 'completedAt' | 'durationMs'> {
+  const completedAt = currentIso()
+  const durationMs = durationBetween(startedAt, completedAt)
+  return {
+    ...(startedAt === undefined ? {} : { startedAt }),
+    completedAt,
+    ...(durationMs === undefined ? {} : { durationMs }),
+  }
+}
+
+function completedNodeRun(currentRun: CanvasNodeRun | undefined, patch: CanvasNodeRun): CanvasNodeRun {
+  return {
+    ...(currentRun ?? {}),
+    ...patch,
+    ...completedNodeTiming(patch.startedAt ?? currentRun?.startedAt),
+  }
+}
+
+function failedNodeInspection(
+  nodeId: string,
+  generationId: string | undefined,
+  message: string,
+  errorCode: string,
+  currentRun: CanvasNodeRun | undefined,
+): NodeInspectionResult {
   return {
     kind: 'failed',
     nodeId,
-    run: { status: 'failed', generationId, error: message },
+    run: completedNodeRun(currentRun, {
+      status: 'failed',
+      ...(generationId === undefined ? {} : { generationId }),
+      error: message,
+      errorCode,
+    }),
   }
 }
 

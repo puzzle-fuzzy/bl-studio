@@ -531,6 +531,7 @@ function toCanvasExecutionSummary(task: TaskRecord) {
   if (!parsed.success) {
     throw new CanvasExecutionError('CANVAS_EXECUTION_INVALID_TASK_INPUT', 'Canvas execution task input is invalid')
   }
+  const durationMs = durationBetween(task.startedAt, task.completedAt)
   return {
     id: task.id,
     documentId: parsed.data.documentId,
@@ -544,12 +545,28 @@ function toCanvasExecutionSummary(task: TaskRecord) {
         ...(run?.generationId === undefined ? {} : { generationId: run.generationId }),
         ...(run?.assetIds === undefined ? {} : { assetIds: run.assetIds }),
         ...(run?.cacheHit === undefined ? {} : { cacheHit: run.cacheHit }),
+        ...(run?.startedAt === undefined ? {} : { startedAt: run.startedAt }),
+        ...(run?.completedAt === undefined ? {} : { completedAt: run.completedAt }),
+        ...(run?.durationMs === undefined ? {} : { durationMs: run.durationMs }),
+        ...(run?.errorCode === undefined ? {} : { errorCode: run.errorCode }),
         ...(run?.error === undefined ? {} : { error: run.error }),
       }
     }),
     ...(task.errorJson?.message === undefined ? {} : { error: task.errorJson.message }),
+    ...(task.startedAt === undefined ? {} : { startedAt: task.startedAt }),
+    ...(task.completedAt === undefined ? {} : { completedAt: task.completedAt }),
+    ...(durationMs === undefined ? {} : { durationMs }),
+    ...(task.errorJson?.code === undefined ? {} : { errorCode: task.errorJson.code }),
     ...(parsed.data.rerun === undefined ? {} : { rerun: parsed.data.rerun }),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   }
+}
+
+function durationBetween(startedAt: string | undefined, completedAt: string | undefined): number | undefined {
+  if (startedAt === undefined || completedAt === undefined) return undefined
+  const startedMs = Date.parse(startedAt)
+  const completedMs = Date.parse(completedAt)
+  if (!Number.isFinite(startedMs) || !Number.isFinite(completedMs) || completedMs < startedMs) return undefined
+  return completedMs - startedMs
 }

@@ -135,6 +135,14 @@ export const CanvasExecutionNodeRunSchema = z
     assetIds: z.array(z.string().trim().min(1).max(160)).optional(),
     /** Whether this node reused an existing generation through the Canvas cache. */
     cacheHit: z.boolean().optional(),
+    /** Timestamp when this node's generation attempt was created. */
+    startedAt: z.string().trim().min(1).max(64).optional(),
+    /** Timestamp when this node reached a terminal state. */
+    completedAt: z.string().trim().min(1).max(64).optional(),
+    /** Elapsed time between startedAt and completedAt, in milliseconds. */
+    durationMs: z.number().int().nonnegative().optional(),
+    /** Stable diagnostic code for a failed node. */
+    errorCode: z.string().trim().min(1).max(160).optional(),
     error: z.string().trim().min(1).max(2000).optional(),
   })
   .strict()
@@ -167,6 +175,10 @@ export const CanvasExecutionNodeStatusSchema = z
     generationId: z.string().trim().min(1).max(160).optional(),
     assetIds: z.array(z.string().trim().min(1).max(160)).optional(),
     cacheHit: z.boolean().optional(),
+    startedAt: z.string().trim().min(1).max(64).optional(),
+    completedAt: z.string().trim().min(1).max(64).optional(),
+    durationMs: z.number().int().nonnegative().optional(),
+    errorCode: z.string().trim().min(1).max(160).optional(),
     error: z.string().trim().min(1).max(2000).optional(),
   })
   .strict()
@@ -179,6 +191,10 @@ export const CanvasExecutionTaskSummarySchema = z
     status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
     nodeStatuses: z.array(CanvasExecutionNodeStatusSchema).max(500),
     error: z.string().trim().min(1).max(2000).optional(),
+    startedAt: z.string().trim().min(1).max(64).optional(),
+    completedAt: z.string().trim().min(1).max(64).optional(),
+    durationMs: z.number().int().nonnegative().optional(),
+    errorCode: z.string().trim().min(1).max(160).optional(),
     rerun: z
       .object({
         sourceExecutionId: z.string().trim().min(1).max(200),

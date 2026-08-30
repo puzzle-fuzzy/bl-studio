@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import { CanvasRepositoryError } from '@bailian-studio/canvas-repository'
-import type { CanvasDocument, CanvasSnapshot, CanvasVersion } from '@bailian-studio/canvas-contracts'
+import { CanvasExecutionTaskInputSchema, type CanvasDocument, type CanvasExecutionTaskInput, type CanvasSnapshot, type CanvasVersion } from '@bailian-studio/canvas-contracts'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { CancelTaskInput } from '@bailian-studio/task-repository'
 import { createTestApp } from '../src/test-app'
@@ -230,13 +230,56 @@ describe('canvas routes', () => {
     expect((await second.json()).data.execution.id).toBe(firstExecution.id)
     expect(taskRepository.enqueues).toBe(1)
 
+    const stored = taskRepository.tasks.get(firstExecution.id)
+    if (stored === undefined) throw new Error('expected stored canvas task')
+    const storedInput = CanvasExecutionTaskInputSchema.parse(stored.input)
+    const diagnosticInput: CanvasExecutionTaskInput = {
+      ...storedInput,
+      nodeRuns: {
+        ...storedInput.nodeRuns,
+        'node-1': {
+          status: 'failed',
+          startedAt: '2026-08-30T00:00:01.500Z',
+          completedAt: '2026-08-30T00:00:02.500Z',
+          durationMs: 1_000,
+          errorCode: 'CANVAS_ARTIFACT_MISSING',
+          error: 'artifact missing',
+        },
+      },
+    }
+    taskRepository.tasks.set(firstExecution.id, {
+      ...stored,
+      status: 'failed',
+      startedAt: '2026-08-30T00:00:01.000Z',
+      completedAt: '2026-08-30T00:00:03.000Z',
+      errorJson: {
+        category: 'validation',
+        message: 'Canvas node node-1 failed',
+        retriable: false,
+        code: 'CANVAS_NODE_FAILED',
+      },
+      input: diagnosticInput,
+    })
+
     const read = await app.handle(
       new Request(`http://localhost/api/canvases/canvas-1/executions/${firstExecution.id}`, {
         headers: { cookie: 'bailian_studio_session=fake-token' },
       }),
     )
     expect(read.status).toBe(200)
-    expect((await read.json()).data.execution.id).toBe(firstExecution.id)
+    expect((await read.json()).data.execution).toMatchObject({
+      id: firstExecution.id,
+      status: 'failed',
+      startedAt: '2026-08-30T00:00:01.000Z',
+      completedAt: '2026-08-30T00:00:03.000Z',
+      durationMs: 2_000,
+      errorCode: 'CANVAS_NODE_FAILED',
+      nodeStatuses: [{
+        nodeId: 'node-1',
+        durationMs: 1_000,
+        errorCode: 'CANVAS_ARTIFACT_MISSING',
+      }],
+    })
 
     const history = await app.handle(
       new Request('http://localhost/api/canvases/canvas-1/executions?limit=10', {
@@ -245,7 +288,7 @@ describe('canvas routes', () => {
     )
     expect(history.status).toBe(200)
     expect((await history.json()).data.items).toMatchObject([
-      { id: firstExecution.id, documentId: 'canvas-1', status: 'queued' },
+      { id: firstExecution.id, documentId: 'canvas-1', status: 'failed', durationMs: 2_000 },
     ])
   })
 

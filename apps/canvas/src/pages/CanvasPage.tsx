@@ -350,6 +350,9 @@ export function CanvasPage() {
                     <span className="block text-[10px] text-muted-foreground">
                       版本 {execution.documentRevision} · {new Date(execution.createdAt).toLocaleString()}
                       {execution.nodeStatuses.some(node => node.cacheHit === true) ? ' · 命中缓存' : ''}
+                      {execution.durationMs === undefined ? '' : ` · 总耗时 ${formatDuration(execution.durationMs)}`}
+                      {failedNodeCount(execution) === 0 ? '' : ` · ${failedNodeCount(execution)} 个节点失败`}
+                      {execution.errorCode === undefined ? '' : ` · ${execution.errorCode}`}
                     </span>
                   </span>
                   <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">{executionStatusLabel(execution.status)}</span>
@@ -440,4 +443,16 @@ function executionStatusLabel(status: CanvasExecutionTaskSummary['status']): str
     failed: '失败',
     cancelled: '已取消',
   }[status]
+}
+
+function failedNodeCount(execution: CanvasExecutionTaskSummary): number {
+  return execution.nodeStatuses.filter(node => node.status === 'failed').length
+}
+
+function formatDuration(milliseconds: number): string {
+  if (milliseconds < 1_000) return `${milliseconds}ms`
+  if (milliseconds < 60_000) return `${(milliseconds / 1_000).toFixed(1)}s`
+  const minutes = Math.floor(milliseconds / 60_000)
+  const seconds = Math.round((milliseconds % 60_000) / 1_000)
+  return seconds === 60 ? `${minutes + 1}m` : `${minutes}m ${seconds}s`
 }

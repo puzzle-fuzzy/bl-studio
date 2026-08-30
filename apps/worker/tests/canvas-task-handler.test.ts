@@ -271,7 +271,7 @@ describe('processCanvasExecutionTask', () => {
     }
     const runningInput = canvasInput({
       nodeRuns: {
-        node_1: { status: 'generating', generationId: generated.id, cacheHit: false },
+        node_1: { status: 'generating', generationId: generated.id, cacheHit: false, startedAt: NOW },
       },
     })
 
@@ -299,6 +299,9 @@ describe('processCanvasExecutionTask', () => {
             status: 'succeeded',
             assetIds: ['asset_generation_artifact_1'],
             cacheHit: false,
+            startedAt: expect.any(String),
+            completedAt: expect.any(String),
+            durationMs: expect.any(Number),
           },
         },
       },
@@ -315,7 +318,7 @@ describe('processCanvasExecutionTask', () => {
       task(
         canvasInput({
           nodeRuns: {
-            node_1: { status: 'generating', generationId: generated.id },
+            node_1: { status: 'generating', generationId: generated.id, startedAt: NOW },
           },
         }),
       ),
@@ -337,6 +340,40 @@ describe('processCanvasExecutionTask', () => {
             status: 'failed',
             generationId: 'generation_1',
             error: 'provider failed',
+            errorCode: 'CANVAS_GENERATION_FAILED',
+            startedAt: expect.any(String),
+            completedAt: expect.any(String),
+            durationMs: expect.any(Number),
+          },
+        },
+      },
+    })
+  })
+
+  it('persists node diagnostics when generation creation fails', async () => {
+    const result = await processCanvasExecutionTask(task(canvasInput()), {
+      repository: {
+        createGeneration: async () => {
+          throw new Error('provider quota unavailable')
+        },
+        getGenerationRecord: async () => undefined,
+        listArtifactsForRecord: async () => [],
+      },
+      logger: createRecordingLogger(),
+    })
+
+    expect(result).toMatchObject({
+      status: 'failed',
+      error: { code: 'CANVAS_NODE_GENERATION_CREATE_FAILED' },
+      nextInput: {
+        nodeRuns: {
+          node_1: {
+            status: 'failed',
+            error: 'provider quota unavailable',
+            errorCode: 'CANVAS_NODE_GENERATION_CREATE_FAILED',
+            startedAt: expect.any(String),
+            completedAt: expect.any(String),
+            durationMs: expect.any(Number),
           },
         },
       },
