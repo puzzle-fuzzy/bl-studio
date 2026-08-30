@@ -6,25 +6,12 @@
  * ProviderOutputMapping.kind，从原始响应里按对应策略取出 url/text，统一包装为
  * NormalizedArtifact，把 provider 特有的结构差异屏蔽在此处。
  */
+import type { NormalizedArtifact, NormalizedOutput } from '@bailian-studio/model-core'
 import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 
-/**
- * 归一化后的单个产出物。kind 标明媒体类型，sourceUrl/text 二者按产出形态提供其一。
- */
-export interface NormalizedArtifact {
-  kind: 'image' | 'video' | 'audio' | 'text' | 'archive'
-  sourceUrl?: string
-  text?: string
-  mimeType?: string
-  providerMeta?: unknown
-}
-
-/** 归一化输出：artifact 列表 + 原始 usage + 原始响应（raw，便于排查/回放）。 */
-export interface NormalizedOutput {
-  artifacts: NormalizedArtifact[]
-  usage?: unknown
-  raw: unknown
-}
+// Compatibility exports keep provider-local imports stable while the shared
+// output contract is owned by model-core.
+export type { NormalizedArtifact, NormalizedOutput } from '@bailian-studio/model-core'
 
 /**
  * 把 DashScope 原始响应按 manifest 归一化为 NormalizedOutput。

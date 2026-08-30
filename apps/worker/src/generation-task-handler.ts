@@ -9,7 +9,7 @@ import type {
   ProviderRequestOperation,
   FinishProviderRequestInput,
 } from '@bailian-studio/generation-repository'
-import type { NormalizedArtifact, NormalizedOutput } from '@bailian-studio/provider-dashscope'
+import type { NormalizedArtifact, NormalizedOutput } from '@bailian-studio/model-core'
 import type { Logger, MetricsCollector } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { nextRunAt } from '@bailian-studio/task-engine'

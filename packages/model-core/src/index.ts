@@ -35,6 +35,7 @@ export {
   readModelReferenceFormat,
   type ModelReferenceFormat,
 } from './request-bindings'
+export type { NormalizedArtifact, NormalizedOutput } from './output-types'
 export type {
   DeepReadonly,
   FrozenModelManifest,

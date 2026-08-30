@@ -57,7 +57,7 @@ Worker 与前端各自维护不同的 wire schema。
 ## 3. Owner 包职责边界
 
 ### packages/model-core（provider-neutral 契约 + 纯函数校验层）
-- **拥有**：`ModelManifest` 的通用形状、参数/计价校验与模型错误类型（`validateModelParams`、`estimateModelCost`、`ModelCoreError`）。
+- **拥有**：`ModelManifest` 的通用形状、`NormalizedOutput/NormalizedArtifact` provider-neutral 输出契约、参数/计价校验与模型错误类型（`validateModelParams`、`estimateModelCost`、`ModelCoreError`）。
 - **禁止**：import SDK / adapter / provider catalog；加 HTTP 客户端、环境访问、数据库代码、运行时编排、第二份契约/价格表。
 
 ### packages/dashscope-manifests（DashScope 模型知识 owner）
@@ -67,7 +67,7 @@ Worker 与前端各自维护不同的 wire schema。
 - 改模型知识 = 改此包的 manifest，跑 `bun run check:manifests`。
 
 ### packages/provider-dashscope（协议执行层，worker 专属）
-- **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、provider 响应解析与错误分类。
+- **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、DashScope 响应解析与错误分类；解析结果实现 `model-core` 的 `NormalizedOutput` 契约。
 - 只经 package root import model-core；禁止 SDK、DB/仓储/task-engine/sse-protocol/API/Worker/apps/elysia/react。
 - 传输层保持可注入以便测试；**绝不向未通过信任校验的 URL 发送凭据**。
 
