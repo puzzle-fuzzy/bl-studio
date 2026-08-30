@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Download, Eye, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
+import { ArrowLeft, Ban, Bookmark, BookmarkCheck, Check, ChevronDown, CircleAlert, Copy, Download, Eye, ListChecks, Loader2, Share2, RotateCcw, Wand2 } from 'lucide-react'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 import { CollectGenerationAssetDialog } from '@/components/assets/CollectGenerationAssetDialog'
+import { CollectGenerationAssetBatchDialog } from '@/components/assets/CollectGenerationAssetBatchDialog'
 import type { AssetItem, GenerationArtifact, GenerationDiagnostics, GenerationRecord } from '@bailian-studio/api-client'
 import { Button } from '@bailian-studio/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@bailian-studio/ui'
@@ -99,6 +100,7 @@ function DetailContent({
   const [favorited, setFavorited] = useState(false)
   const [favoriteBusy, setFavoriteBusy] = useState(false)
   const [collectOpen, setCollectOpen] = useState(false)
+  const [collectBatchOpen, setCollectBatchOpen] = useState(false)
 
   // 加载收藏状态（仅本人可见的作品；详情页记录通常对 owner 可见）。
   useEffect(() => {
@@ -318,7 +320,11 @@ function DetailContent({
       )}
 
       <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-        <ArtifactsSection recordId={id} />
+        <ArtifactsSection
+          recordId={id}
+          canBatchCollect={record.status === 'succeeded'}
+          onBatchCollect={() => setCollectBatchOpen(true)}
+        />
         <div className="space-y-6">
           <ParamsCard record={record} />
           <InfoCard record={record} />
@@ -335,6 +341,17 @@ function DetailContent({
           setCollectOpen(false)
           showMessage({ title: '已建立待确认创意资产版本', tone: 'success' })
           navigate(`/assets/${encodeURIComponent(asset.id)}`)
+        }}
+      />
+      <CollectGenerationAssetBatchDialog
+        open={collectBatchOpen}
+        onOpenChange={setCollectBatchOpen}
+        generationId={id}
+        onCreated={batch => {
+          setCollectBatchOpen(false)
+          showMessage({ title: `已批量建立 ${batch.assets.length} 个待确认创意资产版本`, tone: 'success' })
+          const firstAsset = batch.assets[0]
+          if (firstAsset !== undefined) navigate(`/assets/${encodeURIComponent(firstAsset.id)}`)
         }}
       />
     </div>
@@ -506,11 +523,20 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   )
 }
 
-function ArtifactsSection({ recordId }: { recordId: string }) {
+function ArtifactsSection({
+  recordId,
+  canBatchCollect,
+  onBatchCollect,
+}: {
+  recordId: string
+  canBatchCollect: boolean
+  onBatchCollect: () => void
+}) {
   const { data, isPending } = useGenerationArtifacts(recordId)
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
 
   const items = data?.items ?? []
+  const storedImageCount = items.filter(artifact => artifact.kind === 'image' && artifact.status === 'stored').length
 
   const lightboxItems: LightboxMedia[] = items.map(artifact => ({
     key: artifact.id,
@@ -524,8 +550,14 @@ function ArtifactsSection({ recordId }: { recordId: string }) {
   return (
     <>
       <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between gap-3">
           <CardTitle className="text-base">生成产物</CardTitle>
+          {canBatchCollect && storedImageCount > 1 && (
+            <Button type="button" variant="outline" size="sm" onClick={onBatchCollect}>
+              <ListChecks data-icon />
+              批量收录
+            </Button>
+          )}
         </CardHeader>
         <CardContent>
           {items.length === 0 ? (

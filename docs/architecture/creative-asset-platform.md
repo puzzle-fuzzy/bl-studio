@@ -342,7 +342,7 @@ CreativeGenerationRequest
 | director 路由分别编排阶段估价、预检和运行创建 | 模型能力、镜头状态和合成准入规则容易在多个入口漂移 | 已增加并注入 `DirectorApplicationService`；Worker 仍负责异步状态推进 |
 | creative asset 路由内部创建 use-case facade | 组合根无法统一替换 application service，测试和运行时依赖边界不一致 | 已由 API 组合根创建并注入 `CreativeAssetApplicationService`；版本 `approved` 迁移走显式 `publishVersion` |
 | creative asset 的生成产物收录曾拆成资产创建 + 版本创建两次请求 | 中间失败会留下半成品，重复提交可能生成重复资产 | 已增加单次 `collect-from-generation` 事务入口、用户范围幂等键和请求指纹 |
-| creative asset 的多资产收录曾无批次边界 | 无法表达整批 all-or-nothing、顺序和批次级重试 | 已增加 batch command、批次表、批次项和公开 API；Studio 多选入口待接线 |
+| creative asset 的多资产收录曾无批次边界 | 无法表达整批 all-or-nothing、顺序和批次级重试 | 已增加 batch command、批次表、批次项、公开 API 和 Studio 生成详情多选入口；每批最多 50 个图片产物 |
 | creative asset 尚无跨资源审计 outbox | 业务成功后审计可能丢失，失败恢复边界不清晰 | 已增加同事务 producer、独立 consumer、脱敏 payload、租约恢复、退避、管理员恢复 API、Worker 最小指标契约和 Grafana 运营视图；专用指标存储按规模决定 |
 
 ## 8. 分阶段迁移顺序
