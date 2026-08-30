@@ -47,7 +47,7 @@ export function LibraryPage() {
   const rowCount = Math.ceil(items.length / columns)
 
   return (
-    <div className="mx-auto max-w-6xl space-y-4">
+    <div className="mx-auto min-w-0 w-full max-w-6xl space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <h1 className="mr-auto text-2xl font-semibold">资产</h1>
         <Select value={layout} onValueChange={value => setLayout(value as 'grid' | 'timeline' | 'project')}>
@@ -95,7 +95,7 @@ export function LibraryPage() {
       </div>
 
       {layout === 'grid' ? (
-        <div ref={ref} className="h-[calc(100vh-16rem)] min-h-64 overflow-hidden">
+        <div ref={ref} className="h-[clamp(16rem,calc(100svh-16rem),48rem)] min-h-64 overflow-hidden">
           {size.width > 0 && items.length > 0 && (
             <Grid<AssetCellProps>
               columnCount={columns}
@@ -115,7 +115,7 @@ export function LibraryPage() {
           )}
         </div>
       ) : layout === 'project' ? (
-        <VirtualScrollArea className="h-[calc(100vh-16rem)] min-h-64 pr-1">
+        <VirtualScrollArea className="h-[clamp(16rem,calc(100svh-16rem),48rem)] min-h-64 pr-1">
           {items.length === 0 ? (
             <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
               {assetList.isPending ? '加载中…' : '还没有作品，去创作吧'}
@@ -125,7 +125,7 @@ export function LibraryPage() {
           )}
         </VirtualScrollArea>
       ) : (
-        <VirtualScrollArea className="h-[calc(100vh-16rem)] min-h-64 pr-1">
+        <VirtualScrollArea className="h-[clamp(16rem,calc(100svh-16rem),48rem)] min-h-64 pr-1">
           {items.length === 0 ? (
             <p className="flex h-full items-center justify-center text-sm text-muted-foreground">
               {assetList.isPending ? '加载中…' : '还没有作品，去创作吧'}

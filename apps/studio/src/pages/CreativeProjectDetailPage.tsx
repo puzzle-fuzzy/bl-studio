@@ -212,7 +212,7 @@ export function CreativeProjectDetailPage() {
   }
 
   return (
-    <div className="relative isolate min-h-[calc(100svh-3rem)] overflow-hidden">
+    <div className="relative isolate min-w-0 min-h-[calc(100svh-3rem)] overflow-hidden">
       <div className="relative z-10 mx-auto flex w-full max-w-[1660px] flex-col gap-5">
         <header className="border-b border-border/70 pb-5">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
@@ -267,20 +267,24 @@ export function CreativeProjectDetailPage() {
               </button>
             )}
           </div>
-          <div className="flex items-center gap-2 lg:ml-auto">
-            <Select value={type ?? 'all'} onValueChange={value => setParam('type', value)}>
-              <SelectTrigger className="w-32 bg-background/80" title="筛选素材类型"><SelectValue placeholder="全部类型" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">全部类型</SelectItem>
-                {ASSET_TYPES.map(assetType => <SelectItem key={assetType} value={assetType}>{creativeAssetTypeLabel(assetType)}</SelectItem>)}
-              </SelectContent>
-            </Select>
-            <Select value={versionStatus} onValueChange={value => setParam('status', value)}>
-              <SelectTrigger className="w-32 bg-background/80" title="筛选版本状态"><SelectValue placeholder="全部状态" /></SelectTrigger>
-              <SelectContent>
-                {CREATIVE_ASSET_VERSION_FILTERS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
-              </SelectContent>
-            </Select>
+          <div className="flex w-full flex-wrap items-center gap-2 lg:ml-auto lg:w-auto">
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <Select value={type ?? 'all'} onValueChange={value => setParam('type', value)}>
+                <SelectTrigger className="w-full bg-background/80 sm:w-32" title="筛选素材类型"><SelectValue placeholder="全部类型" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">全部类型</SelectItem>
+                  {ASSET_TYPES.map(assetType => <SelectItem key={assetType} value={assetType}>{creativeAssetTypeLabel(assetType)}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="min-w-0 flex-1 sm:flex-none">
+              <Select value={versionStatus} onValueChange={value => setParam('status', value)}>
+                <SelectTrigger className="w-full bg-background/80 sm:w-32" title="筛选版本状态"><SelectValue placeholder="全部状态" /></SelectTrigger>
+                <SelectContent>
+                  {CREATIVE_ASSET_VERSION_FILTERS.map(option => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
             <fieldset className="flex rounded-lg border border-border bg-background/70 p-1">
               <legend className="sr-only">视图切换</legend>
               <ViewButton active={view === 'grid'} label="网格视图" onClick={() => setParam('view', 'grid')}><Grid2X2 className="size-4" /></ViewButton>

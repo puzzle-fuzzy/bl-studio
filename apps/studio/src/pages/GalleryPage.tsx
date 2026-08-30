@@ -263,43 +263,51 @@ export function GalleryPage() {
   }
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
+    <div className="mx-auto min-w-0 w-full max-w-7xl space-y-4">
+      <div className="flex flex-col items-start gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-lg font-semibold">画廊</h1>
-        <div className="flex flex-wrap items-center gap-2">
-          <Select value={tab} onValueChange={value => changeTab(value as GalleryTab)}>
-            <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="community">全部作品</SelectItem>
-              <SelectItem value="favorites">我的收藏</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={category} onValueChange={changeCategory} disabled={tab === 'favorites'}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部类型</SelectItem>
-              <SelectItem value="image">图片</SelectItem>
-              <SelectItem value="video">视频</SelectItem>
-              <SelectItem value="audio">音频</SelectItem>
-              <SelectItem value="text">文本</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={modelId} onValueChange={changeModel} disabled={tab === 'favorites'}>
-            <SelectTrigger className="w-40"><SelectValue placeholder="全部模型" /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">全部模型</SelectItem>
-              {models.map(model => (
-                <SelectItem key={model.id} value={model.id}>{modelNameZh(model)}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Select value={sort} onValueChange={value => changeSort(value as GallerySort)} disabled={tab === 'favorites'}>
-            <SelectTrigger className="w-28"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              <SelectItem value="latest">最新发布</SelectItem>
-              <SelectItem value="hot">最热</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:w-auto sm:items-center">
+          <div>
+            <Select value={tab} onValueChange={value => changeTab(value as GalleryTab)}>
+              <SelectTrigger className="w-full sm:w-32"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="community">全部作品</SelectItem>
+                <SelectItem value="favorites">我的收藏</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Select value={category} onValueChange={changeCategory} disabled={tab === 'favorites'}>
+              <SelectTrigger className="w-full sm:w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部类型</SelectItem>
+                <SelectItem value="image">图片</SelectItem>
+                <SelectItem value="video">视频</SelectItem>
+                <SelectItem value="audio">音频</SelectItem>
+                <SelectItem value="text">文本</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="col-span-2 sm:col-span-1">
+            <Select value={modelId} onValueChange={changeModel} disabled={tab === 'favorites'}>
+              <SelectTrigger className="w-full sm:w-40"><SelectValue placeholder="全部模型" /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">全部模型</SelectItem>
+                {models.map(model => (
+                  <SelectItem key={model.id} value={model.id}>{modelNameZh(model)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Select value={sort} onValueChange={value => changeSort(value as GallerySort)} disabled={tab === 'favorites'}>
+              <SelectTrigger className="w-full sm:w-28"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="latest">最新发布</SelectItem>
+                <SelectItem value="hot">最热</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </div>
 
@@ -575,11 +583,13 @@ function GalleryDetailView({
   return (
     <>
       <DialogHeader>
-        <DialogTitle className="flex flex-wrap items-center gap-2 pr-8">
-          <Badge variant="secondary">{detail.record.modelId}</Badge>
-          <UserAvatar userId={detail.author.id} name={detail.author.displayName} size="sm" />
-          <span className="text-sm font-normal text-muted-foreground">{detail.author.displayName ?? detail.author.id.slice(0, 8)}</span>
-          <div className="ml-auto flex flex-wrap items-center gap-1.5">
+        <DialogTitle className="flex flex-col gap-3 pr-8 sm:flex-row sm:items-center">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <Badge variant="secondary">{detail.record.modelId}</Badge>
+            <UserAvatar userId={detail.author.id} name={detail.author.displayName} size="sm" />
+            <span className="min-w-0 truncate text-sm font-normal text-muted-foreground">{detail.author.displayName ?? detail.author.id.slice(0, 8)}</span>
+          </div>
+          <div className="flex flex-wrap items-center gap-1.5 sm:ml-auto">
             <button
               type="button"
               onClick={onReuse}
