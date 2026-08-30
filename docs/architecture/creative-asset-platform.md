@@ -277,7 +277,7 @@ apps/worker
 - 提供显式的 `publishVersion` 入口，并复用 repository 的原子版本状态迁移。
 - `createVersionFromGeneration` 已由 repository 在一个事务中完成版本与参考图写入。
 - `collectAssetFromGeneration` 已形成单次收录的应用边界，API 要求 `Idempotency-Key`，重复同指纹请求返回原资产，参数变化返回稳定冲突。
-- `collectAssetFromGenerationBatch` 已形成批次应用边界：批次、批次项、资产、项目关系、版本和参考图在一个事务内写入，批次 key 与指纹支持安全重试；Studio 多选 UI 尚未接线。
+- `collectAssetFromGenerationBatch` 已形成批次应用边界：批次、批次项、资产、项目关系、版本和参考图在一个事务内写入，批次 key 与指纹支持安全重试；Studio 生成详情已接入多选入口，并限制单批最多 50 个图片产物。
 - 单资源和批次收录成功会在同一事务写入脱敏审计 outbox；Worker 通过独立 `audit-repository` 消费并幂等投递到 `audit_logs`，终态失败保留在 outbox 中；管理员可通过 admin API 查询并人工重放。Worker 同时输出 `worker.audit_outbox.events`、`worker.audit_outbox.drain` 和 `worker.audit_outbox.drain_ms` 三组最小指标，并由现有 Alloy → Loki → Grafana 链路提供运营视图。
 - 操作人可见的恢复记录和发布幂等仍需要后续独立契约，当前不把数据库回滚误称为外部副作用恢复。
 

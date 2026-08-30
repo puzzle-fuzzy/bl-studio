@@ -11,10 +11,10 @@ import {
 } from '@xyflow/react'
 
 /**
- * 画布状态（Krea 式）：节点 + 边 + localStorage 持久化。
+ * 画布状态（Krea 式）：节点 + 边 + 服务端持久化，localStorage 仅作离线草稿兜底。
  *
- * MVP 用 localStorage；后端 canvas 文档 API（revision 并发）上线后切到
- * 服务端持久化，接口形状不变（batch 2 后半段）。
+ * 服务端 canvas 文档 API 负责 revision 并发和版本历史；localStorage 只保留
+ * 当前编辑快照，避免网络异常时立即丢失画布操作。
  */
 
 const STORAGE_KEY = 'bailian-studio:canvas:v1'
