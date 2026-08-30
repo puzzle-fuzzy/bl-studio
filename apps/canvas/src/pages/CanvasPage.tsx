@@ -56,7 +56,7 @@ export function CanvasPage() {
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
   const hasNodeGenerationInFlight = nodes.some(node => (
-    (node.data as Partial<MediaNodeData>).status === 'generating'
+    node.data.status === 'generating'
   ))
   const selectedNodeId = nodes.find(node => node.selected)?.id
   const documentId = useCanvasStore(state => state.documentId)

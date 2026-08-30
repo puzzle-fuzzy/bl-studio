@@ -298,15 +298,18 @@ function readStaticReferences(
     return []
   }
   const kinds = node.data['referenceAssetKinds']
-  const declaredKinds = kinds !== null && typeof kinds === 'object' && !Array.isArray(kinds)
-    ? kinds as Record<string, unknown>
-    : {}
+  const declaredKinds = objectRecord(kinds)
   return [...new Set(value.map(item => item.trim()))].map(id => ({
     id,
     kind: assetKinds?.get(id)
       ?? readAssetKind(declaredKinds[id])
       ?? nodeKind,
   }))
+}
+
+function objectRecord(value: unknown): Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return {}
+  return Object.fromEntries(Object.entries(value))
 }
 
 function readAssetKind(value: unknown): CanvasValidationAssetKind | undefined {

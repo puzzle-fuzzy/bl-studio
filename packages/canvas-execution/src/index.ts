@@ -344,8 +344,7 @@ function compileNode(
 
     const staticIds = selected.filter(reference => reference.sourceNodeId === undefined).map(reference => reference.id)
     const upstreamIds = selected
-      .filter(reference => reference.sourceNodeId !== undefined)
-      .map(reference => reference.sourceNodeId as string)
+      .flatMap(reference => reference.sourceNodeId === undefined ? [] : [reference.sourceNodeId])
     if (staticIds.length > 0) assetRefs[parameter.name] = staticIds
     if (upstreamIds.length > 0) dependencyBindings[parameter.name] = upstreamIds
     validationParams[parameter.name] = selected.map(reference => `canvas://${reference.id}`)
@@ -415,7 +414,7 @@ function canonicalize(value: unknown): string {
   if (typeof value === 'number' || typeof value === 'boolean') return String(value)
   if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
   if (typeof value === 'object') {
-    return `{${Object.entries(value as Record<string, unknown>)
+    return `{${Object.entries(value)
       .sort(([left], [right]) => left.localeCompare(right))
       .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry)}`)
       .join(',')}}`

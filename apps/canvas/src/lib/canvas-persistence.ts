@@ -43,7 +43,7 @@ export function toCanvasSnapshot(nodes: readonly Node[], edges: readonly Edge[])
       id: node.id,
       type: node.type ?? 'default',
       position: { x: node.position.x, y: node.position.y },
-      data: persistedData(node.data as Record<string, unknown>),
+      data: persistedData(node.data),
     })),
     edges: edges.map(edge => ({
       id: edge.id,

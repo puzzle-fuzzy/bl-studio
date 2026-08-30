@@ -15,7 +15,7 @@ export function preflightCanvasState(
 ): CanvasPreflightResult {
   const assetKinds = new Map<string, CanvasValidationAssetKind>()
   for (const node of nodes) {
-    const data = node.data as Record<string, unknown>
+    const data = node.data
     const kinds = data.referenceAssetKinds
     if (kinds === null || typeof kinds !== 'object' || Array.isArray(kinds)) continue
     for (const [assetId, kind] of Object.entries(kinds)) {
