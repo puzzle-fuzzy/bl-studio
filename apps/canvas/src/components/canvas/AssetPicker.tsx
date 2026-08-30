@@ -55,11 +55,55 @@ export function AssetPicker({
     return () => { disposed = true }
   }, [mediaKinds])
 
+  // 模型切换后，历史快照中的素材可能不再属于当前允许类型；仍按 ID 读取它们，
+  // 让用户可以在选择器中移除无效绑定，而不是被不可见的旧状态卡住。
+  useEffect(() => {
+    const knownIds = new Set(assets.map(asset => asset.id))
+    const missingIds = selectedIds.filter(assetId => !knownIds.has(assetId))
+    if (missingIds.length === 0) return
+
+    let disposed = false
+    void Promise.all(missingIds.map(async assetId => {
+      try {
+        return await apiClient.getAsset(assetId)
+      }
+      catch {
+        return undefined
+      }
+    })).then(results => {
+      if (disposed) return
+      const additions = results.filter((asset): asset is AssetItem => asset !== undefined)
+      if (additions.length === 0) return
+      setAssets(current => {
+        const byId = new Map(current.map(asset => [asset.id, asset]))
+        for (const asset of additions) byId.set(asset.id, asset)
+        return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+      })
+    })
+
+    return () => { disposed = true }
+  }, [assets, selectedIds])
+
+  const displayAssets = useMemo(() => {
+    const byId = new Map(assets.map(asset => [asset.id, asset]))
+    for (const selectedId of selectedIds) {
+      if (byId.has(selectedId)) continue
+      byId.set(selectedId, {
+        id: selectedId,
+        kind: selectedKinds[selectedId] ?? kind,
+        source: 'derived',
+        fileName: '已选参考素材（详情不可用）',
+        createdAt: '',
+      })
+    }
+    return [...byId.values()].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+  }, [assets, kind, selectedIds, selectedKinds])
+
   const filteredAssets = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
-    if (normalized.length === 0) return assets
-    return assets.filter(asset => (asset.fileName ?? asset.id).toLocaleLowerCase().includes(normalized))
-  }, [assets, query])
+    if (normalized.length === 0) return displayAssets
+    return displayAssets.filter(asset => (asset.fileName ?? asset.id).toLocaleLowerCase().includes(normalized))
+  }, [displayAssets, query])
 
   const selectedCountByKind = useMemo(() => {
     const counts: Partial<Record<MediaKind, number>> = {}
@@ -72,6 +116,9 @@ export function AssetPicker({
   }, [selectedIds, selectedKinds])
 
   const capacitySummary = mediaKinds
+    .concat(
+      [...new Set(Object.values(selectedKinds))].filter(mediaKind => !mediaKinds.includes(mediaKind)),
+    )
     .map(mediaKind => `${mediaKind === 'image' ? '图片' : '视频'} ${selectedCountByKind[mediaKind] ?? 0}/${maxSelectableByKind[mediaKind] ?? 0}`)
     .join(' · ')
 
