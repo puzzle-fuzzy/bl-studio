@@ -3,7 +3,13 @@ import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { ModelCatalog } from '@bailian-studio/model-core'
 import type { TaskError } from '@bailian-studio/task-engine'
 
-/** Task executor 对模型目录唯一需要的只读查询能力。 */
+/**
+ * Task executor 对模型目录唯一需要的只读查询能力。
+ *
+ * 该 port 的 concrete manifest 类型刻意保留在 provider runner 边界：
+ * generation task 最终需要把同一份 manifest 交给 ProviderRegistry.resolve，
+ * 由 concrete runner 读取 provider request/output/transport mapping。
+ */
 export interface ModelRegistryLookup {
   getModelById(id: string): FrozenModelManifest | undefined
 }

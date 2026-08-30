@@ -1,7 +1,7 @@
 import type { GenerationInputAsset } from '@bailian-studio/generation-repository'
-import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
-import type { ProviderErrorInfo } from '@bailian-studio/provider-dashscope'
+import type { FrozenModelManifest } from '@bailian-studio/model-core'
 import type { StorageAdapter } from '@bailian-studio/storage'
+import type { TaskError } from '@bailian-studio/task-engine'
 
 export const GENERATION_INPUT_ASSET_URL_TTL_SECONDS = 15 * 60
 
@@ -18,13 +18,13 @@ export interface ResolveGenerationInputParamsInput {
  * 持久化数据违规属于不可重试的校验错误；存储签名临时失败属于可重试的系统错误。
  */
 export class GenerationInputAssetResolutionError extends Error {
-  readonly info: ProviderErrorInfo
+  readonly info: TaskError
 
   constructor(
     code: string,
     message: string,
     details?: Readonly<Record<string, unknown>>,
-    category: ProviderErrorInfo['category'] = 'validation',
+    category: TaskError['category'] = 'validation',
     retriable = false,
   ) {
     super(message)
