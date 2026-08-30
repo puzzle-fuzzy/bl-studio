@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createIsolatedGenerationRepository, createTestUser, grantTestCredits, type IsolatedGenerationRepository } from '@bailian-studio/generation-repository'
+import { CanvasExecutionTaskInputSchema } from '@bailian-studio/canvas-contracts'
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteInput, ProviderExecuteOutput, ProviderRunner } from '../src/providers'
 import { createTaskQueueRepository, type TaskQueueRepository } from '@bailian-studio/task-repository'
 import { WorkerLoop } from '../src/worker-loop'
-import { FakeStorageAdapter } from './fixtures'
+import { FakeStorageAdapter, makeTask } from './fixtures'
 import { FakeMediaProcessor } from './media-fixtures'
 
 let iso: IsolatedGenerationRepository
@@ -68,6 +69,7 @@ function buildLoop(
     repository: iso.repository,
     generationRecoveryRepository: iso.generationRecoveryRepository,
     taskRepository,
+    assetRepository: iso.assetRepository,
     providerRequestAuditRepository: iso.providerRequestAuditRepository,
     providerRegistry: registry,
     modelRegistry: { getModelById },
@@ -101,6 +103,25 @@ async function runUntilSucceeded(loop: WorkerLoop, recordId: string, timeoutMs: 
       await new Promise(r => setTimeout(r, 10))
     }
     throw new Error('runUntilSucceeded timed out')
+  } finally {
+    loop.stop()
+    await run
+  }
+}
+
+async function runUntilCanvasSucceeded(loop: WorkerLoop, taskId: string, timeoutMs: number): Promise<void> {
+  const run = loop.run()
+  try {
+    const start = Date.now()
+    while (Date.now() - start < timeoutMs) {
+      const task = await taskRepository.getTask(taskId)
+      if (task?.status === 'succeeded') return
+      if (task?.status === 'failed') {
+        throw new Error(`canvas task failed unexpectedly: ${task.errorJson?.message ?? ''}`)
+      }
+      await new Promise(resolve => setTimeout(resolve, 10))
+    }
+    throw new Error('runUntilCanvasSucceeded timed out')
   } finally {
     loop.stop()
     await run
@@ -238,5 +259,72 @@ describe('worker e2e', () => {
 
     expect((await iso.repository.getGenerationRecord(first.record.id))?.status).toBe('succeeded')
     expect((await iso.repository.getGenerationRecord(second.record.id))?.status).toBe('succeeded')
+  })
+
+  it('consumes a persisted canvas task through child generation and asset projection', async () => {
+    const canvasTask = await taskRepository.enqueueTask(makeTask({
+      id: 'canvas-worker-e2e',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      status: 'queued',
+      recordId: 'canvas-worker-document',
+      userId: 'user_e2e',
+      traceId: 'canvas-worker-trace',
+      input: {
+        documentId: 'canvas-worker-document',
+        documentRevision: 1,
+        plan: {
+          nodes: [{
+            nodeId: 'canvas-node-1',
+            kind: 'image',
+            modelId: 'qwen-image',
+            params: { prompt: 'a red lantern', n: 1, size: '1328*1328' },
+            assetRefs: {},
+            dependencyBindings: {},
+            dependsOn: [],
+          }],
+        },
+        nodeRuns: {},
+      },
+    }))
+
+    await runUntilCanvasSucceeded(
+      buildLoop([{
+        success: true,
+        costCents: 20,
+        requiresPoll: false,
+        output: { artifacts: [{ kind: 'image', sourceUrl: IMAGE_DATA_URL }], raw: { canvas: true } },
+      }], 'canvas-worker', 0, 1),
+      canvasTask.id,
+      5_000,
+    )
+
+    const completed = await taskRepository.getTask(canvasTask.id)
+    expect(completed?.status).toBe('succeeded')
+    if (completed === undefined) throw new Error('expected completed canvas task')
+    const input = CanvasExecutionTaskInputSchema.parse(completed.input)
+    const nodeRun = input.nodeRuns['canvas-node-1']
+    expect(nodeRun).toMatchObject({
+      status: 'succeeded',
+      generationId: expect.any(String),
+      assetIds: [expect.any(String)],
+    })
+
+    const generationId = nodeRun?.generationId
+    if (generationId === undefined) throw new Error('expected canvas child generation')
+    expect(await iso.repository.getGenerationRecord(generationId)).toMatchObject({
+      id: generationId,
+      userId: 'user_e2e',
+      status: 'succeeded',
+    })
+    const generatedAsset = (await iso.assetRepository.listUnifiedAssets('user_e2e', {
+      source: 'generation',
+    })).items.find(asset => asset.recordId === generationId)
+    expect(generatedAsset).toMatchObject({
+      kind: 'image',
+      source: 'generation',
+      recordId: generationId,
+      thumbnailStatus: 'ready',
+    })
   })
 })
