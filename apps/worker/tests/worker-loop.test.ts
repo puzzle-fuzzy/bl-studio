@@ -49,7 +49,7 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
     modelCatalog,
     storage: new FakeStorageAdapter(),
     taskRepository: {
-      claimNextQueuedTask: input => repo.claimNextQueuedTask(),
+      claimNextQueuedTask: _input => repo.claimNextQueuedTask(),
       renewTaskLock: input => repo.renewTaskLock(input),
       saveTask: (task, options) => repo.saveTask(task, options),
     },
