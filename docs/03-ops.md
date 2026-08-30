@@ -73,7 +73,8 @@ bun run deploy:prod
   DNS 指向服务器）；该脚本幂等，已存在证书会跳过。
 - **观测栈默认不启动**（`observability` profile）。核心上线稳定后再：
   ```bash
-  bun run prod:observability:up   # 启用 loki/alloy/grafana/monitor
+  bun run prod:observability:up   # 启用并冒烟检查 loki/alloy/grafana/monitor
+  bun run prod:observability:smoke # 服务重启后可单独复查
   ```
 - 之后增量部署每次都是「重新 load 新 SHA 镜像 → 迁移 → 滚动 up → 边缘幂等刷新」。
 
@@ -231,7 +232,8 @@ bun run deploy:prod               # 一键发布（核心栈 + 宿主机 nginx �
 bun run deploy:prod:web           # web-only 快速发版（约 20MB，不动 api/worker）
 bun run db:seed:model-costs       # 播种 model_costs 默认成本（新库首次部署后执行）
 bun run prod:up|down|ps|logs      # 生产核心栈运维
-bun run prod:observability:up|down  # SSH 到服务器启用/停用观测栈（loki/alloy/grafana/monitor）
+bun run prod:observability:up|down  # SSH 到服务器启停观测栈（loki/alloy/grafana/monitor）
+bun run prod:observability:smoke     # SSH 到服务器检查四服务、Loki ready、Grafana health
 bun run logs:api|worker           # 生产单服务日志
 bun run logs:prune                # 清理旧日志（观测栈启用时）
 bun run prod:mem                  # 服务器内存 + 容器占用

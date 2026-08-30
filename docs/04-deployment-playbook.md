@@ -184,7 +184,8 @@ ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /o
 观测栈（loki/alloy/grafana）在 `observability` profile，核心稳定后再启用：
 
 ```bash
-bun run prod:observability:up     # 启用 loki/alloy/grafana
+bun run prod:observability:up     # 启用并冒烟检查 loki/alloy/grafana/monitor
+bun run prod:observability:smoke  # 服务重启后单独复查
 bun run prod:observability:down   # 停用
 bun run logs:prune                # 内存/磁盘吃紧时删除 24h 前旧日志（需 loki 已启）
 bun run prod:mem                  # 看服务器内存 + 容器占用

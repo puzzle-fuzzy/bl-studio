@@ -72,6 +72,7 @@
     "prod:logs": "docker compose --env-file deploy/env/.env.prod -f deploy/docker/compose.prod.yaml logs -f --tail=100",
     "prod:observability:up": "bash scripts/deploy/prod-observability.sh up",
     "prod:observability:down": "bash scripts/deploy/prod-observability.sh down",
+    "prod:observability:smoke": "bash scripts/deploy/prod-observability.sh smoke",
     "logs:api": "docker compose --env-file deploy/env/.env.prod -f deploy/docker/compose.prod.yaml logs -f api",
     "logs:worker": "docker compose --env-file deploy/env/.env.prod -f deploy/docker/compose.prod.yaml logs -f worker",
     "logs:prune": "bash scripts/backup/prune-loki-logs.sh",

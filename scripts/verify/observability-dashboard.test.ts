@@ -118,5 +118,14 @@ describe('Grafana observability dashboards', () => {
     expect(observabilityDeployScriptText).toContain(
       'OBSERVABILITY_SERVICES="loki alloy grafana monitor"',
     )
+    expect(observabilityDeployScriptText).toContain('smoke_observability')
+    expect(observabilityDeployScriptText).toContain(
+      'http://127.0.0.1:3100/ready',
+    )
+    expect(observabilityDeployScriptText).toContain(
+      'http://127.0.0.1:5300/api/health',
+    )
+    expect(observabilityDeployScriptText).toContain('grep -Fxq')
+    expect(observabilityDeployScriptText).toContain('\\$service')
   })
 })
