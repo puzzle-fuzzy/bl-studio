@@ -78,6 +78,15 @@ export interface ProviderError {
   readonly details?: Readonly<Record<string, unknown>>
 }
 
+/** provider 抛异常时供 worker 状态机消费的统一分类结果。 */
+export interface ProviderErrorClassification {
+  readonly category: TaskErrorCategory
+  readonly retriable: boolean
+  readonly code?: string
+  readonly message: string
+  readonly details?: Readonly<Record<string, unknown>>
+}
+
 export type ProviderCancelOutput =
   | { readonly status: 'cancelled'; readonly requestId?: string }
   | { readonly status: 'unsupported'; readonly requestId?: string; readonly reason: string }
@@ -93,6 +102,12 @@ export interface ProviderRunner {
 
   /** 异步 provider task 提交后的尽力取消。 */
   cancel?(input: ProviderCancelInput): Promise<ProviderCancelOutput>
+
+  /**
+   * 将 runner 未能自行收敛的异常转换为统一分类。
+   * provider-specific 分类逻辑由具体 runner 持有，worker 编排层不感知其类型。
+   */
+  classifyError?(error: unknown): ProviderErrorClassification
 
   /** 该 runner 是否能处理给定的 manifest。 */
   supports(manifest: FrozenModelManifest): boolean

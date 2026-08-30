@@ -59,6 +59,7 @@ export {
   type ProviderCancelOutput,
   type ProviderExecuteInput,
   type ProviderExecuteOutput,
+  type ProviderErrorClassification,
   type ProviderError,
   type ProviderRunner,
 } from './providers'

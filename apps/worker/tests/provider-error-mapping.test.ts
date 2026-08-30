@@ -33,7 +33,21 @@ describe('provider error boundary', () => {
     })).toEqual({
       category: 'provider',
       retriable: true,
-      message: 'DashScope HTTP 503',
+      message: 'Provider HTTP 503',
+    })
+  })
+
+  it('delegates opaque errors to the selected provider classifier', () => {
+    expect(classifyThrownProviderError(new Error('opaque provider failure'), () => ({
+      category: 'rate_limit',
+      retriable: true,
+      code: 'THROTTLED',
+      message: 'retry later',
+    }))).toEqual({
+      category: 'rate_limit',
+      retriable: true,
+      code: 'THROTTLED',
+      message: 'retry later',
     })
   })
 

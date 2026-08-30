@@ -7,6 +7,7 @@ export type {
   ProviderCancelOutput,
   ProviderExecuteInput,
   ProviderExecuteOutput,
+  ProviderErrorClassification,
   ProviderError,
   ProviderRunner,
 } from './types'

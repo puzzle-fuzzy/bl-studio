@@ -19,7 +19,7 @@ import {
   classifyThrownProviderError,
   providerErrorToTaskError,
 } from './provider-error-mapping'
-import type { ProviderExecuteOutput, ProviderRegistry } from './providers'
+import type { ProviderErrorClassification, ProviderExecuteOutput, ProviderRegistry } from './providers'
 import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface GenerationTaskHandlerDeps {
@@ -180,7 +180,7 @@ export async function processGenerationTask(
         ...(idempotencyKey !== undefined ? { idempotencyKey } : {}),
       })
     } catch (error) {
-      const info = classifyThrownProviderError(error)
+      const info = classifyThrownProviderError(error, runner.classifyError)
       await finishProviderRequestAudit(audit, auditStartedAt, {
         status: 'failed',
         error: {
@@ -191,7 +191,7 @@ export async function processGenerationTask(
         },
       }, deps)
       recordProviderMetrics(deps.metrics, operation, 'failed', Date.now() - auditStartedAt)
-      return applyUnexpectedError(record.id, task, error, deps)
+      return applyUnexpectedError(record.id, task, error, deps, runner.classifyError)
     }
 
     await finishProviderRequestAudit(audit, auditStartedAt, result.success
@@ -418,8 +418,9 @@ async function applyUnexpectedError(
   task: TaskRecord,
   error: unknown,
   deps: GenerationTaskHandlerDeps,
+  providerClassifier?: (error: unknown) => ProviderErrorClassification,
 ): Promise<TaskProcessOutcome> {
-  const info = classifyThrownProviderError(error)
+  const info = classifyThrownProviderError(error, providerClassifier)
 
   if (info.retriable && task.attempts < task.maxAttempts) {
     const retryAt = nextRunAt(currentIso(), task.attempts)
@@ -574,7 +575,7 @@ async function cancelBeforeExecution(
               }
             }
           } catch (error) {
-            const info = classifyThrownProviderError(error)
+            const info = classifyThrownProviderError(error, runner.classifyError)
             await finishProviderRequestAudit(audit, auditStartedAt, {
               status: 'failed',
               error: {

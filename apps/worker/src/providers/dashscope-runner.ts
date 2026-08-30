@@ -16,6 +16,7 @@ import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import {
   createDashScopeClient,
   DashScopeHttpError,
+  classifyDashScopeError,
   type CreateDashScopeClientOptions,
 } from '@bailian-studio/provider-dashscope'
 import type {
@@ -23,6 +24,7 @@ import type {
   ProviderCancelOutput,
   ProviderExecuteInput,
   ProviderExecuteOutput,
+  ProviderErrorClassification,
   ProviderRunner,
 } from './types'
 
@@ -50,6 +52,10 @@ export class DashScopeProviderRunner implements ProviderRunner {
 
   supports(manifest: FrozenModelManifest): boolean {
     return manifest.provider === this.providerId
+  }
+
+  classifyError(error: unknown): ProviderErrorClassification {
+    return classifyDashScopeError(error)
   }
 
   async execute(input: ProviderExecuteInput): Promise<ProviderExecuteOutput> {
