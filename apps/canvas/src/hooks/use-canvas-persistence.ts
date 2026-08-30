@@ -1,6 +1,7 @@
 import { ApiClientError, type AssetItem, type CanvasDocument, type CanvasVersion } from '@bailian-studio/api-client'
 import { apiClient } from '@bailian-studio/lib-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { browserDraftStorage, loadCanvasDocumentDraft } from '@/lib/canvas-draft-storage'
 import { fromCanvasSnapshot, toCanvasSnapshot } from '@/lib/canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
 
@@ -77,6 +78,26 @@ function applyDocument(document: CanvasDocument): void {
     nodes,
     edges,
   })
+}
+
+function applyCachedDocument(documentId: string, title: string, revision: number): boolean {
+  const storage = browserDraftStorage()
+  if (storage === undefined) return false
+  const draft = loadCanvasDocumentDraft(storage, documentId)
+  if (draft === null) return false
+  useCanvasStore.getState().setDocument({
+    id: documentId,
+    revision: draft.revision ?? revision,
+    title: draft.title ?? title,
+    nodes: draft.nodes,
+    edges: draft.edges,
+  })
+  return true
+}
+
+function shouldUseCachedDocument(error: unknown): boolean {
+  return error instanceof ApiClientError
+    && (error.code === 'NETWORK_ERROR' || (error.status !== undefined && error.status >= 500))
 }
 
 export function useCanvasPersistence() {
@@ -167,9 +188,29 @@ export function useCanvasPersistence() {
           useCanvasStore.getState().edges,
         )
         const list = await apiClient.listCanvases({ limit: 1 })
-        const document = list.items[0] === undefined
-          ? await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
-          : await apiClient.getCanvas(list.items[0].id)
+        const summary = list.items[0]
+        if (summary === undefined) {
+          const document = await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
+          if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+          const hydratedDocument = await hydrateAssetUrls(document)
+          if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+          applyDocument(hydratedDocument)
+          lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
+          setSaveStatus('saved')
+          return
+        }
+
+        let document: CanvasDocument
+        try {
+          document = await apiClient.getCanvas(summary.id)
+        }
+        catch (error) {
+          if (!shouldUseCachedDocument(error) || disposedRef.current || operationEpochRef.current !== operationEpoch) throw error
+          if (!applyCachedDocument(summary.id, summary.title, summary.revision)) throw error
+          lastSavedSignature.current = undefined
+          setSaveStatus('error')
+          return
+        }
         if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
         const hydratedDocument = await hydrateAssetUrls(document)
         if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
