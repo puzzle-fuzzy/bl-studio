@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { CanvasExecutionTaskSummary } from '../packages/api-client/src/schemas'
+import type { CanvasExecutionTaskSummary } from '../packages/canvas-contracts/src/index'
 import {
   canvasExecutionNodeStatusLabel,
   getCanvasExecutionAttentionNodes,

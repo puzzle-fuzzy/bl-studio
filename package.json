@@ -39,7 +39,7 @@
     "credits:release-stale": "dotenv -e deploy/env/.env.dev -- tsx scripts/db/release-stale-reservations.ts",
     "admin:promote": "dotenv -e deploy/env/.env.dev -- tsx scripts/db/promote-admin.ts",
     "seed:lan-test-accounts": "dotenv -e deploy/env/.env.dev -- tsx scripts/db/seed-lan-test-accounts.ts",
-    "e2e": "bun run db:push:test && node scripts/verify/playwright-cli.cjs test --config=playwright.config.ts",
+    "e2e": "tsx scripts/verify/run-e2e.ts",
     "e2e:install": "node scripts/verify/playwright-cli.cjs install chromium",
     "db:up": "docker compose -f deploy/docker/compose.yaml up -d",
     "db:down": "docker compose -f deploy/docker/compose.yaml down",

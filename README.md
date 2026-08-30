@@ -65,6 +65,19 @@ bun run db:up
 
 三个前端的 `/api` 请求都会代理到 API `http://127.0.0.1:5003`。
 
+浏览器验收使用隔离端口，不会复用上面已经运行的开发进程：
+
+```bash
+bun run e2e
+```
+
+默认启动测试 API `5103`、Studio `5102`、Canvas `5107`，并从
+`deploy/env/.env.test` 所指向的 PostgreSQL 实例创建本次运行独享的临时数据库，
+测试结束后自动删除。如由外部编排器提供服务，可设置 `E2E_API_ORIGIN`、
+`E2E_WEB_ORIGIN`、`E2E_CANVAS_ORIGIN`；只有明确设置
+`E2E_REUSE_EXISTING_SERVER=true` 时才会跳过临时库并复用已有进程（此模式要求
+外部 API 已连接同一个测试库）。
+
 > API 由 Bun 运行时启动（Elysia 原生效能路径）；Worker、脚本、db 工具、测试仍走 Node（`node --import tsx`）。
 
 ### Windows 首次运行

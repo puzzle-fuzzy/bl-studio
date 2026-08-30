@@ -15,7 +15,8 @@ import postgres, { type Sql } from 'postgres'
  */
 const databaseUrl = process.env.DATABASE_URL
   ?? 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
-const apiOrigin = process.env.E2E_API_ORIGIN ?? 'http://127.0.0.1:5003'
+const apiOrigin = process.env.E2E_API_ORIGIN
+  ?? `http://127.0.0.1:${process.env.E2E_API_PORT ?? '5103'}`
 const email = `asset-loop-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`
 const userId = `user_asset_loop_${Date.now()}_${Math.random().toString(16).slice(2)}`
 const password = 'asset-loop-password-123'
