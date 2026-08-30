@@ -1,6 +1,7 @@
 import type { AuthService } from '@bailian-studio/auth'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { GenerationDiagnosticsRepository } from '@bailian-studio/generation-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
@@ -32,6 +33,8 @@ export interface ApiDependencies {
   readonly authService: AuthService
   readonly githubOAuth?: GithubOAuthConfig
   readonly creditLedger: CreditLedger
+  /** 当前用户生成详情的安全诊断投影。 */
+  readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository
   readonly generationRepository: GenerationRepository
   readonly directorRepository: DirectorRepository
   readonly creativeAssetRepository: CreativeAssetRepository

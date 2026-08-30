@@ -44,6 +44,7 @@ import {
 	createContentReportRepository,
 	createFeedbackRepository,
 	createGenerationRepository,
+	createGenerationDiagnosticsRepository,
 	createNotificationRepository,
 	createPromptLibraryRepository,
 	createProviderRequestAuditRepository,
@@ -51,6 +52,7 @@ import {
 	createShareRepository,
 	createUsageRepository,
 	type FeedbackRepository,
+	type GenerationDiagnosticsRepository,
 	type GenerationRepository,
 	type NotificationRepository,
 	type PromptLibraryRepository,
@@ -84,6 +86,7 @@ export interface ApiPersistenceRuntime {
 	readonly authService: AuthService;
 	readonly creditLedger: CreditLedger;
 	readonly generationRepository: GenerationRepository;
+	readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository;
 	readonly assetRepository: AssetRepository;
 	readonly shareRepository: ShareRepository;
 	readonly publicShareRepository: PublicShareRepository;
@@ -152,6 +155,7 @@ export function createApiPersistenceRuntime(
 			}),
 			creditLedger: createCreditLedger({ db }),
 			generationRepository,
+			generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),
 			assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
 			shareRepository,
 			publicShareRepository: shareRepository,

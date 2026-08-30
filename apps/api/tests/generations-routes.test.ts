@@ -124,6 +124,7 @@ describe('generation routes', () => {
       authService: fakeAuthService,
       creditLedger: fakeCreditLedger,
       generationRepository: iso.repository,
+      generationDiagnosticsRepository: iso.generationDiagnosticsRepository,
       assetRepository: iso.assetRepository,
       usageRepository: iso.usageRepository,
       creativeAssetRepository: createCreativeAssetRepository({ db: iso.db }),

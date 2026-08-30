@@ -14,6 +14,7 @@ import type { AssetRepository } from './asset-port'
 import { createAuditRepository } from './audit-events'
 import type { AuditRepository } from './audit-port'
 import { createContentReportRepository, type ContentReportRepository } from './content-reports'
+import { createGenerationDiagnosticsRepository, type GenerationDiagnosticsRepository } from './diagnostics'
 import { createFeedbackRepository, type FeedbackRepository } from './feedback'
 import { createGenerationRepository, type GenerationRepository } from './repository'
 import { createNotificationRepository, type NotificationRepository } from './notifications'
@@ -39,6 +40,7 @@ export interface GenerationRepositoryHandle {
   analyticsRepository: AnalyticsRepository
   assetRepository: AssetRepository
   auditRepository: AuditRepository
+  generationDiagnosticsRepository: GenerationDiagnosticsRepository
   contentReportRepository: ContentReportRepository
   feedbackRepository: FeedbackRepository
   notificationRepository: NotificationRepository
@@ -66,6 +68,7 @@ export function createGenerationRepositoryFromUrl(
     analyticsRepository: createAnalyticsRepository(db),
     assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
     auditRepository: createAuditRepository(db),
+    generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),
     contentReportRepository: createContentReportRepository(db),
     feedbackRepository: createFeedbackRepository(db),
     notificationRepository: createNotificationRepository(db),

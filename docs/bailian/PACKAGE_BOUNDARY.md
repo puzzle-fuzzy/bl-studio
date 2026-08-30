@@ -80,6 +80,8 @@
   `ProviderRequestAuditRepository` 注入，写入实现归档在 `provider-requests.ts`；
   `GenerationRepository` 只保留生成详情所需的 provider 请求投影，Worker 不再依赖
   生成核心接口上的审计写入方法。
+- 生成详情诊断通过 `src/diagnostics.ts` 的 `GenerationDiagnosticsRepository` 注入；该 port
+  只提供脱敏只读投影，核心 `GenerationRepository` 不再暴露诊断聚合方法。
 - 用户用量读模型由 `src/usage.ts` 的 `UsageRepository` 拥有；用量查询 SQL 与 generation
   生命周期写入分离，API 只获取当前用户的时间窗口聚合。生成应用服务也显式注入
   `UsageRepository` 做每日限额预检；`GenerationRepository` 核心接口不再包含用量读取，

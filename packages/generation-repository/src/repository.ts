@@ -52,7 +52,6 @@ import {
 	generationEvents,
 	generationInputAssets,
 	generationRecords,
-	providerRequestAudits,
 	taskRecords,
 	usageRecords,
 	userAssets,
@@ -123,7 +122,6 @@ import {
 	toGenerationArtifact,
 	toGenerationEvent,
 	toGenerationRecord,
-	toProviderRequestAudit,
 	toTaskRecord,
 	toWorkerHeartbeat,
 } from "./mappers";
@@ -146,7 +144,6 @@ import type {
 	GenerationArtifact,
 	GenerationAssetRefInput,
 	GenerationAssetRefs,
-	GenerationDiagnostics,
 	GenerationEvent,
 	GenerationInputAsset,
 	GenerationQuotaLimits,
@@ -175,7 +172,6 @@ import type {
 	RetryGenerationInput,
 	ScheduleGenerationPollInput,
 	SetGenerationLibraryStateInput,
-	TaskDiagnostics,
 	UpdateGenerationRecordPatch,
 	UserFeedback,
 	WorkerHealth,
@@ -859,9 +855,6 @@ export interface GenerationRepository {
 	listStuckGenerationRecords?(
 		input?: ListStuckGenerationRecordsInput,
 	): Promise<GenerationRecord[]>;
-	getGenerationDiagnostics?: (
-		id: string,
-	) => Promise<GenerationDiagnostics | undefined>;
 	updateGenerationRecord(
 		id: string,
 		patch: UpdateGenerationRecordPatch,
@@ -2168,88 +2161,6 @@ export function createGenerationRepository(
 				.orderBy(asc(generationRecords.updatedAt))
 				.limit(limit);
 			return rows.map((row) => toGenerationRecord(row));
-		},
-
-		async getGenerationDiagnostics(id) {
-			const [record] = await db
-				.select()
-				.from(generationRecords)
-				.where(eq(generationRecords.id, id))
-				.limit(1);
-
-			if (record === undefined) return undefined;
-
-			const [taskRows, auditRows] = await Promise.all([
-				db
-					.select()
-					.from(taskRecords)
-					.where(eq(taskRecords.recordId, id))
-					.orderBy(asc(taskRecords.createdAt), asc(taskRecords.id)),
-				db
-					.select()
-					.from(providerRequestAudits)
-					.where(eq(providerRequestAudits.generationId, id))
-					.orderBy(
-						asc(providerRequestAudits.startedAt),
-						asc(providerRequestAudits.id),
-					),
-			]);
-
-			const tasks: TaskDiagnostics[] = taskRows.map((taskRow) => {
-				const task = toTaskRecord(taskRow);
-				const error =
-					task.errorJson === undefined
-						? undefined
-						: {
-								category: task.errorJson.category,
-								message: task.errorJson.message,
-								retriable: task.errorJson.retriable,
-								...(task.errorJson.code !== undefined
-									? { code: task.errorJson.code }
-									: {}),
-							};
-				const durationMs =
-					task.startedAt !== undefined && task.completedAt !== undefined
-						? Math.max(
-								0,
-								Date.parse(task.completedAt) - Date.parse(task.startedAt),
-							)
-						: undefined;
-
-				return {
-					id: task.id,
-					type: task.type,
-					status: task.status,
-					attempts: task.attempts,
-					maxAttempts: task.maxAttempts,
-					createdAt: task.createdAt,
-					...(task.startedAt !== undefined
-						? { startedAt: task.startedAt }
-						: {}),
-					...(task.completedAt !== undefined
-						? { completedAt: task.completedAt }
-						: {}),
-					updatedAt: task.updatedAt,
-					...(error !== undefined ? { error } : {}),
-					...(durationMs !== undefined ? { durationMs } : {}),
-				};
-			});
-
-			const generationDurationMs =
-				record.status === "succeeded" ||
-				record.status === "failed" ||
-				record.status === "cancelled"
-					? Math.max(0, record.updatedAt.getTime() - record.createdAt.getTime())
-					: undefined;
-
-			const diagnostics: GenerationDiagnostics = {
-				generationId: record.id,
-				...(record.traceId !== null ? { traceId: record.traceId } : {}),
-				...(generationDurationMs !== undefined ? { generationDurationMs } : {}),
-				tasks,
-				providerRequests: auditRows.map(toProviderRequestAudit),
-			};
-			return diagnostics;
 		},
 
 		/**

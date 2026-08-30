@@ -38,6 +38,7 @@ export interface IsolatedGenerationRepository {
   analyticsRepository: GenerationRepositoryHandle['analyticsRepository']
   assetRepository: GenerationRepositoryHandle['assetRepository']
   auditRepository: GenerationRepositoryHandle['auditRepository']
+  generationDiagnosticsRepository: GenerationRepositoryHandle['generationDiagnosticsRepository']
   contentReportRepository: GenerationRepositoryHandle['contentReportRepository']
   feedbackRepository: GenerationRepositoryHandle['feedbackRepository']
   notificationRepository: GenerationRepositoryHandle['notificationRepository']
@@ -67,6 +68,7 @@ export async function createIsolatedGenerationRepository(
     analyticsRepository: handle.analyticsRepository,
     assetRepository: handle.assetRepository,
     auditRepository: handle.auditRepository,
+    generationDiagnosticsRepository: handle.generationDiagnosticsRepository,
     contentReportRepository: handle.contentReportRepository,
     feedbackRepository: handle.feedbackRepository,
     notificationRepository: handle.notificationRepository,

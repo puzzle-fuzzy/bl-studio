@@ -246,14 +246,7 @@ export function createGenerationRoutes(deps: ApiDependencies) {
        return requestErrorResponseBody(request, 'GENERATION_NOT_FOUND', `Generation not found: ${id}`, set)
      }
 
-     const diagnostics = repository.getGenerationDiagnostics === undefined
-       ? {
-           generationId: record.id,
-           ...(record.traceId !== undefined ? { traceId: record.traceId } : {}),
-           tasks: [],
-           providerRequests: [],
-         }
-       : await repository.getGenerationDiagnostics(id)
+     const diagnostics = await deps.generationDiagnosticsRepository.getGenerationDiagnostics(id)
 
      return { success: true, data: diagnostics }
    })

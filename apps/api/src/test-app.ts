@@ -15,6 +15,7 @@ import type {
   AdminTaskRepository,
   AnalyticsRepository,
   AuditRepository,
+  GenerationDiagnosticsRepository,
   GenerationRepository,
   UsageRepository,
 } from '@bailian-studio/generation-repository'
@@ -62,6 +63,9 @@ export function createTestApp(
   const generationRepository =
     overrides.generationRepository ??
     missing<GenerationRepository>('generationRepository')
+  const generationDiagnosticsRepository =
+    overrides.generationDiagnosticsRepository ??
+    missing<GenerationDiagnosticsRepository>('generationDiagnosticsRepository')
   const auditRepository =
     overrides.auditRepository ??
     missing<AuditRepository>('auditRepository')
@@ -136,6 +140,7 @@ export function createTestApp(
     creditLedger:
       overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository,
+    generationDiagnosticsRepository,
     assetRepository,
     shareRepository,
     publicShareRepository,

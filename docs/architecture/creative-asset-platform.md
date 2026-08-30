@@ -107,6 +107,8 @@ flowchart LR
 - Worker 的 provider 出站请求审计通过 `ProviderRequestAuditRepository` 注入，SQL 写入
   位于 `generation-repository/src/provider-requests.ts`；generation 详情仍可读取
   provider 请求投影，但 Worker 不再从 GenerationRepository 核心接口写审计。
+- 生成详情诊断通过独立的 `GenerationDiagnosticsRepository` 提供安全读投影；它可以联合读取
+  generation、task 和 provider request 记录，但不参与 generation 状态迁移或 Worker 任务生命周期。
 - 用户用量接口通过 `UsageRepository` 读取，调用统计由 `AnalyticsRepository` 读取；相关
   聚合 SQL 分别位于 `usage.ts` 与 `analytics.ts`，避免报表/用量查询继续扩大 generation
   生命周期接口。生成应用服务的每日限额预检也通过显式的 `UsageRepository` 注入完成，
@@ -124,6 +126,8 @@ flowchart LR
 - generation/media/director 的业务 repository 由持久化组合根注入同一个
   `TaskQueueTransactionStore`，但仍各自开启“业务记录 + 初始任务”事务；任务包只负责事务内的
   task row 写入，不负责跨域事务的开启与提交。
+- generation 详情诊断由 `GenerationDiagnosticsRepository` 单独承载，核心
+  `GenerationRepository` 只保留生成状态与业务事务能力。
 
 ## 4. 领域模型归属
 

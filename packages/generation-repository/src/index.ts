@@ -47,6 +47,10 @@ export type {
 } from "./asset-types";
 export type { AuditRepository } from "./audit-port";
 export { createAuditRepository } from "./audit-events";
+export {
+	createGenerationDiagnosticsRepository,
+	type GenerationDiagnosticsRepository,
+} from "./diagnostics";
 export type {
 	AuditAction,
 	AuditEventMetadata,
