@@ -22,6 +22,7 @@ import { formatCents } from '@/lib/money'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
 import { usePhaseReview } from '@/hooks/use-phase-review'
+import { usePreferredModel } from '@/hooks/use-preferred-model'
 import { AnalysisReview, applyDirectorVideoProgress, CharactersReview, DirectorContinuityReview, DirectorDialogueReview, DirectorPromptRebuildReview, DirectorVideoShotList, LocationsReview, PhaseStatusPanel, ReferenceEntityGroup, ScreenplayChatWorkspace, StoryboardReview } from '@/components/director/review-components'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
@@ -271,61 +272,15 @@ export function DirectorProjectPage() {
     if (boundReferenceAssetIds.length > 0) void loadReferenceAssets(boundReferenceAssetIds)
   }, [boundReferenceAssetIds.join('|'), loadReferenceAssets])
 
-  useEffect(() => {
-  })
-
-  useEffect(() => {
-    if (analysisModelId.length > 0 && textModels.some(model => model.id === analysisModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setAnalysisModelId(preferred.id)
-  }, [analysisModelId, textModels])
-
-  useEffect(() => {
-    if (charactersModelId.length > 0 && textModels.some(model => model.id === charactersModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setCharactersModelId(preferred.id)
-  }, [charactersModelId, textModels])
-
-  useEffect(() => {
-    if (locationsModelId.length > 0 && textModels.some(model => model.id === locationsModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setLocationsModelId(preferred.id)
-  }, [locationsModelId, textModels])
-
-  useEffect(() => {
-    if (storyboardModelId.length > 0 && textModels.some(model => model.id === storyboardModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setStoryboardModelId(preferred.id)
-  }, [storyboardModelId, textModels])
-
-  useEffect(() => {
-    if (continuityModelId.length > 0 && textModels.some(model => model.id === continuityModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setContinuityModelId(preferred.id)
-  }, [continuityModelId, textModels])
-
-  useEffect(() => {
-    if (promptRebuildModelId.length > 0 && textModels.some(model => model.id === promptRebuildModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setPromptRebuildModelId(preferred.id)
-  }, [promptRebuildModelId, textModels])
-
-  useEffect(() => {
-    if (dialogueModelId.length > 0 && textModels.some(model => model.id === dialogueModelId)) return
-    const preferred = textModels.find(model => model.id === 'qwen-plus') ?? textModels[0]
-    if (preferred !== undefined) setDialogueModelId(preferred.id)
-  }, [dialogueModelId, textModels])
-
-  useEffect(() => {
-    if (videoModelId.length > 0 && videoModels.some(model => model.id === videoModelId)) return
-    const preferred = videoModels.find(model => model.id === 'wanx-2.7-reference-video') ?? videoModels[0]
-    if (preferred !== undefined) setVideoModelId(preferred.id)
-  }, [videoModelId, videoModels])
-
-  useEffect(() => {
-    if (musicModelId.length > 0 && musicModels.some(model => model.id === musicModelId)) return
-    if (musicModels[0] !== undefined) setMusicModelId(musicModels[0].id)
-  }, [musicModelId, musicModels])
+  usePreferredModel(analysisModelId, textModels, setAnalysisModelId, 'qwen-plus')
+  usePreferredModel(charactersModelId, textModels, setCharactersModelId, 'qwen-plus')
+  usePreferredModel(locationsModelId, textModels, setLocationsModelId, 'qwen-plus')
+  usePreferredModel(storyboardModelId, textModels, setStoryboardModelId, 'qwen-plus')
+  usePreferredModel(continuityModelId, textModels, setContinuityModelId, 'qwen-plus')
+  usePreferredModel(promptRebuildModelId, textModels, setPromptRebuildModelId, 'qwen-plus')
+  usePreferredModel(dialogueModelId, textModels, setDialogueModelId, 'qwen-plus')
+  usePreferredModel(videoModelId, videoModels, setVideoModelId, 'wanx-2.7-reference-video')
+  usePreferredModel(musicModelId, musicModels, setMusicModelId)
 
   useEffect(() => {
     if (id === undefined) return
