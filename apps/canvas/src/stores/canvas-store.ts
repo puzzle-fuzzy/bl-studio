@@ -15,7 +15,9 @@ import {
   clearAllCanvasDrafts,
   clearCanvasDraft,
   loadCanvasBootstrapDraft,
+  loadSelectedCanvasDocumentId,
   writeCanvasDraft,
+  writeSelectedCanvasDocumentId,
 } from '@/lib/canvas-draft-storage'
 
 /**
@@ -78,11 +80,16 @@ function persist(get: () => CanvasState): void {
 
 const draftStorage = browserDraftStorage()
 const initial = draftStorage === undefined ? null : loadCanvasBootstrapDraft(draftStorage)
+const initialSelectedDocumentId = draftStorage === undefined
+  ? undefined
+  : loadSelectedCanvasDocumentId(draftStorage)
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: initial?.nodes ?? [],
   edges: initial?.edges ?? [],
-  ...(initial?.documentId === undefined ? {} : { documentId: initial.documentId }),
+  ...((initial?.documentId ?? initialSelectedDocumentId) === undefined
+    ? {}
+    : { documentId: initial?.documentId ?? initialSelectedDocumentId }),
   ...(initial?.revision === undefined ? {} : { revision: initial.revision }),
   title: initial?.title ?? '未命名画布',
   hydrated: false,
@@ -158,6 +165,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     if (storage === undefined) return
     try {
       writeCanvasDraft(storage, { documentId: id, revision, title, nodes, edges })
+      writeSelectedCanvasDocumentId(storage, id)
     }
     catch {
       // QuotaExceeded 等：服务端文档仍是权威状态

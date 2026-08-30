@@ -4,6 +4,7 @@ import { normalizeStoredCanvasEdge, normalizeStoredCanvasNode } from './media-no
 const BOOTSTRAP_STORAGE_KEY = 'bailian-studio:canvas:bootstrap:v2'
 const LEGACY_STORAGE_KEY = 'bailian-studio:canvas:v1'
 const DOCUMENT_STORAGE_PREFIX = 'bailian-studio:canvas:document:v2:'
+const SELECTED_DOCUMENT_STORAGE_KEY = 'bailian-studio:canvas:selected-document:v1'
 
 export interface CanvasDraft {
   documentId?: string
@@ -83,6 +84,15 @@ export function loadCanvasDocumentDraft(storage: DraftStorage, documentId: strin
   return readDraft(storage, documentStorageKey(documentId), documentId)
 }
 
+export function loadSelectedCanvasDocumentId(storage: DraftStorage): string | undefined {
+  const value = storage.getItem(SELECTED_DOCUMENT_STORAGE_KEY)?.trim()
+  return value === undefined || value.length === 0 ? undefined : value
+}
+
+export function writeSelectedCanvasDocumentId(storage: DraftStorage, documentId: string): void {
+  storage.setItem(SELECTED_DOCUMENT_STORAGE_KEY, documentId)
+}
+
 export function writeCanvasDraft(storage: DraftStorage, draft: CanvasDraft): void {
   const { documentId, ...payload } = draft
   const key = documentId === undefined ? BOOTSTRAP_STORAGE_KEY : documentStorageKey(documentId)
@@ -102,7 +112,12 @@ export function clearCanvasDraft(storage: DraftStorage, documentId?: string): vo
 export function clearAllCanvasDrafts(storage: DraftStorage): void {
   const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
   for (const key of keys) {
-    if (key === BOOTSTRAP_STORAGE_KEY || key === LEGACY_STORAGE_KEY || key?.startsWith(DOCUMENT_STORAGE_PREFIX)) {
+    if (
+      key === BOOTSTRAP_STORAGE_KEY
+      || key === LEGACY_STORAGE_KEY
+      || key === SELECTED_DOCUMENT_STORAGE_KEY
+      || key?.startsWith(DOCUMENT_STORAGE_PREFIX)
+    ) {
       storage.removeItem(key ?? '')
     }
   }

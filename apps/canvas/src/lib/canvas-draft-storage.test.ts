@@ -4,7 +4,9 @@ import {
   clearAllCanvasDrafts,
   loadCanvasBootstrapDraft,
   loadCanvasDocumentDraft,
+  loadSelectedCanvasDocumentId,
   writeCanvasDraft,
+  writeSelectedCanvasDocumentId,
   type CanvasDraft,
 } from './canvas-draft-storage'
 
@@ -70,12 +72,21 @@ describe('canvas draft storage', () => {
     writeCanvasDraft(storage, draft)
     writeCanvasDraft(storage, { ...draft, documentId: 'doc-1' })
     storage.setItem('bailian-studio:canvas:v1', JSON.stringify(draft))
+    writeSelectedCanvasDocumentId(storage, 'doc-1')
     storage.setItem('unrelated-key', 'keep')
 
     clearAllCanvasDrafts(storage)
 
     expect(loadCanvasBootstrapDraft(storage)).toBeNull()
     expect(loadCanvasDocumentDraft(storage, 'doc-1')).toBeNull()
+    expect(loadSelectedCanvasDocumentId(storage)).toBeUndefined()
     expect(storage.getItem('unrelated-key')).toBe('keep')
+  })
+
+  it('round-trips the selected document preference', () => {
+    const storage = createStorage()
+    writeSelectedCanvasDocumentId(storage, 'doc-1')
+
+    expect(loadSelectedCanvasDocumentId(storage)).toBe('doc-1')
   })
 })

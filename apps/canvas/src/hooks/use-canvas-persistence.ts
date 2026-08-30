@@ -1,7 +1,14 @@
-import { ApiClientError, type AssetItem, type CanvasDocument, type CanvasVersion } from '@bailian-studio/api-client'
+import {
+  ApiClientError,
+  type AssetItem,
+  type CanvasDocument,
+  type CanvasDocumentSummary,
+  type CanvasVersion,
+} from '@bailian-studio/api-client'
 import { apiClient } from '@bailian-studio/lib-client'
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { browserDraftStorage, loadCanvasDocumentDraft } from '@/lib/canvas-draft-storage'
+import { selectCanvasDocument } from '@/lib/canvas-document-selection'
 import { fromCanvasSnapshot, toCanvasSnapshot } from '@/lib/canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
 
@@ -80,6 +87,15 @@ function applyDocument(document: CanvasDocument): void {
   })
 }
 
+function summaryOf(document: CanvasDocument): CanvasDocumentSummary {
+  return {
+    id: document.id,
+    title: document.title,
+    revision: document.revision,
+    updatedAt: document.updatedAt,
+  }
+}
+
 function applyCachedDocument(documentId: string, title: string, revision: number): boolean {
   const storage = browserDraftStorage()
   if (storage === undefined) return false
@@ -116,8 +132,20 @@ export function useCanvasPersistence() {
   const pendingSaveRef = useRef(false)
   const disposedRef = useRef(false)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const versionsRequestRef = useRef(0)
+  const [documents, setDocuments] = useState<CanvasDocumentSummary[]>([])
+  const [documentLoading, setDocumentLoading] = useState(false)
+  const [documentError, setDocumentError] = useState<string | undefined>()
   const [versions, setVersions] = useState<CanvasVersion[]>([])
   const [saveTick, setSaveTick] = useState(0)
+
+  const currentSnapshotSignature = useMemo(
+    () => JSON.stringify(toCanvasSnapshot(nodes, edges)),
+    [edges, nodes],
+  )
+  const isDirty = hydrated
+    && documentId !== undefined
+    && currentSnapshotSignature !== lastSavedSignature.current
 
   const invalidatePendingSave = useCallback(() => {
     operationEpochRef.current += 1
@@ -142,6 +170,7 @@ export function useCanvasPersistence() {
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
       applyDocument(document)
       lastSavedSignature.current = JSON.stringify(document.snapshot)
+      setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
       setSaveStatus('saved')
     } catch (error) {
       if (!disposedRef.current) setSaveStatus('error')
@@ -152,8 +181,14 @@ export function useCanvasPersistence() {
   const refreshVersions = useCallback(async () => {
     const id = useCanvasStore.getState().documentId
     if (id === undefined) return []
+    const requestId = versionsRequestRef.current + 1
+    versionsRequestRef.current = requestId
     const nextVersions = await apiClient.listCanvasVersions(id, { limit: 30 })
-    if (!disposedRef.current) setVersions(nextVersions)
+    if (
+      !disposedRef.current
+      && versionsRequestRef.current === requestId
+      && useCanvasStore.getState().documentId === id
+    ) setVersions(nextVersions)
     return nextVersions
   }, [])
 
@@ -173,22 +208,107 @@ export function useCanvasPersistence() {
     if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
     applyDocument(document)
     lastSavedSignature.current = JSON.stringify(document.snapshot)
+    setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
     setSaveStatus('saved')
     await refreshVersions()
   }, [invalidatePendingSave, refreshVersions, setSaveStatus])
+
+  const openDocument = useCallback(async (nextDocumentId: string): Promise<boolean> => {
+    const currentDocumentId = useCanvasStore.getState().documentId
+    if (currentDocumentId === nextDocumentId) return true
+
+    const activeSave = savePromiseRef.current
+    invalidatePendingSave()
+    const operationEpoch = operationEpochRef.current
+    const summary = documents.find(document => document.id === nextDocumentId)
+    setDocumentLoading(true)
+    setDocumentError(undefined)
+    try {
+      if (activeSave !== undefined) await activeSave
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      const document = await apiClient.getCanvas(nextDocumentId)
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      const hydratedDocument = await hydrateAssetUrls(document)
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      applyDocument(hydratedDocument)
+      lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
+      versionsRequestRef.current += 1
+      setVersions([])
+      setSaveStatus('saved')
+      return true
+    } catch (error) {
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      if (
+        shouldUseCachedDocument(error)
+        && applyCachedDocument(nextDocumentId, summary?.title ?? '未命名画布', summary?.revision ?? 1)
+      ) {
+        lastSavedSignature.current = undefined
+        versionsRequestRef.current += 1
+        setVersions([])
+        setSaveStatus('error')
+        return true
+      }
+      setDocumentError(error instanceof Error ? error.message : '画布加载失败')
+      setSaveStatus('error')
+      return false
+    } finally {
+      if (!disposedRef.current && operationEpochRef.current === operationEpoch) setDocumentLoading(false)
+    }
+  }, [documents, invalidatePendingSave, setSaveStatus])
+
+  const createDocument = useCallback(async (): Promise<boolean> => {
+    const activeSave = savePromiseRef.current
+    invalidatePendingSave()
+    const operationEpoch = operationEpochRef.current
+    setDocumentLoading(true)
+    setDocumentError(undefined)
+    try {
+      if (activeSave !== undefined) await activeSave
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      const document = await apiClient.createCanvas({
+        title: '未命名画布',
+        snapshot: { nodes: [], edges: [] },
+      })
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      const hydratedDocument = await hydrateAssetUrls(document)
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      applyDocument(hydratedDocument)
+      lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
+      versionsRequestRef.current += 1
+      setDocuments(current => [
+        summaryOf(hydratedDocument),
+        ...current.filter(summary => summary.id !== hydratedDocument.id),
+      ])
+      setVersions([])
+      setSaveStatus('saved')
+      return true
+    } catch (error) {
+      if (!disposedRef.current && operationEpochRef.current === operationEpoch) {
+        setDocumentError(error instanceof Error ? error.message : '新建画布失败')
+        setSaveStatus('error')
+      }
+      return false
+    } finally {
+      if (!disposedRef.current && operationEpochRef.current === operationEpoch) setDocumentLoading(false)
+    }
+  }, [invalidatePendingSave, setSaveStatus])
 
   useEffect(() => {
     disposedRef.current = false
     const operationEpoch = operationEpochRef.current
     void (async () => {
       try {
+        setDocumentLoading(true)
+        setDocumentError(undefined)
         setSaveStatus('loading')
         const localSnapshot = toCanvasSnapshot(
           useCanvasStore.getState().nodes,
           useCanvasStore.getState().edges,
         )
-        const list = await apiClient.listCanvases({ limit: 1 })
-        const summary = list.items[0]
+        const list = await apiClient.listCanvases({ limit: 100 })
+        if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+        setDocuments(list.items)
+        const summary = selectCanvasDocument(list.items, useCanvasStore.getState().documentId)
         if (summary === undefined) {
           const document = await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
@@ -196,6 +316,7 @@ export function useCanvasPersistence() {
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
           applyDocument(hydratedDocument)
           lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
+          setDocuments([summaryOf(hydratedDocument)])
           setSaveStatus('saved')
           return
         }
@@ -217,11 +338,24 @@ export function useCanvasPersistence() {
         applyDocument(hydratedDocument)
         lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
         setSaveStatus('saved')
-      } catch {
+      } catch (error) {
         if (!disposedRef.current) {
+          const state = useCanvasStore.getState()
+          if (
+            shouldUseCachedDocument(error)
+            && state.documentId !== undefined
+            && applyCachedDocument(state.documentId, state.title, state.revision ?? 1)
+          ) {
+            lastSavedSignature.current = undefined
+            setSaveStatus('error')
+            return
+          }
           useCanvasStore.setState({ hydrated: true })
+          setDocumentError(error instanceof Error ? error.message : '画布加载失败')
           setSaveStatus('error')
         }
+      } finally {
+        if (!disposedRef.current && operationEpochRef.current === operationEpoch) setDocumentLoading(false)
       }
     })()
     return () => {
@@ -258,6 +392,7 @@ export function useCanvasPersistence() {
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
           useCanvasStore.getState().setRevision(saved.revision)
           lastSavedSignature.current = JSON.stringify(saved.snapshot)
+          setDocuments(current => current.map(summary => summary.id === saved.id ? summaryOf(saved) : summary))
           setSaveStatus('saved')
           if (JSON.stringify(toCanvasSnapshot(
             useCanvasStore.getState().nodes,
@@ -290,5 +425,17 @@ export function useCanvasPersistence() {
     }
   }, [documentId, edges, hydrated, nodes, revision, saveTick, setSaveStatus])
 
-  return { saveStatus, versions, refreshDocument, refreshVersions, restoreVersion }
+  return {
+    createDocument,
+    documentError,
+    documentLoading,
+    documents,
+    isDirty,
+    openDocument,
+    refreshDocument,
+    refreshVersions,
+    restoreVersion,
+    saveStatus,
+    versions,
+  }
 }

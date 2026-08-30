@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -15,8 +15,8 @@ import '@xyflow/react/dist/style.css'
 import type { CanvasExecutionTaskSummary, GenerationDiagnostics } from '@bailian-studio/api-client'
 import type { CanvasPreflightIssue } from '@bailian-studio/canvas-validation'
 import { apiClient } from '@bailian-studio/lib-client'
-import { CircleAlert, History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
-import { Button } from '@bailian-studio/ui'
+import { CircleAlert, FilePlus2, History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
 import { MediaNode } from '../components/canvas/MediaNode'
 import { CanvasExecutionDiagnosticsPanel } from '../components/canvas/CanvasExecutionDiagnosticsPanel'
 import { useCanvasStore } from '../stores/canvas-store'
@@ -47,7 +47,19 @@ interface CanvasMenu {
 
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
-  const { saveStatus, versions, refreshDocument, refreshVersions, restoreVersion } = useCanvasPersistence()
+  const {
+    createDocument,
+    documentError,
+    documentLoading,
+    documents,
+    isDirty,
+    openDocument,
+    saveStatus,
+    versions,
+    refreshDocument,
+    refreshVersions,
+    restoreVersion,
+  } = useCanvasPersistence()
   const {
     execute,
     cancel,
@@ -77,6 +89,7 @@ export function CanvasPage() {
   const [executionCursor, setExecutionCursor] = useState<string | undefined>()
   const [executionHistoryLoading, setExecutionHistoryLoading] = useState(false)
   const [executionHistoryError, setExecutionHistoryError] = useState<string | undefined>()
+  const executionHistoryRequestRef = useRef(0)
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
   const [refreshingDocument, setRefreshingDocument] = useState(false)
   const [showPreflightIssues, setShowPreflightIssues] = useState(false)
@@ -120,6 +133,27 @@ export function CanvasPage() {
     setShowPreflightIssues(false)
     void execute()
   }, [execute, models, preflight.valid])
+
+  const documentActionsLocked = documentLoading
+    || hasNodeGenerationInFlight
+    || executionStatus === 'submitting'
+    || executionStatus === 'running'
+    || executionStatus === 'cancelling'
+
+  const confirmDocumentChange = useCallback(() => {
+    if (!isDirty) return true
+    return window.confirm('当前画布还有未保存修改，切换后将放弃这些修改。继续吗？')
+  }, [isDirty])
+
+  const handleDocumentChange = useCallback((nextDocumentId: string) => {
+    if (nextDocumentId === documentId || !confirmDocumentChange()) return
+    void openDocument(nextDocumentId)
+  }, [confirmDocumentChange, documentId, openDocument])
+
+  const handleCreateDocument = useCallback(() => {
+    if (!confirmDocumentChange()) return
+    void createDocument()
+  }, [confirmDocumentChange, createDocument])
 
   useEffect(() => {
     if (preflight.valid) setShowPreflightIssues(false)
@@ -168,6 +202,8 @@ export function CanvasPage() {
 
   const loadExecutionHistory = useCallback(async (cursor?: string, append = false) => {
     if (documentId === undefined) return
+    const requestId = executionHistoryRequestRef.current + 1
+    executionHistoryRequestRef.current = requestId
     setExecutionHistoryLoading(true)
     setExecutionHistoryError(undefined)
     try {
@@ -175,13 +211,22 @@ export function CanvasPage() {
         limit: 20,
         ...(cursor === undefined ? {} : { cursor }),
       })
+      if (requestId !== executionHistoryRequestRef.current || useCanvasStore.getState().documentId !== documentId) return
       setExecutions(current => append ? [...current, ...page.items] : page.items)
       setExecutionCursor(page.nextCursor)
     } catch (error) {
+      if (requestId !== executionHistoryRequestRef.current || useCanvasStore.getState().documentId !== documentId) return
       setExecutionHistoryError(error instanceof Error ? error.message : String(error))
     } finally {
-      setExecutionHistoryLoading(false)
+      if (requestId === executionHistoryRequestRef.current) setExecutionHistoryLoading(false)
     }
+  }, [documentId])
+
+  useEffect(() => {
+    executionHistoryRequestRef.current += 1
+    setExecutions([])
+    setExecutionCursor(undefined)
+    setExecutionHistoryError(undefined)
   }, [documentId])
 
   useEffect(() => {
@@ -331,6 +376,34 @@ export function CanvasPage() {
     <div className="relative h-full min-h-0">
       {/* 工具栏：添加不同类型的节点 */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
+        <div className="flex items-center gap-1 border-r pr-1">
+          <Select
+            value={documentId ?? ''}
+            onValueChange={handleDocumentChange}
+            disabled={documentActionsLocked || documents.length === 0}
+          >
+            <SelectTrigger className="h-7 w-40 border-0 bg-transparent px-2 text-xs shadow-none">
+              <SelectValue placeholder={documentLoading ? '加载画布…' : '选择画布'} />
+            </SelectTrigger>
+            <SelectContent>
+              {documents.map(document => (
+                <SelectItem key={document.id} value={document.id}>
+                  {document.title}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            size="sm"
+            variant="ghost"
+            disabled={documentActionsLocked}
+            onClick={handleCreateDocument}
+            title="新建空白画布"
+          >
+            <FilePlus2 className="size-3.5" aria-hidden />
+            <span className="sr-only">新建画布</span>
+          </Button>
+        </div>
         <Button size="sm" variant="secondary" onClick={() => addMediaNode('image')}>
           <ImagePlus className="mr-1 size-3.5" aria-hidden />
           图片
@@ -349,6 +422,11 @@ export function CanvasPage() {
           ) : null}
           {saveLabel}
         </span>
+        {documentError !== undefined && (
+          <span className="max-w-32 truncate text-[10px] text-destructive" title={documentError}>
+            文档加载失败
+          </span>
+        )}
         {saveStatus === 'conflict' && (
           <Button
             size="sm"
