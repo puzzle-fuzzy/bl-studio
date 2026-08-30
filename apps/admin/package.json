@@ -12,6 +12,7 @@
   },
   "dependencies": {
     "@bailian-studio/api-client": "workspace:*",
+    "@bailian-studio/design-tokens": "workspace:*",
     "@bailian-studio/lib-client": "workspace:*",
     "@bailian-studio/ui": "workspace:*",
     "@tanstack/react-query": "catalog:",

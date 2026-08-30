@@ -6,6 +6,10 @@ const tokensCss = readFileSync(
   fileURLToPath(new URL('../src/tokens.css', import.meta.url)),
   'utf8',
 )
+const baseCss = readFileSync(
+  fileURLToPath(new URL('../src/base.css', import.meta.url)),
+  'utf8',
+)
 
 describe('shared CSS tokens', () => {
   it('ships the standard light theme and keeps dark token compatibility', () => {
@@ -38,5 +42,14 @@ describe('shared CSS tokens', () => {
     expect(tokensCss).not.toContain('[data-theme="neumorphism"]')
     expect(tokensCss).not.toContain('[data-theme="korean-minimal"]')
     expect(tokensCss).not.toContain('[data-theme="distill-style"]')
+  })
+
+  it('ships the shared application base style contract', () => {
+    expect(baseCss).toContain('@import "./tokens.css"')
+    expect(baseCss).toContain('min-width: 320px')
+    expect(baseCss).toContain('font-family: var(--rb-font-system)')
+    expect(baseCss).toContain('line-height: var(--rb-line-height-copy)')
+    expect(baseCss).toContain('font: inherit')
+    expect(baseCss).toContain('cursor: pointer')
   })
 })
