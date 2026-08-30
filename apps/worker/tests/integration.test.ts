@@ -3,16 +3,19 @@ import { createIsolatedGenerationRepository, createTestUser, grantTestCredits, t
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteInput, ProviderExecuteOutput, ProviderRunner } from '../src/providers'
+import { createTaskQueueRepository, type TaskQueueRepository } from '@bailian-studio/task-repository'
 import { WorkerLoop } from '../src/worker-loop'
 import { FakeStorageAdapter } from './fixtures'
 import { FakeMediaProcessor } from './media-fixtures'
 
 let iso: IsolatedGenerationRepository
+let taskRepository!: TaskQueueRepository
 const IMAGE_DATA_URL = 'data:image/png;base64,iVBORw0KGgo='
 const VIDEO_DATA_URL = 'data:video/mp4;base64,AAAAIGZ0eXBpc29t'
 
 beforeAll(async () => {
   iso = await createIsolatedGenerationRepository()
+  taskRepository = createTaskQueueRepository({ db: iso.db })
   // 创建测试用户以满足外键约束
   await createTestUser(iso.databaseUrl, 'user_e2e')
   await createTestUser(iso.databaseUrl, 'user_e2e_poll')
@@ -68,6 +71,7 @@ function buildLoop(
   return new WorkerLoop({
     workerId,
     repository: iso.repository,
+    taskRepository,
     providerRequestAuditRepository: iso.providerRequestAuditRepository,
     providerRegistry: registry,
     modelRegistry: { getModelById },
@@ -170,7 +174,7 @@ describe('worker e2e', () => {
       params: { prompt: 'recovery lantern', n: 1, size: '1328*1328' },
     })
     const baseTime = Date.now()
-    const taskBeforeCrash = await iso.repository.claimNextQueuedTask({
+    const taskBeforeCrash = await taskRepository.claimNextQueuedTask({
       workerId: 'worker-crashed',
       now: new Date(baseTime).toISOString(),
       lockedUntil: new Date(baseTime + 1_000).toISOString(),
@@ -178,13 +182,13 @@ describe('worker e2e', () => {
 
     expect(taskBeforeCrash?.id).toBe(created.task.id)
     expect(taskBeforeCrash?.lockedBy).toBe('worker-crashed')
-    expect(await iso.repository.claimNextQueuedTask({
+    expect(await taskRepository.claimNextQueuedTask({
       workerId: 'worker-recovery',
       now: new Date(baseTime + 500).toISOString(),
       lockedUntil: new Date(baseTime + 60_000).toISOString(),
     })).toBeUndefined()
 
-    const recoveredTask = await iso.repository.claimNextQueuedTask({
+    const recoveredTask = await taskRepository.claimNextQueuedTask({
       workerId: 'worker-recovery',
       now: new Date(baseTime + 1_500).toISOString(),
       lockedUntil: new Date(Date.now() + 60_000).toISOString(),

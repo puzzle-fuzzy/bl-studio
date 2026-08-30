@@ -1,8 +1,8 @@
 /**
  * @bailian-studio/generation-repository 的对外入口。
  *
- * 本包是整个系统的「中央生成接缝」：所有生成（generation）相关的持久化、
- * 状态机推进、任务调度、分享等都集中在这里，对外只暴露类型与工厂函数。
+ * 本包是整个系统的「中央生成接缝」：负责 generation 业务持久化、状态推进和
+ * 业务事务内的初始任务写入；任务调度/租约生命周期由 task-repository 独立拥有。
  *
  * 关键的边界设计：
  *  - services 层被架构规则禁止直接 import `@bailian-studio/db`，因此这里把
@@ -96,14 +96,11 @@ export type {
 export type { ProviderRequestAuditRepository } from "./provider-request-port";
 export { createProviderRequestAuditRepository } from "./provider-requests";
 export {
-	type ClaimNextQueuedTaskInput,
 	createGenerationRepository,
 	estimateGenerationRequest,
 	type GenerationEstimate,
 	type GenerationRepository,
 	type ListStuckGenerationRecordsInput,
-	type RenewTaskLockInput,
-	type SaveTaskOptions,
 } from "./repository";
 export type {
 	PublicShareRepository,

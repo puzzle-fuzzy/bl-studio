@@ -298,7 +298,7 @@ describe('asset routes', () => {
       storageKey: 'uploads/full.png',
       enqueueThumbnail: true,
     })
-    const task = await isolated.repository.claimNextQueuedTask({
+    const task = await isolated.taskQueueRepository.claimNextQueuedTask({
       workerId: 'thumbnail-test-worker',
       now: new Date().toISOString(),
       lockedUntil: new Date(Date.now() + 30_000).toISOString(),

@@ -9,6 +9,7 @@
 import { createDb, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, requireDatabaseUrl, resetBailianStudioTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
 import { createCreditLedger } from '@bailian-studio/credit-ledger'
+import { createTaskQueueRepository, type TaskQueueRepository } from '@bailian-studio/task-repository'
 import {
   createGenerationRepositoryFromUrl,
   type CreateGenerationRepositoryFromUrlOptions,
@@ -42,6 +43,7 @@ export interface IsolatedGenerationRepository {
   notificationRepository: GenerationRepositoryHandle['notificationRepository']
   promptLibraryRepository: GenerationRepositoryHandle['promptLibraryRepository']
   providerRequestAuditRepository: GenerationRepositoryHandle['providerRequestAuditRepository']
+  taskQueueRepository: TaskQueueRepository
   shareRepository: GenerationRepositoryHandle['shareRepository']
   publicShareRepository: GenerationRepositoryHandle['publicShareRepository']
   socialRepository: GenerationRepositoryHandle['socialRepository']
@@ -70,6 +72,7 @@ export async function createIsolatedGenerationRepository(
     notificationRepository: handle.notificationRepository,
     promptLibraryRepository: handle.promptLibraryRepository,
     providerRequestAuditRepository: handle.providerRequestAuditRepository,
+    taskQueueRepository: createTaskQueueRepository({ db: handle.db }),
     shareRepository: handle.shareRepository,
     publicShareRepository: handle.publicShareRepository,
     socialRepository: handle.socialRepository,

@@ -115,7 +115,7 @@ flowchart LR
 - director 的 application service 由 API 组合根创建并注入，统一承接阶段运行的估价、预检、
   视频/音乐/合成运行创建和单镜头重试；Worker 继续负责异步 Provider 调用与运行状态推进。
 
-### 3.2 任务队列生命周期（迁移中）
+### 3.2 任务队列生命周期（已完成，2026-08-30）
 
 - `@bailian-studio/task-engine` 只拥有纯状态机；`@bailian-studio/task-repository` 拥有
   `task_records` 的 claim、租约续期、状态保存和读取，以及 Drizzle 行映射。
@@ -362,5 +362,5 @@ CreativeGenerationRequest
 vertical slice：`collect-from-generation` 在一个数据库事务内写入资产、项目关系、版本和参考图，使用用户范围幂等键
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
-`task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法正在移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是把 generation 核心接口中的任务生命周期方法也移除；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。
+`task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是评估业务 repository 的事务 store 是否需要进一步统一；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。

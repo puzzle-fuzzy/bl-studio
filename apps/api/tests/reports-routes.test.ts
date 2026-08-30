@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { AdminGalleryRepository, AuditRepository, ContentReportRepository, GenerationRepository } from '@bailian-studio/generation-repository'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { createTestApp } from '../src/test-app'
@@ -27,11 +27,7 @@ const report = {
   updatedAt: '2026-08-08T00:00:00.000Z',
 }
 
-const fakeGenerationRepository = {
-  recordAuditEvent: async (input: Record<string, unknown>) => {
-    audits.push(input)
-    return {} as never
-  },
+const fakeContentReportRepository = {
   submitContentReport: async (input: { reporterId: string; generationId: string; reason: string; details?: string }) => ({
     ...report,
     reporterId: input.reporterId,
@@ -45,10 +41,27 @@ const fakeGenerationRepository = {
     id: input.reportId,
     status: input.status,
   }),
+} as unknown as ContentReportRepository
+
+const fakeGenerationRepository = {
+  recordAuditEvent: async (input: Record<string, unknown>) => {
+    audits.push(input)
+    return {} as never
+  },
+} as unknown as GenerationRepository
+
+const fakeAuditRepository: AuditRepository = {
+  recordAuditEvent: async (input) => {
+    audits.push({ ...input })
+    return {} as never
+  },
+}
+
+const fakeAdminGalleryRepository = {
   setGalleryRecordHidden: async (input: Record<string, unknown>) => {
     hidden.push(input)
   },
-} as unknown as GenerationRepository
+} as unknown as AdminGalleryRepository
 
 const fakeCreditLedger = {} as CreditLedger
 const fakeStorage = {
@@ -62,6 +75,9 @@ const app = createTestApp({
   authService: fakeAuthService,
   creditLedger: fakeCreditLedger,
   generationRepository: fakeGenerationRepository,
+  auditRepository: fakeAuditRepository,
+  contentReportRepository: fakeContentReportRepository,
+  adminGalleryRepository: fakeAdminGalleryRepository,
   storage: fakeStorage,
 }).app
 

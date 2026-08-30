@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CreditBalance, CreditLedger, GrantCreditsResult } from '@bailian-studio/credit-ledger'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { AuditRepository, GenerationRepository } from '@bailian-studio/generation-repository'
 import { CreditLedgerError } from '@bailian-studio/credit-ledger'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
@@ -84,6 +84,13 @@ const fakeGenerationRepository = {
   },
 } as unknown as GenerationRepository
 
+const fakeAuditRepository: AuditRepository = {
+  recordAuditEvent: async (input) => {
+    audits.push({ ...input })
+    return {} as never
+  },
+}
+
 function authed(url: string, init: RequestInit = {}): Request {
   const headers = new Headers(init.headers)
   headers.set('cookie', 'bailian_studio_session=fake-token')
@@ -110,7 +117,7 @@ describe('points routes', () => {
 
   it('returns the authenticated account balance', async () => {
     balances.set('user-1', { userId: 'user-1', availableCents: 1200, reservedCents: 300, totalCents: 1500 })
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
 
     const response = await app.handle(authed('http://localhost/api/account/points'))
     const body = await response.json() as { success: true; data: { balance: CreditBalance } }
@@ -120,7 +127,7 @@ describe('points routes', () => {
   })
 
   it('rejects a non-admin grant before touching the ledger', async () => {
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(json('http://localhost/api/admin/users/target-1/points/grants', {
       amountCents: 100,
       reason: 'test account',
@@ -134,7 +141,7 @@ describe('points routes', () => {
   })
 
   it('returns the authenticated user ledger page', async () => {
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(authed('http://localhost/api/account/points/ledger?limit=10'))
     const body = await response.json() as { success: true; data: { items: unknown[] } }
     expect(response.status).toBe(200)
@@ -143,7 +150,7 @@ describe('points routes', () => {
 
   it('allows admins to make a reasoned signed adjustment', async () => {
     currentUser = { id: 'admin-1', role: 'admin' }
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(json('http://localhost/api/admin/users/target-1/points/adjustments', {
       amountCents: -50, reason: 'manual correction', idempotencyKey: 'adjustment-1',
     }))
@@ -154,7 +161,7 @@ describe('points routes', () => {
 
   it('allows admins to grant points with actor and request identity', async () => {
     currentUser = { id: 'admin-1', role: 'admin' }
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(json(
       'http://localhost/api/admin/users/target-1/points/grants',
       { amountCents: 500, reason: '线上回归测试', idempotencyKey: 'grant-1' },
@@ -175,7 +182,7 @@ describe('points routes', () => {
       ...fakeCreditLedger,
       grant: async () => { throw new CreditLedgerError('POINTS_IDEMPOTENCY_CONFLICT', 'conflict') },
     }
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: conflictLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: conflictLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(json('http://localhost/api/admin/users/target-1/points/grants', {
       amountCents: 100,
       reason: 'test account',
@@ -189,7 +196,7 @@ describe('points routes', () => {
 
   it('rejects non-positive or malformed grants at the HTTP boundary', async () => {
     currentUser = { id: 'admin-1', role: 'admin' }
-    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository }).app
+    const app = createTestApp({ authService: fakeAuthService, creditLedger: fakeCreditLedger, generationRepository: fakeGenerationRepository, auditRepository: fakeAuditRepository }).app
     const response = await app.handle(json('http://localhost/api/admin/users/target-1/points/grants', {
       amountCents: 0,
       reason: '',

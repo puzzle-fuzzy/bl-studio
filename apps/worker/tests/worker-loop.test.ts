@@ -39,6 +39,11 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
     providerRegistry: registry,
     modelRegistry: { getModelById: () => qwenImage },
     storage: new FakeStorageAdapter(),
+    taskRepository: {
+      claimNextQueuedTask: input => repo.claimNextQueuedTask(),
+      renewTaskLock: input => repo.renewTaskLock(input),
+      saveTask: (task, options) => repo.saveTask(task, options),
+    },
     logger,
     idleSleepMs: 1,
     pollIntervalMs: 1,
@@ -402,6 +407,11 @@ describe('WorkerLoop', () => {
         providerRegistry: registry,
         modelRegistry: { getModelById: () => qwenImage },
         storage: new FakeStorageAdapter(),
+        taskRepository: {
+          claimNextQueuedTask: claim,
+          renewTaskLock: input => repo.renewTaskLock(input),
+          saveTask: (task, options) => repo.saveTask(task, options),
+        },
         logger,
         idleSleepMs: 1,
         pollIntervalMs: 1,

@@ -22,8 +22,8 @@ export interface WorkerLoopConfig {
   workerId: string
   repository: GenerationRepository
   providerRequestAuditRepository: ProviderRequestAuditRepository
-  /** 任务生命周期的最小持久化端口；缺省时回退到 repository 兼容 facade。 */
-  taskRepository?: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
+  /** 任务生命周期的最小持久化端口；必须由 worker 组合根显式注入。 */
+  taskRepository: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
   /** 可选的审计 outbox 消费句柄，由 worker 组合根注入。 */
   auditOutboxRepository?: Pick<AuditOutboxRepository, 'drain'>
   directorRepository?: DirectorRepository
@@ -128,11 +128,7 @@ export class WorkerLoop {
     })
     this.logger = config.logger ?? createLogger(`worker:${config.workerId}`)
     this.metrics = metrics
-    this.taskRepository = config.taskRepository ?? {
-      claimNextQueuedTask: input => config.repository.claimNextQueuedTask(input),
-      renewTaskLock: input => config.repository.renewTaskLock(input),
-      saveTask: (task, options) => config.repository.saveTask(task, options),
-    }
+    this.taskRepository = config.taskRepository
     // 任务租约与轮询节奏（默认值）：
     // - 锁 90s：任务执行期间持有；worker 崩溃后最迟 90s 由其它 worker 重新认领。
     // - 心跳 = 锁/3（约 30s）：执行期间周期性续租，网络抖动在锁过期前有重试机会。

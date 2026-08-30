@@ -16,8 +16,8 @@
  *  - **幂等性**：createGeneration 由 `(userId, idempotencyKey)` 唯一索引兜底；
  *    createGenerationShare 由 `generation_shares_record_idx` 部分唯一索引兜底，
  *    每个 generation 恰好产生一个 share。
- *  - **并发认领**：claimNextQueuedTask 使用 `FOR UPDATE SKIP LOCKED`，多 worker
- *    并发拉取时互不阻塞、且不会抢到同一条任务。
+ *  - **任务生命周期**：任务认领、续租与结果保存由 task-repository 独立负责；本包
+ *    只在 generation 事务内写入初始任务，避免把队列运行时重新耦合进业务仓储。
  *  - **processing 中间态**：markGenerationProcessing / scheduleGenerationPoll
  *    会把记录翻到 `processing`，这是 repository 内部中间态，不属于 event-bus
  *    的 GenerationStatus 联合——详见 types.ts 的 RepositoryGenerationStatus。
@@ -71,9 +71,7 @@ import {
 } from "@bailian-studio/model-core";
 import type { TaskError, TaskRecord } from "@bailian-studio/task-engine";
 import {
-	createTaskQueueRepository,
 	enqueueTask,
-	TaskRepositoryError,
 } from "@bailian-studio/task-repository";
 import {
 	and,
@@ -92,7 +90,6 @@ import {
 	sql,
 } from "drizzle-orm";
 import { enqueueAssetThumbnail } from "./assets";
-import type { AssetRepository } from "./asset-port";
 import type {
 	AssetThumbnailSource,
 	CompleteAssetThumbnailInput,
@@ -796,17 +793,6 @@ function errorToJsonRecord(error: Error | TaskError): Record<string, unknown> {
 	};
 }
 
-function mapTaskRepositoryError(
-	error: unknown,
-): GenerationRepositoryError | undefined {
-	if (!(error instanceof TaskRepositoryError)) return undefined;
-	return new GenerationRepositoryError(
-		error.code,
-		error.message,
-		error.details,
-	);
-}
-
 export interface CreateGenerationRepositoryOptions {
 	db: BailianStudioDb;
 }
@@ -828,26 +814,6 @@ function mapCreditLedgerError(
 							? "DATABASE_ERROR"
 							: error.code;
 	return new GenerationRepositoryError(code, error.message, error.details);
-}
-
-/** claimNextQueuedTask 的入参：worker 标识、当前时间、锁过期时间。 */
-export interface ClaimNextQueuedTaskInput {
-	workerId: string;
-	now: string;
-	lockedUntil: string;
-}
-
-/** 延长一条运行中 task 的租约；只有当前 worker 仍持有未过期锁时才成功。 */
-export interface RenewTaskLockInput {
-	taskId: string;
-	workerId: string;
-	now: string;
-	lockedUntil: string;
-}
-
-/** 保存 task 时可选的所有权护栏，避免旧 worker 覆盖新 worker 的结果。 */
-export interface SaveTaskOptions {
-	expectedWorkerId?: string;
 }
 
 export interface GenerationEstimate {
@@ -954,15 +920,6 @@ export interface GenerationRepository {
 	markArtifactFailed(
 		input: MarkArtifactFailedInput,
 	): Promise<GenerationArtifact>;
-	claimNextQueuedTask(
-		input: ClaimNextQueuedTaskInput,
-	): Promise<TaskRecord | undefined>;
-	renewTaskLock(input: RenewTaskLockInput): Promise<TaskRecord | undefined>;
-	saveTask(
-		task: TaskRecord,
-		options?: SaveTaskOptions,
-	): Promise<TaskRecord | undefined>;
-	getTask(id: string): Promise<TaskRecord | undefined>;
 	listGenerationEvents(
 		options?: ListGenerationEventsOptions,
 	): Promise<GenerationEvent[]>;
@@ -1644,7 +1601,6 @@ export function createGenerationRepository(
 	options: CreateGenerationRepositoryOptions,
 ): GenerationRepository {
 	const { db } = options;
-	const taskQueueRepository = createTaskQueueRepository({ db });
 
 	return {
 		async healthCheck() {
@@ -3389,39 +3345,6 @@ export function createGenerationRepository(
 			}
 
 			return toGenerationArtifact(updated);
-		},
-
-		/** 兼容旧 API 的任务生命周期 facade；实现已下沉到 task-repository。 */
-		async claimNextQueuedTask(input) {
-			try {
-				return await taskQueueRepository.claimNextQueuedTask(input);
-			} catch (error) {
-				throw mapTaskRepositoryError(error) ?? error;
-			}
-		},
-
-		async renewTaskLock(input) {
-			try {
-				return await taskQueueRepository.renewTaskLock(input);
-			} catch (error) {
-				throw mapTaskRepositoryError(error) ?? error;
-			}
-		},
-
-		async saveTask(task, options) {
-			try {
-				return await taskQueueRepository.saveTask(task, options);
-			} catch (error) {
-				throw mapTaskRepositoryError(error) ?? error;
-			}
-		},
-
-		async getTask(id) {
-			try {
-				return await taskQueueRepository.getTask(id);
-			} catch (error) {
-				throw mapTaskRepositoryError(error) ?? error;
-			}
 		},
 
 		/**

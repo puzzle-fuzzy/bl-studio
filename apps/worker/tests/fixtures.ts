@@ -54,11 +54,9 @@ import type {
   ProviderRequestAudit,
   WorkerHeartbeat,
   RequestGenerationCancelInput,
-  RenewTaskLockInput,
   RetryGenerationInput,
   RevokeGenerationShareInput,
   RecordAuditEventInput,
-  SaveTaskOptions,
   ScheduleGenerationPollInput,
   SetGenerationLibraryStateInput,
   StartProviderRequestInput,
@@ -66,6 +64,7 @@ import type {
   UpdateGenerationRecordPatch,
   UnifiedAssetItem,
 } from '@bailian-studio/generation-repository'
+import type { RenewTaskLockInput, SaveTaskOptions } from '@bailian-studio/task-repository'
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import type { NormalizedOutput } from '@bailian-studio/provider-dashscope'
 import type { Logger } from '@bailian-studio/shared'

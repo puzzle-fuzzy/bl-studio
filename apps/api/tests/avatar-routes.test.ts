@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { AuthService } from '@bailian-studio/auth'
-import type { GenerationRepository, RecordAuditEventInput } from '@bailian-studio/generation-repository'
+import type { AuditRepository, GenerationRepository, RecordAuditEventInput } from '@bailian-studio/generation-repository'
 import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult } from '@bailian-studio/storage'
 import { mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
@@ -31,15 +31,14 @@ class TestStorage implements StorageAdapter {
 function createTestContext(avatarKey: () => string | null | undefined) {
   const auditInputs: RecordAuditEventInput[] = []
   const repository = new Proxy({} as GenerationRepository, {
-    get(_target, property) {
-      if (property === 'recordAuditEvent') {
-        return async (input: RecordAuditEventInput) => {
-          auditInputs.push(input)
-        }
-      }
-      return undefined
-    },
+    get: () => undefined,
   })
+  const auditRepository: AuditRepository = {
+    recordAuditEvent: async (input) => {
+      auditInputs.push(input)
+      return {} as never
+    },
+  }
   const storage = new TestStorage()
   const baseAuth = createFakeAuthService(() => ({
     id: 'avatar_user',
@@ -54,6 +53,7 @@ function createTestContext(avatarKey: () => string | null | undefined) {
   const { app } = createTestApp({
     authService,
     generationRepository: repository,
+    auditRepository,
     storage,
     artifactLocalRoot: join(tmpdir(), 'avatar-routes-test'),
   })
