@@ -1,4 +1,5 @@
 import type { CreativeAssetRepository } from "@bailian-studio/creative-asset-repository";
+import { getModelById } from "@bailian-studio/dashscope-manifests";
 import type {
 	DailyGenerationUsage,
 	GenerationEstimate,
@@ -31,6 +32,8 @@ const usage: DailyGenerationUsage = {
 	providerCostCents: 0,
 };
 
+const modelResolver = { getModelById };
+
 describe("generation creative asset preparation", () => {
 	it("compiles approved asset bindings into the stable generation input", async () => {
 		const resolveGenerationBindings = vi
@@ -57,6 +60,7 @@ describe("generation creative asset preparation", () => {
 			repository: {} as GenerationRepository,
 			usageRepository: {} as UsageRepository,
 			limits: { dailyQuotaMode: "attempts" },
+			modelResolver,
 			creativeAssetRepository: { resolveGenerationBindings },
 		});
 
@@ -103,6 +107,24 @@ describe("generation creative asset preparation", () => {
 });
 
 describe("generation application service", () => {
+	it("uses the injected model resolver for model lookup", async () => {
+		const getModelById = vi.fn().mockReturnValue(undefined);
+		const service = createGenerationApplicationService({
+			repository: {} as GenerationRepository,
+			usageRepository: {} as UsageRepository,
+			limits: { dailyQuotaMode: "attempts" },
+			modelResolver: { getModelById },
+			creativeAssetRepository: {} as CreativeAssetRepository,
+		});
+
+		await expect(service.estimate({
+			userId: "user-1",
+			modelId: "provider-owned-model",
+			params: { prompt: "fixture", n: 1 },
+		})).rejects.toThrow(/Unknown model/);
+		expect(getModelById).toHaveBeenCalledWith("provider-owned-model");
+	});
+
 	it("owns estimate preparation and daily usage lookup", async () => {
 		const getGenerationUsage = vi
 			.fn<UsageRepository["getGenerationUsage"]>()
@@ -112,6 +134,7 @@ describe("generation application service", () => {
 			repository,
 			usageRepository: { getGenerationUsage },
 			limits: { dailyQuotaMode: "attempts" },
+			modelResolver,
 			creativeAssetRepository: {} as CreativeAssetRepository,
 		});
 
@@ -149,6 +172,7 @@ describe("generation application service", () => {
 			repository,
 			usageRepository,
 			limits: { dailyTaskLimit: 2, dailyQuotaMode: "attempts" },
+			modelResolver,
 			creativeAssetRepository: {} as CreativeAssetRepository,
 		});
 

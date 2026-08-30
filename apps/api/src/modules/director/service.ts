@@ -12,11 +12,11 @@ import { DirectorRepositoryError, type DirectorProjectRepositoryDetail, type Dir
 import {
   estimatePriceCents,
   validateModelParams,
+  type ModelCatalog,
+  type ModelManifestResolver,
 } from '@bailian-studio/model-core'
-import {
-  getBailianOperationCapability,
-  getModelById,
-  type FrozenModelManifest,
+import type {
+  FrozenModelManifest,
 } from '@bailian-studio/dashscope-manifests'
 
 export interface DirectorApplicationService {
@@ -71,21 +71,29 @@ export interface DirectorApplicationService {
 
 // ── 模型前置校验 ──
 
-export function requireDirectorMusicModel(modelId: string | undefined): FrozenModelManifest {
-  const model = modelId === undefined ? undefined : getModelById(modelId)
-  if (model === undefined || model.availability.enabled === false || getBailianOperationCapability(model.id) !== 'music.generate') {
+export function requireDirectorMusicModel(
+  modelId: string | undefined,
+  modelResolver: ModelManifestResolver<FrozenModelManifest>,
+  modelCatalog: Pick<ModelCatalog, 'getById'>,
+): FrozenModelManifest {
+  const model = modelId === undefined ? undefined : modelResolver.getModelById(modelId)
+  if (model === undefined || model.availability.enabled === false || modelCatalog.getById(model.id)?.operation !== 'music.generate') {
     throw new ValidationError('音乐阶段需要使用已启用的音乐生成模型')
   }
   return model
 }
 
-export function requireDirectorVideoModel(modelId: string | undefined): FrozenModelManifest {
-  const model = modelId === undefined ? undefined : getModelById(modelId)
+export function requireDirectorVideoModel(
+  modelId: string | undefined,
+  modelResolver: ModelManifestResolver<FrozenModelManifest>,
+  modelCatalog: Pick<ModelCatalog, 'getById'>,
+): FrozenModelManifest {
+  const model = modelId === undefined ? undefined : modelResolver.getModelById(modelId)
   if (
     model === undefined
     || model.availability.enabled === false
     || model.request.kind !== 'dashscope-video-task'
-    || getBailianOperationCapability(model.id) !== 'video.reference-to-video'
+    || modelCatalog.getById(model.id)?.operation !== 'video.reference-to-video'
     || !model.parameters.some(parameter => (
       parameter.type === 'media'
       && parameter.mediaKind === 'image'
@@ -218,8 +226,12 @@ function requireRetryableDirectorShot(
   return shot
 }
 
-function validateDirectorMusicInput(input: CreateDirectorPhaseRunInput) {
-  const model = requireDirectorMusicModel(input.modelId)
+function validateDirectorMusicInput(
+  input: CreateDirectorPhaseRunInput,
+  modelResolver: ModelManifestResolver<FrozenModelManifest>,
+  modelCatalog: Pick<ModelCatalog, 'getById'>,
+) {
+  const model = requireDirectorMusicModel(input.modelId, modelResolver, modelCatalog)
   const params = directorMusicParams(input)
   const validation = validateModelParams(model, params)
   if (!validation.valid) {
@@ -232,8 +244,12 @@ function validateDirectorMusicInput(input: CreateDirectorPhaseRunInput) {
 
 export function createDirectorApplicationService({
   repository,
+  modelResolver,
+  modelCatalog,
 }: {
   repository: DirectorRepository
+  modelResolver: ModelManifestResolver<FrozenModelManifest>
+  modelCatalog: Pick<ModelCatalog, 'getById'>
 }): DirectorApplicationService {
   return {
     async requestScriptChat({ userId, projectId, traceId, input }) {
@@ -247,7 +263,7 @@ export function createDirectorApplicationService({
     },
 
     async estimateShotVideo({ userId, projectId, shotId, modelId }) {
-      const model = requireDirectorVideoModel(modelId)
+      const model = requireDirectorVideoModel(modelId, modelResolver, modelCatalog)
       const project = await requireDirectorProject(repository, userId, projectId)
       const shot = requireRetryableDirectorShot(project, shotId)
       validateDirectorVideoShots(model, [shot])
@@ -264,7 +280,7 @@ export function createDirectorApplicationService({
     },
 
     async createShotVideoRun({ userId, projectId, shotId, traceId, input }) {
-      const model = requireDirectorVideoModel(input.modelId)
+      const model = requireDirectorVideoModel(input.modelId, modelResolver, modelCatalog)
       const project = await requireDirectorProject(repository, userId, projectId)
       const shot = requireRetryableDirectorShot(project, shotId)
       validateDirectorVideoShots(model, [shot])
@@ -280,7 +296,7 @@ export function createDirectorApplicationService({
 
     async createPhaseRun({ userId, projectId, phase, traceId, input }) {
       if (phase === 'videos') {
-        const model = requireDirectorVideoModel(input.modelId)
+        const model = requireDirectorVideoModel(input.modelId, modelResolver, modelCatalog)
         const project = await requireDirectorProject(repository, userId, projectId)
         validateDirectorVideoShots(
           model,
@@ -290,7 +306,7 @@ export function createDirectorApplicationService({
         )
       }
       if (phase === 'bgm') {
-        validateDirectorMusicInput(input)
+        validateDirectorMusicInput(input, modelResolver, modelCatalog)
       }
       return repository.requestPhaseRun({
         userId,
@@ -302,7 +318,7 @@ export function createDirectorApplicationService({
     },
 
     async estimateVideos({ userId, projectId, modelId }) {
-      const model = requireDirectorVideoModel(modelId)
+      const model = requireDirectorVideoModel(modelId, modelResolver, modelCatalog)
       const project = await requireDirectorProject(repository, userId, projectId)
       const pendingShots = project.shots.filter(
         (shot) => shot.status === 'locked' || shot.status === 'failed',
@@ -338,7 +354,7 @@ export function createDirectorApplicationService({
     },
 
     async estimateMusic({ userId, projectId, input }) {
-      const { model, params } = validateDirectorMusicInput(input)
+      const { model, params } = validateDirectorMusicInput(input, modelResolver, modelCatalog)
       await requireDirectorProject(repository, userId, projectId)
       return {
         modelId: model.id,

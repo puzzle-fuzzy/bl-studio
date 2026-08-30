@@ -1,5 +1,6 @@
 import { compileCreativeGeneration } from "@bailian-studio/creative-asset-compiler";
 import type { CreativeAssetRepository } from "@bailian-studio/creative-asset-repository";
+import type { FrozenModelManifest } from "@bailian-studio/dashscope-manifests";
 import {
 	type CreateGenerationInput,
 	type CreateGenerationResult,
@@ -13,7 +14,7 @@ import {
 	type RetryGenerationInput,
 	type UsageRepository,
 } from "@bailian-studio/generation-repository";
-import { getModelById } from "@bailian-studio/dashscope-manifests";
+import type { ModelManifestResolver } from "@bailian-studio/model-core";
 import type { GenerationLimits } from "../../lib/limits";
 
 export interface CreateGenerationUseCaseResult {
@@ -26,6 +27,7 @@ export interface CreateGenerationUseCaseDependencies {
 	repository: GenerationRepository;
 	usageRepository: UsageRepository;
 	limits: GenerationLimits;
+	modelResolver: ModelManifestResolver<FrozenModelManifest>;
 	creativeAssetRepository: Pick<
 		CreativeAssetRepository,
 		"resolveGenerationBindings"
@@ -80,7 +82,7 @@ async function prepareCreativeGenerationInput(
 	const context = input.creativeContext;
 	if (context === undefined) return input;
 
-	const manifest = getModelById(input.modelId);
+	const manifest = deps.modelResolver.getModelById(input.modelId);
 	if (manifest === undefined) {
 		throw new GenerationRepositoryError(
 			"MODEL_NOT_FOUND",
@@ -158,7 +160,7 @@ export function createGenerationApplicationService(
 			input: CreateGenerationInput,
 		): Promise<GenerationEstimateResult> {
 			const prepared = await prepareCreativeGenerationInput(input, deps);
-			const estimate = estimatePreparedGeneration(prepared);
+			const estimate = estimatePreparedGeneration(prepared, deps.modelResolver);
 			const usage = await getDailyGenerationUsage(
 				deps.usageRepository,
 				prepared.userId,
@@ -169,7 +171,7 @@ export function createGenerationApplicationService(
 			input: CreateGenerationInput,
 		): Promise<CreateGenerationUseCaseResult> {
 			const prepared = await prepareCreativeGenerationInput(input, deps);
-			const estimate = estimatePreparedGeneration(prepared);
+			const estimate = estimatePreparedGeneration(prepared, deps.modelResolver);
 			const usage = await getDailyGenerationUsage(
 				deps.usageRepository,
 				prepared.userId,
@@ -188,12 +190,13 @@ export function createGenerationApplicationService(
 
 function estimatePreparedGeneration(
 	input: CreateGenerationInput,
+	modelResolver: ModelManifestResolver<FrozenModelManifest>,
 ): GenerationEstimate {
 	return estimateGenerationRequest({
 		modelId: input.modelId,
 		params: input.params,
 		...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
-	}, { getModelById });
+	}, modelResolver);
 }
 
 /**

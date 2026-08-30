@@ -83,6 +83,8 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
   const usageRepository = overrides.usageRepository ?? missing<UsageRepository>('usageRepository')
   const creativeAssetRepository =
     overrides.creativeAssetRepository ?? missing<CreativeAssetRepository>('creativeAssetRepository')
+  const modelResolver = overrides.modelResolver ?? { getModelById }
+  const resolvedModelCatalog = overrides.modelCatalog ?? modelCatalog
   const generationLimits = overrides.generationLimits ?? readGenerationLimits({})
   const generationApplicationService =
     overrides.generationApplicationService ??
@@ -90,11 +92,17 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
       repository: generationRepository,
       usageRepository,
       limits: generationLimits,
+      modelResolver,
       creativeAssetRepository,
     })
   const directorRepository = overrides.directorRepository ?? missing<DirectorRepository>('directorRepository')
   const directorApplicationService =
-    overrides.directorApplicationService ?? createDirectorApplicationService({ repository: directorRepository })
+    overrides.directorApplicationService ??
+    createDirectorApplicationService({
+      repository: directorRepository,
+      modelResolver,
+      modelCatalog: resolvedModelCatalog,
+    })
   const creativeAssetApplicationService =
     overrides.creativeAssetApplicationService ??
     createCreativeAssetApplicationService({
@@ -109,8 +117,8 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
     ...(overrides.githubOAuth !== undefined ? { githubOAuth: overrides.githubOAuth } : {}),
     creditLedger: overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository,
-    modelResolver: overrides.modelResolver ?? { getModelById },
-    modelCatalog: overrides.modelCatalog ?? modelCatalog,
+    modelResolver,
+    modelCatalog: resolvedModelCatalog,
     generationDiagnosticsRepository,
     assetRepository,
     shareRepository,

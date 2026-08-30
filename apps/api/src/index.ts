@@ -57,10 +57,13 @@ async function main(): Promise<void> {
     repository: persistence.generationRepository,
     usageRepository: persistence.usageRepository,
     limits: generationLimits,
+    modelResolver,
     creativeAssetRepository: persistence.creativeAssetRepository,
   })
   const directorApplicationService = createDirectorApplicationService({
     repository: persistence.directorRepository,
+    modelResolver,
+    modelCatalog,
   })
   const creativeAssetApplicationService = createCreativeAssetApplicationService(
     {

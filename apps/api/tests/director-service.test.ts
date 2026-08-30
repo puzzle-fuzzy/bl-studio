@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DirectorProjectRepositoryDetail, DirectorRepository } from '@bailian-studio/director-repository'
 import type { DirectorPhaseRun } from '@bailian-studio/director-contracts'
+import { getModelById, modelCatalog } from '@bailian-studio/dashscope-manifests'
 import { createDirectorApplicationService } from '../src/modules/director/service'
 
 function projectWithShots(shots: Array<Record<string, unknown>>): DirectorProjectRepositoryDetail {
@@ -14,13 +15,32 @@ const pendingRun = {
   status: 'pending',
 } as unknown as DirectorPhaseRun
 
+const modelResolver = { getModelById }
+
 describe('director application service', () => {
+  it('uses the injected model resolver for phase validation', async () => {
+    const getModelById = vi.fn().mockReturnValue(undefined)
+    const service = createDirectorApplicationService({
+      repository: {} as DirectorRepository,
+      modelResolver: { getModelById },
+      modelCatalog,
+    })
+
+    await expect(service.createPhaseRun({
+      userId: 'user-1',
+      projectId: 'project-1',
+      phase: 'bgm',
+      input: { modelId: 'provider-owned-model', prompt: '夜雨中的钢琴' },
+    })).rejects.toThrow('音乐阶段需要使用已启用的音乐生成模型')
+    expect(getModelById).toHaveBeenCalledWith('provider-owned-model')
+  })
+
   it('estimates pending video shots from repository state', async () => {
     const getProject = vi.fn().mockResolvedValue(projectWithShots([
       { status: 'locked', durationSeconds: 8, referenceAssetIds: ['reference-1'], videoGenerationId: null },
     ]))
     const repository = { getProject } as unknown as DirectorRepository
-    const service = createDirectorApplicationService({ repository })
+    const service = createDirectorApplicationService({ repository, modelResolver, modelCatalog })
 
     const estimate = await service.estimateVideos({
       userId: 'user-1',
@@ -48,7 +68,7 @@ describe('director application service', () => {
       getAssemblyPreflight,
       requestPhaseRun,
     } as unknown as DirectorRepository
-    const service = createDirectorApplicationService({ repository })
+    const service = createDirectorApplicationService({ repository, modelResolver, modelCatalog })
 
     await expect(service.createAssemblyRun({
       userId: 'user-1',
@@ -62,7 +82,7 @@ describe('director application service', () => {
   it('queues validated phase runs through the repository boundary', async () => {
     const requestPhaseRun = vi.fn().mockResolvedValue(pendingRun)
     const repository = { requestPhaseRun } as unknown as DirectorRepository
-    const service = createDirectorApplicationService({ repository })
+    const service = createDirectorApplicationService({ repository, modelResolver, modelCatalog })
 
     await service.createPhaseRun({
       userId: 'user-1',

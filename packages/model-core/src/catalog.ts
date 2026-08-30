@@ -15,8 +15,10 @@ import type {
  * catalog. The process composition root decides which catalog implementation
  * supplies the immutable manifest snapshot.
  */
-export interface ModelManifestResolver {
-  getModelById(id: string): FrozenModelManifest | undefined
+export interface ModelManifestResolver<
+  TManifest extends FrozenModelManifest = FrozenModelManifest,
+> {
+  getModelById(id: string): TManifest | undefined
 }
 
 /**
