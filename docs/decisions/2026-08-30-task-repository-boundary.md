@@ -38,6 +38,6 @@
 核心 repository 和各域窄 port；`GenerationRepositoryCompat` 与 `content.ts` 已删除，
 仓储测试按窄 port 组合 harness。API 测试工厂也不再把核心 repository 隐式强转为其它 port。
 
-Worker 的 `TaskQueueRepository` 注入已从可选兼容路径变为强制依赖；业务 repository 继续把
-业务记录和初始任务放在同一个事务中。后续如有必要，再以事务 store 统一不同业务 repository
-对 `enqueueTask` 的调用约定。
+Worker 的 `TaskQueueRepository` 注入已从可选兼容路径变为强制依赖；generation、media、director
+由组合根注入同一个 `TaskQueueTransactionStore`，业务记录和初始任务继续放在各自同一个事务中。
+事务 store 统一任务写入约定，但不升级为 request-scoped transaction context。

@@ -66,6 +66,7 @@ import {
 } from "@bailian-studio/media-repository";
 import {
 	createTaskQueueRepository,
+	createTaskQueueTransactionStore,
 	type TaskQueueRepository,
 } from "@bailian-studio/task-repository";
 
@@ -139,7 +140,8 @@ export function createApiPersistenceRuntime(
 	const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax);
 	try {
 		const close = closeOnce(db);
-		const generationRepository = createGenerationRepository({ db });
+		const taskQueueTransactionStore = createTaskQueueTransactionStore();
+		const generationRepository = createGenerationRepository({ db, taskQueueTransactionStore });
 		const shareRepository = createShareRepository(db);
 		return {
 			auditOutboxRepository: createAuditOutboxRepository({ db }),
@@ -150,7 +152,7 @@ export function createApiPersistenceRuntime(
 			}),
 			creditLedger: createCreditLedger({ db }),
 			generationRepository,
-			assetRepository: createAssetRepository(db),
+			assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
 			shareRepository,
 			publicShareRepository: shareRepository,
 			socialRepository: createSocialRepository(db),
@@ -162,9 +164,9 @@ export function createApiPersistenceRuntime(
 			adminTaskRepository: createAdminTaskRepository(db),
 			analyticsRepository: createAnalyticsRepository(db),
 			usageRepository: createUsageRepository(db),
-			directorRepository: createDirectorRepository({ db }),
+			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
 			creativeAssetRepository: createCreativeAssetRepository({ db }),
-			mediaRepository: createMediaRepository({ db }),
+			mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
 			close,
 		};
 	} catch (error) {
@@ -179,14 +181,15 @@ export function createWorkerPersistenceRuntime(
 	const db = createSharedDatabase(options.databaseUrl, options.databasePoolMax);
 	try {
 		const close = closeOnce(db);
+		const taskQueueTransactionStore = createTaskQueueTransactionStore();
 		return {
 			auditOutboxRepository: createAuditOutboxRepository({ db }),
 			creditLedger: createCreditLedger({ db }),
-			generationRepository: createGenerationRepository({ db }),
+			generationRepository: createGenerationRepository({ db, taskQueueTransactionStore }),
 			taskQueueRepository: createTaskQueueRepository({ db }),
 			providerRequestAuditRepository: createProviderRequestAuditRepository(db),
-			directorRepository: createDirectorRepository({ db }),
-			mediaRepository: createMediaRepository({ db }),
+			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
+			mediaRepository: createMediaRepository({ db, taskQueueTransactionStore }),
 			close,
 		};
 	} catch (error) {

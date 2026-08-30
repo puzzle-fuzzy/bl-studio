@@ -71,7 +71,7 @@ import {
 } from "@bailian-studio/model-core";
 import type { TaskError, TaskRecord } from "@bailian-studio/task-engine";
 import {
-	enqueueTask,
+	type TaskQueueTransactionStore,
 } from "@bailian-studio/task-repository";
 import {
 	and,
@@ -795,6 +795,7 @@ function errorToJsonRecord(error: Error | TaskError): Record<string, unknown> {
 
 export interface CreateGenerationRepositoryOptions {
 	db: BailianStudioDb;
+	taskQueueTransactionStore: TaskQueueTransactionStore;
 }
 
 function mapCreditLedgerError(
@@ -1600,7 +1601,7 @@ async function refundGenerationInTransaction(
 export function createGenerationRepository(
 	options: CreateGenerationRepositoryOptions,
 ): GenerationRepository {
-	const { db } = options;
+	const { db, taskQueueTransactionStore } = options;
 
 	return {
 		async healthCheck() {
@@ -1897,7 +1898,7 @@ export function createGenerationRepository(
 						updatedAt: createdAt,
 					};
 
-					const insertedTask = await enqueueTask(tx, task);
+					const insertedTask = await taskQueueTransactionStore.enqueueTask(tx, task);
 
 					const [insertedEvent] = await tx
 						.insert(generationEvents)
@@ -2396,7 +2397,7 @@ export function createGenerationRepository(
 					now,
 					input.nextRunAt ?? now,
 				);
-				const insertedTask = await enqueueTask(tx, task);
+				const insertedTask = await taskQueueTransactionStore.enqueueTask(tx, task);
 
 				return {
 					record: toGenerationRecord(updatedRecord),
@@ -2591,7 +2592,7 @@ export function createGenerationRepository(
 					now,
 					"artifact",
 				);
-				const insertedTask = await enqueueTask(tx, task);
+				const insertedTask = await taskQueueTransactionStore.enqueueTask(tx, task);
 
 				return {
 					outcome: "completed" as const,
@@ -3315,9 +3316,10 @@ export function createGenerationRepository(
 							storageKey: updated.storageKey ?? undefined,
 							enqueueThumbnail: updated.storageProvider === "local",
 							...(record.traceId !== null ? { traceId: record.traceId } : {}),
-						},
-						now,
-					);
+							},
+							now,
+							taskQueueTransactionStore,
+						);
 				}
 
 				return toGenerationArtifact(updated);

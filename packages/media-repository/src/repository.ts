@@ -1,6 +1,7 @@
 import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 import { mediaJobs, taskRecords, userAssets, type BailianStudioDb } from '@bailian-studio/db'
 import type { TaskRecord } from '@bailian-studio/task-engine'
+import type { TaskQueueTransactionStore } from '@bailian-studio/task-repository'
 import { createMediaJobId, createMediaTaskId } from './id'
 import { MediaRepositoryError } from './errors'
 import { toMediaJob, toTaskRecord } from './mappers'
@@ -17,6 +18,7 @@ import type {
 
 export interface CreateMediaRepositoryOptions {
   db: BailianStudioDb
+  taskQueueTransactionStore: TaskQueueTransactionStore
 }
 
 export interface MediaRepository {
@@ -72,30 +74,7 @@ function toDate(value: string): Date {
   return new Date(value)
 }
 
-function taskValues(task: TaskRecord): typeof taskRecords.$inferInsert {
-  return {
-    id: task.id,
-    type: task.type,
-    domain: task.domain,
-    status: task.status,
-    priority: task.priority,
-    inputJson: task.input,
-    outputJson: task.output ?? null,
-    lockedBy: task.lockedBy ?? null,
-    lockedUntil: task.lockedUntil === undefined ? null : toDate(task.lockedUntil),
-    startedAt: task.startedAt === undefined ? null : toDate(task.startedAt),
-    completedAt: task.completedAt === undefined ? null : toDate(task.completedAt),
-    attempts: task.attempts,
-    maxAttempts: task.maxAttempts,
-    nextRunAt: toDate(task.nextRunAt),
-    errorJson: task.errorJson === undefined ? null : taskErrorJson(task.errorJson),
-    recordId: task.recordId ?? null,
-    userId: task.userId ?? null,
-    traceId: task.traceId ?? null,
-    createdAt: toDate(task.createdAt),
-    updatedAt: toDate(task.updatedAt),
-  }
-}
+// P1-C：任务序列化与写入已统一到 @bailian-studio/task-repository
 
 function taskErrorJson(error: NonNullable<TaskRecord['errorJson']>): Record<string, unknown> {
   return {
@@ -144,7 +123,7 @@ function operationOptions(operation: CreateMediaJobInput['operation'], options: 
 }
 
 export function createMediaRepository(options: CreateMediaRepositoryOptions): MediaRepository {
-  const { db } = options
+  const { db, taskQueueTransactionStore } = options
 
   return {
     async createMediaJob(input) {
@@ -279,12 +258,9 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
           updatedAt: now,
         }
 
-        const [taskRow] = await tx.insert(taskRecords).values(taskValues(task)).returning()
-        if (taskRow === undefined) {
-          throw new MediaRepositoryError('DATABASE_ERROR', 'Failed to insert media task')
-        }
+        const taskRow = await taskQueueTransactionStore.enqueueTask(tx, task)
 
-        return { job: toMediaJob(jobRow), task: toTaskRecord(taskRow) }
+        return { job: toMediaJob(jobRow), task: taskRow }
       })
     },
 

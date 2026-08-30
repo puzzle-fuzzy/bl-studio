@@ -10,9 +10,9 @@ import {
 	directorScriptMessages,
 	directorScriptVersions,
 	directorShots,
-	taskRecords,
 	userAssets,
 } from "@bailian-studio/db";
+import type { TaskQueueTransactionStore } from "@bailian-studio/task-repository";
 import {
 	DIRECTOR_PHASES,
 	buildDirectorAssemblyPreflight,
@@ -490,11 +490,15 @@ async function phaseRowsForProjects(
 		.where(inArray(directorPhaseStates.projectId, projectIds));
 }
 
+export interface CreateDirectorRepositoryOptions {
+	db: BailianStudioDb;
+	taskQueueTransactionStore: TaskQueueTransactionStore;
+}
+
 export function createDirectorRepository({
 	db,
-}: {
-	db: BailianStudioDb;
-}): DirectorRepository {
+	taskQueueTransactionStore,
+}: CreateDirectorRepositoryOptions): DirectorRepository {
 	return {
 		async createProject(input: CreateDirectorProjectRepositoryInput) {
 			const now = new Date();
@@ -2202,28 +2206,26 @@ export function createDirectorRepository({
 					});
 				}
 
-				await tx.insert(taskRecords).values({
-					id: taskId,
-					type: "director.phase",
-					domain: "director",
-					status: "queued",
-					priority: 0,
-					inputJson: {
-						projectId: input.projectId,
-						phaseRunId: runId,
-						phase: input.phase,
-						modelId: input.modelId,
-					},
-					attempts: 0,
-					maxAttempts: input.phase === "videos" ? 360 : 60,
-					nextRunAt: now,
-					recordId: runId,
-					userId: input.userId,
-					traceId: input.traceId ?? null,
-					createdBy: input.userId,
-					updatedBy: input.userId,
-					createdAt: now,
-					updatedAt: now,
+				await taskQueueTransactionStore.enqueueTask(tx, {
+        id: taskId,
+        type: "director.phase",
+        domain: "director",
+        status: "queued",
+        priority: 0,
+        input: {
+          projectId: input.projectId,
+          phaseRunId: runId,
+          phase: input.phase,
+          modelId: input.modelId,
+        },
+        attempts: 0,
+        maxAttempts: input.phase === "videos" ? 360 : 60,
+        nextRunAt: now.toISOString(),
+        recordId: runId,
+        userId: input.userId,
+        traceId: input.traceId ?? undefined,
+        createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
 				});
 
 				await tx

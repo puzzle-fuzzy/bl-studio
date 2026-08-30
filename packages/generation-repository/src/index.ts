@@ -28,7 +28,10 @@ export {
 	type GenerationCallStats,
 } from "./analytics";
 export type { AssetRepository } from "./asset-port";
-export { createAssetRepository } from "./assets";
+export {
+	createAssetRepository,
+	type CreateAssetRepositoryOptions,
+} from "./assets";
 export type {
 	AssetDerivativeStatus,
 	AssetSort,

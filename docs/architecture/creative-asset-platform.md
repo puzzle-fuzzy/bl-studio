@@ -121,8 +121,9 @@ flowchart LR
   `task_records` 的 claim、租约续期、状态保存和读取，以及 Drizzle 行映射。
 - `apps/worker` 通过 `persistence-runtime` 接收 `claim/renew/save` 最小 port；
   generation repository 不再承担任务生命周期 port。
-- generation/media/director 的业务 repository 暂时继续在自己的“业务记录 + 初始任务”事务中写任务；
-  后续以可注入事务 store 收敛这些生产路径，保持跨域事务边界清晰。
+- generation/media/director 的业务 repository 由持久化组合根注入同一个
+  `TaskQueueTransactionStore`，但仍各自开启“业务记录 + 初始任务”事务；任务包只负责事务内的
+  task row 写入，不负责跨域事务的开启与提交。
 
 ## 4. 领域模型归属
 

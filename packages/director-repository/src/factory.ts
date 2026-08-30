@@ -1,6 +1,7 @@
 import { type BailianStudioDb, createDb } from "@bailian-studio/db";
 import { createDirectorRepository } from "./repository";
 import type { DirectorRepository } from "./types";
+import { createTaskQueueTransactionStore } from "@bailian-studio/task-repository";
 
 export interface DirectorRepositoryHandle {
 	db: BailianStudioDb;
@@ -14,7 +15,10 @@ export function createDirectorRepositoryFromUrl(
 	const db = createDb({ url, max: 5 });
 	return {
 		db,
-		repository: createDirectorRepository({ db }),
+		repository: createDirectorRepository({
+			db,
+			taskQueueTransactionStore: createTaskQueueTransactionStore(),
+		}),
 		close: () => db.close(),
 	};
 }

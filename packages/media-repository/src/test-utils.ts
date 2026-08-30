@@ -1,5 +1,6 @@
 import { createDb, userAssets, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, requireDatabaseUrl, resetBailianStudioTestDb } from '@bailian-studio/db/test'
+import { createTaskQueueTransactionStore } from '@bailian-studio/task-repository'
 import { createMediaRepository, type MediaRepository } from './repository'
 
 export function requireMediaDatabaseUrl(): string {
@@ -14,7 +15,7 @@ export interface MediaRepositoryTestDb {
 
 export function createMediaRepositoryFromUrl(url: string): MediaRepositoryTestDb {
   const db = createDb({ url, max: 5 })
-  return { db, repository: createMediaRepository({ db }), close: () => db.close() }
+  return { db, repository: createMediaRepository({ db, taskQueueTransactionStore: createTaskQueueTransactionStore() }), close: () => db.close() }
 }
 
 export interface IsolatedMediaRepository {

@@ -2,8 +2,7 @@
  * 用户资产持久化实现。
  *
  * 资产列表同时投影 user_assets、generation_artifacts 和 thumbnail derivative，
- * 因此它是一个独立的读写边界；generation repository 只通过兼容 facade 重新
- * 暴露这些方法，新的 API 代码应直接依赖 AssetRepository。
+ * 因此它是一个独立的读写边界，API 代码直接依赖 AssetRepository。
  */
 import {
 	assetDerivatives,
@@ -28,7 +27,7 @@ import {
 	sql,
 } from "drizzle-orm";
 import type { TaskRecord } from "@bailian-studio/task-engine";
-import { enqueueTask } from "@bailian-studio/task-repository";
+import type { TaskQueueTransactionStore } from "@bailian-studio/task-repository";
 import {
 	assetCursorFilters,
 	decodeAssetCursor,
@@ -200,6 +199,7 @@ export async function enqueueAssetThumbnail(
 	tx: BailianStudioDbTransaction,
 	input: CreateUserAssetInput,
 	now: string,
+	taskQueueTransactionStore: TaskQueueTransactionStore,
 ): Promise<void> {
 	if (!thumbnailSourceIsEligible(input)) return;
 
@@ -241,10 +241,15 @@ export async function enqueueAssetThumbnail(
 		createdAt: now,
 		updatedAt: now,
 	};
-	await enqueueTask(tx, task);
+	await taskQueueTransactionStore.enqueueTask(tx, task);
 }
 
-export function createAssetRepository(db: BailianStudioDb): AssetRepository {
+export interface CreateAssetRepositoryOptions {
+	db: BailianStudioDb;
+	taskQueueTransactionStore: TaskQueueTransactionStore;
+}
+
+export function createAssetRepository({ db, taskQueueTransactionStore }: CreateAssetRepositoryOptions): AssetRepository {
 	async function createUserAsset(input: CreateUserAssetInput): Promise<void> {
 		const now = input.now ?? new Date().toISOString();
 		await db.transaction(async (tx) => {
@@ -270,7 +275,7 @@ export function createAssetRepository(db: BailianStudioDb): AssetRepository {
 				createdAt: new Date(now),
 				updatedAt: new Date(now),
 			});
-			await enqueueAssetThumbnail(tx, input, now);
+			await enqueueAssetThumbnail(tx, input, now, taskQueueTransactionStore);
 		});
 	}
 

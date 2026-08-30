@@ -36,7 +36,11 @@ import {
   GenerationRepositoryError,
   type GenerationRepository,
 } from '../src'
-import { createTaskQueueRepository, type TaskQueueRepository } from '@bailian-studio/task-repository'
+import {
+  createTaskQueueRepository,
+  createTaskQueueTransactionStore,
+  type TaskQueueRepository,
+} from '@bailian-studio/task-repository'
 
 type RepositoryTestHarness = GenerationRepository &
   ReturnType<typeof createAssetRepository> &
@@ -65,13 +69,14 @@ beforeAll(async () => {
   db = createDb({ url: testDb.url, max: 5 })
   const shareRepository = createShareRepository(db)
   taskRepository = createTaskQueueRepository({ db })
+  const taskQueueTransactionStore = createTaskQueueTransactionStore()
   repository = {
-    ...createGenerationRepository({ db }),
+    ...createGenerationRepository({ db, taskQueueTransactionStore }),
     ...taskRepository,
     ...createAdminGalleryRepository(db),
     ...createAdminTaskRepository(db),
     ...createAnalyticsRepository(db),
-    ...createAssetRepository(db),
+    ...createAssetRepository({ db, taskQueueTransactionStore }),
     ...createAuditRepository(db),
     ...createContentReportRepository(db),
     ...createFeedbackRepository(db),
