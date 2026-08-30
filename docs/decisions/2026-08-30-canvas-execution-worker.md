@@ -41,8 +41,10 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
   不原地改写，派生任务带有 `rerun.sourceExecutionId` / `rerun.nodeId` 元数据和独立幂等边界。
 - Canvas 页面通过选中节点后的“重跑节点”操作调用该接口，并继续使用 Canvas execution SSE；SSE 不可用时
   使用同一个 fallback polling 实现。
-- 这仍是执行快照内的结果复用，不是跨任务的通用结果缓存；跨任务缓存需要下一阶段再定义 fingerprint、
-  资产版本和计费命中规则。
+- 普通执行输入携带 `cachePolicy=reuse`，Worker 以 `modelManifestHash + params + resolvedAssetRefs` 生成
+  版本化 cache idempotency key，交给已有 generation repository 的用户级幂等边界。只有成功且未软删除的
+  结果可被继续复用；失败/取消结果切换到任务级 fresh key，避免坏缓存永久阻塞后续运行。节点级手动重跑
+  使用 `cachePolicy=refresh`，保证“重跑”仍然产生新结果。
 - 资产 ID 和画布 revision 都在服务端重新校验；客户端不能通过任务查询跨用户读取执行状态。
 
 下一阶段可在不改变当前 generation 语义的前提下增加 Canvas 页面节点重跑入口，并继续定义可复用的节点结果缓存。

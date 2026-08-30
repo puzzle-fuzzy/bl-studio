@@ -8,6 +8,7 @@
  */
 import {
   getModelById as getRegisteredModelById,
+  getModelAuditMetadata,
   validateModelParams,
   type FrozenModelManifest,
   type ModelCategory,
@@ -52,6 +53,24 @@ export interface CompileCanvasGraphOptions {
   /** Required when the snapshot contains manually selected asset IDs. */
   assetKinds?: ReadonlyMap<string, CanvasExecutionAssetKind>
   getModelById?: (id: string) => FrozenModelManifest | undefined
+}
+
+/**
+ * 生成一个跨 Canvas 执行可复用的节点请求键。
+ *
+ * 只接收已通过编译和依赖解析的参数；对象键排序但保留数组顺序，保证同一
+ * 组有序参考素材得到相同键，而参考素材顺序变化会得到不同键。
+ */
+export function canvasNodeCacheKey(
+  node: CanvasExecutionPlanNode,
+  resolvedAssetRefs: Readonly<Record<string, readonly string[]>>,
+): string {
+  return `v1-${shortFingerprint({
+    modelId: node.modelId,
+    modelManifestHash: node.modelManifestHash ?? 'legacy-unknown',
+    params: node.params,
+    assetRefs: resolvedAssetRefs,
+  })}`
 }
 
 /**
@@ -356,11 +375,39 @@ function compileNode(
     nodeId: node.id,
     kind,
     modelId,
+    modelManifestHash: getModelAuditMetadata(model).manifestHash,
     params,
     assetRefs,
     dependencyBindings,
     dependsOn,
   }
+}
+
+function shortFingerprint(value: unknown): string {
+  const input = canonicalize(value)
+  let first = 0x811c9dc5
+  let second = 0x9e3779b1
+  for (let index = 0; index < input.length; index += 1) {
+    const code = input.charCodeAt(index)
+    first = Math.imul(first ^ code, 0x01000193)
+    second = Math.imul(second ^ (code + index), 0x85ebca6b)
+  }
+  return `${(first >>> 0).toString(16).padStart(8, '0')}${(second >>> 0).toString(16).padStart(8, '0')}`
+}
+
+function canonicalize(value: unknown): string {
+  if (value === null) return 'null'
+  if (value === undefined) return 'undefined'
+  if (typeof value === 'string') return JSON.stringify(value)
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  if (Array.isArray(value)) return `[${value.map(canonicalize).join(',')}]`
+  if (typeof value === 'object') {
+    return `{${Object.entries(value as Record<string, unknown>)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([key, entry]) => `${JSON.stringify(key)}:${canonicalize(entry)}`)
+      .join(',')}}`
+  }
+  return String(value)
 }
 
 function topologicalSort(

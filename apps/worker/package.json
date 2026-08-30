@@ -15,6 +15,7 @@
   "dependencies": {
     "@bailian-studio/audit-repository": "workspace:*",
     "@bailian-studio/canvas-contracts": "workspace:*",
+    "@bailian-studio/canvas-execution": "workspace:*",
     "@bailian-studio/credit-ledger": "workspace:*",
     "@bailian-studio/director-repository": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",

@@ -34,6 +34,7 @@ export type {
   CanvasDocumentSummary,
   CanvasEdge,
   CanvasExecutionNodeStatus,
+  CanvasExecutionCachePolicy,
   CanvasExecutionPlan,
   CanvasExecutionPlanNode,
   CanvasExecutionTaskInput,

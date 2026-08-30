@@ -12,7 +12,7 @@
 | `@bailian-studio/persistence-runtime` | `packages/persistence-runtime` | `apps/api` / `apps/worker` | `workspace:*` |
 | `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `packages/admin-repository` / `apps/api` / `apps/worker` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
-| `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api` | `workspace:*` |
+| `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。

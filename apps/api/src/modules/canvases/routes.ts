@@ -110,6 +110,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
           documentRevision: document.revision,
           plan,
           nodeRuns: {},
+          cachePolicy: 'reuse',
         },
         attempts: 0,
         maxAttempts: Math.min(10_000, Math.max(1_000, plan.nodes.length * 50)),
@@ -179,6 +180,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         priority: 1,
         input: {
           ...rerunInput,
+          cachePolicy: 'refresh',
           rerun: {
             sourceExecutionId: sourceTask.id,
             nodeId: params.nodeId,

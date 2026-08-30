@@ -161,6 +161,9 @@ flowchart LR
   一并失效，取消任务中的非成功节点不会被复用。原任务保持不可变，接口使用幂等键保护派生任务创建。
 - Canvas 页面已提供选中节点后的“重跑节点”入口，并复用同一条 SSE/轮询跟踪链路；因此节点级重跑不会
   另起一套前端状态机。
+- 普通 Canvas 执行会按 `modelManifestHash + params + resolvedAssetRefs` 生成版本化节点缓存键，复用同一
+  用户下成功且未软删除的 generation 幂等结果；缓存命中不重复创建 generation，也不重复扣费。失败/取消
+  的旧缓存会自动降级为本次任务的 fresh key，节点级手动重跑固定使用 `refresh` 策略。
 
 ## 4. 领域模型归属
 

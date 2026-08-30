@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { compileCanvasGraph, CanvasExecutionError, prepareCanvasNodeRerun } from '../src/index'
-import type { CanvasExecutionTaskInput, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
+import { canvasNodeCacheKey, compileCanvasGraph, CanvasExecutionError, prepareCanvasNodeRerun } from '../src/index'
+import type { CanvasExecutionPlanNode, CanvasExecutionTaskInput, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
 
 function snapshot(
   nodes: CanvasSnapshot['nodes'],
@@ -208,6 +208,34 @@ describe('prepareCanvasNodeRerun', () => {
       new CanvasExecutionError('CANVAS_EXECUTION_NODE_NOT_FOUND', 'Canvas node missing is not present in the execution plan', {
         nodeId: 'missing',
       }),
+    )
+  })
+})
+
+describe('canvasNodeCacheKey', () => {
+  const node: CanvasExecutionPlanNode = {
+    nodeId: 'node-1',
+    kind: 'image',
+    modelId: 'qwen-image',
+    modelManifestHash: 'manifest-v1',
+    params: { prompt: 'lantern', n: 1 },
+    assetRefs: {},
+    dependencyBindings: {},
+    dependsOn: [],
+  }
+
+  it('is stable for object key ordering and changes with inputs', () => {
+    expect(canvasNodeCacheKey(node, { image: ['asset-a', 'asset-b'] })).toBe(
+      canvasNodeCacheKey(
+        { ...node, params: { n: 1, prompt: 'lantern' } },
+        { image: ['asset-a', 'asset-b'] },
+      ),
+    )
+    expect(canvasNodeCacheKey(node, { image: ['asset-b', 'asset-a'] })).not.toBe(
+      canvasNodeCacheKey(node, { image: ['asset-a', 'asset-b'] }),
+    )
+    expect(canvasNodeCacheKey(node, {})).not.toBe(
+      canvasNodeCacheKey({ ...node, modelManifestHash: 'manifest-v2' }, {}),
     )
   })
 })

@@ -32,9 +32,9 @@ function canvasInput(overrides: Partial<CanvasExecutionTaskInput> = {}): CanvasE
   }
 }
 
-function task(input: CanvasExecutionTaskInput) {
+function task(input: CanvasExecutionTaskInput, id = 'canvas_task_1') {
   return makeTask({
-    id: 'canvas_task_1',
+    id,
     type: 'canvas.execute',
     domain: 'canvas',
     input,
@@ -87,6 +87,77 @@ describe('processCanvasExecutionTask', () => {
       },
     })
     expect(created).toBe(1)
+  })
+
+  it('uses the same cache idempotency key for equivalent nodes across executions', async () => {
+    const requests: CreateGenerationInput[] = []
+    const generated = makeRecord({ id: 'generation_cached', status: 'submitting' })
+    const repository = {
+      createGeneration: async (request: CreateGenerationInput) => {
+        requests.push(request)
+        return createdGeneration(generated)
+      },
+      getGenerationRecord: async () => generated,
+      listArtifactsForRecord: async () => [],
+    }
+
+    await processCanvasExecutionTask(task(canvasInput()), { repository, logger: createRecordingLogger() })
+    await processCanvasExecutionTask(task(canvasInput(), 'canvas_task_2'), { repository, logger: createRecordingLogger() })
+
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.idempotencyKey).toBe(requests[1]?.idempotencyKey)
+    expect(requests[0]?.idempotencyKey).toMatch(/^canvas-cache:user_1:v1-/)
+  })
+
+  it('falls back to a fresh generation key when the cached result is failed', async () => {
+    const requests: CreateGenerationInput[] = []
+    let calls = 0
+    const repository = {
+      createGeneration: async (request: CreateGenerationInput) => {
+        requests.push(request)
+        calls += 1
+        return createdGeneration(
+          makeRecord({
+            id: calls === 1 ? 'generation_failed_cache' : 'generation_fresh',
+            status: calls === 1 ? 'failed' : 'submitting',
+          }),
+        )
+      },
+      getGenerationRecord: async () => undefined,
+      listArtifactsForRecord: async () => [],
+    }
+
+    const result = await processCanvasExecutionTask(task(canvasInput()), {
+      repository,
+      logger: createRecordingLogger(),
+    })
+
+    expect(result).toMatchObject({
+      status: 'retry',
+      nextInput: { nodeRuns: { node_1: { status: 'generating', generationId: 'generation_fresh' } } },
+    })
+    expect(requests).toHaveLength(2)
+    expect(requests[0]?.idempotencyKey).not.toBe(requests[1]?.idempotencyKey)
+    expect(requests[1]?.idempotencyKey).toBe('canvas:canvas_task_1:node_1')
+  })
+
+  it('uses a task-scoped key when a node rerun explicitly requests refresh', async () => {
+    const requests: CreateGenerationInput[] = []
+    const repository = {
+      createGeneration: async (request: CreateGenerationInput) => {
+        requests.push(request)
+        return createdGeneration(makeRecord({ id: `generation_${requests.length}`, status: 'submitting' }))
+      },
+      getGenerationRecord: async () => undefined,
+      listArtifactsForRecord: async () => [],
+    }
+
+    await processCanvasExecutionTask(task(canvasInput({ cachePolicy: 'refresh' })), {
+      repository,
+      logger: createRecordingLogger(),
+    })
+
+    expect(requests[0]?.idempotencyKey).toBe('canvas:canvas_task_1:node_1')
   })
 
   it('starts independent nodes in parallel while respecting the task limit', async () => {

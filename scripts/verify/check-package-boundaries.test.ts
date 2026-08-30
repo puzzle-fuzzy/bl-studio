@@ -208,7 +208,7 @@ describe('package boundary rules', () => {
       {
         packageName: '@bailian-studio/canvas-execution',
         ownerScope: 'packages/canvas-execution',
-        allowedConsumerScopes: ['apps/api'],
+        allowedConsumerScopes: ['apps/api', 'apps/worker'],
         dependencyProtocol: 'workspace:*',
       },
     ])

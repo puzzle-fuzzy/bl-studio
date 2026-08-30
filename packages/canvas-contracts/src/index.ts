@@ -101,11 +101,15 @@ export const RetryCanvasNodeInputSchema = z
   })
   .strict()
 
+export const CanvasExecutionCachePolicySchema = z.enum(['reuse', 'refresh'])
+
 export const CanvasExecutionPlanNodeSchema = z
   .object({
     nodeId: z.string().trim().min(1).max(120),
     kind: z.enum(['image', 'video']),
     modelId: z.string().trim().min(1).max(160),
+    /** Full model manifest version used to prevent stale cross-execution reuse. */
+    modelManifestHash: z.string().trim().min(1).max(200).optional(),
     params: z.record(z.string(), z.unknown()),
     /** Static user asset IDs selected in the authored snapshot. */
     assetRefs: z.record(z.string(), z.array(z.string().trim().min(1).max(160))),
@@ -142,6 +146,8 @@ export const CanvasExecutionTaskInputSchema = z
       z.string().trim().min(1).max(120),
       CanvasExecutionNodeRunSchema,
     ),
+    /** `reuse` is the default for normal runs; manual node reruns use `refresh`. */
+    cachePolicy: CanvasExecutionCachePolicySchema.optional(),
     rerun: z
       .object({
         sourceExecutionId: z.string().trim().min(1).max(200),
@@ -212,6 +218,7 @@ export type ListCanvasesResult = z.infer<typeof ListCanvasesResponseSchema>
 export type CanvasVersionsResult = z.infer<typeof CanvasVersionsResponseSchema>
 export type ExecuteCanvasInput = z.infer<typeof ExecuteCanvasInputSchema>
 export type RetryCanvasNodeInput = z.infer<typeof RetryCanvasNodeInputSchema>
+export type CanvasExecutionCachePolicy = z.infer<typeof CanvasExecutionCachePolicySchema>
 export type CanvasExecutionPlanNode = z.infer<
   typeof CanvasExecutionPlanNodeSchema
 >

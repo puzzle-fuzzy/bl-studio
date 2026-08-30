@@ -6,6 +6,7 @@ import type {
   GenerationRepository,
 } from '@bailian-studio/generation-repository'
 import { CanvasExecutionTaskInputSchema, type CanvasExecutionTaskInput } from '@bailian-studio/canvas-contracts'
+import { canvasNodeCacheKey } from '@bailian-studio/canvas-execution'
 import type { Logger } from '@bailian-studio/shared'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { TaskProcessOutcome } from './task-contracts'
@@ -112,15 +113,36 @@ export async function processCanvasExecutionTask(
           return { nodeId: node.nodeId, error: dependencyResult.error }
         }
         try {
-          const created = await deps.repository.createGeneration({
+          const cachePolicy = nextInput.cachePolicy ?? 'reuse'
+          const cacheIdempotencyKey = `canvas-cache:${userId}:${canvasNodeCacheKey(node, dependencyResult.assetRefs)}`
+          const freshIdempotencyKey = `canvas:${task.id}:${node.nodeId}`
+          let created = await deps.repository.createGeneration({
             userId,
             modelId: node.modelId,
             params: node.params,
             ...(Object.keys(dependencyResult.assetRefs).length > 0 ? { assetRefs: dependencyResult.assetRefs } : {}),
             ...(task.traceId === undefined ? {} : { traceId: task.traceId }),
-            idempotencyKey: `canvas:${task.id}:${node.nodeId}`,
+            idempotencyKey: cachePolicy === 'refresh' ? freshIdempotencyKey : cacheIdempotencyKey,
             ...(deps.generationQuota === undefined ? {} : { quota: deps.generationQuota }),
           })
+          if (
+            cachePolicy === 'reuse'
+            && (
+              created.record.status === 'failed'
+              || created.record.status === 'cancelled'
+              || created.record.deletedAt !== undefined
+            )
+          ) {
+            created = await deps.repository.createGeneration({
+              userId,
+              modelId: node.modelId,
+              params: node.params,
+              ...(Object.keys(dependencyResult.assetRefs).length > 0 ? { assetRefs: dependencyResult.assetRefs } : {}),
+              ...(task.traceId === undefined ? {} : { traceId: task.traceId }),
+              idempotencyKey: freshIdempotencyKey,
+              ...(deps.generationQuota === undefined ? {} : { quota: deps.generationQuota }),
+            })
+          }
           return { nodeId: node.nodeId, created }
         } catch (error) {
           return {
