@@ -319,6 +319,37 @@ describe('createApiClient', () => {
     expect(calls[0]?.credentials).toBe('include')
   })
 
+  it('accepts canvas tasks with execution diagnostic fields', async () => {
+    const task = {
+      id: 'canvas-task-1',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      status: 'failed',
+      priority: 0,
+      attempts: 1,
+      maxAttempts: 3,
+      nextRunAt: '2026-08-30T00:00:00.000Z',
+      startedAt: '2026-08-30T00:00:01.000Z',
+      completedAt: '2026-08-30T00:00:03.000Z',
+      createdAt: '2026-08-30T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:03.000Z',
+      recordId: 'canvas-1',
+      error: {
+        category: 'validation',
+        message: 'Canvas node failed',
+        retriable: false,
+        code: 'CANVAS_NODE_FAILED',
+      },
+      durationMs: 2_000,
+    }
+    const { fetch } = queuedFetch([jsonResponse({ success: true, data: { items: [task] } })])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.adminListTasks({ domain: 'canvas' })).resolves.toMatchObject({
+      items: [{ domain: 'canvas', type: 'canvas.execute', durationMs: 2_000 }],
+    })
+  })
+
   it('lists, reviews, and removes director entity candidates through the typed client', async () => {
     const candidate = {
       id: 'entity-candidate-1',

@@ -1127,7 +1127,7 @@ export const AdminTaskErrorSchema = z.object({
 export const AdminTaskItemSchema = z.object({
   id: z.string(),
   type: z.string(),
-  domain: z.enum(['generation', 'artifact', 'media', 'director', 'system']),
+  domain: z.enum(['generation', 'artifact', 'media', 'director', 'canvas', 'system']),
   status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
   priority: z.number(),
   attempts: z.number(),

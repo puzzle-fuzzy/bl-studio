@@ -36,6 +36,7 @@ const DOMAIN_LABELS: Record<string, string> = {
   artifact: '产物',
   media: '媒体',
   director: '导演',
+  canvas: '画布',
   system: '系统',
 }
 
