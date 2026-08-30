@@ -76,4 +76,35 @@ describe('canvas repository', () => {
     await expect(repository.listVersions({ userId: 'someone-else', documentId: document.id }))
       .rejects.toBeInstanceOf(CanvasRepositoryError)
   })
+
+  it('lists documents with a stable keyset cursor', async () => {
+    const userId = 'canvas-pagination-test'
+    await db.insert(users).values({
+      id: userId,
+      email: 'canvas-pagination-test@example.test',
+      passwordHash: 'test-hash',
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    })
+    const now = new Date('2026-08-31T00:00:00.000Z')
+    await repository.createDocument({ userId, title: '第一个', now })
+    await repository.createDocument({ userId, title: '第二个', now })
+    await repository.createDocument({ userId, title: '第三个', now })
+
+    const first = await repository.listDocuments({ userId, limit: 2 })
+    expect(first.items).toHaveLength(2)
+    expect(first.nextCursor).toBeDefined()
+
+    const second = await repository.listDocuments({ userId, limit: 2, cursor: first.nextCursor })
+    expect(second.items).toHaveLength(1)
+    expect(second.nextCursor).toBeUndefined()
+    expect(new Set([...first.items, ...second.items].map(item => item.id)).size).toBe(3)
+  })
+
+  it('rejects malformed document cursors', async () => {
+    await expect(repository.listDocuments({
+      userId: 'canvas-repository-test',
+      cursor: 'not-a-cursor',
+    })).rejects.toMatchObject({ code: 'CANVAS_INVALID_CURSOR' })
+  })
 })

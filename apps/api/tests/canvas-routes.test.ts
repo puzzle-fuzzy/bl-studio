@@ -125,6 +125,30 @@ beforeEach(() => {
 })
 
 describe('canvas routes', () => {
+  it('lists canvas documents with an opaque cursor', async () => {
+    const repository = createFakeCanvasRepository()
+    repository.listDocuments = async input => {
+      expect(input).toEqual({ userId: user.id, limit: 2, cursor: 'page-1' })
+      return { items: [document], nextCursor: 'page-2' }
+    }
+    const app = createTestApp({
+      authService: createFakeAuthService(() => user),
+      canvasRepository: repository,
+    }).app
+
+    const response = await app.handle(
+      new Request('http://localhost/api/canvases?limit=2&cursor=page-1', {
+        headers: { cookie: 'bailian_studio_session=fake-token' },
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({
+      success: true,
+      data: { items: [{ id: 'canvas-1' }], nextCursor: 'page-2' },
+    })
+  })
+
   it('reads and saves a canvas using the authenticated user', async () => {
     const app = createTestApp({
       authService: createFakeAuthService(() => user),

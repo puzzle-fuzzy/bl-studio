@@ -11,12 +11,14 @@ import {
   type BailianStudioDb,
   type BailianStudioDbTransaction,
 } from '@bailian-studio/db'
-import { and, desc, eq } from 'drizzle-orm'
+import { decodeCursor, encodeCursor } from '@bailian-studio/shared'
+import { and, desc, eq, lt, or } from 'drizzle-orm'
 
 export const CANVAS_REPOSITORY_ERROR_CODES = [
   'CANVAS_NOT_FOUND',
   'CANVAS_REVISION_CONFLICT',
   'CANVAS_VERSION_NOT_FOUND',
+  'CANVAS_INVALID_CURSOR',
   'CANVAS_DATABASE_ERROR',
 ] as const
 
@@ -35,7 +37,10 @@ export class CanvasRepositoryError extends Error {
 }
 
 export interface CanvasRepository {
-  listDocuments(input: { userId: string; limit?: number }): Promise<{ items: CanvasDocumentSummary[] }>
+  listDocuments(input: { userId: string; limit?: number; cursor?: string }): Promise<{
+    items: CanvasDocumentSummary[]
+    nextCursor?: string
+  }>
   createDocument(input: { userId: string; title?: string; snapshot?: CanvasSnapshot; now?: Date }): Promise<CanvasDocument>
   getDocument(input: { userId: string; documentId: string }): Promise<CanvasDocument | undefined>
   saveDocument(input: {
@@ -62,6 +67,29 @@ const DEFAULT_SNAPSHOT: CanvasSnapshot = { nodes: [], edges: [] }
 function limitOf(value: number | undefined, fallback: number, max: number): number {
   if (value === undefined || !Number.isFinite(value)) return fallback
   return Math.max(1, Math.min(max, Math.trunc(value)))
+}
+
+interface CanvasDocumentCursor {
+  updatedAt: string
+  id: string
+}
+
+function encodeDocumentCursor(cursor: CanvasDocumentCursor): string {
+  return encodeCursor({ updatedAt: cursor.updatedAt, id: cursor.id })
+}
+
+function decodeDocumentCursor(value: string): CanvasDocumentCursor {
+  const decoded = decodeCursor(value)
+  if (
+    decoded === undefined
+    || typeof decoded.updatedAt !== 'string'
+    || !Number.isFinite(Date.parse(decoded.updatedAt))
+    || typeof decoded.id !== 'string'
+    || decoded.id.length === 0
+  ) {
+    throw new CanvasRepositoryError('CANVAS_INVALID_CURSOR', 'Invalid canvas document cursor')
+  }
+  return { updatedAt: decoded.updatedAt, id: decoded.id }
 }
 
 function snapshotOf(value: unknown): CanvasSnapshot {
@@ -200,15 +228,37 @@ export function createCanvasRepository(db: BailianStudioDb): CanvasRepository {
   }
 
   return {
-    async listDocuments({ userId, limit }) {
+    async listDocuments({ userId, limit, cursor: cursorToken }) {
       try {
+        const limitValue = limitOf(limit, 50, 100)
+        const cursor = cursorToken === undefined ? undefined : decodeDocumentCursor(cursorToken)
+        const conditions = [eq(canvasDocuments.userId, userId)]
+        if (cursor !== undefined) {
+          const cursorDate = new Date(cursor.updatedAt)
+          const cursorCondition = or(
+            lt(canvasDocuments.updatedAt, cursorDate),
+            and(
+              eq(canvasDocuments.updatedAt, cursorDate),
+              lt(canvasDocuments.id, cursor.id),
+            ),
+          )
+          if (cursorCondition !== undefined) conditions.push(cursorCondition)
+        }
         const rows = await db
           .select()
           .from(canvasDocuments)
-          .where(eq(canvasDocuments.userId, userId))
+          .where(and(...conditions))
           .orderBy(desc(canvasDocuments.updatedAt), desc(canvasDocuments.id))
-          .limit(limitOf(limit, 50, 100))
-        return { items: rows.map(toSummary) }
+          .limit(limitValue + 1)
+        const hasMore = rows.length > limitValue
+        const page = hasMore ? rows.slice(0, limitValue) : rows
+        const last = page[page.length - 1]
+        return {
+          items: page.map(toSummary),
+          ...(hasMore && last !== undefined
+            ? { nextCursor: encodeDocumentCursor({ updatedAt: last.updatedAt.toISOString(), id: last.id }) }
+            : {}),
+        }
       } catch (error) {
         throw asRepositoryError(error)
       }

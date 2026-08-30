@@ -133,6 +133,7 @@
         "tw-animate-css": "^1.4.0",
         "typescript": "catalog:",
         "vite": "catalog:",
+        "vitest": "catalog:",
       },
     },
     "apps/studio": {
@@ -339,10 +340,10 @@
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/canvas-contracts": "workspace:*",
-        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "typescript": "catalog:",
         "vitest": "catalog:",
       },
@@ -353,6 +354,7 @@
       "dependencies": {
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/db": "workspace:*",
+        "@bailian-studio/shared": "workspace:*",
         "drizzle-orm": "catalog:",
       },
       "devDependencies": {
@@ -481,7 +483,6 @@
         "@bailian-studio/creative-asset-contracts": "workspace:*",
         "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
-        "@bailian-studio/dashscope-manifests": "workspace:*",
         "@bailian-studio/db": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/sse-protocol": "workspace:*",
@@ -493,6 +494,7 @@
       },
       "devDependencies": {
         "@bailian-studio/admin-repository": "workspace:*",
+        "@bailian-studio/dashscope-manifests": "workspace:*",
         "typescript": "catalog:",
       },
     },

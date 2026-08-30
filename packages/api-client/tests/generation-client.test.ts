@@ -1271,6 +1271,25 @@ describe('createApiClient', () => {
     expect(calls[3]?.body).toBe(JSON.stringify({ idempotencyKey: 'retry-1' }))
   })
 
+  it('lists canvas documents with a keyset cursor', async () => {
+    const summary = {
+      id: 'canvas_1',
+      title: '测试画布',
+      revision: 3,
+      updatedAt: '2026-08-30T00:00:00.000Z',
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [summary], nextCursor: 'next-page' } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.listCanvases({ limit: 10, cursor: 'previous page' })).resolves.toEqual({
+      items: [summary],
+      nextCursor: 'next-page',
+    })
+    expect(calls[0]?.url).toBe('http://api.test/api/canvases?limit=10&cursor=previous+page')
+  })
+
   it('lists canvas execution history with a keyset cursor', async () => {
     const execution = {
       id: 'canvas_execution_history_1',

@@ -26,12 +26,17 @@ import { requireAuthUser } from '../auth/session'
 const ListCanvasesQuerySchema = z
   .object({
     limit: z.coerce.number().int().min(1).max(100).optional(),
+    cursor: z.string().trim().min(1).max(1024).optional(),
   })
   .strict()
 
-const ListCanvasExecutionsQuerySchema = ListCanvasesQuerySchema.extend({
-  cursor: z.string().trim().min(1).max(1024).optional(),
-})
+const ListCanvasExecutionsQuerySchema = ListCanvasesQuerySchema
+
+const ListCanvasVersionsQuerySchema = z
+  .object({
+    limit: z.coerce.number().int().min(1).max(100).optional(),
+  })
+  .strict()
 
 const CANVAS_SSE_POLL_INTERVAL_MS = 1_000
 const CANVAS_SSE_HEARTBEAT_INTERVAL_MS = 15_000
@@ -45,12 +50,13 @@ export function createCanvasRoutes(deps: ApiDependencies) {
   return new Elysia({ prefix: '/api/canvases' })
     .get('/', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const { limit } = validateInput(ListCanvasesQuerySchema, query)
+      const { limit, cursor } = validateInput(ListCanvasesQuerySchema, query)
       return {
         success: true,
         data: await deps.canvasRepository.listDocuments({
           userId: user.id,
           ...(limit !== undefined ? { limit } : {}),
+          ...(cursor !== undefined ? { cursor } : {}),
         }),
       }
     })
@@ -433,7 +439,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
     })
     .get('/:id/versions', async ({ request, params, query }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const { limit } = validateInput(ListCanvasesQuerySchema, query)
+      const { limit } = validateInput(ListCanvasVersionsQuerySchema, query)
       const versions = await deps.canvasRepository.listVersions({
         userId: user.id,
         documentId: params.id,

@@ -234,6 +234,7 @@ export const ListCanvasExecutionsResponseSchema = z
 export const ListCanvasesResponseSchema = z
   .object({
     items: z.array(CanvasDocumentSummarySchema),
+    nextCursor: z.string().trim().min(1).max(1024).optional(),
   })
   .strict()
 

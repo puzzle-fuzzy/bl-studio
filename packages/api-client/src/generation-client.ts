@@ -473,7 +473,7 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   getAssetCapabilities(): Promise<AssetCapabilities>
   getAsset(id: string): Promise<AssetItem>
   /** `GET /api/canvases` —— 当前用户的画布文档列表。 */
-  listCanvases(params?: { limit?: number }): Promise<ListCanvasesResult>
+  listCanvases(params?: { limit?: number; cursor?: string }): Promise<ListCanvasesResult>
   /** `POST /api/canvases` —— 创建一个画布文档。 */
   createCanvas(input?: CreateCanvasInput): Promise<CanvasDocument>
   /** `GET /api/canvases/:id` —— 获取画布当前快照。 */
@@ -1312,6 +1312,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async listCanvases(params = {}) {
       const query = new URLSearchParams()
       if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.cursor !== undefined) query.set('cursor', params.cursor)
       const qs = query.toString()
       return unwrapData(
         `${base}/api/canvases${qs.length > 0 ? `?${qs}` : ''}`,
