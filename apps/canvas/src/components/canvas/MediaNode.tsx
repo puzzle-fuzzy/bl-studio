@@ -1,12 +1,17 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react'
-import { Handle, Position, type NodeProps } from '@xyflow/react'
-import { ImagePlus, Loader2, RefreshCw, Send, Video, X } from 'lucide-react'
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
-import { cn } from '@bailian-studio/lib-client'
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
+import { cn } from '@bailian-studio/lib-client'
+import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
+import { Handle, type NodeProps, Position } from '@xyflow/react'
+import { ImagePlus, Loader2, RefreshCw, Send, Video, X } from 'lucide-react'
+import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { useCanvasGeneration } from '@/hooks/use-canvas-generation'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
-import { buildCanvasAssetRefs, canvasMediaParameters, type CanvasReferenceAsset } from '@/lib/generation-refs'
+import {
+  buildCanvasAssetRefs,
+  type CanvasReferenceAsset,
+  canvasMediaParameters,
+  canvasReferenceCapacityByKind,
+} from '@/lib/generation-refs'
 import { useCanvasStore } from '@/stores/canvas-store'
 import { AssetPicker } from './AssetPicker'
 
@@ -107,6 +112,10 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     () => [...new Set(mediaParameters.map(parameter => parameter.mediaKind))],
     [mediaParameters],
   )
+  const referenceCapacityByKind = useMemo(
+    () => canvasReferenceCapacityByKind(mediaParameters),
+    [mediaParameters],
+  )
   const referenceAssets = useMemo<CanvasReferenceAsset[]>(
     () => [...connectedReferences
       .filter((reference): reference is ConnectedReference & { assetId: string } => reference.assetId !== undefined)
@@ -126,15 +135,20 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     () => new Set(Object.values(assetRefs).flatMap(value => Array.isArray(value) ? value : [value])),
     [assetRefs],
   )
-  const hasUnusableReference = connectedReferences.some(reference => (
-    reference.assetId === undefined || !boundAssetIds.has(reference.assetId)
+  const hasMissingUpstreamAsset = connectedReferences.some(reference => reference.assetId === undefined)
+  const hasUnboundReference = connectedReferences.some(reference => (
+    reference.assetId !== undefined && !boundAssetIds.has(reference.assetId)
   )) || referenceAssetIds.some(assetId => !boundAssetIds.has(assetId))
-    || (connectedReferences.length === 0 && referenceAssetIds.length === 0 && referenceUrls.length > 0)
+  const hasLegacyReference = connectedReferences.length === 0
+    && referenceAssetIds.length === 0
+    && referenceUrls.length > 0
   const missingRequiredReference = mediaParameters.some(parameter => (
     parameter.required === true && assetRefs[parameter.name] === undefined
   ))
-  const referenceError = hasUnusableReference
+  const referenceError = hasMissingUpstreamAsset || hasLegacyReference
     ? '请先重新生成上游节点，等待产物归档后再连接'
+    : hasUnboundReference
+      ? '当前模型的参考槽位不足或类型不匹配，请减少已选素材或更换模型'
     : missingRequiredReference
       ? '当前模型需要连接匹配类型的参考素材'
       : undefined
@@ -274,6 +288,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
             <AssetPicker
               kind={nodeKind}
               allowedKinds={selectableReferenceKinds}
+              maxSelectableByKind={referenceCapacityByKind}
               selectedIds={referenceAssetIds}
               selectedKinds={referenceAssetKinds}
               onChange={(ids, kinds) => updateNodeData(id, { referenceAssetIds: ids, referenceAssetKinds: kinds })}

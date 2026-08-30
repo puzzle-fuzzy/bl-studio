@@ -11,6 +11,22 @@ type CanvasMediaParameter = ModelCatalogItem['parameters'][number] & {
 }
 
 /**
+ * 汇总当前模型按媒体类型可承载的参考素材槽位。
+ *
+ * 选择器和编译器都以 manifest 的 maxItems 为准；同一媒体类型存在多个
+ * 参数时，用户可以在这些参数之间分配素材，因此容量是各参数上限之和。
+ */
+export function canvasReferenceCapacityByKind(
+  parameters: ReadonlyArray<CanvasMediaParameter>,
+): Record<CanvasReferenceAsset['kind'], number> {
+  const capacityByKind: Record<CanvasReferenceAsset['kind'], number> = { image: 0, video: 0 }
+  for (const parameter of parameters) {
+    capacityByKind[parameter.mediaKind] += Math.max(0, parameter.maxItems ?? 1)
+  }
+  return capacityByKind
+}
+
+/**
  * 将画布入边转换为生成协议中的 assetRefs。
  *
  * 参考素材必须通过资产 ID 绑定，不能把 readUrl 塞进 params；参数的

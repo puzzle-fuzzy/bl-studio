@@ -7,6 +7,7 @@ import type { MediaKind } from './MediaNode'
 interface AssetPickerProps {
   kind: MediaKind
   allowedKinds: readonly MediaKind[]
+  maxSelectableByKind: Readonly<Partial<Record<MediaKind, number>>>
   selectedIds: readonly string[]
   selectedKinds: Readonly<Record<string, MediaKind>>
   onChange: (ids: string[], kinds: Record<string, MediaKind>) => void
@@ -14,7 +15,15 @@ interface AssetPickerProps {
 }
 
 /** 画布节点的素材选择器：写入稳定资产 ID 与媒体类型，URL 仅用于当前预览。 */
-export function AssetPicker({ kind, allowedKinds, selectedIds, selectedKinds, onChange, onClose }: AssetPickerProps) {
+export function AssetPicker({
+  kind,
+  allowedKinds,
+  maxSelectableByKind,
+  selectedIds,
+  selectedKinds,
+  onChange,
+  onClose,
+}: AssetPickerProps) {
   const [assets, setAssets] = useState<AssetItem[]>([])
   const [query, setQuery] = useState('')
   const [loading, setLoading] = useState(true)
@@ -52,14 +61,32 @@ export function AssetPicker({ kind, allowedKinds, selectedIds, selectedKinds, on
     return assets.filter(asset => (asset.fileName ?? asset.id).toLocaleLowerCase().includes(normalized))
   }, [assets, query])
 
+  const selectedCountByKind = useMemo(() => {
+    const counts: Partial<Record<MediaKind, number>> = {}
+    for (const selectedId of selectedIds) {
+      const selectedKind = selectedKinds[selectedId] ?? kind
+      if (selectedKind !== 'image' && selectedKind !== 'video') continue
+      counts[selectedKind] = (counts[selectedKind] ?? 0) + 1
+    }
+    return counts
+  }, [selectedIds, selectedKinds])
+
+  const capacitySummary = mediaKinds
+    .map(mediaKind => `${mediaKind === 'image' ? '图片' : '视频'} ${selectedCountByKind[mediaKind] ?? 0}/${maxSelectableByKind[mediaKind] ?? 0}`)
+    .join(' · ')
+
   const toggle = (asset: AssetItem) => {
     if (asset.kind !== 'image' && asset.kind !== 'video') return
     const id = asset.id
-    const next = selectedIds.includes(id)
+    const selected = selectedIds.includes(id)
+    const capacity = maxSelectableByKind[asset.kind]
+    const selectedCount = selectedCountByKind[asset.kind] ?? 0
+    if (!selected && capacity !== undefined && selectedCount >= capacity) return
+    const next = selected
       ? selectedIds.filter(selectedId => selectedId !== id)
       : [...selectedIds, id]
     const nextKinds = { ...selectedKinds }
-    if (selectedIds.includes(id)) delete nextKinds[id]
+    if (selected) delete nextKinds[id]
     else nextKinds[id] = asset.kind
     onChange(next, nextKinds)
   }
@@ -73,6 +100,7 @@ export function AssetPicker({ kind, allowedKinds, selectedIds, selectedKinds, on
         <span className="text-[11px] font-medium">从资产库选择{selectedIds.length > 0 ? `（${selectedIds.length}）` : ''}</span>
         <button type="button" className="text-[10px] text-muted-foreground hover:text-foreground" onClick={onClose}>完成</button>
       </div>
+      <p className="text-[10px] text-muted-foreground">参考槽位：{capacitySummary}</p>
       <label className="flex h-7 items-center gap-1.5 rounded-md border px-2 text-muted-foreground">
         <Search className="size-3" aria-hidden />
         <input
@@ -91,13 +119,18 @@ export function AssetPicker({ kind, allowedKinds, selectedIds, selectedKinds, on
         {filteredAssets.map(asset => {
           const previewUrl = resolveApiUrl(asset.thumbnailUrl ?? asset.url ?? asset.downloadUrl)
           const selected = selectedIds.includes(asset.id)
+          const assetKind = asset.kind === 'image' || asset.kind === 'video' ? asset.kind : undefined
+          const capacity = assetKind === undefined ? 0 : maxSelectableByKind[assetKind]
+          const atCapacity = assetKind === undefined
+            || (!selected && capacity !== undefined && (selectedCountByKind[assetKind] ?? 0) >= capacity)
           return (
             <button
               key={asset.id}
               type="button"
               title={asset.fileName ?? asset.id}
               aria-pressed={selected}
-              className={`relative aspect-square overflow-hidden rounded-md border bg-muted transition ${selected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/60'}`}
+              disabled={atCapacity}
+              className={`relative aspect-square overflow-hidden rounded-md border bg-muted transition ${selected ? 'border-primary ring-2 ring-primary/40' : 'border-border hover:border-primary/60'} disabled:cursor-not-allowed disabled:opacity-45`}
               onClick={() => toggle(asset)}
             >
               {previewUrl !== '' && asset.kind === 'image' ? (
