@@ -7,7 +7,7 @@
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { AuditOutboxRepository } from '@bailian-studio/audit-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
-import type { GenerationQuotaLimits, GenerationRepository, ProviderRequestAuditRepository } from '@bailian-studio/generation-repository'
+import type { GenerationQuotaLimits, GenerationRecoveryRepository, GenerationRepository, ProviderRequestAuditRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import { createLogger, MetricsCollector, type Logger, type MetricsSnapshot } from '@bailian-studio/shared'
@@ -21,6 +21,7 @@ import type { ArtifactFetchPolicy } from './artifact-persist'
 export interface WorkerLoopConfig {
   workerId: string
   repository: GenerationRepository
+  generationRecoveryRepository: GenerationRecoveryRepository
   providerRequestAuditRepository: ProviderRequestAuditRepository
   /** 任务生命周期的最小持久化端口；必须由 worker 组合根显式注入。 */
   taskRepository: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
@@ -355,9 +356,6 @@ export class WorkerLoop {
 
   /** 周期清扫「任务已终态失败/取消、记录仍卡在 submitting/processing」的 generation。 */
   private startStaleGenerationSweeper(): () => void {
-    if (this.config.repository.listStuckGenerationRecords === undefined) {
-      return () => {}
-    }
     const timer = setInterval(() => {
       void this.sweepStaleGenerations()
     }, this.staleGenerationSweepIntervalMs)
@@ -366,11 +364,10 @@ export class WorkerLoop {
 
   private async sweepStaleGenerations(): Promise<void> {
     const repo = this.config.repository
-    const listStuck = repo.listStuckGenerationRecords
-    if (listStuck === undefined) return
-    let records: Awaited<ReturnType<NonNullable<GenerationRepository['listStuckGenerationRecords']>>>
+    const listStuck = this.config.generationRecoveryRepository.listStuckGenerationRecords
+    let records: Awaited<ReturnType<GenerationRecoveryRepository['listStuckGenerationRecords']>>
     try {
-      records = await listStuck.call(repo, { now: currentIso() })
+      records = await listStuck({ now: currentIso() })
     } catch (error) {
       this.logger.error('stale_generations.list_failed', { error: errorMessage(error) })
       return

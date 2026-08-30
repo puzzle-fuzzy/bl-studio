@@ -52,7 +52,6 @@ import {
 	generationEvents,
 	generationInputAssets,
 	generationRecords,
-	taskRecords,
 	usageRecords,
 	userAssets,
 	workerHeartbeats,
@@ -77,7 +76,6 @@ import {
 	asc,
 	desc,
 	eq,
-	exists,
 	gt,
 	gte,
 	ilike,
@@ -822,13 +820,6 @@ export interface GenerationEstimate {
 }
 
 /** 清扫器输入：找「任务已终态失败/取消、记录仍卡在 submitting/processing」的 generation。 */
-export interface ListStuckGenerationRecordsInput {
-	/** 判断「卡住」的时长下限，默认 10 分钟。 */
-	staleAfterMs?: number;
-	now?: string;
-	limit?: number;
-}
-
 /**
  * 生成 repository 的对外契约。
  *
@@ -849,10 +840,6 @@ export interface GenerationRepository {
 	): Promise<GenerationRecord>;
 	/** Worker 内部读模型；切勿把存储坐标通过 HTTP 暴露。 */
 	getGenerationInputAssets(recordId: string): Promise<GenerationInputAsset[]>;
-	/** 清扫器：列出「任务已终态失败/取消、记录仍卡住」的 generation（可选能力）。 */
-	listStuckGenerationRecords?(
-		input?: ListStuckGenerationRecordsInput,
-	): Promise<GenerationRecord[]>;
 	updateGenerationRecord(
 		id: string,
 		patch: UpdateGenerationRecordPatch,
@@ -2113,43 +2100,6 @@ export function createGenerationRepository(
 		 * 返回一条 generation 的安全诊断投影：只包含任务生命周期摘要和 provider
 		 * 请求审计，不返回任务 input/output、prompt、原始 provider 响应或存储 URL。
 		 */
-		/**
-		 * 清扫器用：找出「任务已终态失败/取消、但记录仍停在 submitting/processing」的
-		 * generation 记录。这是 worker catch 的 failGeneration 也失败（DB 全挂）或
-		 * 进程崩溃时残留的状态。只返回存在 failed/cancelled 任务且 updatedAt 早于
-		 * staleAfterMs 的记录，避开仍在运行的异步长任务与正常的终态过渡窗口。
-		 */
-		async listStuckGenerationRecords(input) {
-			const staleAfterMs = input?.staleAfterMs ?? 10 * 60 * 1000;
-			const cutoff = new Date(
-				Date.parse(input?.now ?? nowIso()) - staleAfterMs,
-			).toISOString();
-			const limit = input?.limit ?? 100;
-			const rows = await db
-				.select()
-				.from(generationRecords)
-				.where(
-					and(
-						inArray(generationRecords.status, ["submitting", "processing"]),
-						lt(generationRecords.updatedAt, new Date(cutoff)),
-						exists(
-							db
-								.select({ id: taskRecords.id })
-								.from(taskRecords)
-								.where(
-									and(
-										eq(taskRecords.recordId, generationRecords.id),
-										inArray(taskRecords.status, ["failed", "cancelled"]),
-									),
-								),
-						),
-					),
-				)
-				.orderBy(asc(generationRecords.updatedAt))
-				.limit(limit);
-			return rows.map((row) => toGenerationRecord(row));
-		},
-
 		/**
 		 * 按 patch 更新记录。
 		 * 仅校验「记录存在」，不做状态机合法性校验——上层应通过专门的状态推进方法

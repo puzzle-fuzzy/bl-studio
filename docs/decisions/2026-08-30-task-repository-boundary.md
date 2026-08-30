@@ -45,3 +45,7 @@ Worker 的 `TaskQueueRepository` 注入已从可选兼容路径变为强制依�
 生成详情诊断读取已进一步从 `GenerationRepository` 核心接口移入独立的
 `GenerationDiagnosticsRepository`。它是只读投影边界，允许联合读取 generation、task 和
 provider request 数据，但不拥有任何状态迁移或任务生命周期写入。
+
+Worker 的陈旧 generation 清扫同样移入独立的 `GenerationRecoveryRepository`。该 port 只负责
+读取跨 generation/task 的恢复候选；Worker 仍通过核心 `GenerationRepository` 执行最终的
+`failGeneration` 收口，避免把恢复扫描与生成状态写入重新混回同一个接口。

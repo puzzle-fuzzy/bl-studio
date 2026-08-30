@@ -94,7 +94,7 @@
 
 单一接口混合：generation 生命周期、任务队列 claim/lock/save、worker 心跳、用量分析、provider 请求审计、gallery/点赞/收藏、admin 审核、admin 任务中心、社交通知、提示词库、模型成本。它仍是 generation 业务路由与整个 worker 的公共依赖——变更放大与合并冲突的直接来源。**方案**：按上下文拆分（任务队列 port 移入独立 task-repository；内容/社交/admin/通知/分析各自成 repository 或独立接口，在 `ApiDependencies` 组合）。**已开始**：Worker 已切到最小任务生命周期 port，gallery、通知、提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享和 API 审计已切到各自窄 port；对应 SQL 已从各自中央实现文件物理移出，内容域不再通过 generation repository 聚合，核心接口仅保留 generation/worker 所需能力。
 
-**P1-B 当前进度（2026-08-30）**：提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享、API 审计和用户用量已分别切换到窄 port；admin 任务请求上下文也已归档到 `AdminTaskRepository`，调用统计与用量查询 SQL 已分别移入 `analytics.ts`、`usage.ts`，资产/分享 SQL 已分别移入 `assets.ts`、`shares.ts`，API 审计写入 SQL 已移入 `audit-events.ts`。生成应用服务的每日限额预检已显式注入 `UsageRepository`，Worker 的 provider 请求审计写入已迁移到 `ProviderRequestAuditRepository` 与 `provider-requests.ts`；`GenerationRepository` 核心接口已移除资产/分享/用量读取、API 审计写入、provider 审计写入、全部 content facade 方法以及任务生命周期方法，生成详情诊断也已切换到独立的 `GenerationDiagnosticsRepository`。URL 工厂与隔离测试句柄已改为直接暴露核心 repository 和各域窄 port；`GenerationRepositoryCompat` 与 `content.ts` 已删除，仓储测试按窄 port 组合 harness。P1-B 的兼容删除窗口已关闭，下一步转向独立 repository 包的物理拆包或路由 service 层收敛。
+**P1-B 当前进度（2026-08-30）**：提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享、API 审计和用户用量已分别切换到窄 port；admin 任务请求上下文也已归档到 `AdminTaskRepository`，调用统计与用量查询 SQL 已分别移入 `analytics.ts`、`usage.ts`，资产/分享 SQL 已分别移入 `assets.ts`、`shares.ts`，API 审计写入 SQL 已移入 `audit-events.ts`。生成应用服务的每日限额预检已显式注入 `UsageRepository`，Worker 的 provider 请求审计写入已迁移到 `ProviderRequestAuditRepository` 与 `provider-requests.ts`；`GenerationRepository` 核心接口已移除资产/分享/用量读取、API 审计写入、provider 审计写入、全部 content facade 方法以及任务生命周期方法，生成详情诊断与故障恢复扫描也已分别切换到独立的 `GenerationDiagnosticsRepository`、`GenerationRecoveryRepository`。URL 工厂与隔离测试句柄已改为直接暴露核心 repository 和各域窄 port；`GenerationRepositoryCompat` 与 `content.ts` 已删除，仓储测试按窄 port 组合 harness。P1-B 的兼容删除窗口已关闭，下一步转向独立 repository 包的物理拆包或路由 service 层收敛。
 
 admin gallery、admin 任务中心和成本/留存分析已分别切换到 `AdminGalleryRepository`、`AdminTaskRepository`、`AnalyticsRepository`；用户资产、公开分享、API 审计和用户用量也已完成 API 依赖收敛，后台治理与举报下架联动不再直接依赖 `GenerationRepository`。P1-B 的内容/横切能力拆分、任务生命周期拆分与兼容 facade 清理已完成，生成详情诊断已改为独立只读 port，下一步继续清理业务 repository 对 `task_records` 的直接读取。
 
@@ -116,7 +116,7 @@ admin gallery、admin 任务中心和成本/留存分析已分别切换到 `Admi
 当前仍由 3 个业务 repository 构造各自领域的 TaskRecord，并由持久化组合根注入同一个
 `TaskQueueTransactionStore`；各 repository 继续把调用方事务传给该 store，这是有意保留的原子性边界。
 `task-repository` 已接管 task_records 的序列化、插入、生命周期和回读，但不接管跨域业务事务的开启。
-业务事务内的简单任务查询与 queued 任务取消也应通过其窄 transaction store；generation 的幂等回读与轮询去重、资产删除时的 thumbnail 取消已迁移，僵尸检测仍待按其跨表原子性需求继续迁移。
+业务事务内的简单任务查询与 queued 任务取消也应通过其窄 transaction store；generation 的幂等回读与轮询去重、资产删除时的 thumbnail 取消已迁移。Worker 的僵尸候选扫描已迁移到独立的 `GenerationRecoveryRepository`，只保留最终 `failGeneration` 在生成核心 repository 中。
 
 ### P1-D. API 分层不一致（✅ gallery + admin service 层完成 2026-08-29，其余 11 个渐进迁移）
 

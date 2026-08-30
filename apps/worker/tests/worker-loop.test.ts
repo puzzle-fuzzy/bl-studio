@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskRecord } from '@bailian-studio/task-engine'
+import type { GenerationRecoveryRepository } from '@bailian-studio/generation-repository'
 import { MetricsCollector } from '@bailian-studio/shared'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteOutput } from '../src/providers'
@@ -19,6 +20,7 @@ import {
 interface LoopHarness {
   loop: WorkerLoop
   repo: FakeRepository
+  generationRecoveryRepository: GenerationRecoveryRepository
   runner: FakeProviderRunner
   logger: RecordingLogger
 }
@@ -31,10 +33,15 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
   const registry = new ProviderRegistry()
   registry.register(runner)
   const logger = createRecordingLogger()
+  const generationRecoveryRepository = {
+    listStuckGenerationRecords: (input: Parameters<FakeRepository['listStuckGenerationRecords']>[0]) =>
+      repo.listStuckGenerationRecords(input),
+  }
 
   const loop = new WorkerLoop({
     workerId: 'worker-test',
     repository: repo,
+    generationRecoveryRepository,
     providerRequestAuditRepository: repo,
     providerRegistry: registry,
     modelRegistry: { getModelById: () => qwenImage },
@@ -54,7 +61,7 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
     ...overrides,
   })
 
-  return { loop, repo, runner, logger }
+  return { loop, repo, generationRecoveryRepository, runner, logger }
 }
 
 /** 若 promise 在 `ms` 内未落定则 reject，让失控的循环快速失败。 */
@@ -257,8 +264,8 @@ describe('WorkerLoop', () => {
   })
 
   it('sweeps stuck generation records whose task already failed (P0-04)', async () => {
-    const { loop, repo } = buildLoop({ staleGenerationSweepIntervalMs: 1 })
-    repo.listStuckGenerationRecords = () =>
+    const { loop, repo, generationRecoveryRepository } = buildLoop({ staleGenerationSweepIntervalMs: 1 })
+    generationRecoveryRepository.listStuckGenerationRecords = () =>
       Promise.resolve([makeRecord({ id: 'rec_stuck', status: 'processing' })])
 
     const running = loop.run()
@@ -400,9 +407,13 @@ describe('WorkerLoop', () => {
       const registry = new ProviderRegistry()
       registry.register(runner)
       const logger = createRecordingLogger()
+      const generationRecoveryRepository = {
+        listStuckGenerationRecords: () => Promise.resolve([]),
+      }
       const loop = new WorkerLoop({
         workerId,
         repository: repo,
+        generationRecoveryRepository,
         providerRequestAuditRepository: repo,
         providerRegistry: registry,
         modelRegistry: { getModelById: () => qwenImage },
@@ -420,7 +431,7 @@ describe('WorkerLoop', () => {
         providerAsyncMaxDurationMs: TEST_TIMEOUT_MS,
         artifactPersistTimeoutMs: TEST_TIMEOUT_MS,
       })
-      return { loop, repo, runner, logger }
+      return { loop, repo, generationRecoveryRepository, runner, logger }
     }
 
     const w1 = makeWorker('worker-1')

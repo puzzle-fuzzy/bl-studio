@@ -71,6 +71,7 @@ function buildLoop(
   return new WorkerLoop({
     workerId,
     repository: iso.repository,
+    generationRecoveryRepository: iso.generationRecoveryRepository,
     taskRepository,
     providerRequestAuditRepository: iso.providerRequestAuditRepository,
     providerRegistry: registry,

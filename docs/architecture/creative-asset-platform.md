@@ -128,6 +128,8 @@ flowchart LR
   task row 写入、窄查询和任务状态转换，不负责跨域事务的开启与提交。
 - generation 详情诊断由 `GenerationDiagnosticsRepository` 单独承载，核心
   `GenerationRepository` 只保留生成状态与业务事务能力。
+- Worker 的陈旧 generation 清扫通过独立的 `GenerationRecoveryRepository` 读取；恢复读模型
+  与生成核心状态写入分离，Worker 仍显式调用核心 repository 完成最终失败收口。
 
 ## 4. 领域模型归属
 

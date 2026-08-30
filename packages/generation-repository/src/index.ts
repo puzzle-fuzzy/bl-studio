@@ -1,8 +1,9 @@
 /**
  * @bailian-studio/generation-repository 的对外入口。
  *
- * 本包是整个系统的「中央生成接缝」：负责 generation 业务持久化、状态推进和
- * 业务事务内的初始任务写入；任务调度/租约生命周期由 task-repository 独立拥有。
+ * 本包是整个系统的「生成持久化接缝」：核心 repository 负责 generation 业务持久化、
+ * 状态推进和业务事务内的初始任务写入；诊断与故障恢复通过独立窄 port 暴露，任务
+ * 调度/租约生命周期由 task-repository 独立拥有。
  *
  * 关键的边界设计：
  *  - services 层被架构规则禁止直接 import `@bailian-studio/db`，因此这里把
@@ -51,6 +52,11 @@ export {
 	createGenerationDiagnosticsRepository,
 	type GenerationDiagnosticsRepository,
 } from "./diagnostics";
+export {
+	createGenerationRecoveryRepository,
+	type GenerationRecoveryRepository,
+	type ListStuckGenerationRecordsInput,
+} from "./recovery";
 export type {
 	AuditAction,
 	AuditEventMetadata,
@@ -107,7 +113,6 @@ export {
 	estimateGenerationRequest,
 	type GenerationEstimate,
 	type GenerationRepository,
-	type ListStuckGenerationRecordsInput,
 } from "./repository";
 export type {
 	PublicShareRepository,

@@ -82,6 +82,7 @@ async function main(): Promise<void> {
   const config: WorkerLoopConfig = {
     workerId: env.workerId,
     repository: persistence.generationRepository,
+    generationRecoveryRepository: persistence.generationRecoveryRepository,
     taskRepository: persistence.taskQueueRepository,
     providerRequestAuditRepository: persistence.providerRequestAuditRepository,
     auditOutboxRepository: persistence.auditOutboxRepository,

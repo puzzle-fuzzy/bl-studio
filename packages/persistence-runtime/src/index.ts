@@ -45,6 +45,7 @@ import {
 	createFeedbackRepository,
 	createGenerationRepository,
 	createGenerationDiagnosticsRepository,
+	createGenerationRecoveryRepository,
 	createNotificationRepository,
 	createPromptLibraryRepository,
 	createProviderRequestAuditRepository,
@@ -54,6 +55,7 @@ import {
 	type FeedbackRepository,
 	type GenerationDiagnosticsRepository,
 	type GenerationRepository,
+	type GenerationRecoveryRepository,
 	type NotificationRepository,
 	type PromptLibraryRepository,
 	type PublicShareRepository,
@@ -87,6 +89,7 @@ export interface ApiPersistenceRuntime {
 	readonly creditLedger: CreditLedger;
 	readonly generationRepository: GenerationRepository;
 	readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository;
+	readonly generationRecoveryRepository: GenerationRecoveryRepository;
 	readonly assetRepository: AssetRepository;
 	readonly shareRepository: ShareRepository;
 	readonly publicShareRepository: PublicShareRepository;
@@ -114,6 +117,7 @@ export interface WorkerPersistenceRuntime {
 	readonly auditOutboxRepository: AuditOutboxRepository;
 	readonly creditLedger: CreditLedger;
 	readonly generationRepository: GenerationRepository;
+	readonly generationRecoveryRepository: GenerationRecoveryRepository;
 	readonly taskQueueRepository: TaskQueueRepository;
 	readonly providerRequestAuditRepository: ProviderRequestAuditRepository;
 	readonly directorRepository: DirectorRepository;
@@ -156,6 +160,7 @@ export function createApiPersistenceRuntime(
 			creditLedger: createCreditLedger({ db }),
 			generationRepository,
 			generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),
+			generationRecoveryRepository: createGenerationRecoveryRepository(db),
 			assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
 			shareRepository,
 			publicShareRepository: shareRepository,
@@ -190,6 +195,7 @@ export function createWorkerPersistenceRuntime(
 			auditOutboxRepository: createAuditOutboxRepository({ db }),
 			creditLedger: createCreditLedger({ db }),
 			generationRepository: createGenerationRepository({ db, taskQueueTransactionStore }),
+			generationRecoveryRepository: createGenerationRecoveryRepository(db),
 			taskQueueRepository: createTaskQueueRepository({ db }),
 			providerRequestAuditRepository: createProviderRequestAuditRepository(db),
 			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
