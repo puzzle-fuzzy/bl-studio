@@ -351,6 +351,7 @@ describe('processCanvasExecutionTask', () => {
   })
 
   it('persists node diagnostics when generation creation fails', async () => {
+    const logger = createRecordingLogger()
     const result = await processCanvasExecutionTask(task(canvasInput()), {
       repository: {
         createGeneration: async () => {
@@ -359,7 +360,7 @@ describe('processCanvasExecutionTask', () => {
         getGenerationRecord: async () => undefined,
         listArtifactsForRecord: async () => [],
       },
-      logger: createRecordingLogger(),
+      logger,
     })
 
     expect(result).toMatchObject({
@@ -377,6 +378,17 @@ describe('processCanvasExecutionTask', () => {
           },
         },
       },
+    })
+    expect(logger.entries).toContainEqual({
+      level: 'error',
+      message: 'canvas.node_failed',
+      meta: expect.objectContaining({
+        taskId: 'canvas_task_1',
+        nodeId: 'node_1',
+        errorCode: 'CANVAS_NODE_GENERATION_CREATE_FAILED',
+        error: 'provider quota unavailable',
+        durationMs: expect.any(Number),
+      }),
     })
   })
 

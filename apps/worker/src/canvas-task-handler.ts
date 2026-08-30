@@ -212,11 +212,19 @@ export async function processCanvasExecutionTask(
         })
       } else if (result.error !== undefined) {
         failedCount += 1
-        nextInput = withNodeRun(nextInput, result.nodeId, {
+        const failedRun = {
           status: 'failed',
           error: result.error.message,
           errorCode: result.error.code,
           ...completedNodeTiming(result.startedAt),
+        } satisfies CanvasNodeRun
+        nextInput = withNodeRun(nextInput, result.nodeId, failedRun)
+        deps.logger.error('canvas.node_failed', {
+          taskId: task.id,
+          nodeId: result.nodeId,
+          errorCode: result.error.code,
+          error: result.error.message,
+          durationMs: failedRun.durationMs,
         })
       }
     }
