@@ -21,7 +21,6 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { ModelCatalog, ModelManifestResolver } from '@bailian-studio/model-core'
-import type { FrozenModelManifest as FrozenDashScopeModelManifest } from '@bailian-studio/dashscope-manifests'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import type { ArtifactConfig } from './lib/artifact-config'
@@ -59,7 +58,7 @@ export interface ApiDependencies {
   readonly creditLedger: CreditLedger
   readonly generationRepository: GenerationRepository
   /** API 组合根提供的 provider-neutral 模型目录解析器。 */
-  readonly modelResolver: ModelManifestResolver<FrozenDashScopeModelManifest>
+  readonly modelResolver: ModelManifestResolver
   /** API 路由消费的 provider-neutral 模型目录投影。 */
   readonly modelCatalog: ModelCatalog
   /** 当前用户生成详情的安全诊断投影。 */

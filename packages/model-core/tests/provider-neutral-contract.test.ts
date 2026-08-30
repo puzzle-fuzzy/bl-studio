@@ -5,6 +5,7 @@ import type {
   ProviderRequestContract,
   ProviderTransportContract,
 } from '../src'
+import { readModelParameterBinding } from '../src'
 
 type MockRequest = ProviderRequestContract & {
   kind: 'mock-generate'
@@ -62,5 +63,16 @@ describe('provider-neutral manifest contract', () => {
     expect(mockManifest.request.responseMode).toBe('json')
     expect(mockManifest.output.artifactPath).toBe('result.url')
     expect(mockManifest.transport.submit.route).toBe('/jobs')
+  })
+
+  it('normalizes provider binding extensions to the shared vocabulary', () => {
+    expect(readModelParameterBinding({ target: 'input.media', mediaType: 'reference_image' })).toEqual({
+      target: 'input.media',
+    })
+    expect(readModelParameterBinding({ target: 'input.field', field: 'negative_prompt', wrapInArray: true })).toEqual({
+      target: 'input.field',
+      field: 'negative_prompt',
+    })
+    expect(readModelParameterBinding({ target: 'unsupported' })).toBeUndefined()
   })
 })

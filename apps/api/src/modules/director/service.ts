@@ -11,13 +11,12 @@ import { ValidationError } from '@bailian-studio/shared'
 import { DirectorRepositoryError, type DirectorProjectRepositoryDetail, type DirectorRepository } from '@bailian-studio/director-repository'
 import {
   estimatePriceCents,
+  readModelParameterBinding,
   validateModelParams,
+  type FrozenModelManifest,
   type ModelCatalog,
   type ModelManifestResolver,
 } from '@bailian-studio/model-core'
-import type {
-  FrozenModelManifest,
-} from '@bailian-studio/dashscope-manifests'
 
 export interface DirectorApplicationService {
   requestScriptChat(input: {
@@ -92,12 +91,11 @@ export function requireDirectorVideoModel(
   if (
     model === undefined
     || model.availability.enabled === false
-    || model.request.kind !== 'dashscope-video-task'
     || modelCatalog.getById(model.id)?.operation !== 'video.reference-to-video'
     || !model.parameters.some(parameter => (
       parameter.type === 'media'
       && parameter.mediaKind === 'image'
-      && model.request.bindings[parameter.name]?.target === 'input.media'
+      && readModelParameterBinding(model.request.bindings[parameter.name])?.target === 'input.media'
     ))
   ) {
     throw new ValidationError('视频阶段需要使用支持参考图像输入的已启用参考生视频模型', 'modelId')
@@ -145,7 +143,7 @@ export function directorVideoParams(
   const referenceParameter = manifest.parameters.find(parameter => (
     parameter.type === 'media'
     && parameter.mediaKind === 'image'
-    && manifest.request.bindings[parameter.name]?.target === 'input.media'
+    && readModelParameterBinding(manifest.request.bindings[parameter.name])?.target === 'input.media'
   ))
   if (referenceParameter !== undefined && referenceCount > 0) params[referenceParameter.name] = Array.from({ length: referenceCount }, () => 'reference')
   return params

@@ -30,6 +30,7 @@ export { ModelCoreError } from './errors'
 export { isModelParameterVisible } from './parameter-visibility'
 export { modelValuesEqual } from './value-equality'
 export { isNumberStepAligned } from './number-step'
+export { readModelParameterBinding } from './request-bindings'
 export type {
   DeepReadonly,
   FrozenModelManifest,

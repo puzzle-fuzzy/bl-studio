@@ -1,8 +1,8 @@
 import {
   getModelAuditMetadata,
+  readModelParameterBinding,
   validateModelParams,
 } from '@bailian-studio/model-core'
-import type { ModelParameterBinding } from '@bailian-studio/model-core'
 import {
   CREATIVE_ASSET_PROTOCOL_VERSION,
   CreativeGenerationContextSchema,
@@ -406,23 +406,8 @@ function mediaParameterNames(manifest: CreativeAssetCompilerManifest): string[] 
   return providerMediaParameterNames(manifest).filter(name => names.has(name))
 }
 
-function bindingFor(manifest: CreativeAssetCompilerManifest, parameterName: string): ModelParameterBinding | undefined {
-  const binding = manifest.request.bindings[parameterName]
-  if (typeof binding !== 'object' || binding === null || !('target' in binding)) return undefined
-  const record = binding as Record<string, unknown>
-  const target = record.target
-  if (target === 'input.prompt' || target === 'input.media' || target === 'ui.only') {
-    return { target }
-  }
-  if (target === 'input.field') {
-    return typeof record.field === 'string' ? { target, field: record.field } : undefined
-  }
-  if (target === 'parameters.field') {
-    return record.field === undefined || typeof record.field === 'string'
-      ? { target, ...(record.field === undefined ? {} : { field: record.field }) }
-      : undefined
-  }
-  return undefined
+function bindingFor(manifest: CreativeAssetCompilerManifest, parameterName: string) {
+  return readModelParameterBinding(manifest.request.bindings[parameterName])
 }
 
 type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
