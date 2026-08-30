@@ -61,3 +61,9 @@ API 审计也已独立为 `AuditRepository` port：路由只注入审计写入�
 并从 `GenerationRepository` 核心接口移除 `getDailyGenerationUsage` / `getGenerationUsage`；
 兼容 URL 工厂与隔离测试仍通过 `GenerationRepositoryCompat` 转发 `UsageRepository` 的
 读方法。这一步只移动读模型职责，不改变 generation 账本的写入与结算事务。
+
+Provider 出站请求审计也已完成写入边界收敛：Worker 通过
+`ProviderRequestAuditRepository` 写入 `started` / `finished` 记录，具体 SQL 位于
+`provider-requests.ts`；生成详情读取的 provider 请求投影继续留在 generation repository，
+因此没有改变对外响应。`GenerationRepository` 核心接口不再暴露这两个 Worker 写入方法，
+仅兼容 URL 工厂与隔离测试保留转发。

@@ -106,6 +106,8 @@ import type {
 } from "./asset-types";
 import type { AuditLog, RecordAuditEventInput } from "./audit-types";
 import { createContentRepository } from "./content";
+import type { ProviderRequestAuditRepository } from "./provider-request-port";
+import { createProviderRequestAuditRepository } from "./provider-requests";
 import { createShareRepository } from "./shares";
 import type { PublicShareRepository, ShareRepository } from "./share-port";
 import {
@@ -126,7 +128,6 @@ import {
 	nextCreativeGenerationContextReferenceId,
 	nextGenerationEventId,
 	nextGenerationRecordId,
-	nextProviderRequestAuditId,
 	nextTaskRecordId,
 	nextUsageRecordId,
 } from "./id";
@@ -141,11 +142,6 @@ import {
 	toTaskRecord,
 	toWorkerHeartbeat,
 } from "./mappers";
-import type {
-	FinishProviderRequestInput,
-	ProviderRequestAudit,
-	StartProviderRequestInput,
-} from "./provider-request-types";
 import type {
 	CancelGenerationInput,
 	CompleteGenerationInput,
@@ -1010,12 +1006,6 @@ export interface GenerationRepository {
 		staleAfterMs?: number;
 	}) => Promise<WorkerHealth>;
 
-	startProviderRequest(
-		input: StartProviderRequestInput,
-	): Promise<ProviderRequestAudit>;
-	finishProviderRequest(
-		input: FinishProviderRequestInput,
-	): Promise<ProviderRequestAudit | undefined>;
 	recordAuditEvent(input: RecordAuditEventInput): Promise<AuditLog>;
 
 	/** 仅 Worker 使用的来源查询，供持久化缩略图衍生任务读取。 */
@@ -1239,7 +1229,8 @@ export type GenerationRepositoryCompat = GenerationRepository &
 	AssetRepository &
 	ShareRepository &
 	PublicShareRepository &
-	UsageRepository;
+	UsageRepository &
+	ProviderRequestAuditRepository;
 
 type BailianStudioTx = Parameters<
 	Parameters<BailianStudioDb["transaction"]>[0]
@@ -1884,6 +1875,7 @@ export function createGenerationRepository(
 	const assetRepository = createAssetRepository(db);
 	const shareRepository = createShareRepository(db);
 	const usageRepository = createUsageRepository(db);
+	const providerRequestAuditRepository = createProviderRequestAuditRepository(db);
 
 	return {
 		async healthCheck() {
@@ -1966,79 +1958,6 @@ export function createGenerationRepository(
 				(row) => row.status === "running" && row.lastSeenAt.getTime() >= cutoff,
 			);
 			return { status: healthy ? "ok" : "failed", workers };
-		},
-
-		/**
-		 * 记录一次 provider 出站调用的开始。
-		 *
-		 * 该行先以 started 落库，再由 worker 在 provider 返回后收尾。这样即使
-		 * worker 在 HTTP 调用期间崩溃，也能从审计表识别「发起但未收尾」的请求，
-		 * 不把一次可能产生费用的外部调用伪装成从未发生。
-		 */
-		async startProviderRequest(input) {
-			const startedAt = input.startedAt ?? nowIso();
-			const [inserted] = await db
-				.insert(providerRequestAudits)
-				.values({
-					id: nextProviderRequestAuditId(),
-					generationId: input.generationId,
-					...(input.taskId !== undefined ? { taskId: input.taskId } : {}),
-					userId: input.userId,
-					provider: input.provider,
-					providerModel: input.providerModel,
-					operation: input.operation,
-					status: "started",
-					...(input.idempotencyKey !== undefined
-						? { idempotencyKey: input.idempotencyKey }
-						: {}),
-					...(input.providerTaskId !== undefined
-						? { providerTaskId: input.providerTaskId }
-						: {}),
-					attempt: input.attempt,
-					estimatedCostCents: input.estimatedCostCents,
-					startedAt: new Date(startedAt),
-					createdAt: new Date(startedAt),
-					updatedAt: new Date(startedAt),
-				})
-				.returning();
-
-			if (!inserted) {
-				throw new GenerationRepositoryError(
-					"DATABASE_ERROR",
-					`Failed to record provider request for generation: ${input.generationId}`,
-				);
-			}
-
-			return toProviderRequestAudit(inserted);
-		},
-
-		/** 收尾一条 provider 请求审计；找不到行时返回 undefined，供 worker 记录告警。 */
-		async finishProviderRequest(input) {
-			const completedAt = input.completedAt ?? nowIso();
-			const [updated] = await db
-				.update(providerRequestAudits)
-				.set({
-					status: input.status,
-					...(input.providerTaskId !== undefined
-						? { providerTaskId: input.providerTaskId }
-						: {}),
-					...(input.providerRequestId !== undefined
-						? { providerRequestId: input.providerRequestId }
-						: {}),
-					...(input.billedCostCents !== undefined
-						? { billedCostCents: input.billedCostCents }
-						: {}),
-					...(input.error !== undefined
-						? { errorJson: { ...input.error } }
-						: {}),
-					completedAt: new Date(completedAt),
-					latencyMs: Math.max(0, Math.round(input.latencyMs)),
-					updatedAt: new Date(completedAt),
-				})
-				.where(eq(providerRequestAudits.id, input.auditId))
-				.returning();
-
-			return updated ? toProviderRequestAudit(updated) : undefined;
 		},
 
 		/**
@@ -4010,6 +3929,8 @@ export function createGenerationRepository(
 		getPublicSharedGeneration: shareRepository.getPublicSharedGeneration,
 		getPublicSharedArtifact: shareRepository.getPublicSharedArtifact,
 		getGenerationUsage: usageRepository.getGenerationUsage,
+		startProviderRequest: providerRequestAuditRepository.startProviderRequest,
+		finishProviderRequest: providerRequestAuditRepository.finishProviderRequest,
 		...createContentRepository(db),
 	};
 }

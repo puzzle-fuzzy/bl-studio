@@ -102,6 +102,9 @@ flowchart LR
   `GenerationRepository` 仅为未迁移调用方保留兼容 facade。
 - API 审计通过独立 `AuditRepository` port 注入；约 115 个审计调用已不再把完整
   `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。
+- Worker 的 provider 出站请求审计通过 `ProviderRequestAuditRepository` 注入，SQL 写入
+  位于 `generation-repository/src/provider-requests.ts`；generation 详情仍可读取
+  provider 请求投影，但 Worker 不再从 GenerationRepository 核心接口写审计。
 - 用户用量接口通过 `UsageRepository` 读取，调用统计由 `AnalyticsRepository` 读取；相关
   聚合 SQL 分别位于 `usage.ts` 与 `analytics.ts`，避免报表/用量查询继续扩大 generation
   生命周期接口。生成应用服务的每日限额预检也通过显式的 `UsageRepository` 注入完成，

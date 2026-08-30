@@ -68,6 +68,7 @@ function buildLoop(
   return new WorkerLoop({
     workerId,
     repository: iso.repository,
+    providerRequestAuditRepository: iso.repository,
     providerRegistry: registry,
     modelRegistry: { getModelById },
     storage: new FakeStorageAdapter(),

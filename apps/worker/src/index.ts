@@ -5,12 +5,10 @@
  * 并一直运行直到收到停止信号。
  */
 
-import { createCreditLedgerFromUrl } from '@bailian-studio/credit-ledger'
 import { getModelById } from '@bailian-studio/model-core'
-import { createGenerationRepositoryFromUrl } from '@bailian-studio/generation-repository'
-import { createDirectorRepositoryFromUrl } from '@bailian-studio/director-repository'
-import { createMediaRepositoryFromUrl } from '@bailian-studio/media-repository'
+import { createWorkerPersistenceRuntime } from '@bailian-studio/persistence-runtime'
 import { createStorageFromEnv } from '@bailian-studio/storage'
+import { readGenerationLimits } from '@bailian-studio/shared'
 import { WorkerLoop, type WorkerLoopConfig } from './worker-loop'
 import { createFfmpegMediaProcessor } from './media-processor'
 import { createProviderRegistry } from './providers'
@@ -69,10 +67,7 @@ async function main(): Promise<void> {
   const env = readWorkerEnv()
   const bailianRuntime = verifyBailianRuntime()
 
-  const generationHandle = createGenerationRepositoryFromUrl(env.databaseUrl)
-  const directorHandle = createDirectorRepositoryFromUrl(env.databaseUrl)
-  const mediaHandle = createMediaRepositoryFromUrl(env.databaseUrl)
-  const creditHandle = createCreditLedgerFromUrl(env.databaseUrl)
+  const persistence = createWorkerPersistenceRuntime({ databaseUrl: env.databaseUrl })
 
   const providerRegistry = createProviderRegistry({
     dashscope: {
@@ -86,9 +81,12 @@ async function main(): Promise<void> {
 
   const config: WorkerLoopConfig = {
     workerId: env.workerId,
-    repository: generationHandle.repository,
-    directorRepository: directorHandle.repository,
-    mediaRepository: mediaHandle.repository,
+    repository: persistence.generationRepository,
+    taskRepository: persistence.taskQueueRepository,
+    providerRequestAuditRepository: persistence.providerRequestAuditRepository,
+    auditOutboxRepository: persistence.auditOutboxRepository,
+    directorRepository: persistence.directorRepository,
+    mediaRepository: persistence.mediaRepository,
     providerRegistry,
     modelRegistry: { getModelById },
     storage,
@@ -119,8 +117,11 @@ async function main(): Promise<void> {
       : { staleGenerationSweepIntervalMs: env.workerStaleGenerationSweepIntervalMs }),
     pollIntervalMs: env.workerPollIntervalMs ?? 100,
     idleSleepMs: env.workerIdleSleepMs ?? 1000,
+    // 导演流程在 worker 侧创建 generation，必须与 API 路径共用同一份每日限额，
+    // 否则导演阶段任务成为绕过任务数/成本日限额的旁路。
+    generationQuota: readGenerationLimits(process.env),
     // P1-27：接入 credit-ledger，worker 周期兜底释放「终态 generation 的僵尸 reserve」。
-    creditLedger: creditHandle.ledger,
+    creditLedger: persistence.creditLedger,
   }
 
   const loop = new WorkerLoop(config)
@@ -138,7 +139,7 @@ async function main(): Promise<void> {
     await loop.run()
     console.log(`[${env.workerId}] stopped`)
   } finally {
-    await Promise.all([generationHandle.close(), directorHandle.close(), mediaHandle.close(), creditHandle.close()])
+    await persistence.close()
   }
 }
 

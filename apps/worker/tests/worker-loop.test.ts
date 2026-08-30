@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskRecord } from '@bailian-studio/task-engine'
+import { MetricsCollector } from '@bailian-studio/shared'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteOutput } from '../src/providers'
 import { WorkerLoop } from '../src/worker-loop'
@@ -34,6 +35,7 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
   const loop = new WorkerLoop({
     workerId: 'worker-test',
     repository: repo,
+    providerRequestAuditRepository: repo,
     providerRegistry: registry,
     modelRegistry: { getModelById: () => qwenImage },
     storage: new FakeStorageAdapter(),
@@ -86,6 +88,80 @@ describe('WorkerLoop', () => {
     expect(repo.workerHeartbeatEvents[0]).toEqual({ kind: 'register', workerId: 'worker-test' })
     expect(repo.workerHeartbeatEvents.some(event => event.kind === 'touch')).toBe(true)
     expect(repo.workerHeartbeatEvents.at(-1)).toEqual({ kind: 'stop', workerId: 'worker-test' })
+  })
+
+  it('uses the injected task repository for queue polling', async () => {
+    let claims = 0
+    const { loop, repo, logger } = buildLoop({
+      taskRepository: {
+        claimNextQueuedTask: async () => {
+          claims += 1
+          return undefined
+        },
+        renewTaskLock: input => repo.renewTaskLock(input),
+        saveTask: (task, options) => repo.saveTask(task, options),
+      },
+    })
+    repo.claimNextQueuedTask = async () => {
+      throw new Error('worker should not use the generation repository queue facade')
+    }
+
+    const running = loop.run()
+    await new Promise(resolve => setTimeout(resolve, 10))
+    loop.stop()
+    await resolveWithin(running, 500)
+
+    expect(claims).toBeGreaterThan(0)
+    expect(logger.entries.some(entry => entry.message === 'worker.iteration_failed')).toBe(false)
+  })
+
+  it('records audit outbox delivery counts and drain latency', async () => {
+    const metrics = new MetricsCollector()
+    let drains = 0
+    const { loop } = buildLoop({
+      metrics,
+      auditOutboxIntervalMs: 10,
+      auditOutboxRepository: {
+        drain: async () => {
+          drains += 1
+          return { claimed: 2, delivered: 1, retried: 1, failed: 0 }
+        },
+      },
+    })
+
+    const running = loop.run()
+    await new Promise(resolve => setTimeout(resolve, 25))
+    loop.stop()
+    await resolveWithin(running, 500)
+
+    const snapshot = loop.metricsSnapshot()
+    expect(drains).toBeGreaterThan(0)
+    expect(snapshot.counters['worker.audit_outbox.events|status=claimed']).toBe(drains * 2)
+    expect(snapshot.counters['worker.audit_outbox.events|status=delivered']).toBe(drains)
+    expect(snapshot.counters['worker.audit_outbox.events|status=retried']).toBe(drains)
+    expect(snapshot.counters['worker.audit_outbox.events|status=failed']).toBeUndefined()
+    expect(snapshot.counters['worker.audit_outbox.drain|status=completed']).toBe(drains)
+    expect(snapshot.timers['worker.audit_outbox.drain_ms|status=completed']?.count).toBe(drains)
+  })
+
+  it('records audit outbox drain errors without stopping the worker', async () => {
+    const metrics = new MetricsCollector()
+    const { loop, logger } = buildLoop({
+      metrics,
+      auditOutboxRepository: {
+        drain: async () => { throw new Error('audit database unavailable') },
+      },
+    })
+
+    const running = loop.run()
+    await new Promise(resolve => setTimeout(resolve, 5))
+    loop.stop()
+    await resolveWithin(running, 500)
+
+    const snapshot = loop.metricsSnapshot()
+    expect(snapshot.counters['worker.audit_outbox.drain|status=error']).toBeGreaterThan(0)
+    expect(snapshot.timers['worker.audit_outbox.drain_ms|status=error']?.count).toBeGreaterThan(0)
+    expect(logger.entries.some(entry => entry.message === 'audit_outbox.drain_failed')).toBe(true)
   })
 
   it('logs the task outcome when a task succeeds', async () => {
@@ -322,6 +398,7 @@ describe('WorkerLoop', () => {
       const loop = new WorkerLoop({
         workerId,
         repository: repo,
+        providerRequestAuditRepository: repo,
         providerRegistry: registry,
         modelRegistry: { getModelById: () => qwenImage },
         storage: new FakeStorageAdapter(),

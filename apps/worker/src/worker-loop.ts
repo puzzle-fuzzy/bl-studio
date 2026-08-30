@@ -5,9 +5,11 @@
  */
 
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
+import type { AuditOutboxRepository } from '@bailian-studio/audit-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { GenerationQuotaLimits, GenerationRepository, ProviderRequestAuditRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
+import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import { createLogger, MetricsCollector, type Logger, type MetricsSnapshot } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { transitionTask, type TaskError, type TaskRecord } from '@bailian-studio/task-engine'
@@ -19,6 +21,11 @@ import type { ArtifactFetchPolicy } from './artifact-persist'
 export interface WorkerLoopConfig {
   workerId: string
   repository: GenerationRepository
+  providerRequestAuditRepository: ProviderRequestAuditRepository
+  /** 任务生命周期的最小持久化端口；缺省时回退到 repository 兼容 facade。 */
+  taskRepository?: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
+  /** 可选的审计 outbox 消费句柄，由 worker 组合根注入。 */
+  auditOutboxRepository?: Pick<AuditOutboxRepository, 'drain'>
   directorRepository?: DirectorRepository
   providerRegistry: ProviderRegistry
   modelRegistry: ModelRegistryLookup
@@ -50,8 +57,16 @@ export interface WorkerLoopConfig {
   artifactPersistTimeoutMs?: number
   /** provider 产物下载安全策略。 */
   artifactFetch?: ArtifactFetchPolicy
+  /** worker 侧创建 generation（导演流程等）的原子准入限额；缺省不设限。 */
+  generationQuota?: GenerationQuotaLimits
   /** 更新 worker 存活行的间隔。默认 5s。 */
   workerHeartbeatIntervalMs?: number
+  /** 消费审计 outbox 的间隔。默认 5s。 */
+  auditOutboxIntervalMs?: number
+  /** 每轮最多领取的审计 outbox 数量。默认 25。 */
+  auditOutboxBatchSize?: number
+  /** 审计 outbox 达到该次数后进入终态失败。默认 5。 */
+  auditOutboxMaxAttempts?: number
   /** 卡住 generation 记录（任务已终态失败但记录停在 submitting/processing）的清扫间隔。默认 60s。 */
   staleGenerationSweepIntervalMs?: number
   /** 可选的 credit-ledger 句柄：周期兜底释放「generation 已终态但 reserve 从未结算/退款」的陈旧预留（P1-27）。 */
@@ -69,6 +84,7 @@ export class WorkerLoop {
   /** P1-26：当前在途任务数（认领后未落终态）。 */
   private inFlight = 0
   private readonly executor: TaskExecutor
+  private readonly taskRepository: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
   private readonly logger: Logger
   private readonly lockDurationMs: number
   private readonly lockHeartbeatMs: number
@@ -76,6 +92,9 @@ export class WorkerLoop {
   private readonly idleSleepMs: number
   private readonly errorBackoffMs: number
   private readonly workerHeartbeatIntervalMs: number
+  private readonly auditOutboxIntervalMs: number
+  private readonly auditOutboxBatchSize: number
+  private readonly auditOutboxMaxAttempts: number
   private readonly staleGenerationSweepIntervalMs: number
   private readonly concurrency: number
   private readonly creditLedger?: Pick<CreditLedger, 'releaseStaleReservations'>
@@ -86,6 +105,7 @@ export class WorkerLoop {
     const metrics = config.metrics ?? new MetricsCollector()
     this.executor = createTaskExecutor({
       repository: config.repository,
+      providerRequestAuditRepository: config.providerRequestAuditRepository,
       ...(config.directorRepository === undefined ? {} : { directorRepository: config.directorRepository }),
       providerRegistry: config.providerRegistry,
       modelRegistry: config.modelRegistry,
@@ -102,11 +122,17 @@ export class WorkerLoop {
         ? { artifactPersistTimeoutMs: config.artifactPersistTimeoutMs }
         : {}),
       ...(config.artifactFetch === undefined ? {} : { artifactFetch: config.artifactFetch }),
+      ...(config.generationQuota === undefined ? {} : { generationQuota: config.generationQuota }),
       ...(config.logger !== undefined ? { logger: config.logger } : {}),
       metrics,
     })
     this.logger = config.logger ?? createLogger(`worker:${config.workerId}`)
     this.metrics = metrics
+    this.taskRepository = config.taskRepository ?? {
+      claimNextQueuedTask: input => config.repository.claimNextQueuedTask(input),
+      renewTaskLock: input => config.repository.renewTaskLock(input),
+      saveTask: (task, options) => config.repository.saveTask(task, options),
+    }
     // 任务租约与轮询节奏（默认值）：
     // - 锁 90s：任务执行期间持有；worker 崩溃后最迟 90s 由其它 worker 重新认领。
     // - 心跳 = 锁/3（约 30s）：执行期间周期性续租，网络抖动在锁过期前有重试机会。
@@ -120,6 +146,9 @@ export class WorkerLoop {
     this.idleSleepMs = config.idleSleepMs ?? 1000
     this.errorBackoffMs = config.errorBackoffMs ?? 5_000
     this.workerHeartbeatIntervalMs = config.workerHeartbeatIntervalMs ?? 5_000
+    this.auditOutboxIntervalMs = config.auditOutboxIntervalMs ?? 5_000
+    this.auditOutboxBatchSize = config.auditOutboxBatchSize ?? 25
+    this.auditOutboxMaxAttempts = config.auditOutboxMaxAttempts ?? 5
     this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
     this.concurrency = config.concurrency ?? 3
     this.creditLedger = config.creditLedger
@@ -132,6 +161,7 @@ export class WorkerLoop {
     const stopHeartbeat = this.startWorkerHeartbeat()
     const stopSweeper = this.startStaleGenerationSweeper()
     const stopReserveSweeper = this.startStaleReserveSweeper()
+    const stopAuditOutbox = this.startAuditOutboxConsumer()
     const stopMetricsReporter = this.startMetricsReporter()
     try {
       while (this.running) {
@@ -143,7 +173,7 @@ export class WorkerLoop {
         try {
           const now = new Date()
           const lockedUntil = new Date(now.getTime() + this.lockDurationMs)
-          const task = await this.config.repository.claimNextQueuedTask({
+          const task = await this.taskRepository.claimNextQueuedTask({
             workerId: this.config.workerId,
             now: now.toISOString(),
             lockedUntil: lockedUntil.toISOString(),
@@ -178,6 +208,7 @@ export class WorkerLoop {
       await stopHeartbeat()
       stopSweeper()
       stopReserveSweeper()
+      await stopAuditOutbox()
       stopMetricsReporter()
     }
   }
@@ -202,6 +233,70 @@ export class WorkerLoop {
     report()
     const timer = setInterval(report, this.metricsLogIntervalMs)
     return () => clearInterval(timer)
+  }
+
+  /**
+   * 在已有 worker 进程中消费审计 outbox，避免为一条轻量后台链路再引入独立进程。
+   * repository 自己负责 skip-locked claim、租约恢复、幂等 materialize 与退避；这里
+   * 只负责调度和进程生命周期，业务模块不感知 audit_logs 的投递细节。
+   */
+  private startAuditOutboxConsumer(): () => Promise<void> {
+    const repository = this.config.auditOutboxRepository
+    if (repository === undefined) return async () => {}
+
+    let activeDrain: Promise<void> | undefined
+    const drain = (): void => {
+      if (activeDrain !== undefined) return
+      activeDrain = this.drainAuditOutbox(repository).finally(() => {
+        activeDrain = undefined
+      })
+    }
+
+    drain()
+    const timer = setInterval(drain, this.auditOutboxIntervalMs)
+    return async () => {
+      clearInterval(timer)
+      if (activeDrain !== undefined) await activeDrain
+    }
+  }
+
+  private async drainAuditOutbox(repository: Pick<AuditOutboxRepository, 'drain'>): Promise<void> {
+    const startedAt = Date.now()
+    try {
+      const result = await repository.drain({
+        consumerId: this.config.workerId,
+        limit: this.auditOutboxBatchSize,
+        maxAttempts: this.auditOutboxMaxAttempts,
+        now: currentIso(),
+      })
+      if (result.claimed > 0) {
+        this.metrics.increment('worker.audit_outbox.events', { status: 'claimed' }, result.claimed)
+      }
+      if (result.delivered > 0) {
+        this.metrics.increment('worker.audit_outbox.events', { status: 'delivered' }, result.delivered)
+      }
+      if (result.retried > 0) {
+        this.metrics.increment('worker.audit_outbox.events', { status: 'retried' }, result.retried)
+      }
+      if (result.failed > 0) {
+        this.metrics.increment('worker.audit_outbox.events', { status: 'failed' }, result.failed)
+      }
+      this.metrics.increment('worker.audit_outbox.drain', { status: 'completed' })
+      this.metrics.timing('worker.audit_outbox.drain_ms', Date.now() - startedAt, { status: 'completed' })
+      if (result.claimed > 0) {
+        this.logger.info('audit_outbox.drained', {
+          claimed: result.claimed,
+          delivered: result.delivered,
+          retried: result.retried,
+          failed: result.failed,
+        })
+      }
+    } catch (error) {
+      this.metrics.increment('worker.audit_outbox.drain', { status: 'error' })
+      this.metrics.timing('worker.audit_outbox.drain_ms', Date.now() - startedAt, { status: 'error' })
+      // 审计投递不应打断 generation 消费；未完成的 outbox 会在下一轮恢复。
+      this.logger.error('audit_outbox.drain_failed', { error: errorMessage(error) })
+    }
   }
 
   /**
@@ -415,7 +510,7 @@ export class WorkerLoop {
       activeRenewal = (async () => {
         const now = new Date()
         try {
-          const renewed = await this.config.repository.renewTaskLock({
+          const renewed = await this.taskRepository.renewTaskLock({
             taskId: task.id,
             workerId,
             now: now.toISOString(),
@@ -463,7 +558,7 @@ export class WorkerLoop {
 
   /** 仅当认领该任务的 worker 仍持有任务行时才保存结果。 */
   private async saveTaskIfOwned(task: TaskRecord, nextTask: TaskRecord): Promise<boolean> {
-    const saved = await this.config.repository.saveTask(
+    const saved = await this.taskRepository.saveTask(
       nextTask,
       task.lockedBy === undefined ? undefined : { expectedWorkerId: task.lockedBy },
     )

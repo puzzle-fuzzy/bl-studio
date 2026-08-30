@@ -5,7 +5,7 @@
  * media 处理分别位于独立模块，避免不同业务生命周期共享一个大型实现文件。
  */
 
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { GenerationQuotaLimits, GenerationRepository, ProviderRequestAuditRepository } from '@bailian-studio/generation-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { createLogger, MetricsCollector, type Logger } from '@bailian-studio/shared'
@@ -25,6 +25,7 @@ export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface TaskExecutorDeps {
   readonly repository: GenerationRepository
+  readonly providerRequestAuditRepository: ProviderRequestAuditRepository
   readonly directorRepository?: DirectorRepository
   readonly providerRegistry: ProviderRegistry
   readonly modelRegistry: ModelRegistryLookup
@@ -39,6 +40,11 @@ export interface TaskExecutorDeps {
   readonly artifactPersistTimeoutMs?: number
   /** provider 产物下载安全策略。 */
   readonly artifactFetch?: ArtifactFetchPolicy
+  /**
+   * 导演流程等 worker 侧创建 generation 时的原子准入限额；
+   * 缺省即不设限——与 API 路径共用同一解析器时两侧语义一致。
+   */
+  readonly generationQuota?: GenerationQuotaLimits
   /** 可选的进程内计数器/计时器，用于任务与 provider 诊断。 */
   readonly metrics?: MetricsCollector
   readonly logger?: Logger
@@ -72,6 +78,7 @@ export class TaskExecutor {
         repository: this.deps.repository,
         ...(this.deps.directorRepository === undefined ? {} : { directorRepository: this.deps.directorRepository }),
         ...(this.deps.mediaRepository === undefined ? {} : { mediaRepository: this.deps.mediaRepository }),
+        ...(this.deps.generationQuota === undefined ? {} : { generationQuota: this.deps.generationQuota }),
         modelRegistry: this.deps.modelRegistry,
         logger: this.logger,
       })
@@ -130,6 +137,7 @@ export class TaskExecutor {
 
     return processGenerationTask(recordId, task, {
       repository: this.deps.repository,
+      providerRequestAuditRepository: this.deps.providerRequestAuditRepository,
       providerRegistry: this.deps.providerRegistry,
       modelRegistry: this.deps.modelRegistry,
       storage: this.deps.storage,

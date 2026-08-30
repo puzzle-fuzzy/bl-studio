@@ -4,6 +4,7 @@ import type {
   GenerationRepository,
   NormalizedGenerationOutput,
   ProviderRequestAudit,
+  ProviderRequestAuditRepository,
   ProviderRequestErrorSummary,
   ProviderRequestOperation,
   FinishProviderRequestInput,
@@ -23,6 +24,7 @@ import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface GenerationTaskHandlerDeps {
   readonly repository: GenerationRepository
+  readonly providerRequestAuditRepository: ProviderRequestAuditRepository
   readonly providerRegistry: ProviderRegistry
   readonly modelRegistry: ModelRegistryLookup
   readonly storage: StorageAdapter
@@ -632,7 +634,7 @@ async function startProviderRequestAudit(
   deps: GenerationTaskHandlerDeps,
 ): Promise<ProviderRequestAudit | undefined> {
   try {
-    return await deps.repository.startProviderRequest({
+    return await deps.providerRequestAuditRepository.startProviderRequest({
       generationId: record.id,
       taskId: task.id,
       userId: record.userId,
@@ -665,7 +667,7 @@ async function finishProviderRequestAudit(
   if (audit === undefined) return
 
   try {
-    const updated = await deps.repository.finishProviderRequest({
+    const updated = await deps.providerRequestAuditRepository.finishProviderRequest({
       auditId: audit.id,
       ...patch,
       completedAt: currentIso(),

@@ -50,6 +50,7 @@ function setup(opts: {
   const metrics = new MetricsCollector()
   const executor = createTaskExecutor({
     repository: repo,
+    providerRequestAuditRepository: repo,
     providerRegistry: registry,
     modelRegistry: { getModelById: () => opts.manifestMissing === true ? undefined : opts.manifest ?? qwenImage },
     storage,
@@ -808,6 +809,7 @@ describe('TaskExecutor.processTask', () => {
     const registry = new ProviderRegistry()
     const executor = createTaskExecutor({
       repository: repo,
+      providerRequestAuditRepository: repo,
       mediaRepository: mediaRepo,
       mediaProcessor: processor,
       providerRegistry: registry,
@@ -841,8 +843,10 @@ describe('TaskExecutor.processTask', () => {
       retriable: false,
       code: 'FFMPEG_NOT_CONFIGURED',
     })
+    const repo = new FakeRepository()
     const executor = createTaskExecutor({
-      repository: new FakeRepository(),
+      repository: repo,
+      providerRequestAuditRepository: repo,
       mediaRepository: mediaRepo,
       mediaProcessor: processor,
       providerRegistry: new ProviderRegistry(),

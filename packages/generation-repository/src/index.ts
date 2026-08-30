@@ -92,6 +92,8 @@ export type {
 	ProviderRequestStatus,
 	StartProviderRequestInput,
 } from "./provider-request-types";
+export type { ProviderRequestAuditRepository } from "./provider-request-port";
+export { createProviderRequestAuditRepository } from "./provider-requests";
 export {
 	type ClaimNextQueuedTaskInput,
 	createGenerationRepository,
