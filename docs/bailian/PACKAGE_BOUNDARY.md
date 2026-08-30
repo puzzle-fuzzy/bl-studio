@@ -14,7 +14,7 @@
 | `@bailian-studio/creative-asset-repository` | `packages/creative-asset-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 | `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
-| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-execution` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
+| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
@@ -45,7 +45,7 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/db` | `@bailian-studio/(api\|worker\|task-engine\|sse-protocol\|model-core\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-engine` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-repository` | 除 `@bailian-studio/(db\|task-engine)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
-| `packages/canvas-execution` | `@bailian-studio/(db\|storage\|provider-dashscope\|generation-repository\|task-repository\|task-engine\|api-client)`、services、apps、react、elysia |
+| `packages/canvas-execution` | `@bailian-studio/(db\|storage\|provider-dashscope\|dashscope-manifests\|generation-repository\|task-repository\|task-engine\|api-client)`、services、apps、react、elysia |
 | `packages/sse-protocol` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/persistence-runtime` | services、apps、react、elysia；只负责进程级持久化资源组装 |
 | `apps/api` | `@bailian-studio/(db\|provider-dashscope)`、importsApps、worker sibling、provider-dashscope package 路径 |
@@ -120,6 +120,8 @@ Worker 与前端各自维护不同的 wire schema。
 ### packages/canvas-execution（Canvas 图编译器）
 - **拥有**：Canvas 快照到执行计划的纯函数编译、DAG 环检测、节点模型/素材输入校验和
   provider-neutral 的参数/资产绑定；只依赖 `canvas-contracts` 与 `model-core`。
+- **模型依赖**：通过 `model-core` 的 `ModelManifestResolver` 注入模型目录；Canvas 编译器不
+  绑定任何具体 provider。
 - **不拥有**：用户鉴权、资产 ownership 查询、任务入队、generation 状态推进、Provider
   请求和 read URL。API 在调用编译器前解析用户资产种类，Worker 只消费已固化的执行计划。
 - 执行计划只保存稳定资产 ID，不保存签名 URL；这保证任务重试和版本历史不依赖过期地址。

@@ -5,7 +5,15 @@ import {
   CanvasExecutionError,
   prepareCanvasNodeRerun,
 } from '../src/index'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
+import type { CompileCanvasGraphOptions } from '../src/index'
 import type { CanvasExecutionPlanNode, CanvasExecutionTaskInput, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
+
+function compile(
+  options: Omit<CompileCanvasGraphOptions, 'modelResolver'>,
+): ReturnType<typeof compileCanvasGraph> {
+  return compileCanvasGraph({ ...options, modelResolver: { getModelById } })
+}
 
 function snapshot(
   nodes: CanvasSnapshot['nodes'],
@@ -46,13 +54,13 @@ function expectExecutionError(run: () => unknown, code: string): void {
 describe('compileCanvasGraph', () => {
   it('rejects an empty canvas instead of creating an unexecutable task', () => {
     expectExecutionError(
-      () => compileCanvasGraph({ snapshot: snapshot([]) }),
+      () => compile({ snapshot: snapshot([]) }),
       'CANVAS_EXECUTION_INVALID_GRAPH',
     )
   })
 
   it('compiles a deterministic DAG and binds upstream output to a media parameter', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot(
         [
           mediaNode('source', { prompt: 'a red fox', modelId: 'qwen-image' }),
@@ -77,7 +85,7 @@ describe('compileCanvasGraph', () => {
   })
 
   it('resolves static assets by kind and keeps them separate from dependencies', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot([
         mediaNode('edit', {
           modelId: 'qwen-image-edit',
@@ -93,7 +101,7 @@ describe('compileCanvasGraph', () => {
   })
 
   it('assigns mixed static media to the model parameters that declare each kind', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot([
         mediaNode('first-last', {
           kind: 'video',
@@ -117,7 +125,7 @@ describe('compileCanvasGraph', () => {
   })
 
   it('maps the authored Canvas ratio to the model manifest parameter', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot([
         mediaNode('portrait', { aspectRatio: '9:16' }),
       ]),
@@ -127,7 +135,7 @@ describe('compileCanvasGraph', () => {
   })
 
   it('projects authored manifest parameters and ignores stale enum values', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot([
         mediaNode('configured', {
           parameterValues: {
@@ -147,7 +155,7 @@ describe('compileCanvasGraph', () => {
   })
 
   it('keeps an unsupported authored ratio out of the provider params', () => {
-    const result = compileCanvasGraph({
+    const result = compile({
       snapshot: snapshot([
         mediaNode('unsupported', {
           modelId: 'wanx-2.7-image',
@@ -164,7 +172,7 @@ describe('compileCanvasGraph', () => {
 
   it('rejects cycles before creating an execution plan', () => {
     expect(() =>
-      compileCanvasGraph({
+      compile({
         snapshot: snapshot(
           [mediaNode('a', {}), mediaNode('b', {})],
           [
@@ -184,7 +192,7 @@ describe('compileCanvasGraph', () => {
   it('rejects unsupported model and node combinations', () => {
     expectExecutionError(
       () =>
-        compileCanvasGraph({
+        compile({
           snapshot: snapshot([mediaNode('bad', { modelId: 'not-a-model' })]),
         }),
       'CANVAS_EXECUTION_MODEL_NOT_FOUND',
@@ -192,7 +200,7 @@ describe('compileCanvasGraph', () => {
 
     expectExecutionError(
       () =>
-        compileCanvasGraph({
+        compile({
           snapshot: snapshot([
             mediaNode('bad_kind', { kind: 'video', modelId: 'qwen-image' }),
           ]),
@@ -204,7 +212,7 @@ describe('compileCanvasGraph', () => {
   it('requires the media input declared by an edit model', () => {
     expectExecutionError(
       () =>
-        compileCanvasGraph({
+        compile({
           snapshot: snapshot([
             mediaNode('edit', { modelId: 'qwen-image-edit' }),
           ]),

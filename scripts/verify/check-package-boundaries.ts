@@ -38,6 +38,10 @@ const generationRepositoryTestOnlyFiles = [
   'packages/generation-repository/src/test-utils.ts',
   'packages/generation-repository/tests',
 ] as const
+const dashscopeCatalogTestOnlyFiles = [
+  ...generationRepositoryTestOnlyFiles,
+  'packages/canvas-execution/tests',
+] as const
 
 export interface BailianPackageBoundary {
   readonly packageName: string
@@ -115,15 +119,17 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
     allowedConsumerScopes: [
       'apps/api',
       'apps/worker',
-      'packages/canvas-execution',
       'packages/canvas-validation',
       'packages/creative-asset-compiler',
       'packages/provider-dashscope',
       'scripts',
     ],
     dependencyProtocol: 'workspace:*',
-    testOnlySourceFiles: generationRepositoryTestOnlyFiles,
-    testOnlyDependencyScopes: ['packages/generation-repository'],
+    testOnlySourceFiles: dashscopeCatalogTestOnlyFiles,
+    testOnlyDependencyScopes: [
+      'packages/generation-repository',
+      'packages/canvas-execution',
+    ],
   },
 ] as const
 
@@ -245,12 +251,13 @@ export const rules: Array<{
   {
     scope: 'packages/canvas-execution',
     banned: [
-      /@bailian-studio\/(db|storage|provider-dashscope|generation-repository|task-repository|task-engine|api-client)\b/,
+      /@bailian-studio\/(db|storage|provider-dashscope|dashscope-manifests|generation-repository|task-repository|task-engine|api-client)\b/,
       importsApps,
       importsServices,
       importsElysia,
       importsReact,
     ],
+    testOnlyFiles: ['packages/canvas-execution/tests'],
   },
   {
     scope: 'packages/provider-dashscope',

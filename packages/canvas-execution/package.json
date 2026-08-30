@@ -13,10 +13,10 @@
   },
   "dependencies": {
     "@bailian-studio/canvas-contracts": "workspace:*",
-    "@bailian-studio/dashscope-manifests": "workspace:*",
     "@bailian-studio/model-core": "workspace:*"
   },
   "devDependencies": {
+    "@bailian-studio/dashscope-manifests": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

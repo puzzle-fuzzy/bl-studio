@@ -267,7 +267,6 @@ describe('package boundary rules', () => {
         allowedConsumerScopes: [
           'apps/api',
           'apps/worker',
-          'packages/canvas-execution',
           'packages/canvas-validation',
           'packages/creative-asset-compiler',
           'packages/provider-dashscope',
@@ -277,8 +276,12 @@ describe('package boundary rules', () => {
         testOnlySourceFiles: [
           'packages/generation-repository/src/test-utils.ts',
           'packages/generation-repository/tests',
+          'packages/canvas-execution/tests',
         ],
-        testOnlyDependencyScopes: ['packages/generation-repository'],
+        testOnlyDependencyScopes: [
+          'packages/generation-repository',
+          'packages/canvas-execution',
+        ],
       },
     ])
 

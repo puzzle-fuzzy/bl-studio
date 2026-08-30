@@ -10,9 +10,9 @@ import {
   getModelAuditMetadata,
   validateModelParams,
   type FrozenModelManifest,
+  type ModelManifestResolver,
   type ModelCategory,
 } from '@bailian-studio/model-core'
-import { getModelById as getRegisteredModelById } from '@bailian-studio/dashscope-manifests'
 import {
   projectCanvasParameterValues,
   resolveCanvasAspectRatioParameter,
@@ -54,7 +54,7 @@ export interface CompileCanvasGraphOptions {
   snapshot: CanvasSnapshot
   /** Required when the snapshot contains manually selected asset IDs. */
   assetKinds?: ReadonlyMap<string, CanvasExecutionAssetKind>
-  getModelById?: (id: string) => FrozenModelManifest | undefined
+  modelResolver: ModelManifestResolver
 }
 
 /**
@@ -162,7 +162,7 @@ interface NodeContext {
 export function compileCanvasGraph({
   snapshot,
   assetKinds,
-  getModelById = getRegisteredModelById,
+  modelResolver,
 }: CompileCanvasGraphOptions): CanvasExecutionPlan {
   if (snapshot.nodes.length === 0) {
     throw invalidGraph('Canvas graph must contain at least one executable node')
@@ -181,7 +181,7 @@ export function compileCanvasGraph({
         nodeId: node.id,
       })
     }
-    const model = getModelById(modelId)
+    const model = modelResolver.getModelById(modelId)
     if (model === undefined) {
       throw new CanvasExecutionError(
         'CANVAS_EXECUTION_MODEL_NOT_FOUND',

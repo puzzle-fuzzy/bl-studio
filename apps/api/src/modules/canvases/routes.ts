@@ -88,6 +88,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       const plan = compileCanvasGraph({
         snapshot: document.snapshot,
         assetKinds,
+        modelResolver: deps.modelResolver,
       })
       const taskId =
         input.idempotencyKey === undefined

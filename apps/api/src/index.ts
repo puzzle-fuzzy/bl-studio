@@ -33,9 +33,10 @@ export type { ApiDependencies } from './dependencies'
 
 async function main(): Promise<void> {
   const env = readApiEnvOrThrow()
+  const modelResolver = { getModelById }
   const persistence = createApiPersistenceRuntime({
     databaseUrl: env.databaseUrl,
-    modelResolver: { getModelById },
+    modelResolver,
     jwtSecret: env.authJwtSecret,
     emailSender: createSmtpEmailSender(process.env),
     publicWebOrigin: env.authPublicWebOrigin,
@@ -70,6 +71,7 @@ async function main(): Promise<void> {
     ...(githubOAuth !== undefined ? { githubOAuth } : {}),
     creditLedger: persistence.creditLedger,
     generationRepository: persistence.generationRepository,
+    modelResolver,
     generationDiagnosticsRepository:
       persistence.generationDiagnosticsRepository,
     assetRepository: persistence.assetRepository,
