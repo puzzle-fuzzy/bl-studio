@@ -140,6 +140,7 @@ export function DirectorProjectPage() {
   const videoEstimateRequestRef = useRef(0)
   const musicEstimateRequestRef = useRef(0)
   const assemblyPreflightRequestRef = useRef(0)
+  const projectSessionRef = useRef(0)
   const scriptVersionCacheRef = useRef(new Map<string, DirectorScriptVersion>())
   const { modelId: promptRebuildModelId, setModelId: setPromptRebuildModelId, text: promptRebuildText, setText: setPromptRebuildText, result: promptRebuildResult, setResult: setPromptRebuildResult, stale: promptRebuildStale, setStale: setPromptRebuildStale } = usePhaseReview<DirectorPromptRebuildResult>()
   const [applyingPromptShotId, setApplyingPromptShotId] = useState<string>()
@@ -288,6 +289,7 @@ export function DirectorProjectPage() {
   usePreferredModel(musicModelId, musicModels, setMusicModelId)
 
   useEffect(() => {
+    projectSessionRef.current += 1
     videoEstimateRequestRef.current += 1
     musicEstimateRequestRef.current += 1
     assemblyPreflightRequestRef.current += 1
@@ -310,6 +312,9 @@ export function DirectorProjectPage() {
     setAssemblyAudioVolume('1')
     setReferencePickerOpen(false)
     setReferenceTarget(undefined)
+    setApplyingPromptShotId(undefined)
+    setApplyingDialogueShotId(undefined)
+    setSaving(false)
     if (id === undefined) return
     const projectId = id
     let cancelled = false
@@ -402,6 +407,7 @@ export function DirectorProjectPage() {
       })
     return () => {
       cancelled = true
+      projectSessionRef.current += 1
       scriptMessagesRequestRef.current += 1
       scriptVersionsRequestRef.current += 1
       scriptVersionRequestRef.current += 1
@@ -547,9 +553,11 @@ export function DirectorProjectPage() {
 
   const runAnalysis = async () => {
     if (id === undefined || analysisModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'analyze', { modelId: analysisModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('analyze')
       setProject(current => current === undefined ? current : {
@@ -560,15 +568,16 @@ export function DirectorProjectPage() {
       })
       toast.success('剧本分析已加入执行队列')
     } catch {
-      toast.error('无法启动剧本分析，请确认阶段已准备好')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动剧本分析，请确认阶段已准备好')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const sendScriptMessage = async () => {
     const message = scriptMessage.trim()
     if (id === undefined || analysisModelId.length === 0 || message.length === 0 || activeRunId !== undefined || isHistoricalScriptVersion) return
+    const projectSession = projectSessionRef.current
     const clientMessageId = `client-${crypto.randomUUID()}`
     setPendingScriptMessage({
       id: clientMessageId,
@@ -588,6 +597,7 @@ export function DirectorProjectPage() {
     })
     try {
       const run = await apiClient.requestDirectorScriptChat(id, { modelId: analysisModelId, message })
+      if (projectSession !== projectSessionRef.current) return
       setPendingScriptMessage(current => current?.id === clientMessageId ? { ...current, runId: run.id } : current)
       void reloadScriptMessages(id, 'chat-queued')
       setActiveRunId(run.id)
@@ -605,6 +615,7 @@ export function DirectorProjectPage() {
         clientMessageId,
       })
     } catch (error) {
+      if (projectSession !== projectSessionRef.current) return
       setPendingScriptMessage(current => current?.id === clientMessageId ? { ...current, deliveryStatus: 'failed' } : current)
       setScriptMessage(message)
       logDirectorClientEvent('script_chat.send.failed', {
@@ -620,9 +631,11 @@ export function DirectorProjectPage() {
 
   const runCharacters = async () => {
     if (id === undefined || charactersModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'characters', { modelId: charactersModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('characters')
       setProject(current => current === undefined ? current : {
@@ -633,17 +646,19 @@ export function DirectorProjectPage() {
       })
       toast.success('角色阶段已加入执行队列')
     } catch {
-      toast.error('无法启动角色阶段，请确认剧本分析已完成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动角色阶段，请确认剧本分析已完成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const runLocations = async () => {
     if (id === undefined || locationsModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'locations', { modelId: locationsModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('locations')
       setProject(current => current === undefined ? current : {
@@ -654,17 +669,19 @@ export function DirectorProjectPage() {
       })
       toast.success('场景阶段已加入执行队列')
     } catch {
-      toast.error('无法启动场景阶段，请确认角色阶段已完成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动场景阶段，请确认角色阶段已完成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const runStoryboard = async () => {
     if (id === undefined || storyboardModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'storyboard', { modelId: storyboardModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('storyboard')
       setProject(current => current === undefined ? current : {
@@ -675,17 +692,19 @@ export function DirectorProjectPage() {
       })
       toast.success('分镜阶段已加入执行队列')
     } catch {
-      toast.error('无法启动分镜阶段，请确认分析、角色和场景都已完成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动分镜阶段，请确认分析、角色和场景都已完成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const runContinuity = async () => {
     if (id === undefined || continuityModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'continuity', { modelId: continuityModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('continuity')
       setProject(current => current === undefined ? current : {
@@ -696,17 +715,19 @@ export function DirectorProjectPage() {
       })
       toast.success('连续性检查已加入执行队列')
     } catch {
-      toast.error('无法启动连续性检查，请确认分镜已经生成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动连续性检查，请确认分镜已经生成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const runPromptRebuild = async () => {
     if (id === undefined || promptRebuildModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'rebuild', { modelId: promptRebuildModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('rebuild')
       setPromptRebuildText(undefined)
@@ -721,34 +742,38 @@ export function DirectorProjectPage() {
       })
       toast.success('视频提示词重建已加入执行队列')
     } catch {
-      toast.error('无法启动视频提示词重建，请确认当前分镜已经生成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动视频提示词重建，请确认当前分镜已经生成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const applyPromptSuggestion = async (shotId: string, patch: UpdateDirectorShotInput) => {
     if (id === undefined) return
+    const projectSession = projectSessionRef.current
     setApplyingPromptShotId(shotId)
     try {
       const shot = await apiClient.updateDirectorShot(id, shotId, patch)
+      if (projectSession !== projectSessionRef.current) return
       setProject(current => current === undefined
         ? current
         : { ...current, shots: current.shots.map(candidate => candidate.id === shot.id ? shot : candidate) })
       setAppliedPromptShotIds(current => new Set(current).add(shotId))
       toast.success(`镜头 ${String(shot.sequence).padStart(2, '0')} 的提示词已应用，请重新审核并锁定`)
     } catch {
-      toast.error('提示词应用失败，请确认镜头未锁定且仍属于当前分镜')
+      if (projectSession === projectSessionRef.current) toast.error('提示词应用失败，请确认镜头未锁定且仍属于当前分镜')
     } finally {
-      setApplyingPromptShotId(undefined)
+      if (projectSession === projectSessionRef.current) setApplyingPromptShotId(undefined)
     }
   }
 
   const runDialogue = async () => {
     if (id === undefined || dialogueModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'dialogue', { modelId: dialogueModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('dialogue')
       setDialogueText(undefined)
@@ -763,9 +788,9 @@ export function DirectorProjectPage() {
       })
       toast.success('对白整理已加入执行队列')
     } catch {
-      toast.error('无法启动对白整理，请确认当前分镜已经生成')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动对白整理，请确认当前分镜已经生成')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
@@ -773,18 +798,20 @@ export function DirectorProjectPage() {
     if (id === undefined) return
     const shot = project?.shots.find(candidate => candidate.id === shotId)
     if (shot === undefined) return
+    const projectSession = projectSessionRef.current
     setApplyingDialogueShotId(shotId)
     try {
       const updated = await apiClient.updateDirectorShot(id, shotId, { expectedVersion: shot.version, dialogue: { lines } })
+      if (projectSession !== projectSessionRef.current) return
       setProject(current => current === undefined
         ? current
         : { ...current, shots: current.shots.map(candidate => candidate.id === updated.id ? updated : candidate) })
       setAppliedDialogueShotIds(current => new Set(current).add(shotId))
       toast.success(`镜头 ${String(updated.sequence).padStart(2, '0')} 的对白已应用，请重新审核并锁定`)
     } catch {
-      toast.error('对白应用失败，请确认镜头未锁定且仍属于当前分镜')
+      if (projectSession === projectSessionRef.current) toast.error('对白应用失败，请确认镜头未锁定且仍属于当前分镜')
     } finally {
-      setApplyingDialogueShotId(undefined)
+      if (projectSession === projectSessionRef.current) setApplyingDialogueShotId(undefined)
     }
   }
 
@@ -814,6 +841,7 @@ export function DirectorProjectPage() {
   const confirmMusicRun = async () => {
     const duration = Number.parseInt(musicDuration, 10)
     if (id === undefined || musicModelId.length === 0 || musicPrompt.trim().length === 0 || !Number.isInteger(duration)) return
+    const projectSession = projectSessionRef.current
     setMusicConfirmOpen(false)
     setSaving(true)
     try {
@@ -823,6 +851,7 @@ export function DirectorProjectPage() {
         isInstrumental: true,
         duration,
       })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('bgm')
       setProject(current => current === undefined ? current : {
@@ -833,9 +862,9 @@ export function DirectorProjectPage() {
       })
       toast.success('音乐生成已加入执行队列')
     } catch {
-      toast.error('无法启动音乐生成，请确认当前阶段已准备好')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动音乐生成，请确认当前阶段已准备好')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
@@ -877,10 +906,12 @@ export function DirectorProjectPage() {
   const confirmAssemblyRun = async () => {
     const settings = readAssemblySettings()
     if (id === undefined || settings === undefined || assemblyPreflight?.ready !== true || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     setAssemblyConfirmOpen(false)
     setSaving(true)
     try {
       const run = await apiClient.requestDirectorPhaseRun(id, 'assemble', { assembly: settings })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('assemble')
       setProject(current => current === undefined ? current : {
@@ -891,14 +922,15 @@ export function DirectorProjectPage() {
       })
       toast.success('合成任务已加入执行队列')
     } catch {
-      toast.error('合成任务启动失败，请重新执行预检')
+      if (projectSession === projectSessionRef.current) toast.error('合成任务启动失败，请重新执行预检')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const confirmVideoRun = async () => {
     if (id === undefined || videoModelId.length === 0 || dirty || activeRunId !== undefined) return
+    const projectSession = projectSessionRef.current
     const retryShotId = videoRetryShotId
     setVideoConfirmOpen(false)
     if (retryShotId !== undefined) setVideoRetryingShotId(retryShotId)
@@ -907,6 +939,7 @@ export function DirectorProjectPage() {
       const run = retryShotId === undefined
         ? await apiClient.requestDirectorPhaseRun(id, 'videos', { modelId: videoModelId })
         : await apiClient.requestDirectorShotVideoRun(id, retryShotId, { modelId: videoModelId })
+      if (projectSession !== projectSessionRef.current) return
       setActiveRunId(run.id)
       setActivePhase('videos')
       setProject(current => current === undefined ? current : {
@@ -917,11 +950,13 @@ export function DirectorProjectPage() {
       })
       toast.success('视频生成已加入执行队列')
     } catch {
-      toast.error('无法启动视频生成，请确认所有分镜已锁定')
+      if (projectSession === projectSessionRef.current) toast.error('无法启动视频生成，请确认所有分镜已锁定')
     } finally {
-      setSaving(false)
-      setVideoRetryingShotId(undefined)
-      setVideoRetryShotId(undefined)
+      if (projectSession === projectSessionRef.current) {
+        setSaving(false)
+        setVideoRetryingShotId(undefined)
+        setVideoRetryShotId(undefined)
+      }
     }
   }
 
@@ -970,6 +1005,7 @@ export function DirectorProjectPage() {
 
   const saveProject = async () => {
     if (id === undefined || !dirty || title.trim().length === 0 || storyText.trim().length === 0) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const next = await apiClient.updateDirectorProject(id, {
@@ -977,6 +1013,7 @@ export function DirectorProjectPage() {
         storyText: storyText.trim(),
         synopsis: synopsis.trim().length > 0 ? synopsis.trim() : null,
       })
+      if (projectSession !== projectSessionRef.current) return
       setProject(next)
       setTitle(next.title)
       setStoryText(next.storyText)
@@ -986,9 +1023,9 @@ export function DirectorProjectPage() {
       if (locationsText !== undefined || locationsResult !== undefined) setLocationsStale(true)
       toast.success('项目基础信息已保存')
     } catch {
-      toast.error('保存失败，请稍后重试')
+      if (projectSession === projectSessionRef.current) toast.error('保存失败，请稍后重试')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
@@ -1000,6 +1037,7 @@ export function DirectorProjectPage() {
   const attachReferenceAsset = async (assets: AssetItem[]) => {
     const asset = assets[0]
     if (id === undefined || referenceTarget === undefined || asset === undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       await apiClient.attachDirectorAsset(id, {
@@ -1009,46 +1047,53 @@ export function DirectorProjectPage() {
         ownerId: referenceTarget.ownerId,
       })
       const next = await apiClient.getDirectorProject(id)
+      if (projectSession !== projectSessionRef.current) return
       setProject(next)
       void loadReferenceAssets([asset.id])
       toast.success('参考资产已绑定到当前项目')
     } catch {
-      toast.error('参考资产绑定失败，请稍后重试')
+      if (projectSession === projectSessionRef.current) toast.error('参考资产绑定失败，请稍后重试')
     } finally {
-      setSaving(false)
-      setReferencePickerOpen(false)
-      setReferenceTarget(undefined)
+      if (projectSession === projectSessionRef.current) {
+        setSaving(false)
+        setReferencePickerOpen(false)
+        setReferenceTarget(undefined)
+      }
     }
   }
 
   const detachReferenceAsset = async (asset: DirectorAsset) => {
     if (id === undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const next = await apiClient.detachDirectorAsset(id, asset.id)
+      if (projectSession !== projectSessionRef.current) return
       setProject(next)
       toast.success('已移除导演台引用，原始资产仍保留在资产库')
     } catch {
-      toast.error('移除引用失败，请稍后重试')
+      if (projectSession === projectSessionRef.current) toast.error('移除引用失败，请稍后重试')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
   const updateStoryboardShot = async (shotId: string, input: UpdateDirectorShotInput) => {
     if (id === undefined) return
+    const projectSession = projectSessionRef.current
     setSaving(true)
     try {
       const nextShot = await apiClient.updateDirectorShot(id, shotId, input)
+      if (projectSession !== projectSessionRef.current) return
       setProject(current => current === undefined ? current : {
         ...current,
         shots: current.shots.map(shot => shot.id === nextShot.id ? nextShot : shot),
       })
       toast.success(input.status === 'locked' ? '镜头已锁定' : input.status === 'needs_review' ? '镜头已解锁' : '镜头修改已保存')
     } catch {
-      toast.error('镜头保存失败，请稍后重试')
+      if (projectSession === projectSessionRef.current) toast.error('镜头保存失败，请稍后重试')
     } finally {
-      setSaving(false)
+      if (projectSession === projectSessionRef.current) setSaving(false)
     }
   }
 
