@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from 'react'
 import { FolderKanban, Plus } from 'lucide-react'
 import type { CreativeProject } from '@bailian-studio/api-client'
-import { Button } from '@bailian-studio/ui'
+import { Button, PageState } from '@bailian-studio/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@bailian-studio/ui'
 import { Input } from '@bailian-studio/ui'
 import { Label } from '@bailian-studio/ui'
@@ -40,25 +40,30 @@ export function ProjectCollection({
 
   if (error && projects.length === 0) {
     return (
-      <div className="flex min-h-72 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
-        <p className="text-sm font-medium">暂时没有可显示的项目</p>
-        <p className="text-sm text-muted-foreground">可以稍后重新加载，或先创建一个新项目。</p>
-        <Button variant="outline" onClick={onRetry} title="重新加载项目">重新加载</Button>
-      </div>
+      <PageState
+        variant="error"
+        title="暂时没有可显示的项目"
+        description="可以稍后重新加载，或先创建一个新项目。"
+        action={<Button variant="outline" onClick={onRetry} title="重新加载项目">重新加载</Button>}
+      />
     )
   }
 
   if (projects.length === 0) {
     return (
-      <div className="flex min-h-80 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center">
-        <FolderKanban className="size-8 text-primary" aria-hidden="true" />
-        <h2 className="text-base font-semibold">还没有创作项目</h2>
-        <p className="max-w-md text-sm text-muted-foreground">先用项目把短剧素材分开，之后可以跨项目复用主体、场景和道具。</p>
-        <Button onClick={onCreate} title="新建创作项目">
-          <Plus className="size-4" />
-          新建项目
-        </Button>
-      </div>
+      <PageState
+        variant="empty"
+        title="还没有创作项目"
+        description="先用项目把短剧素材分开，之后可以跨项目复用主体、场景和道具。"
+        icon={<FolderKanban className="size-6" aria-hidden="true" />}
+        action={(
+          <Button onClick={onCreate} title="新建创作项目">
+            <Plus className="size-4" />
+            新建项目
+          </Button>
+        )}
+        className="min-h-80"
+      />
     )
   }
 

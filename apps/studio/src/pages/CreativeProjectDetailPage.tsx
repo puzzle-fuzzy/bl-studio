@@ -3,7 +3,7 @@ import { ArrowLeft, FolderKanban, Grid2X2, Image as ImageIcon, List, Loader2, Pl
 import { Link, useNavigate, useParams, useSearchParams } from 'react-router'
 import type { CreativeAssetSummary, CreativeAssetType } from '@bailian-studio/api-client'
 import { CreativeProjectAssetPickerDialog } from '@/components/assets/CreativeProjectAssetPickerDialog'
-import { Button } from '@bailian-studio/ui'
+import { Button, PageState } from '@bailian-studio/ui'
 import { Checkbox } from '@bailian-studio/ui'
 import { Input } from '@bailian-studio/ui'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
@@ -382,9 +382,22 @@ function ProjectEmptyState({ hasAssets, onAdd, onCreate, onClear, disabled }: { 
 }
 
 function ProjectLoadingState() {
-  return <div className="flex min-h-[calc(100svh-8rem)] items-center justify-center text-sm text-muted-foreground"><Loader2 className="mr-2 size-4 animate-spin" />正在打开项目…</div>
+  return <PageState variant="loading" title="正在打开项目…" className="min-h-[calc(100svh-8rem)] border-0 bg-transparent" />
 }
 
 function ProjectErrorState({ title, description, onBack }: { title: string; description: string; onBack: () => void }) {
-  return <div className="flex min-h-[calc(100svh-8rem)] flex-col items-center justify-center gap-3 p-8 text-center"><FolderKanban className="size-9 text-muted-foreground" /><h1 className="text-xl font-semibold">{title}</h1><p className="max-w-md text-sm text-muted-foreground">{description}</p><Button variant="outline" onClick={onBack}><ArrowLeft className="size-4" />返回项目列表</Button></div>
+  return (
+    <PageState
+      variant="error"
+      title={title}
+      description={description}
+      action={(
+        <Button variant="outline" onClick={onBack}>
+          <ArrowLeft className="size-4" />
+          返回项目列表
+        </Button>
+      )}
+      className="min-h-[calc(100svh-8rem)] border-0 bg-transparent"
+    />
+  )
 }

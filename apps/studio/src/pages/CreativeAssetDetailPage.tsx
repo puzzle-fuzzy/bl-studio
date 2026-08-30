@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Check, CheckCircle2, FolderKanban, Image as ImageIcon, Layers3, Loader2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
+import { ArrowLeft, Check, CheckCircle2, FolderKanban, Image as ImageIcon, Loader2, Plus, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import type {
   AssetItem,
   CreativeAssetReference,
@@ -11,7 +11,7 @@ import type {
 } from '@bailian-studio/api-client'
 import { AssetPickerDialog } from '@/components/assets/AssetPickerDialog'
 import { CreativeAssetProjectDialog } from '@/components/assets/CreativeAssetProjectDialog'
-import { Button } from '@bailian-studio/ui'
+import { Button, PageState } from '@bailian-studio/ui'
 import { Card, CardContent, CardHeader, CardTitle } from '@bailian-studio/ui'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@bailian-studio/ui'
 import { Input } from '@bailian-studio/ui'
@@ -366,5 +366,14 @@ function AddReferenceDialog({
 }
 
 function DetailState({ title, description, loading = false, onRetry }: { title: string; description: string; loading?: boolean; onRetry?: () => void }) {
-  return <div className="flex min-h-80 flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border bg-card/60 p-8 text-center"><div className="flex size-12 items-center justify-center rounded-xl bg-muted/70 text-primary">{loading ? <Layers3 className="size-5 animate-pulse" /> : <ImageIcon className="size-5" />}</div><h1 className="text-base font-semibold">{title}</h1><p className="max-w-md text-sm leading-6 text-muted-foreground">{description}</p>{onRetry && <Button variant="outline" onClick={onRetry}>重新加载</Button>}</div>
+  return (
+    <PageState
+      variant={loading ? 'loading' : onRetry === undefined ? 'empty' : 'error'}
+      title={title}
+      description={description}
+      icon={<ImageIcon className="size-6" aria-hidden="true" />}
+      action={onRetry !== undefined && <Button variant="outline" onClick={onRetry}>重新加载</Button>}
+      className="min-h-80"
+    />
+  )
 }
