@@ -35,7 +35,7 @@ interface CanvasMenu {
 
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
-  const { saveStatus, versions, refreshVersions, restoreVersion } = useCanvasPersistence()
+  const { saveStatus, versions, refreshDocument, refreshVersions, restoreVersion } = useCanvasPersistence()
   const {
     execute,
     cancel,
@@ -60,6 +60,7 @@ export function CanvasPage() {
   const [executionHistoryLoading, setExecutionHistoryLoading] = useState(false)
   const [executionHistoryError, setExecutionHistoryError] = useState<string | undefined>()
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
+  const [refreshingDocument, setRefreshingDocument] = useState(false)
 
   useEffect(() => {
     if (showVersions) void refreshVersions()
@@ -111,6 +112,18 @@ export function CanvasPage() {
               : executionStatus === 'cancelled'
                 ? '已取消'
                 : '运行画布'
+
+  const reloadServerDocument = useCallback(async () => {
+    if (!window.confirm('当前本地修改无法覆盖服务器的新版本。放弃本地修改并重新载入服务器版本吗？')) return
+    setRefreshingDocument(true)
+    try {
+      await refreshDocument()
+    } catch {
+      // refreshDocument 已将保存状态切换为 error，保留当前页面供用户稍后重试。
+    } finally {
+      setRefreshingDocument(false)
+    }
+  }, [refreshDocument])
 
   // 点击菜单外部或按 Esc 关闭右键菜单。
   useEffect(() => {
@@ -236,6 +249,18 @@ export function CanvasPage() {
           ) : null}
           {saveLabel}
         </span>
+        {saveStatus === 'conflict' && (
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={refreshingDocument}
+            onClick={() => void reloadServerDocument()}
+            title="放弃本地修改并重新载入服务器版本"
+          >
+            {refreshingDocument ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden /> : <RefreshCw className="mr-1 size-3.5" aria-hidden />}
+            {refreshingDocument ? '载入中…' : '重载服务器版本'}
+          </Button>
+        )}
         <Button
           size="sm"
           variant="secondary"

@@ -98,12 +98,20 @@ export function useCanvasPersistence() {
   const refreshDocument = useCallback(async () => {
     const id = useCanvasStore.getState().documentId
     if (id === undefined) return
+    if (timerRef.current !== null) clearTimeout(timerRef.current)
+    timerRef.current = null
+    pendingSaveRef.current = false
     setSaveStatus('loading')
-    const document = await hydrateAssetUrls(await apiClient.getCanvas(id))
-    if (disposedRef.current) return
-    applyDocument(document)
-    lastSavedSignature.current = JSON.stringify(document.snapshot)
-    setSaveStatus('saved')
+    try {
+      const document = await hydrateAssetUrls(await apiClient.getCanvas(id))
+      if (disposedRef.current) return
+      applyDocument(document)
+      lastSavedSignature.current = JSON.stringify(document.snapshot)
+      setSaveStatus('saved')
+    } catch (error) {
+      if (!disposedRef.current) setSaveStatus('error')
+      throw error
+    }
   }, [setSaveStatus])
 
   const refreshVersions = useCallback(async () => {
