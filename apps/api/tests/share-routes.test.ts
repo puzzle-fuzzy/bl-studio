@@ -81,6 +81,10 @@ beforeEach(async () => {
   app = createTestApp({
     authService: fakeAuthService,
     generationRepository: iso.repository,
+    assetRepository: iso.assetRepository,
+    shareRepository: iso.shareRepository,
+    publicShareRepository: iso.publicShareRepository,
+    usageRepository: iso.usageRepository,
     creditLedger: testCreditLedger,
     storage: new FakeStorageAdapter(),
   }).app
@@ -159,6 +163,10 @@ describe('generation share routes', () => {
       app = createTestApp({
         authService: fakeAuthService,
         generationRepository: iso.repository,
+        assetRepository: iso.assetRepository,
+        shareRepository: iso.shareRepository,
+        publicShareRepository: iso.publicShareRepository,
+        usageRepository: iso.usageRepository,
         storage: new FakeStorageAdapter(),
         artifactLocalRoot: root,
       }).app
@@ -198,6 +206,10 @@ describe('generation share routes', () => {
       app = createTestApp({
         authService: fakeAuthService,
         generationRepository: iso.repository,
+        assetRepository: iso.assetRepository,
+        shareRepository: iso.shareRepository,
+        publicShareRepository: iso.publicShareRepository,
+        usageRepository: iso.usageRepository,
         storage: new FakeStorageAdapter(),
         artifactLocalRoot: root,
         artifactConfig: { maxReadBytes: 4 },

@@ -91,10 +91,7 @@ import {
 	or,
 	sql,
 } from "drizzle-orm";
-import {
-	createAssetRepository,
-	enqueueAssetThumbnail,
-} from "./assets";
+import { enqueueAssetThumbnail } from "./assets";
 import type { AssetRepository } from "./asset-port";
 import type {
 	AssetThumbnailSource,
@@ -103,13 +100,6 @@ import type {
 	FailAssetThumbnailInput,
 	MarkAssetThumbnailProcessingInput,
 } from "./asset-types";
-import { createAuditRepository } from "./audit-events";
-import type { AuditRepository } from "./audit-port";
-import { createContentRepository, type ContentRepository } from "./content";
-import type { ProviderRequestAuditRepository } from "./provider-request-port";
-import { createProviderRequestAuditRepository } from "./provider-requests";
-import { createShareRepository } from "./shares";
-import type { PublicShareRepository, ShareRepository } from "./share-port";
 import {
 	clampLimit,
 	decodeCursor,
@@ -199,7 +189,6 @@ import {
 	type GenerationUsageInput,
 	readGenerationUsage,
 } from "./usage";
-import { createUsageRepository, type UsageRepository } from "./usage";
 
 /**
  * 把任意值安全地当作 JSON 记录返回。
@@ -1016,23 +1005,6 @@ export interface GenerationRepository {
 
 }
 
-/**
- * 旧 URL 工厂和隔离测试仍需要的兼容形状。
- *
- * 生产 API/Worker 只依赖 GenerationRepository 核心接口；资产与分享能力由
- * persistence-runtime 的窄 port 注入。这个类型保留在迁移接缝，避免旧测试和
- * 直接使用 URL 工厂的调用方被一次性打断。新生产代码应直接注入各自的窄 port，
- * 包括 UsageRepository、ProviderRequestAuditRepository 和 ContentRepository。
- */
-export type GenerationRepositoryCompat = GenerationRepository &
-	AssetRepository &
-	ShareRepository &
-	PublicShareRepository &
-	UsageRepository &
-	ProviderRequestAuditRepository &
-	AuditRepository &
-	ContentRepository;
-
 type BailianStudioTx = Parameters<
 	Parameters<BailianStudioDb["transaction"]>[0]
 >[0];
@@ -1670,14 +1642,9 @@ async function refundGenerationInTransaction(
  */
 export function createGenerationRepository(
 	options: CreateGenerationRepositoryOptions,
-): GenerationRepositoryCompat {
+): GenerationRepository {
 	const { db } = options;
 	const taskQueueRepository = createTaskQueueRepository({ db });
-	const assetRepository = createAssetRepository(db);
-	const shareRepository = createShareRepository(db);
-	const usageRepository = createUsageRepository(db);
-	const providerRequestAuditRepository = createProviderRequestAuditRepository(db);
-	const auditRepository = createAuditRepository(db);
 
 	return {
 		async healthCheck() {
@@ -3675,20 +3642,6 @@ export function createGenerationRepository(
 			}
 		},
 
-		createUserAsset: assetRepository.createUserAsset,
-		listUnifiedAssets: assetRepository.listUnifiedAssets,
-		getUserAsset: assetRepository.getUserAsset,
-		softDeleteUserAsset: assetRepository.softDeleteUserAsset,
-		createGenerationShare: shareRepository.createGenerationShare,
-		getGenerationShareForRecord: shareRepository.getGenerationShareForRecord,
-		revokeGenerationShare: shareRepository.revokeGenerationShare,
-		getPublicSharedGeneration: shareRepository.getPublicSharedGeneration,
-		getPublicSharedArtifact: shareRepository.getPublicSharedArtifact,
-		getGenerationUsage: usageRepository.getGenerationUsage,
-		startProviderRequest: providerRequestAuditRepository.startProviderRequest,
-		finishProviderRequest: providerRequestAuditRepository.finishProviderRequest,
-		recordAuditEvent: auditRepository.recordAuditEvent,
-		...createContentRepository(db),
 	};
 }
 

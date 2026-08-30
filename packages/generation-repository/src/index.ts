@@ -101,7 +101,6 @@ export {
 	estimateGenerationRequest,
 	type GenerationEstimate,
 	type GenerationRepository,
-	type GenerationRepositoryCompat,
 	type ListStuckGenerationRecordsInput,
 	type RenewTaskLockInput,
 	type SaveTaskOptions,

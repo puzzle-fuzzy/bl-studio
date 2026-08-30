@@ -57,27 +57,25 @@
 ### packages/generation-repository（持久化接缝）
 - **拥有**：持久化事务、任务/记录状态迁移、幂等、存储成本快照。
 - gallery/social 已先通过 `src/social.ts` 暴露窄 `SocialRepository` port；API 组合根注入该 port，
-  SQL 已物理归档在 `social.ts`，`content.ts` 仅保留兼容聚合，后续再迁移为独立 repository 包。
+  SQL 已物理归档在 `social.ts`，后续再迁移为独立 repository 包。
 - 通知已通过 `src/notifications.ts` 暴露 `NotificationRepository` port；通知收件箱和 gallery
-  的社交通知编排都通过 API 组合根注入，`content.ts` 仅保留兼容聚合。
+  的社交通知编排都通过 API 组合根注入。
 - 提示词库、用户反馈、内容举报分别由 `src/prompt-library.ts`、`src/feedback.ts`、
   `src/content-reports.ts` 拥有 SQL 和窄 port；API 组合根分别注入，路由不再把这些能力
   绑定到 `GenerationRepository`。举报后的 admin 画廊下架仍是显式治理编排。
 - admin gallery 治理由 `src/admin-gallery.ts` 的 `AdminGalleryRepository` 拥有；它允许
   后台预览隐藏作品，但不改变面向用户的 SocialRepository 可见性策略。
 - admin 任务中心和成本/留存读模型分别由 `src/admin-tasks.ts` 的 `AdminTaskRepository`
-  与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；`content.ts` 仅为旧接口提供聚合。
-- `content.ts` 现在仅是 `ContentRepository` 兼容聚合；`GenerationRepository` 核心接口不再
-  重复声明 gallery、通知、提示词库、反馈、举报、admin 与分析方法，旧 URL 工厂/隔离
-  测试句柄现在分别暴露核心 repository 与各域窄 port；完整兼容形状只留在
-  `createGenerationRepository` 的仓储包内部回归接缝。
+  与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；内容域不再通过中央聚合转发。
+- `GenerationRepository` 核心接口不再重复声明 gallery、通知、提示词库、反馈、举报、
+  admin 与分析方法；URL 工厂/隔离测试句柄分别暴露核心 repository 与各域窄 port，仓储
+  测试按窄 port 组合 harness。
 - 资产与分享由显式窄 port 约束 API：`AssetRepository`、`ShareRepository`、
   `PublicShareRepository`；SQL 已分别归档在 `assets.ts`、`shares.ts`，旧
-  `GenerationRepository` 核心接口不再暴露这些方法；仅 `GenerationRepositoryCompat`
-  为 URL 工厂和隔离测试保留兼容 facade。
+  `GenerationRepository` 核心接口不再暴露这些方法。
 - API 审计通过 `src/audit-port.ts` 的 `AuditRepository` 注入；审计写入是横切能力，路由
   不应为了记录审计而依赖完整 `GenerationRepository`。具体 SQL 已物理归档到
-  `src/audit-events.ts`；`GenerationRepositoryCompat` 只保留过渡转发。
+  `src/audit-events.ts`；核心 generation repository 不再转发该能力。
 - Worker 的 provider 出站请求审计通过 `src/provider-request-port.ts` 的
   `ProviderRequestAuditRepository` 注入，写入实现归档在 `provider-requests.ts`；
   `GenerationRepository` 只保留生成详情所需的 provider 请求投影，Worker 不再依赖
@@ -91,7 +89,7 @@
 ### packages/task-repository（任务生命周期持久化）
 - **拥有**：`task_records` 的 claim、租约续期、状态保存和按 id 读取；负责 Drizzle 行与 task-engine 领域记录之间的日期/JSON 映射。
 - **不拥有**：状态机规则、业务记录 + 初始任务的复合生产事务、Provider 执行或 API 编排；状态转换由 `task-engine` 负责，生产事务暂由各业务 repository 保持原子性。
-- Worker 只依赖这里的最小生命周期 port；generation-repository 暂时保留兼容 facade，避免一次性扩大迁移面。
+- Worker 只依赖这里的最小生命周期 port；generation-repository 不承担任务生命周期 port。
 
 ## 4. 运行时应用
 

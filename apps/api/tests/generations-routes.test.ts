@@ -124,6 +124,8 @@ describe('generation routes', () => {
       authService: fakeAuthService,
       creditLedger: fakeCreditLedger,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
+      usageRepository: iso.usageRepository,
       creativeAssetRepository: createCreativeAssetRepository({ db: iso.db }),
       storage: new FakeStorageAdapter(),
     })
@@ -349,6 +351,8 @@ describe('generation routes', () => {
     const context = createTestApp({
       authService: fakeAuthService,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
+      usageRepository: iso.usageRepository,
       storage: new FakeStorageAdapter(),
       generationLimits: { dailyTaskLimit: 1, dailyQuotaMode: 'attempts' },
     })
@@ -460,6 +464,8 @@ describe('generation routes', () => {
       authService: fakeAuthService,
       creditLedger: fakeCreditLedger,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
+      usageRepository: iso.usageRepository,
       storage: new FakeStorageAdapter('oss'),
     }).app
 

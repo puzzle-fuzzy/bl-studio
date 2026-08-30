@@ -29,6 +29,7 @@ async function makeRoot(): Promise<string> {
   app = createTestApp({
     authService: fakeAuthService,
     generationRepository: iso.repository,
+    assetRepository: iso.assetRepository,
     storage: new FakeStorageAdapter(),
     artifactLocalRoot: root,
   }).app
@@ -202,6 +203,7 @@ describe('artifact routes', () => {
     app = createTestApp({
       authService: fakeAuthService,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
       storage: new FakeStorageAdapter(),
       artifactLocalRoot: root,
       artifactConfig: { maxReadBytes: 4 },
@@ -266,6 +268,7 @@ async function prepareLocalRouteTest(): Promise<void> {
   app = createTestApp({
     authService: fakeAuthService,
     generationRepository: iso.repository,
+    assetRepository: iso.assetRepository,
     storage: new FakeStorageAdapter(),
     artifactLocalRoot: roots.at(-1),
   }).app
@@ -306,6 +309,7 @@ describe('artifact library routes', () => {
     app = createTestApp({
       authService: fakeAuthService,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
       creditLedger: testCreditLedger,
       storage: new FakeStorageAdapter(),
     }).app
@@ -436,6 +440,7 @@ describe('artifact library routes', () => {
     app = createTestApp({
       authService: fakeAuthService,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
       storage: new FakeStorageAdapter('oss'),
     }).app
     await iso.assetRepository.createUserAsset({
@@ -469,6 +474,7 @@ describe('artifact library routes', () => {
     app = createTestApp({
       authService: fakeAuthService,
       generationRepository: iso.repository,
+      assetRepository: iso.assetRepository,
       storage: new FakeStorageAdapter('oss'),
     }).app
     await iso.assetRepository.createUserAsset({

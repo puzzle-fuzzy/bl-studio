@@ -87,25 +87,23 @@ flowchart LR
 - generation 的 application service 由 API 组合根创建并注入，统一承接估价、提交、取消和重试；
   路由不再分别编排这些写入/状态转换流程。
 - gallery/social 的 API 路由已改为依赖窄 `SocialRepository` port；SQL 已物理归档在
-  `generation-repository/src/social.ts`，`content.ts` 只保留兼容聚合，后续可在不改路由的情况下
-  移动到独立 social repository。
+  `generation-repository/src/social.ts`，后续可在不改路由的情况下移动到独立 social repository。
 - 通知收件箱、已读状态和点赞/收藏通知编排已改为依赖窄 `NotificationRepository` port；
-  SQL 位于 `generation-repository/src/notifications.ts`，旧 `content.ts` facade 仍兼容保留。
+  SQL 位于 `generation-repository/src/notifications.ts`。
 - 提示词库、用户反馈和内容举报分别依赖 `PromptLibraryRepository`、`FeedbackRepository`、
   `ContentReportRepository`；SQL 已归档到对应模块，API 组合根负责实例化和注入。
 - admin gallery 的治理/预览依赖 `AdminGalleryRepository`，SQL 位于
   `generation-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
 - admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
-  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；`content.ts` 只用于兼容旧调用方。
-- `content.ts` 仅保留 `ContentRepository` 兼容聚合，`GenerationRepository` 核心接口不再
-  重复声明这些内容域方法；URL 工厂/隔离测试句柄分别暴露核心 repository 与各域窄 port。
-  完整兼容聚合仅留在仓储包自身的低层回归接缝。
+  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`。
+- 内容域方法已从 `GenerationRepository` 核心接口移除；URL 工厂/隔离测试句柄分别暴露
+  核心 repository 与各域窄 port，仓储测试按窄 port 组合 harness。
 - 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；
-  SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，旧
-  `GenerationRepository` 仅为未迁移调用方保留兼容 facade。
+  SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，核心
+  `GenerationRepository` 不再暴露这些方法。
 - API 审计通过独立 `AuditRepository` port 注入；约 115 个审计调用已不再把完整
   `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。审计写入 SQL
-  已物理归档到 `generation-repository/src/audit-events.ts`，兼容 facade 只负责过渡转发。
+  已物理归档到 `generation-repository/src/audit-events.ts`，核心 generation repository 不再转发。
 - Worker 的 provider 出站请求审计通过 `ProviderRequestAuditRepository` 注入，SQL 写入
   位于 `generation-repository/src/provider-requests.ts`；generation 详情仍可读取
   provider 请求投影，但 Worker 不再从 GenerationRepository 核心接口写审计。
@@ -122,7 +120,7 @@ flowchart LR
 - `@bailian-studio/task-engine` 只拥有纯状态机；`@bailian-studio/task-repository` 拥有
   `task_records` 的 claim、租约续期、状态保存和读取，以及 Drizzle 行映射。
 - `apps/worker` 通过 `persistence-runtime` 接收 `claim/renew/save` 最小 port；
-  `generation-repository` 暂保旧方法作为兼容 facade，降低迁移风险。
+  generation repository 不再承担任务生命周期 port。
 - generation/media/director 的业务 repository 暂时继续在自己的“业务记录 + 初始任务”事务中写任务；
   后续以可注入事务 store 收敛这些生产路径，保持跨域事务边界清晰。
 
@@ -364,5 +362,5 @@ CreativeGenerationRequest
 vertical slice：`collect-from-generation` 在一个数据库事务内写入资产、项目关系、版本和参考图，使用用户范围幂等键
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
-`task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 暂保兼容 facade。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是盘点剩余消费者并逐步收缩兼容 facade；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。
+`task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法正在移除。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是把 generation 核心接口中的任务生命周期方法也移除；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。

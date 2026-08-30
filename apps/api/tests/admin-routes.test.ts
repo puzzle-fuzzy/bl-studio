@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { AssetRepository, AuditRepository } from '@bailian-studio/generation-repository'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
@@ -37,7 +38,7 @@ const fakeStorage: StorageAdapter = {
 
 const fakeGenerationRepository = {
   recordAuditEvent: async (input: Record<string, unknown>) => {
-    audits.push(input)
+    audits.push({ ...input } as Record<string, unknown>)
     return {} as never
   },
   listUnifiedAssets: async (_userId: string, options: { limit?: number; kind?: string }) => {
@@ -104,10 +105,26 @@ const fakeGenerationRepository = {
   }),
 } as unknown as GenerationRepository
 
+const fakeAuditRepository: AuditRepository = {
+  recordAuditEvent: async (input) => {
+    audits.push({ ...input } as Record<string, unknown>)
+    return {} as never
+  },
+}
+
+const fakeAssetRepository = {
+  createUserAsset: async () => undefined,
+  listUnifiedAssets: (fakeGenerationRepository as unknown as AssetRepository).listUnifiedAssets,
+  getUserAsset: (fakeGenerationRepository as unknown as AssetRepository).getUserAsset,
+  softDeleteUserAsset: async () => false,
+} as unknown as AssetRepository
+
 const app = createTestApp({
   authService: fakeAuthService,
   creditLedger: fakeCreditLedger,
   generationRepository: fakeGenerationRepository,
+  auditRepository: fakeAuditRepository,
+  assetRepository: fakeAssetRepository,
   storage: fakeStorage,
 }).app
 
