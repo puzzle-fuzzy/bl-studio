@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   clearCanvasDraft,
+  clearAllCanvasDrafts,
   loadCanvasBootstrapDraft,
   loadCanvasDocumentDraft,
   writeCanvasDraft,
@@ -62,5 +63,19 @@ describe('canvas draft storage', () => {
     clearCanvasDraft(storage, 'doc-1')
     expect(loadCanvasBootstrapDraft(storage)).toBeNull()
     expect(loadCanvasDocumentDraft(storage, 'doc-1')).toBeNull()
+  })
+
+  it('登出时清理所有文档分桶与旧版本 key', () => {
+    const storage = createStorage()
+    writeCanvasDraft(storage, draft)
+    writeCanvasDraft(storage, { ...draft, documentId: 'doc-1' })
+    storage.setItem('bailian-studio:canvas:v1', JSON.stringify(draft))
+    storage.setItem('unrelated-key', 'keep')
+
+    clearAllCanvasDrafts(storage)
+
+    expect(loadCanvasBootstrapDraft(storage)).toBeNull()
+    expect(loadCanvasDocumentDraft(storage, 'doc-1')).toBeNull()
+    expect(storage.getItem('unrelated-key')).toBe('keep')
   })
 })

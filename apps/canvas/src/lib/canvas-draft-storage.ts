@@ -17,6 +17,8 @@ interface DraftStorage {
   getItem(key: string): string | null
   setItem(key: string, value: string): void
   removeItem(key: string): void
+  key(index: number): string | null
+  readonly length: number
 }
 
 function objectRecord(value: unknown): Record<string, unknown> {
@@ -93,7 +95,17 @@ export function writeCanvasDraft(storage: DraftStorage, draft: CanvasDraft): voi
 
 export function clearCanvasDraft(storage: DraftStorage, documentId?: string): void {
   storage.removeItem(BOOTSTRAP_STORAGE_KEY)
+  storage.removeItem(LEGACY_STORAGE_KEY)
   if (documentId !== undefined) storage.removeItem(documentStorageKey(documentId))
+}
+
+export function clearAllCanvasDrafts(storage: DraftStorage): void {
+  const keys = Array.from({ length: storage.length }, (_, index) => storage.key(index))
+  for (const key of keys) {
+    if (key === BOOTSTRAP_STORAGE_KEY || key === LEGACY_STORAGE_KEY || key?.startsWith(DOCUMENT_STORAGE_PREFIX)) {
+      storage.removeItem(key ?? '')
+    }
+  }
 }
 
 export function browserDraftStorage(): DraftStorage | undefined {

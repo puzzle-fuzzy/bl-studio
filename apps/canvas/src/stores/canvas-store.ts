@@ -9,8 +9,10 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
+import { registerPrivateDataReset } from '@bailian-studio/app-shell'
 import {
   browserDraftStorage,
+  clearAllCanvasDrafts,
   clearCanvasDraft,
   loadCanvasBootstrapDraft,
   writeCanvasDraft,
@@ -167,3 +169,18 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   setSaveStatus: (saveStatus) => set({ saveStatus }),
   setCanvasExecutionBusy: (canvasExecutionBusy) => set({ canvasExecutionBusy }),
 }))
+
+registerPrivateDataReset(() => {
+  const storage = browserDraftStorage()
+  if (storage !== undefined) clearAllCanvasDrafts(storage)
+  useCanvasStore.setState({
+    nodes: [],
+    edges: [],
+    documentId: undefined,
+    revision: undefined,
+    title: '未命名画布',
+    hydrated: false,
+    saveStatus: 'idle',
+    canvasExecutionBusy: false,
+  })
+})

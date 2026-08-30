@@ -7,5 +7,7 @@ export function matchesCanvasGenerationSession(
   current: CanvasGenerationSession | undefined,
   expected: CanvasGenerationSession,
 ): boolean {
-  return current?.documentId === expected.documentId && current.nodeId === expected.nodeId
+  return current !== undefined
+    && current.documentId === expected.documentId
+    && current.nodeId === expected.nodeId
 }
