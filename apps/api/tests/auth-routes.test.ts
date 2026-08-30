@@ -4,7 +4,11 @@ import {
   type IsolatedAuthService,
   type TransactionalEmailSender,
 } from '@bailian-studio/auth'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type {
+  AuditRepository,
+  GenerationRepository,
+  RecordAuditEventInput,
+} from '@bailian-studio/generation-repository'
 import { createTestApp } from '../src/test-app'
 
 interface SentEmail {
@@ -28,9 +32,9 @@ class MemoryEmailSender implements TransactionalEmailSender {
 let handle: IsolatedAuthService
 let sender: MemoryEmailSender
 let app: ReturnType<typeof createTestApp>['app']
-const audits: Array<Parameters<GenerationRepository['recordAuditEvent']>[0]> = []
+const audits: RecordAuditEventInput[] = []
 const auditRepository = {
-  async recordAuditEvent(input: Parameters<GenerationRepository['recordAuditEvent']>[0]) {
+  async recordAuditEvent(input: RecordAuditEventInput) {
     audits.push(input)
     const occurredAt = input.occurredAt ?? '2026-07-25T00:00:00.000Z'
     return {
@@ -45,7 +49,7 @@ const auditRepository = {
       updatedAt: occurredAt,
     }
   },
-} as GenerationRepository
+} satisfies AuditRepository
 
 beforeAll(async () => {
   sender = new MemoryEmailSender()
@@ -56,7 +60,8 @@ beforeAll(async () => {
   })
   app = createTestApp({
     authService: handle.authService,
-    generationRepository: auditRepository,
+    generationRepository: {} as GenerationRepository,
+    auditRepository,
   }).app
 })
 
@@ -294,7 +299,8 @@ describe('github oauth routes', () => {
   beforeAll(() => {
     githubApp = createTestApp({
       authService: handle.authService,
-      generationRepository: auditRepository,
+      generationRepository: {} as GenerationRepository,
+      auditRepository,
       githubOAuth: {
         clientId: 'test-client',
         clientSecret: 'test-secret',

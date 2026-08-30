@@ -18,16 +18,23 @@ import {
   type BailianStudioDb,
 } from '@bailian-studio/db'
 import { createIsolatedTestDb, resetBailianStudioTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
-import { createGenerationRepository, GenerationRepositoryError, type GenerationRepositoryCompat } from '../src'
+import {
+  createAuditRepository,
+  createGenerationRepository,
+  GenerationRepositoryError,
+  type GenerationRepositoryCompat,
+} from '../src'
 
 let testDb!: IsolatedTestDb
 let db!: BailianStudioDb
 let repository!: GenerationRepositoryCompat
+let auditRepository!: ReturnType<typeof createAuditRepository>
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb()
   db = createDb({ url: testDb.url, max: 5 })
   repository = createGenerationRepository({ db })
+  auditRepository = createAuditRepository(db)
 })
 
 // 文件级（不嵌套在 describe 内），让连接对本文件的每个 describe 都保持打开——
@@ -1243,7 +1250,7 @@ describe('generation repository', () => {
   })
 
   it('records bounded product audit events without request payloads', async () => {
-    const event = await repository.recordAuditEvent({
+    const event = await auditRepository.recordAuditEvent({
       userId: 'user_1',
       action: 'generation.create',
       outcome: 'succeeded',

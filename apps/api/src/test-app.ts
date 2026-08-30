@@ -14,6 +14,7 @@ import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type {
   AdminTaskRepository,
   AnalyticsRepository,
+  AuditRepository,
   GenerationRepository,
   GenerationUsage,
   UsageRepository,
@@ -66,7 +67,9 @@ export function createTestApp(
   const generationRepository =
     overrides.generationRepository ??
     missing<GenerationRepository>('generationRepository')
-  const auditRepository = overrides.auditRepository ?? generationRepository
+  const auditRepository =
+    overrides.auditRepository ??
+    legacy<AuditRepository>(generationRepository)
   const assetRepository =
     overrides.assetRepository ?? legacy<NonNullable<ApiDependencies['assetRepository']>>(generationRepository)
   const shareRepository =

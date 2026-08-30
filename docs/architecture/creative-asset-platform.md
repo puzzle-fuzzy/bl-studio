@@ -103,7 +103,8 @@ flowchart LR
   SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，旧
   `GenerationRepository` 仅为未迁移调用方保留兼容 facade。
 - API 审计通过独立 `AuditRepository` port 注入；约 115 个审计调用已不再把完整
-  `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。
+  `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。审计写入 SQL
+  已物理归档到 `generation-repository/src/audit-events.ts`，兼容 facade 只负责过渡转发。
 - Worker 的 provider 出站请求审计通过 `ProviderRequestAuditRepository` 注入，SQL 写入
   位于 `generation-repository/src/provider-requests.ts`；generation 详情仍可读取
   provider 请求投影，但 Worker 不再从 GenerationRepository 核心接口写审计。

@@ -39,6 +39,7 @@ import {
 	createAdminGalleryRepository,
 	createAdminTaskRepository,
 	createAssetRepository,
+	createAuditRepository,
 	createAnalyticsRepository,
 	createContentReportRepository,
 	createFeedbackRepository,
@@ -142,7 +143,7 @@ export function createApiPersistenceRuntime(
 		const shareRepository = createShareRepository(db);
 		return {
 			auditOutboxRepository: createAuditOutboxRepository({ db }),
-			auditRepository: generationRepository,
+			auditRepository: createAuditRepository(db),
 			authService: createAuthService({
 				db,
 				...withoutDatabaseRuntimeOptions(options),

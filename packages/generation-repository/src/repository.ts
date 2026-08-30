@@ -40,7 +40,6 @@ import {
 } from "@bailian-studio/credit-ledger";
 import {
 	assetDerivatives,
-	auditLogs,
 	type BailianStudioDb,
 	creativeAssetReferences,
 	creativeAssets,
@@ -104,7 +103,8 @@ import type {
 	FailAssetThumbnailInput,
 	MarkAssetThumbnailProcessingInput,
 } from "./asset-types";
-import type { AuditLog, RecordAuditEventInput } from "./audit-types";
+import { createAuditRepository } from "./audit-events";
+import type { AuditRepository } from "./audit-port";
 import { createContentRepository, type ContentRepository } from "./content";
 import type { ProviderRequestAuditRepository } from "./provider-request-port";
 import { createProviderRequestAuditRepository } from "./provider-requests";
@@ -122,7 +122,6 @@ import { GenerationRepositoryError } from "./errors";
 import {
 	nextArtifactId,
 	nextAssetDerivativeId,
-	nextAuditLogId,
 	nextCreativeGenerationContextAssetId,
 	nextCreativeGenerationContextId,
 	nextCreativeGenerationContextReferenceId,
@@ -134,7 +133,6 @@ import {
 import {
 	type GenerationRecordRow,
 	type TaskRecordRow,
-	toAuditLog,
 	toGenerationArtifact,
 	toGenerationEvent,
 	toGenerationRecord,
@@ -1006,8 +1004,6 @@ export interface GenerationRepository {
 		staleAfterMs?: number;
 	}) => Promise<WorkerHealth>;
 
-	recordAuditEvent(input: RecordAuditEventInput): Promise<AuditLog>;
-
 	/** 仅 Worker 使用的来源查询，供持久化缩略图衍生任务读取。 */
 	getAssetThumbnailSource(
 		derivativeId: string,
@@ -1034,6 +1030,7 @@ export type GenerationRepositoryCompat = GenerationRepository &
 	PublicShareRepository &
 	UsageRepository &
 	ProviderRequestAuditRepository &
+	AuditRepository &
 	ContentRepository;
 
 type BailianStudioTx = Parameters<
@@ -1680,6 +1677,7 @@ export function createGenerationRepository(
 	const shareRepository = createShareRepository(db);
 	const usageRepository = createUsageRepository(db);
 	const providerRequestAuditRepository = createProviderRequestAuditRepository(db);
+	const auditRepository = createAuditRepository(db);
 
 	return {
 		async healthCheck() {
@@ -1762,52 +1760,6 @@ export function createGenerationRepository(
 				(row) => row.status === "running" && row.lastSeenAt.getTime() >= cutoff,
 			);
 			return { status: healthy ? "ok" : "failed", workers };
-		},
-
-		/**
-		 * 记录一条产品侧安全审计事件。
-		 *
-		 * 事件与业务写入保持独立：API 层以 best-effort 方式调用本方法，审计表
-		 * 写入失败不会回滚已经完成的登录、生成或资源读取。metadata 由 API 层
-		 * 先做 primitive-only 脱敏/限长，这里仍复制一份，避免调用方后续修改
-		 * 同一个对象时影响 Drizzle 的序列化结果。
-		 */
-		async recordAuditEvent(input) {
-			const occurredAt = input.occurredAt ?? nowIso();
-			const [inserted] = await db
-				.insert(auditLogs)
-				.values({
-					id: nextAuditLogId(),
-					...(input.userId !== undefined ? { userId: input.userId } : {}),
-					action: input.action,
-					outcome: input.outcome,
-					...(input.targetType !== undefined
-						? { targetType: input.targetType }
-						: {}),
-					...(input.targetId !== undefined ? { targetId: input.targetId } : {}),
-					...(input.requestId !== undefined
-						? { requestId: input.requestId }
-						: {}),
-					...(input.traceId !== undefined ? { traceId: input.traceId } : {}),
-					...(input.method !== undefined ? { method: input.method } : {}),
-					...(input.path !== undefined ? { path: input.path } : {}),
-					...(input.metadata !== undefined
-						? { metadataJson: { ...input.metadata } }
-						: {}),
-					occurredAt: new Date(occurredAt),
-					createdAt: new Date(occurredAt),
-					updatedAt: new Date(occurredAt),
-				})
-				.returning();
-
-			if (inserted === undefined) {
-				throw new GenerationRepositoryError(
-					"DATABASE_ERROR",
-					`Failed to record audit event: ${input.action}`,
-				);
-			}
-
-			return toAuditLog(inserted);
 		},
 
 		/**
@@ -3735,6 +3687,7 @@ export function createGenerationRepository(
 		getGenerationUsage: usageRepository.getGenerationUsage,
 		startProviderRequest: providerRequestAuditRepository.startProviderRequest,
 		finishProviderRequest: providerRequestAuditRepository.finishProviderRequest,
+		recordAuditEvent: auditRepository.recordAuditEvent,
 		...createContentRepository(db),
 	};
 }

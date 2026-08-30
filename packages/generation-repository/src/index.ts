@@ -43,6 +43,7 @@ export type {
 	UnifiedAssetItem,
 } from "./asset-types";
 export type { AuditRepository } from "./audit-port";
+export { createAuditRepository } from "./audit-events";
 export type {
 	AuditAction,
 	AuditEventMetadata,

@@ -75,7 +75,8 @@
   `GenerationRepository` 核心接口不再暴露这些方法；仅 `GenerationRepositoryCompat`
   为 URL 工厂和隔离测试保留兼容 facade。
 - API 审计通过 `src/audit-port.ts` 的 `AuditRepository` 注入；审计写入是横切能力，路由
-  不应为了记录审计而依赖完整 `GenerationRepository`。
+  不应为了记录审计而依赖完整 `GenerationRepository`。具体 SQL 已物理归档到
+  `src/audit-events.ts`；`GenerationRepositoryCompat` 只保留过渡转发。
 - Worker 的 provider 出站请求审计通过 `src/provider-request-port.ts` 的
   `ProviderRequestAuditRepository` 注入，写入实现归档在 `provider-requests.ts`；
   `GenerationRepository` 只保留生成详情所需的 provider 请求投影，Worker 不再依赖

@@ -55,6 +55,11 @@ API 审计也已独立为 `AuditRepository` port：路由只注入审计写入�
 `recordApiAuditEvent` 持有完整 `GenerationRepository`；审计写入失败继续由 API 层吞并并记录
 稳定告警，不能反向改变业务响应。
 
+本轮进一步把 API 审计写入 SQL 从中央 `repository.ts` 移到
+`generation-repository/src/audit-events.ts`。生产组合根直接创建 `AuditRepository`，
+`GenerationRepository` 核心接口不再声明 `recordAuditEvent`；旧 URL 工厂和隔离测试仍可
+通过 `GenerationRepositoryCompat` 使用转发方法，作为明确的迁移接缝。
+
 用户用量与 admin 调用统计也已完成读取边界收敛：`UsageRepository` 负责用户时间窗口
 聚合，`AnalyticsRepository` 负责后台调用统计；两者的查询 SQL 分别归档在 `usage.ts`
 与 `analytics.ts`。随后已把生成应用服务的每日限额预检改为显式注入 `UsageRepository`，
