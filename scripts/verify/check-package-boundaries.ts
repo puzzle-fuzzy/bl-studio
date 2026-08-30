@@ -53,6 +53,8 @@ export interface BailianPackageBoundary {
   readonly testOnlySourceFiles?: readonly string[]
   /** 仅测试包可声明的 devDependency 例外，不代表运行时依赖。 */
   readonly testOnlyDependencyScopes?: readonly string[]
+  /** consumer 内允许直接 import 该包的 source scope；用于锁定 provider adapter 边界。 */
+  readonly allowedSourceImportScopes?: readonly string[]
 }
 
 /**
@@ -67,6 +69,11 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
     ownerScope: 'packages/provider-dashscope',
     allowedConsumerScopes: ['apps/worker'],
     dependencyProtocol: 'workspace:*',
+    allowedSourceImportScopes: [
+      'apps/worker/src/providers',
+      'apps/worker/src/config.ts',
+      'apps/worker/tests',
+    ],
   },
   {
     packageName: '@bailian-studio/persistence-runtime',
@@ -209,6 +216,15 @@ export function checkBailianPackageSourceBoundary(
     if (!isBailianPackageConsumerAllowed(boundary, relativeFile)) {
       violations.push(
         `${relativeFile} imports ${boundary.packageName} outside its consumer allowlist`,
+      )
+    } else if (
+      boundary.allowedSourceImportScopes !== undefined
+      && !boundary.allowedSourceImportScopes.some((scope) =>
+        isWithinScope(relativeFile, scope),
+      )
+    ) {
+      violations.push(
+        `${relativeFile} imports ${boundary.packageName} outside its source boundary`,
       )
     } else if (importsPackageSubpath(boundary.packageName, source)) {
       violations.push(

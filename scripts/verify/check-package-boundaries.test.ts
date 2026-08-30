@@ -235,6 +235,11 @@ describe('package boundary rules', () => {
         ownerScope: 'packages/provider-dashscope',
         allowedConsumerScopes: ['apps/worker'],
         dependencyProtocol: 'workspace:*',
+        allowedSourceImportScopes: [
+          'apps/worker/src/providers',
+          'apps/worker/src/config.ts',
+          'apps/worker/tests',
+        ],
       },
       {
         packageName: '@bailian-studio/persistence-runtime',
@@ -375,6 +380,18 @@ describe('package boundary rules', () => {
         "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
       ),
     ).toEqual([])
+    expect(
+      checkBailianPackageSourceBoundary(
+        'apps/worker/src/config.ts',
+        "import { isValidDashScopeWorkspaceId } from '@bailian-studio/provider-dashscope'",
+      ),
+    ).toEqual([])
+    expect(
+      checkBailianPackageSourceBoundary(
+        'apps/worker/src/task-handler.ts',
+        "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
+      ),
+    ).toEqual(['apps/worker/src/task-handler.ts imports @bailian-studio/provider-dashscope outside its source boundary'])
     expect(
       checkBailianPackageSourceBoundary(
         'packages/generation-repository/tests/model-port.test.ts',

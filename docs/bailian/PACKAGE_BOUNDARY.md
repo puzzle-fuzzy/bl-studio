@@ -68,6 +68,7 @@ Worker 与前端各自维护不同的 wire schema。
 
 ### packages/provider-dashscope（协议执行层，worker 专属）
 - **拥有**：传输目标解析（`resolveSubmit/Poll/CancelTarget` + 信任主机）、请求构造、HTTP submit/poll/chat 执行、DashScope 响应解析与错误分类；解析结果实现 `model-core` 的 `NormalizedOutput` 契约。
+- Worker 侧只有 `apps/worker/src/providers`（adapter）、`apps/worker/src/config.ts`（provider 配置校验）和测试 fixture 可以直接 import；其余 task handler 只能使用 `ProviderRunner` 端口。
 - 只经 package root import model-core；禁止 SDK、DB/仓储/task-engine/sse-protocol/API/Worker/apps/elysia/react。
 - 传输层保持可注入以便测试；**绝不向未通过信任校验的 URL 发送凭据**。
 
