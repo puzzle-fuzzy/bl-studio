@@ -57,4 +57,7 @@ API 审计也已独立为 `AuditRepository` port：路由只注入审计写入�
 
 用户用量与 admin 调用统计也已完成读取边界收敛：`UsageRepository` 负责用户时间窗口
 聚合，`AnalyticsRepository` 负责后台调用统计；两者的查询 SQL 分别归档在 `usage.ts`
-与 `analytics.ts`。这一步只移动读模型职责，不改变 generation 账本的写入与结算事务。
+与 `analytics.ts`。随后已把生成应用服务的每日限额预检改为显式注入 `UsageRepository`，
+并从 `GenerationRepository` 核心接口移除 `getDailyGenerationUsage` / `getGenerationUsage`；
+兼容 URL 工厂与隔离测试仍通过 `GenerationRepositoryCompat` 转发 `UsageRepository` 的
+读方法。这一步只移动读模型职责，不改变 generation 账本的写入与结算事务。

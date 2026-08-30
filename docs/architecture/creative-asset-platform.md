@@ -104,7 +104,9 @@ flowchart LR
   `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。
 - 用户用量接口通过 `UsageRepository` 读取，调用统计由 `AnalyticsRepository` 读取；相关
   聚合 SQL 分别位于 `usage.ts` 与 `analytics.ts`，避免报表/用量查询继续扩大 generation
-  生命周期接口。
+  生命周期接口。生成应用服务的每日限额预检也通过显式的 `UsageRepository` 注入完成，
+  `GenerationRepository` 核心接口不再承载用量读模型；旧 URL 工厂/隔离测试仍可通过
+  兼容 facade 过渡。
 - director 的 application service 由 API 组合根创建并注入，统一承接阶段运行的估价、预检、
   视频/音乐/合成运行创建和单镜头重试；Worker 继续负责异步 Provider 调用与运行状态推进。
 

@@ -16,6 +16,7 @@ import type {
   AnalyticsRepository,
   GenerationRepository,
   GenerationUsage,
+  UsageRepository,
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import {
@@ -101,6 +102,7 @@ export function createTestApp(
     overrides.generationApplicationService ??
     createGenerationApplicationService({
       repository: generationRepository,
+      usageRepository,
       limits: generationLimits,
       creativeAssetRepository,
     })
@@ -167,14 +169,15 @@ export function createTestApp(
 
 function createLegacyUsageRepository(
   generationRepository: GenerationRepository,
-) {
+): UsageRepository {
+  const legacyRepository = legacy<Partial<UsageRepository>>(generationRepository)
   return {
     getGenerationUsage: async (input: {
       userId: string
       since: string
       until: string
     }): Promise<GenerationUsage> =>
-      generationRepository.getGenerationUsage?.(input) ?? {
+      legacyRepository.getGenerationUsage?.(input) ?? {
         attemptCount: 0,
         successfulCount: 0,
         generationCount: 0,

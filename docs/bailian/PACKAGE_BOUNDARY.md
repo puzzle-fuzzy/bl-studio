@@ -74,7 +74,9 @@
 - API 审计通过 `src/audit-port.ts` 的 `AuditRepository` 注入；审计写入是横切能力，路由
   不应为了记录审计而依赖完整 `GenerationRepository`。
 - 用户用量读模型由 `src/usage.ts` 的 `UsageRepository` 拥有；用量查询 SQL 与 generation
-  生命周期写入分离，API 只获取当前用户的时间窗口聚合。
+  生命周期写入分离，API 只获取当前用户的时间窗口聚合。生成应用服务也显式注入
+  `UsageRepository` 做每日限额预检；`GenerationRepository` 核心接口不再包含用量读取，
+  只有 URL 工厂/隔离测试兼容形状保留转发。
 - 成本估算/结算只 import model-core 的纯函数（`estimateModelCost` / `calculateUsageCostCents`）；禁止 provider-dashscope、DashScope HTTP、解析 provider 端点、维护第二份契约/价格表。
 
 ### packages/task-repository（任务生命周期持久化）

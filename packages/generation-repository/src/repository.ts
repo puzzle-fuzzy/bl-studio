@@ -201,12 +201,11 @@ import type {
 	WorkerHeartbeat,
 } from "./types";
 import {
-	type DailyGenerationUsage,
-	type DailyGenerationUsageInput,
 	type GenerationUsage,
 	type GenerationUsageInput,
 	readGenerationUsage,
 } from "./usage";
+import { createUsageRepository, type UsageRepository } from "./usage";
 
 /**
  * 把任意值安全地当作 JSON 记录返回。
@@ -1011,16 +1010,6 @@ export interface GenerationRepository {
 		staleAfterMs?: number;
 	}) => Promise<WorkerHealth>;
 
-	/** 只读的每日用量聚合，用于任务/成本限额的预检。 */
-	getDailyGenerationUsage?: (
-		input: DailyGenerationUsageInput,
-	) => Promise<DailyGenerationUsage>;
-
-	/** 只读用量聚合，支持任意报表时间窗口，包括当月。 */
-	getGenerationUsage?: (
-		input: GenerationUsageInput,
-	) => Promise<GenerationUsage>;
-
 	startProviderRequest(
 		input: StartProviderRequestInput,
 	): Promise<ProviderRequestAudit>;
@@ -1243,12 +1232,14 @@ export interface GenerationRepository {
  *
  * 生产 API/Worker 只依赖 GenerationRepository 核心接口；资产与分享能力由
  * persistence-runtime 的窄 port 注入。这个类型保留在迁移接缝，避免旧测试和
- * 直接使用 URL 工厂的调用方被一次性打断。
+ * 直接使用 URL 工厂的调用方被一次性打断。新生产代码应直接注入各自的窄 port，
+ * 包括 UsageRepository。
  */
 export type GenerationRepositoryCompat = GenerationRepository &
 	AssetRepository &
 	ShareRepository &
-	PublicShareRepository;
+	PublicShareRepository &
+	UsageRepository;
 
 type BailianStudioTx = Parameters<
 	Parameters<BailianStudioDb["transaction"]>[0]
@@ -1892,6 +1883,7 @@ export function createGenerationRepository(
 	const taskQueueRepository = createTaskQueueRepository({ db });
 	const assetRepository = createAssetRepository(db);
 	const shareRepository = createShareRepository(db);
+	const usageRepository = createUsageRepository(db);
 
 	return {
 		async healthCheck() {
@@ -1974,14 +1966,6 @@ export function createGenerationRepository(
 				(row) => row.status === "running" && row.lastSeenAt.getTime() >= cutoff,
 			);
 			return { status: healthy ? "ok" : "failed", workers };
-		},
-
-		async getDailyGenerationUsage(input) {
-			return readGenerationUsage(db, input);
-		},
-
-		async getGenerationUsage(input) {
-			return readGenerationUsage(db, input);
 		},
 
 		/**
@@ -4025,6 +4009,7 @@ export function createGenerationRepository(
 		revokeGenerationShare: shareRepository.revokeGenerationShare,
 		getPublicSharedGeneration: shareRepository.getPublicSharedGeneration,
 		getPublicSharedArtifact: shareRepository.getPublicSharedArtifact,
+		getGenerationUsage: usageRepository.getGenerationUsage,
 		...createContentRepository(db),
 	};
 }
