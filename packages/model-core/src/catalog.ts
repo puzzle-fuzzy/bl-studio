@@ -7,6 +7,7 @@ import type {
   ModelTaskMode,
   ModelValidationRule,
 } from './types'
+import type { ModelReferenceFormat } from './request-bindings'
 
 /**
  * Provider-neutral model lookup seam.
@@ -45,7 +46,7 @@ export interface ModelCatalogProjection {
     readonly stage: 'stable' | 'beta' | 'hidden'
     readonly notActivated?: string
   }
-  referenceFormat?: string
+  referenceFormat?: ModelReferenceFormat
 }
 
 /** Model catalog seam supplied by the process composition root. */

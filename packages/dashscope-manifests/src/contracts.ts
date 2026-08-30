@@ -6,8 +6,10 @@
  * DashScope catalog so model-core can remain provider-neutral.
  */
 
+import type { ModelReferenceFormat } from '@bailian-studio/model-core'
+
 /** Prompt reference syntax understood by a DashScope model. */
-export type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
+export type ReferenceFormat = ModelReferenceFormat
 
 /** Maps one manifest parameter to a DashScope request location. */
 export type ParameterBinding =
