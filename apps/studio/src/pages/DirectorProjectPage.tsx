@@ -19,6 +19,7 @@ import { VirtualScrollArea } from '@/components/ui/virtual-scroll-area'
 import { apiClient } from '@/lib/api'
 import { notifyError } from '@/lib/toast'
 import { formatCents } from '@/lib/money'
+import { parseDirectorPhaseResult, type DirectorPhaseResultSpec } from '@/lib/director-phase-result'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
 import { usePhaseReview } from '@/hooks/use-phase-review'
@@ -285,9 +286,10 @@ export function DirectorProjectPage() {
 
   useEffect(() => {
     if (id === undefined) return
+    const projectId = id
     let cancelled = false
     setLoading(true)
-    void apiClient.getDirectorProject(id)
+    void apiClient.getDirectorProject(projectId)
       .then(next => {
         if (cancelled) return
         setProject(next)
@@ -330,8 +332,8 @@ export function DirectorProjectPage() {
         setAssemblyConfirmOpen(false)
         setReferencePickerOpen(false)
         setReferenceTarget(undefined)
-        void reloadScriptMessages(id, 'project-load')
-        void reloadScriptVersions(id, 'project-load')
+        void reloadScriptMessages(projectId, 'project-load')
+        void reloadScriptVersions(projectId, 'project-load')
         const analysisState = next.phases.find(state => state.phase === 'analyze')
         const charactersState = next.phases.find(state => state.phase === 'characters')
         const locationsState = next.phases.find(state => state.phase === 'locations')
@@ -343,73 +345,31 @@ export function DirectorProjectPage() {
           setActiveRunId(activePhaseState.runId)
           setActivePhase(activePhaseState.phase)
         }
-        if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
-            .then(run => {
-              if (!cancelled && run.status === 'succeeded' && typeof run.outputSummary?.analysisText === 'string') {
-                setAnalysisText(run.outputSummary.analysisText)
-                setAnalysisStale(run.staleAt !== null)
-                const parsed = DirectorAnalysisResultSchema.safeParse(run.outputSummary.analysis)
-                if (parsed.success) setAnalysisResult(parsed.data)
-              }
-            })
-            .catch(() => {})
-        }
-        if (charactersState?.lastRunId !== null && charactersState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'characters', charactersState.lastRunId)
+        function loadPhaseResult<Result>(
+          phase: DirectorPhase,
+          phaseState: DirectorProjectDetail['phases'][number] | undefined,
+          spec: DirectorPhaseResultSpec<Result>,
+          setText: (value: string) => void,
+          setResult: (value: Result) => void,
+          setStale: (value: boolean) => void,
+        ) {
+          if (phaseState?.lastRunId === null || phaseState?.lastRunId === undefined) return
+          void apiClient.getDirectorPhaseRun(projectId, phase, phaseState.lastRunId)
             .then(run => {
               if (cancelled || run.status !== 'succeeded') return
-              if (typeof run.outputSummary?.charactersText === 'string') setCharactersText(run.outputSummary.charactersText)
-              setCharactersStale(run.staleAt !== null)
-              const parsed = DirectorCharactersResultSchema.safeParse(run.outputSummary?.characters)
-              if (parsed.success) setCharactersResult(parsed.data)
+              const parsed = parseDirectorPhaseResult(run.outputSummary, run.staleAt, spec)
+              if (parsed.text !== undefined) setText(parsed.text)
+              setStale(parsed.stale)
+              if (parsed.result !== undefined) setResult(parsed.result)
             })
             .catch(() => {})
         }
-        if (locationsState?.lastRunId !== null && locationsState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'locations', locationsState.lastRunId)
-            .then(run => {
-              if (cancelled || run.status !== 'succeeded') return
-              if (typeof run.outputSummary?.locationsText === 'string') setLocationsText(run.outputSummary.locationsText)
-              setLocationsStale(run.staleAt !== null)
-              const parsed = DirectorLocationsResultSchema.safeParse(run.outputSummary?.locations)
-              if (parsed.success) setLocationsResult(parsed.data)
-            })
-            .catch(() => {})
-        }
-        if (continuityState?.lastRunId !== null && continuityState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'continuity', continuityState.lastRunId)
-            .then(run => {
-              if (cancelled || run.status !== 'succeeded') return
-              if (typeof run.outputSummary?.continuityText === 'string') setContinuityText(run.outputSummary.continuityText)
-              setContinuityStale(run.staleAt !== null)
-              const parsed = DirectorContinuityResultSchema.safeParse(run.outputSummary?.continuity)
-              if (parsed.success) setContinuityResult(parsed.data)
-            })
-            .catch(() => {})
-        }
-        if (promptRebuildState?.lastRunId !== null && promptRebuildState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'rebuild', promptRebuildState.lastRunId)
-            .then(run => {
-              if (cancelled || run.status !== 'succeeded') return
-              if (typeof run.outputSummary?.promptRebuildText === 'string') setPromptRebuildText(run.outputSummary.promptRebuildText)
-              setPromptRebuildStale(run.staleAt !== null)
-              const parsed = DirectorPromptRebuildResultSchema.safeParse(run.outputSummary?.promptRebuild)
-              if (parsed.success) setPromptRebuildResult(parsed.data)
-            })
-            .catch(() => {})
-        }
-        if (dialogueState?.lastRunId !== null && dialogueState?.lastRunId !== undefined) {
-          void apiClient.getDirectorPhaseRun(id, 'dialogue', dialogueState.lastRunId)
-            .then(run => {
-              if (cancelled || run.status !== 'succeeded') return
-              if (typeof run.outputSummary?.dialogueText === 'string') setDialogueText(run.outputSummary.dialogueText)
-              setDialogueStale(run.staleAt !== null)
-              const parsed = DirectorDialogueResultSchema.safeParse(run.outputSummary?.dialogue)
-              if (parsed.success) setDialogueResult(parsed.data)
-            })
-            .catch(() => {})
-        }
+        loadPhaseResult('analyze', analysisState, { textKey: 'analysisText', resultKey: 'analysis', schema: DirectorAnalysisResultSchema }, setAnalysisText, setAnalysisResult, setAnalysisStale)
+        loadPhaseResult('characters', charactersState, { textKey: 'charactersText', resultKey: 'characters', schema: DirectorCharactersResultSchema }, setCharactersText, setCharactersResult, setCharactersStale)
+        loadPhaseResult('locations', locationsState, { textKey: 'locationsText', resultKey: 'locations', schema: DirectorLocationsResultSchema }, setLocationsText, setLocationsResult, setLocationsStale)
+        loadPhaseResult('continuity', continuityState, { textKey: 'continuityText', resultKey: 'continuity', schema: DirectorContinuityResultSchema }, setContinuityText, setContinuityResult, setContinuityStale)
+        loadPhaseResult('rebuild', promptRebuildState, { textKey: 'promptRebuildText', resultKey: 'promptRebuild', schema: DirectorPromptRebuildResultSchema }, setPromptRebuildText, setPromptRebuildResult, setPromptRebuildStale)
+        loadPhaseResult('dialogue', dialogueState, { textKey: 'dialogueText', resultKey: 'dialogue', schema: DirectorDialogueResultSchema }, setDialogueText, setDialogueResult, setDialogueStale)
       })
       .catch(() => {
         if (!cancelled) {
