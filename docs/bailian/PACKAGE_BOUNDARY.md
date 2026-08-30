@@ -135,7 +135,7 @@ Worker 与前端各自维护不同的 wire schema。
 ### apps/api
 - 禁止 `@bailian-studio/db`、`@bailian-studio/provider-dashscope`、deep-import provider 源码、import worker sibling / apps。
 - 持久化通过 `@bailian-studio/persistence-runtime` 取得进程级共享句柄；API 不直接碰 Drizzle，URL 工厂仅用于独立包测试或单模块工具。
-- 模型目录 `/models/catalog` 与 `/models/:id` 直接投影 `dashscope-manifests` 的 catalog（`listModelCatalogItems`），不在路由里重建模型元数据。
+- 模型目录 `/models/catalog` 与 `/models/:id` 只消费组合根注入的 `modelCatalog` port，不在路由里重建模型元数据；当前默认实现来自 `dashscope-manifests`。
 
 ### apps/worker
 - 禁止 `@bailian-studio/api`、`@bailian-studio/db`、import api sibling / apps、字面 DashScope HTTP 调用。

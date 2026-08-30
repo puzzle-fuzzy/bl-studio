@@ -20,7 +20,11 @@ export {
   type ModelUsageCostEstimate,
 } from './pricing'
 export { getModelAuditMetadata, type ModelAuditMetadata } from './metadata'
-export type { ModelManifestResolver } from './catalog'
+export type {
+  ModelCatalog,
+  ModelCatalogProjection,
+  ModelManifestResolver,
+} from './catalog'
 export { applyDefaults, validateModelParams } from './validation'
 export { ModelCoreError } from './errors'
 export { isModelParameterVisible } from './parameter-visibility'

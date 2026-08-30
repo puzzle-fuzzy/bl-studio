@@ -5,6 +5,7 @@ import {
 import { MODEL_REGISTRY } from './registry'
 import type { ReferenceFormat } from './contracts'
 import type { FrozenModelManifest } from './types'
+import type { ModelCatalog } from '@bailian-studio/model-core'
 
 export type ModelCatalogItem = FrozenModelManifest & Readonly<{
   operation: BailianOperationCapability
@@ -36,4 +37,10 @@ export function getModelCatalogItemById(
   id: string,
 ): ModelCatalogItem | undefined {
   return MODEL_CATALOG.find((model) => model.id === id)
+}
+
+/** DashScope implementation of the provider-neutral model catalog port. */
+export const modelCatalog: ModelCatalog = {
+  list: listModelCatalogItems,
+  getById: getModelCatalogItemById,
 }

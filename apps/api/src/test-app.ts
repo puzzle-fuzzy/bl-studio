@@ -20,7 +20,10 @@ import type {
   UsageRepository,
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
-import { getModelById } from '@bailian-studio/dashscope-manifests'
+import {
+  getModelById,
+  modelCatalog,
+} from '@bailian-studio/dashscope-manifests'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import { resolveArtifactLocalRoot, type StorageAdapter } from '@bailian-studio/storage'
 import { type App, createApp } from './app'
@@ -107,6 +110,7 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
     creditLedger: overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository,
     modelResolver: overrides.modelResolver ?? { getModelById },
+    modelCatalog: overrides.modelCatalog ?? modelCatalog,
     generationDiagnosticsRepository,
     assetRepository,
     shareRepository,

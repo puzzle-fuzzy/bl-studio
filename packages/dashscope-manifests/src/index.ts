@@ -6,7 +6,12 @@
  * 可以拥有自己的 manifest 包，而不必把模型注册表塞回中立核心。
  */
 export { getModelById, listModels, MODEL_REGISTRY } from './registry'
-export { getModelCatalogItemById, listModelCatalogItems, type ModelCatalogItem } from './catalog'
+export {
+  getModelCatalogItemById,
+  listModelCatalogItems,
+  modelCatalog,
+  type ModelCatalogItem,
+} from './catalog'
 export {
   assertBailianOperationMapComplete,
   getBailianOperationCapability,

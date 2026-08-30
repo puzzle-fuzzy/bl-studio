@@ -7,7 +7,6 @@
  */
 
 import type { UnifiedAssetItem } from "@bailian-studio/generation-repository";
-import { listModels } from "@bailian-studio/dashscope-manifests";
 import { ValidationError, validateInput } from "@bailian-studio/shared";
 import {
 	assetDownloadFileName,
@@ -125,7 +124,8 @@ export function createAssetRoutes(deps: ApiDependencies) {
 			const modelIds =
 				normalizedQuery === undefined || normalizedQuery.length === 0
 					? []
-					: listModels()
+					: deps.modelCatalog.list()
+							.filter((model) => model.availability.enabled)
 							.filter((model) =>
 								model.displayName.toLocaleLowerCase().includes(normalizedQuery),
 							)

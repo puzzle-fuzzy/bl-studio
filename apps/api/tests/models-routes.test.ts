@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import type { ModelCatalog } from '@bailian-studio/model-core'
 import { createTestApp } from '../src/test-app'
 
 const { app } = createTestApp()
@@ -42,6 +43,47 @@ describe('model routes', () => {
     expect(response.status).toBe(200)
     expect(body.data.id).toBe('qwen-image')
     expect(body.data.operation).toBe('image.text-to-image')
+  })
+
+  it('reads the catalog through the injected provider-neutral port', async () => {
+    const item = {
+      id: 'mock-image',
+      provider: 'mock-provider',
+      providerModel: 'mock-image-v1',
+      displayName: 'Mock image',
+      category: 'image' as const,
+      operation: 'image.text-to-image',
+      taskMode: 'sync' as const,
+      capabilities: [],
+      parameters: [],
+      availability: { enabled: true, stage: 'stable' as const },
+    }
+    const catalog: ModelCatalog = {
+      list: () => [item],
+      getById: (id) => (id === item.id ? item : undefined),
+    }
+    const injectedApp = createTestApp({ modelCatalog: catalog }).app
+    const response = await injectedApp.handle(
+      new Request('http://localhost/api/models/mock-image'),
+    )
+    const body = await response.json() as {
+      success: true
+      data: { id: string; provider: string }
+    }
+
+    expect(response.status).toBe(200)
+    expect(body.data).toMatchObject({
+      id: 'mock-image',
+      provider: 'mock-provider',
+      providerModel: 'mock-image-v1',
+      displayName: 'Mock image',
+      category: 'image',
+      operation: 'image.text-to-image',
+      taskMode: 'sync',
+      capabilities: [],
+      parameters: [],
+      availability: { enabled: true, stage: 'stable' },
+    })
   })
 
   it('returns 404 for an unknown model', async () => {

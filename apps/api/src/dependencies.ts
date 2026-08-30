@@ -20,7 +20,7 @@ import type {
   UsageRepository,
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
-import type { ModelManifestResolver } from '@bailian-studio/model-core'
+import type { ModelCatalog, ModelManifestResolver } from '@bailian-studio/model-core'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
 import type { ArtifactConfig } from './lib/artifact-config'
@@ -59,6 +59,8 @@ export interface ApiDependencies {
   readonly generationRepository: GenerationRepository
   /** API 组合根提供的 provider-neutral 模型目录解析器。 */
   readonly modelResolver: ModelManifestResolver
+  /** API 路由消费的 provider-neutral 模型目录投影。 */
+  readonly modelCatalog: ModelCatalog
   /** 当前用户生成详情的安全诊断投影。 */
   readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository
   /** 用户资产读写的窄持久化 port。 */

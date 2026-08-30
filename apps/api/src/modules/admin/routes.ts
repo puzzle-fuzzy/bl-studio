@@ -1,6 +1,5 @@
 import { AuthError } from '@bailian-studio/auth'
 import type { CreditBalance } from '@bailian-studio/credit-ledger'
-import { listModels } from '@bailian-studio/dashscope-manifests'
 import { createLogger, validateInput } from '@bailian-studio/shared'
 import { resolveLocalStoragePath } from '@bailian-studio/storage'
 import { Elysia } from 'elysia'
@@ -363,7 +362,8 @@ export function createAdminRoutes(deps: ApiDependencies) {
           const modelIds =
             normalizedQuery === undefined || normalizedQuery.length === 0
               ? []
-              : listModels()
+              : deps.modelCatalog.list()
+                  .filter((model) => model.availability.enabled)
                   .filter((model) =>
                     model.displayName
                       .toLocaleLowerCase()
@@ -402,7 +402,10 @@ export function createAdminRoutes(deps: ApiDependencies) {
           }),
         ])
         const modelLabels = new Map(
-          listModels().map((model) => [model.id, model.displayName]),
+          deps.modelCatalog
+            .list()
+            .filter((model) => model.availability.enabled)
+            .map((model) => [model.id, model.displayName]),
         )
         const todayStr = startOfToday.toISOString().slice(0, 10)
         return {
@@ -466,7 +469,10 @@ export function createAdminRoutes(deps: ApiDependencies) {
           0,
         )
         const modelLabels = new Map(
-          listModels().map((model) => [model.id, model.displayName]),
+          deps.modelCatalog
+            .list()
+            .filter((model) => model.availability.enabled)
+            .map((model) => [model.id, model.displayName]),
         )
         return {
           success: true,

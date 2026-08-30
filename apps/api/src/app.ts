@@ -26,7 +26,7 @@ import { createPromptLibraryRoutes } from './modules/prompt-library/routes'
 import { createFeedbackRoutes } from './modules/feedback/routes'
 import { createContentReportRoutes } from './modules/reports/routes'
 import { createNotificationsRoutes } from './modules/notifications/routes'
-import { modelRoutes } from './modules/models/routes'
+import { createModelRoutes } from './modules/models/routes'
 import { createArtifactRoutes } from './modules/artifacts/routes'
 import { createAssetRoutes } from './modules/assets'
 import { createAvatarRoutes } from './modules/avatars'
@@ -147,7 +147,7 @@ export function createApp(options: ApiAppOptions) {
     })
     return errorResponseBody(error, traceId)
   })
-  .use(modelRoutes)
+  .use(createModelRoutes(dependencies))
   .use(createAuthRoutes(dependencies))
   .use(createAvatarRoutes(dependencies))
   .use(createGenerationRoutes(dependencies))

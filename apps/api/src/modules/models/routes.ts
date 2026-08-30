@@ -1,19 +1,17 @@
 import { Elysia } from 'elysia'
-import {
-  getModelCatalogItemById,
-  listModelCatalogItems,
-} from '@bailian-studio/dashscope-manifests'
 import { requestErrorResponseBody } from '../../lib/http-errors'
+import type { ApiDependencies } from '../../dependencies'
 
-export const modelRoutes = new Elysia({ prefix: '/api/models' })
+export function createModelRoutes(deps: Pick<ApiDependencies, 'modelCatalog'>) {
+  return new Elysia({ prefix: '/api/models' })
   .get('/catalog', () => ({
     success: true,
     data: {
-      items: listModelCatalogItems(),
+      items: deps.modelCatalog.list(),
     },
   }))
   .get('/:id', ({ request, params, set }) => {
-    const model = getModelCatalogItemById(params.id)
+    const model = deps.modelCatalog.getById(params.id)
     if (!model) {
       set.status = 404
       return requestErrorResponseBody(request, 'MODEL_NOT_FOUND', 'Model not found', set)
@@ -24,3 +22,4 @@ export const modelRoutes = new Elysia({ prefix: '/api/models' })
       data: model,
     }
   })
+}
