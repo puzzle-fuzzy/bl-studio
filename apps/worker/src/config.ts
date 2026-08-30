@@ -1,4 +1,5 @@
 import { isValidDashScopeWorkspaceId } from '@bailian-studio/provider-dashscope'
+import { assertProductionStorageConfigured } from '@bailian-studio/storage'
 
 export interface WorkerEnv {
   readonly databaseUrl: string
@@ -160,11 +161,12 @@ function configError(zh: string, en: string): Error {
 }
 
 function validateProductionStorage(source: EnvironmentSource): void {
-  const required = ['OSS_REGION', 'OSS_BUCKET', 'OSS_ACCESS_KEY_ID', 'OSS_ACCESS_KEY_SECRET']
-  if (required.some(name => optionalValue(source[name]) === undefined)) {
+  try {
+    assertProductionStorageConfigured(source)
+  } catch {
     throw configError(
       '生产环境必须完整配置 OSS 存储，禁止回退到本地文件系统',
-      'Production requires complete OSS storage configuration; local fallback is disabled',
+      'Production requires complete OSS storage configuration',
     )
   }
 }

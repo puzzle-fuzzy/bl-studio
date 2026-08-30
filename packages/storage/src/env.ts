@@ -7,9 +7,30 @@ import type { StorageAdapter } from './types'
 /** ali-oss 默认仅等待 60 秒；生产上传允许更大的对象和较慢的跨地域链路。 */
 export const DEFAULT_OSS_TIMEOUT_MS = 180_000
 
+export const REQUIRED_OSS_ENV_KEYS = [
+  'OSS_REGION',
+  'OSS_BUCKET',
+  'OSS_ACCESS_KEY_ID',
+  'OSS_ACCESS_KEY_SECRET',
+] as const
+
+export type StorageEnvironmentSource = Readonly<Record<string, string | undefined>>
+
 export interface CreateStorageFromEnvOptions {
   env?: Record<string, string | undefined>
   logger?: Logger
+}
+
+/**
+ * 生产环境的存储配置门禁。API 与 Worker 必须共用这一条规则，避免一边允许
+ * 本地回退、另一边拒绝启动，导致同一版本的读写进程使用不同存储后端。
+ */
+export function assertProductionStorageConfigured(source: StorageEnvironmentSource): void {
+  if (REQUIRED_OSS_ENV_KEYS.some(key => nonEmpty(source[key]) === undefined)) {
+    throw new Error(
+      'Production storage requires complete OSS configuration: OSS_REGION, OSS_BUCKET, OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET',
+    )
+  }
 }
 
 /**
@@ -61,11 +82,7 @@ export function createStorageFromEnv(options: CreateStorageFromEnvOptions = {}):
     })
   }
 
-  if (env['NODE_ENV']?.trim().toLowerCase() === 'production') {
-    throw new Error(
-      'Production storage requires complete OSS configuration: OSS_REGION, OSS_BUCKET, OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET',
-    )
-  }
+  if (env['NODE_ENV']?.trim().toLowerCase() === 'production') assertProductionStorageConfigured(env)
 
   if (hasAnyRequiredOssKey) {
     logger.warn('storage.oss_incomplete_using_local', {})

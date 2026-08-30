@@ -4,6 +4,7 @@
  * 触发签名时才暴露）。
  */
 import { readGenerationLimits } from './limits'
+import { assertProductionStorageConfigured } from '@bailian-studio/storage'
 export interface ApiEnv {
   databaseUrl: string
   authJwtSecret: string
@@ -96,10 +97,7 @@ function validateProductionEnvironment(source: EnvironmentSource, authJwtSecret:
     throw new Error('Production API requires CORS_ALLOWED_ORIGINS with non-local explicit origins')
   }
 
-  const storageKeys = ['OSS_REGION', 'OSS_BUCKET', 'OSS_ACCESS_KEY_ID', 'OSS_ACCESS_KEY_SECRET']
-  if (storageKeys.some(key => source[key]?.trim() === undefined || source[key]?.trim() === '')) {
-    throw new Error('Production API requires complete OSS storage configuration')
-  }
+  assertProductionStorageConfigured(source)
 }
 
 function isSecurePublicOrigin(origin: string): boolean {
