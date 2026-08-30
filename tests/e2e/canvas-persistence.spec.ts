@@ -74,7 +74,7 @@ test.afterAll(async () => {
   await sql.end({ timeout: 5 })
 })
 
-test('canvas persistence loop: save → versions → restore → reject stale revision', async ({ request }) => {
+test('canvas persistence loop: save → versions → restore → reject stale revision', async ({ request, page }) => {
   const login = await request.post(`${apiOrigin}/api/auth/login`, {
     data: { email, password },
   })
@@ -216,4 +216,21 @@ test('canvas persistence loop: save → versions → restore → reject stale re
     data: { document: { revision: number; snapshot: typeof initialSnapshot } }
   }
   expect(currentBody.data.document).toMatchObject({ revision: 3, snapshot: initialSnapshot })
+
+  const canvasOrigin = process.env.E2E_CANVAS_ORIGIN
+    ?? `http://127.0.0.1:${process.env.E2E_CANVAS_PORT ?? '5107'}`
+  await page.goto(`${canvasOrigin}/canvas/login?cb=%2Fcanvas`)
+  await expect(page.getByText('账户访问', { exact: true })).toBeVisible()
+  await page.getByLabel('邮箱地址').fill(email)
+  await page.getByLabel('密码').fill(password)
+  await page.getByRole('button', { name: '登录工作台' }).click()
+
+  await expect(page).toHaveURL(/\/canvas\/?$/)
+  await expect(page.getByRole('button', { name: '运行画布' })).toBeVisible()
+  await expect(page.getByRole('button', { name: '版本' })).toBeVisible()
+  await expect(page.getByText('已保存')).toBeVisible()
+
+  await page.getByRole('button', { name: '图片' }).first().click()
+  await expect(page.getByText('点击配置生成')).toBeVisible()
+  await expect(page.getByText('从资产库选择参考素材')).toBeVisible()
 })
