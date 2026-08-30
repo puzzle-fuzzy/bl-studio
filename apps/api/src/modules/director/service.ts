@@ -91,6 +91,7 @@ export function requireDirectorVideoModel(
   if (
     model === undefined
     || model.availability.enabled === false
+    || model.taskMode !== 'provider_async'
     || modelCatalog.getById(model.id)?.operation !== 'video.reference-to-video'
     || !model.parameters.some(parameter => (
       parameter.type === 'media'

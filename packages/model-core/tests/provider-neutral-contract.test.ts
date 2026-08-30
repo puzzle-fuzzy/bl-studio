@@ -5,7 +5,7 @@ import type {
   ProviderRequestContract,
   ProviderTransportContract,
 } from '../src'
-import { readModelParameterBinding } from '../src'
+import { readModelParameterBinding, readModelReferenceFormat } from '../src'
 
 type MockRequest = ProviderRequestContract & {
   kind: 'mock-generate'
@@ -74,5 +74,10 @@ describe('provider-neutral manifest contract', () => {
       field: 'negative_prompt',
     })
     expect(readModelParameterBinding({ target: 'unsupported' })).toBeUndefined()
+  })
+
+  it('normalizes optional reference syntax to a safe product-level default', () => {
+    expect(readModelReferenceFormat('image-bracket')).toBe('image-bracket')
+    expect(readModelReferenceFormat('provider-specific')).toBe('angle-bracket')
   })
 })

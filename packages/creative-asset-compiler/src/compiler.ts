@@ -1,6 +1,7 @@
 import {
   getModelAuditMetadata,
   readModelParameterBinding,
+  readModelReferenceFormat,
   validateModelParams,
 } from '@bailian-studio/model-core'
 import {
@@ -410,16 +411,11 @@ function bindingFor(manifest: CreativeAssetCompilerManifest, parameterName: stri
   return readModelParameterBinding(manifest.request.bindings[parameterName])
 }
 
-type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
-
-function referenceFormatFor(manifest: CreativeAssetCompilerManifest): ReferenceFormat {
-  const format = manifest.request.referenceFormat
-  return format === 'angle-bracket' || format === 'image-bracket' || format === 'chinese'
-    ? format
-    : 'angle-bracket'
+function referenceFormatFor(manifest: CreativeAssetCompilerManifest) {
+  return readModelReferenceFormat(manifest.request.referenceFormat)
 }
 
-function resolvePromptReferences(prompt: string, format: ReferenceFormat, referenceCount: number): string {
+function resolvePromptReferences(prompt: string, format: ReturnType<typeof readModelReferenceFormat>, referenceCount: number): string {
   return prompt.replace(/@图(\d+)/g, (match, rawIndex: string) => {
     const index = Number(rawIndex)
     if (!Number.isSafeInteger(index) || index < 1 || index > referenceCount) {
@@ -433,7 +429,7 @@ function resolvePromptReferences(prompt: string, format: ReferenceFormat, refere
   })
 }
 
-function providerSyntaxFor(format: ReferenceFormat, index: number): string {
+function providerSyntaxFor(format: ReturnType<typeof readModelReferenceFormat>, index: number): string {
   switch (format) {
     case 'angle-bracket':
       return `<<<image_${index}>>>`

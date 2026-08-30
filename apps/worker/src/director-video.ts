@@ -1,5 +1,9 @@
-import { validateModelParams } from '@bailian-studio/model-core'
-import type { FrozenModelManifest, ReferenceFormat } from '@bailian-studio/dashscope-manifests'
+import {
+  readModelParameterBinding,
+  readModelReferenceFormat,
+  validateModelParams,
+  type FrozenModelManifest,
+} from '@bailian-studio/model-core'
 import type { DirectorAsset, DirectorShot } from '@bailian-studio/director-contracts'
 
 const REFERENCE_ASSET_KINDS = new Set<DirectorAsset['kind']>([
@@ -49,7 +53,7 @@ export function buildDirectorVideoGenerationInput(
   assets: readonly DirectorAsset[],
   manifest: FrozenModelManifest,
 ): DirectorVideoGenerationInput {
-  if (manifest.category !== 'video' || manifest.request.kind !== 'dashscope-video-task') {
+  if (manifest.category !== 'video' || manifest.taskMode !== 'provider_async') {
     throw new DirectorVideoInputError(
       'DIRECTOR_VIDEO_MODEL_INVALID',
       'Director video generation requires an enabled asynchronous video model',
@@ -59,7 +63,7 @@ export function buildDirectorVideoGenerationInput(
   const referenceParameter = manifest.parameters.find(parameter => (
     parameter.type === 'media'
     && parameter.mediaKind === 'image'
-    && manifest.request.bindings[parameter.name]?.target === 'input.media'
+    && readModelParameterBinding(manifest.request.bindings[parameter.name])?.target === 'input.media'
   ))?.name
   const promptParameter = manifest.parameters.find(parameter => parameter.name === 'prompt' && parameter.type === 'text')
   if (referenceParameter === undefined || promptParameter === undefined) {
@@ -96,7 +100,7 @@ export function buildDirectorVideoGenerationInput(
     )
   }
 
-  const prompt = buildPrompt(shot, manifest.request.referenceFormat, references.length)
+  const prompt = buildPrompt(shot, readModelReferenceFormat(manifest.request.referenceFormat), references.length)
   const params: Record<string, unknown> = {
     [promptParameter.name]: prompt.slice(0, promptParameter.maxLength ?? 5_000),
   }
@@ -156,7 +160,7 @@ export function parseDirectorVideoRunSummary(value: Record<string, unknown> | nu
 
 function buildPrompt(
   shot: Pick<DirectorShot, 'narrative' | 'camera' | 'durationSeconds' | 'environmentPrompt' | 'videoPrompt' | 'dialogue' | 'referenceAssetIds'>,
-  referenceFormat: ReferenceFormat | undefined,
+  referenceFormat: ReturnType<typeof readModelReferenceFormat>,
   referenceCount: number,
 ): string {
   const camera = Object.entries(shot.camera)

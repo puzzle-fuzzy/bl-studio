@@ -1,5 +1,8 @@
 import type { ModelParameterBinding } from './types'
 
+/** Prompt reference syntaxes understood by product-level media workflows. */
+export type ModelReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
+
 /**
  * Read the small binding vocabulary shared by model-aware product compilers.
  * Provider manifests may attach extra fields, but consumers only rely on the
@@ -21,4 +24,14 @@ export function readModelParameterBinding(value: unknown): ModelParameterBinding
       : undefined
   }
   return undefined
+}
+
+/**
+ * Normalize an optional manifest reference syntax without exposing provider
+ * contract types to product compilers and workflow handlers.
+ */
+export function readModelReferenceFormat(value: unknown): ModelReferenceFormat {
+  return value === 'angle-bracket' || value === 'image-bracket' || value === 'chinese'
+    ? value
+    : 'angle-bracket'
 }
