@@ -11,6 +11,7 @@
 | `@bailian-studio/provider-dashscope` | `packages/provider-dashscope` | `apps/worker` | `workspace:*` |
 | `@bailian-studio/persistence-runtime` | `packages/persistence-runtime` | `apps/api` / `apps/worker` | `workspace:*` |
 | `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `packages/admin-repository` / `apps/api` / `apps/worker` | `workspace:*` |
+| `@bailian-studio/creative-asset-repository` | `packages/creative-asset-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 | `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
 
@@ -33,7 +34,7 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/director-contracts` | 任何其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope)`、apps、services |
 | `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|event-bus)`、apps、services、elysia、react |
-| `packages/generation-repository` | `@bailian-studio/provider-dashscope`、services、apps、react、elysia |
+| `packages/generation-repository` | `@bailian-studio/provider-dashscope`、直接从 `@bailian-studio/db` 导入创意资产域表、services、apps、react、elysia |
 | `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|event-bus)`、services、apps、react、elysia |
 | `packages/director-repository` | 除 `@bailian-studio/(db\|director-contracts\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/credit-ledger` | 除 `@bailian-studio/(db\|shared)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |

@@ -10,7 +10,11 @@ import {
 import { createIsolatedTestDb, resetBailianStudioTestDb } from '@bailian-studio/db/test'
 import { eq } from 'drizzle-orm'
 import { CreativeAssetRepositoryError } from '../src/errors'
-import { createCreativeAssetRepository } from '../src/repository'
+import {
+  createCreativeAssetRepository,
+  createCreativeGenerationContextStore,
+  fingerprintCreativeGenerationContext,
+} from '../src'
 
 const now = new Date('2026-08-25T00:00:00.000Z')
 const ownerId = 'creative-owner'
@@ -355,5 +359,87 @@ describe('creative asset repository', () => {
       position: 0,
       metadata: {},
     })).rejects.toBeInstanceOf(CreativeAssetRepositoryError)
+  })
+
+  it('owns the transactional generation context snapshot and readback boundary', async () => {
+    const source = await createStoredGenerationArtifact()
+    const project = await repository.createProject({ userId: ownerId, title: '上下文快照' })
+    const asset = await repository.createAsset({ userId: ownerId, projectId: project.id, type: 'character', name: '主角' })
+    const versioned = await repository.createVersion({
+      userId: ownerId,
+      assetId: asset.id,
+      semanticSpec: { identity: { name: '主角' } },
+      generationRecipe: { modelId: 'qwen-image' },
+    })
+    const versionId = versioned.versions[0]?.id
+    if (versionId === undefined) throw new Error('expected asset version')
+    await createReferenceSource('snapshot-character-front')
+    const referenced = await repository.addReference({
+      userId: ownerId,
+      assetVersionId: versionId,
+      userAssetId: 'snapshot-character-front',
+      role: 'front',
+      position: 0,
+      metadata: {},
+    })
+    const referenceId = referenced.versions[0]?.references[0]?.id
+    if (referenceId === undefined) throw new Error('expected reference')
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'generating' })
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'candidate' })
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'approved' })
+
+    const context = {
+      protocolVersion: 1 as const,
+      purpose: 'shot_image' as const,
+      projectId: project.id,
+      prompt: '让主角站在雨中',
+      modelId: 'qwen-image',
+      assetBindings: [{ assetVersionId: versionId, role: 'character' as const, position: 0, referenceIds: [referenceId] }],
+      recipe: { aspectRatio: '16:9' },
+      capabilitySnapshot: { compilerProtocolVersion: 1 },
+    }
+    const store = createCreativeGenerationContextStore()
+    await db.transaction(async tx => {
+      await store.validateForGeneration({ tx, userId: ownerId, context })
+      await store.persist({
+        tx,
+        generationId: source.generationId,
+        userId: ownerId,
+        modelId: 'qwen-image',
+        context,
+        createdAt: now,
+      })
+    })
+
+    await expect(store.read({ db, generationId: source.generationId })).resolves.toEqual(context)
+    await expect(store.findFingerprint({ db, generationId: source.generationId })).resolves.toBe(
+      fingerprintCreativeGenerationContext(context),
+    )
+  })
+
+  it('allows candidate versions only for asset variants', async () => {
+    const asset = await repository.createAsset({ userId: ownerId, type: 'character', name: '候选角色' })
+    const versioned = await repository.createVersion({ userId: ownerId, assetId: asset.id, semanticSpec: {}, generationRecipe: {} })
+    const versionId = versioned.versions[0]?.id
+    if (versionId === undefined) throw new Error('expected asset version')
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'generating' })
+    await repository.transitionVersion({ userId: ownerId, assetVersionId: versionId, status: 'candidate' })
+
+    const store = createCreativeGenerationContextStore()
+    const context = {
+      protocolVersion: 1 as const,
+      purpose: 'shot_image' as const,
+      prompt: '候选版本',
+      assetBindings: [{ assetVersionId: versionId, role: 'character' as const, position: 0, referenceIds: [] }],
+      recipe: {},
+      capabilitySnapshot: {},
+    }
+    await expect(db.transaction(tx => store.validateForGeneration({ tx, userId: ownerId, context })))
+      .rejects.toMatchObject({ code: 'CREATIVE_ASSET_VERSION_STATE_INVALID' })
+    await expect(db.transaction(tx => store.validateForGeneration({
+      tx,
+      userId: ownerId,
+      context: { ...context, purpose: 'asset_variant' },
+    }))).resolves.toBeUndefined()
   })
 })

@@ -1,6 +1,13 @@
 export { CreativeAssetRepositoryError, type CreativeAssetRepositoryErrorCode } from './errors'
 export { createCreativeAssetRepositoryFromUrl, type CreativeAssetRepositoryHandle } from './factory'
 export { createCreativeAssetRepository } from './repository'
+export {
+  createCreativeGenerationContextStore,
+  fingerprintCreativeGenerationContext,
+  type CreativeGenerationContextStore,
+  type PersistCreativeGenerationContextInput,
+  type ValidateCreativeGenerationContextInput,
+} from './generation-context'
 export type {
   AddCreativeAssetReferenceRepositoryInput,
   ArchiveCreativeAssetRepositoryInput,

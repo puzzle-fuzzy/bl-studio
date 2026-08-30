@@ -38,6 +38,7 @@ import {
   GenerationRepositoryError,
   type GenerationRepository,
 } from '../src'
+import { createCreativeGenerationContextStore } from '@bailian-studio/creative-asset-repository'
 import {
   createTaskQueueRepository,
   createTaskQueueTransactionStore,
@@ -72,8 +73,13 @@ beforeAll(async () => {
   const shareRepository = createShareRepository(db)
   taskRepository = createTaskQueueRepository({ db })
   const taskQueueTransactionStore = createTaskQueueTransactionStore()
+  const creativeGenerationContextStore = createCreativeGenerationContextStore()
   repository = {
-    ...createGenerationRepository({ db, taskQueueTransactionStore }),
+    ...createGenerationRepository({
+      db,
+      taskQueueTransactionStore,
+      creativeGenerationContextStore,
+    }),
     ...taskRepository,
     ...createAdminGalleryRepository(db),
     ...createAdminTaskRepository(db),

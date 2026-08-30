@@ -286,6 +286,7 @@ apps/worker
 - 把查询结果与写入输入继续保持领域类型，不向 API 暴露 Drizzle row。
 - 保留分页、软删除、恢复和事务边界。
 - `collectAssetFromGeneration` 在一个事务内完成资产、项目关系、版本和参考图写入；重复请求由用户范围内的幂等键与服务端指纹收敛到同一结果。
+- `generation-context.ts` 作为创意资产域的唯一快照 owner，提供 `CreativeGenerationContextStore` 事务端口：负责生成时的项目/版本/参考图 `FOR UPDATE` 准入校验、上下文快照写入、重跑读取和幂等指纹查询。`generation-repository` 注入该端口，仍与 generation 记录保持同一事务，但不再直接 import 创意资产域表。
 - 补齐并发冲突、唯一约束冲突和审计字段的稳定错误映射；普通 `createAsset` 不携带收录幂等字段。
 
 ### 6.4 `apps/api/src/modules/creative-assets/service.ts`（已实现）

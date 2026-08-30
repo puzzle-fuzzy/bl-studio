@@ -18,6 +18,7 @@ import {
 } from '@bailian-studio/auth'
 import {
   type CreativeAssetRepository,
+  createCreativeGenerationContextStore,
   createCreativeAssetRepository,
 } from '@bailian-studio/creative-asset-repository'
 import {
@@ -151,9 +152,11 @@ export function createApiPersistenceRuntime(
   try {
     const close = closeOnce(db)
     const taskQueueTransactionStore = createTaskQueueTransactionStore()
+    const creativeGenerationContextStore = createCreativeGenerationContextStore()
     const generationRepository = createGenerationRepository({
       db,
       taskQueueTransactionStore,
+      creativeGenerationContextStore,
     })
     const shareRepository = createShareRepository(db)
     return {
@@ -201,12 +204,14 @@ export function createWorkerPersistenceRuntime(
   try {
     const close = closeOnce(db)
     const taskQueueTransactionStore = createTaskQueueTransactionStore()
+    const creativeGenerationContextStore = createCreativeGenerationContextStore()
     return {
       auditOutboxRepository: createAuditOutboxRepository({ db }),
       creditLedger: createCreditLedger({ db }),
       generationRepository: createGenerationRepository({
         db,
         taskQueueTransactionStore,
+        creativeGenerationContextStore,
       }),
       generationRecoveryRepository: createGenerationRecoveryRepository(db),
       taskQueueRepository: createTaskQueueRepository({ db }),

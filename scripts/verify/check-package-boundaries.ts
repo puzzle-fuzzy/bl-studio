@@ -29,6 +29,7 @@ const importsWorkerSibling = importSpecifier(
 export const importsProviderDashScope = importSpecifier(
   String.raw`@bailian-studio\/provider-dashscope`,
 )
+export const importsCreativeAssetTables = /import\s*\{[^}]*\b(?:creativeAssetReferences|creativeAssets|creativeAssetVersions|creativeGenerationContextAssets|creativeGenerationContextReferences|creativeGenerationContexts|creativeProjects)\b[^}]*\}\s*from\s*['"]@bailian-studio\/db['"]/s
 
 export interface BailianPackageBoundary {
   readonly packageName: string
@@ -67,6 +68,16 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
       'packages/admin-repository',
       'apps/api',
       'apps/worker',
+    ],
+    dependencyProtocol: 'workspace:*',
+  },
+  {
+    packageName: '@bailian-studio/creative-asset-repository',
+    ownerScope: 'packages/creative-asset-repository',
+    allowedConsumerScopes: [
+      'apps/api',
+      'packages/persistence-runtime',
+      'packages/generation-repository',
     ],
     dependencyProtocol: 'workspace:*',
   },
@@ -364,6 +375,9 @@ export const rules: Array<{
     scope: 'packages/generation-repository',
     banned: [
       /@bailian-studio\/provider-dashscope\b/,
+      // generation-repository 只消费创意资产 repository 的事务端口；它仍可依赖
+      // db 读写 generation 自有表，但不能直接读取创意资产域表。
+      importsCreativeAssetTables,
       importsServices,
       importsApps,
       importsReact,

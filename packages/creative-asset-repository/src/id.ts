@@ -31,3 +31,15 @@ export function nextCreativeAssetCollectionBatchItemId(): string {
 export function nextAuditEventOutboxId(): string {
   return `audit-event-outbox_${randomUUID()}`
 }
+
+export function nextCreativeGenerationContextId(): string {
+  return `creative_context_${randomUUID()}`
+}
+
+export function nextCreativeGenerationContextAssetId(): string {
+  return `creative_context_asset_${randomUUID()}`
+}
+
+export function nextCreativeGenerationContextReferenceId(): string {
+  return `creative_context_reference_${randomUUID()}`
+}

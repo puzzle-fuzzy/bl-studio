@@ -5,6 +5,7 @@ import {
   checkBailianPackageManifestBoundary,
   checkBailianPackageSourceBoundary,
   declaresPackageDependency,
+  importsCreativeAssetTables,
   importsProviderDashScope,
   isBailianPackageConsumerAllowed,
   rules,
@@ -192,6 +193,16 @@ describe('package boundary rules', () => {
           'packages/admin-repository',
           'apps/api',
           'apps/worker',
+        ],
+        dependencyProtocol: 'workspace:*',
+      },
+      {
+        packageName: '@bailian-studio/creative-asset-repository',
+        ownerScope: 'packages/creative-asset-repository',
+        allowedConsumerScopes: [
+          'apps/api',
+          'packages/persistence-runtime',
+          'packages/generation-repository',
         ],
         dependencyProtocol: 'workspace:*',
       },
@@ -477,6 +488,17 @@ describe('package boundary rules', () => {
         "import { createDb } from '@bailian-studio/db'",
       ),
     ).toBe(false)
+    expect(
+      matchesRule(
+        'packages/generation-repository',
+        "import { creativeAssets } from '@bailian-studio/db'",
+      ),
+    ).toBe(true)
+    expect(
+      importsCreativeAssetTables.test(
+        "import { creativeGenerationContexts } from '@bailian-studio/db'",
+      ),
+    ).toBe(true)
   })
 
   it('keeps the credit ledger persistence package independent from runtime and domain packages', () => {

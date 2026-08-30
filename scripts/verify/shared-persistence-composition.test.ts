@@ -40,8 +40,9 @@ describe("process persistence composition", () => {
 		);
 		expect(runtimeSource).toContain("function closeOnce(db: BailianStudioDb)");
 		expect(runtimeSource).toContain("const taskQueueTransactionStore = createTaskQueueTransactionStore()");
+		expect(runtimeSource).toContain("const creativeGenerationContextStore = createCreativeGenerationContextStore()");
 		expect(runtimeSource).toMatch(
-			/createGenerationRepository\(\{\s*db,\s*taskQueueTransactionStore,?\s*\}\)/s,
+			/createGenerationRepository\(\{\s*db,\s*taskQueueTransactionStore,\s*creativeGenerationContextStore,?\s*\}\)/s,
 		);
 		expect(runtimeSource).toMatch(
 			/createDirectorRepository\(\{\s*db,\s*taskQueueTransactionStore,?\s*\}\)/s,

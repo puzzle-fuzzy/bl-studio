@@ -6,6 +6,7 @@
  * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository。
  */
 import { createDb, type BailianStudioDb } from '@bailian-studio/db'
+import { createCreativeGenerationContextStore } from '@bailian-studio/creative-asset-repository'
 import { createAssetRepository } from './assets'
 import type { AssetRepository } from './asset-port'
 import { createAuditRepository } from './audit-events'
@@ -55,10 +56,15 @@ export function createGenerationRepositoryFromUrl(
 ): GenerationRepositoryHandle {
   const db = createDb({ url, max: options.max ?? 5 })
   const taskQueueTransactionStore = createTaskQueueTransactionStore()
+  const creativeGenerationContextStore = createCreativeGenerationContextStore()
   const shareRepository = createShareRepository(db)
   return {
     db,
-    repository: createGenerationRepository({ db, taskQueueTransactionStore }),
+    repository: createGenerationRepository({
+      db,
+      taskQueueTransactionStore,
+      creativeGenerationContextStore,
+    }),
     assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
     auditRepository: createAuditRepository(db),
     generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),

@@ -468,6 +468,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/creative-asset-contracts": "workspace:*",
+        "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
         "@bailian-studio/db": "workspace:*",
         "@bailian-studio/event-bus": "workspace:*",

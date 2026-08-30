@@ -159,9 +159,11 @@ apps/web 18 个测试文件 = 17 个 `src/lib/*` + 1 个 store；components/page
 
 **方案**：抽 `repository-kit`（keyset 游标编解码、限值钳制、`RepositoryError` 基类 + 域前缀码、`withRowLock` 助手）为共享叶子包，6 个数据包统一采用。与 TODO 末尾"错误类型跨层统一继承"议题合并推进。
 
-### P1-I. generation-repository 越界读写 creative-asset 域表
+### P1-I. generation-repository 越界读写 creative-asset 域表（✅ 完成 2026-08-31）
 
-直接 import `creativeAssets/creativeAssetVersions/creativeProjects/creativeGenerationContext*`（`repository.ts:40-46`）做跨域校验（415-499），而同一批表归 creative-asset-repository 所有——两包写读同表、错误词表与映射各行其是。**方案**：跨域校验改走 creative-asset-repository 的 API；与 P1-B 拆分协同。
+~~直接 import `creativeAssets/creativeAssetVersions/creativeProjects/creativeGenerationContext*`（`repository.ts:40-46`）做跨域校验（415-499），而同一批表归 creative-asset-repository 所有——两包写读同表、错误词表与映射各行其是。~~
+
+**已实施**：新增 `creativeGenerationContextStore` 事务端口，由 `creative-asset-repository` 独占创意资产域表的锁定校验、上下文快照持久化、读取和指纹查询；`generation-repository` 只在自己的 generation 事务中注入并调用该端口，保留原子性但不再直接 import 创意资产表。新增边界规则与集成测试，禁止生成仓储重新绕过端口。
 
 ### P1-J. 审计动作枚举三处定义（✅ 完成 2026-08-29）
 
