@@ -1,6 +1,7 @@
 import { beforeAll, afterAll, describe, expect, it } from 'vitest'
 import { createDb, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
+import { RepositoryError } from '@bailian-studio/shared'
 import { CanvasRepositoryError, createCanvasRepository, type CanvasRepository } from '../src'
 
 let isolated: IsolatedTestDb
@@ -106,5 +107,9 @@ describe('canvas repository', () => {
       userId: 'canvas-repository-test',
       cursor: 'not-a-cursor',
     })).rejects.toMatchObject({ code: 'CANVAS_INVALID_CURSOR' })
+  })
+
+  it('exposes repository errors through the shared error base', () => {
+    expect(new CanvasRepositoryError('CANVAS_NOT_FOUND', 'missing')).toBeInstanceOf(RepositoryError)
   })
 })

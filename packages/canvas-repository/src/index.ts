@@ -11,7 +11,7 @@ import {
   type BailianStudioDb,
   type BailianStudioDbTransaction,
 } from '@bailian-studio/db'
-import { decodeCursor, encodeCursor } from '@bailian-studio/shared'
+import { decodeCursor, encodeCursor, RepositoryError } from '@bailian-studio/shared'
 import { and, desc, eq, lt, or } from 'drizzle-orm'
 
 export const CANVAS_REPOSITORY_ERROR_CODES = [
@@ -24,12 +24,12 @@ export const CANVAS_REPOSITORY_ERROR_CODES = [
 
 export type CanvasRepositoryErrorCode = typeof CANVAS_REPOSITORY_ERROR_CODES[number]
 
-export class CanvasRepositoryError extends Error {
+export class CanvasRepositoryError extends RepositoryError {
   readonly code: CanvasRepositoryErrorCode
   readonly details?: unknown
 
   constructor(code: CanvasRepositoryErrorCode, message: string, details?: unknown) {
-    super(message)
+    super(code, message, details)
     this.name = 'CanvasRepositoryError'
     this.code = code
     this.details = details
