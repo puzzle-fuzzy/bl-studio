@@ -153,6 +153,9 @@ flowchart LR
 - 用户可以取消仍处于 queued/running 的整张 Canvas 任务；任务状态会原子地变为 cancelled、释放租约，
   并尽力向已创建的子 generation 发出取消请求。Provider 是否已经停止执行由现有 generation/provider
   生命周期决定，因此取消接口不承诺已发出的外部请求能够瞬时中断。
+- Canvas 执行状态通过 `GET /api/canvases/:id/executions/:taskId/events` 提供 SSE；API 只读取
+  `task_records` 的变化并推送最新完整快照，避免引入第二份运行状态。客户端以 SSE 为主，连接不可用时
+  降级为原有任务查询轮询，终态事件发送后关闭连接。
 
 ## 4. 领域模型归属
 
@@ -393,4 +396,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度和整图取消已经落地；下一步应优先补实时进度事件和节点级重跑/缓存。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度、整图取消和 SSE 实时进度已经落地；下一步应优先补节点级重跑/缓存。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。

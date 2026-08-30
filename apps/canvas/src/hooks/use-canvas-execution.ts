@@ -1,4 +1,5 @@
 import type { AssetItem, CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
+import { CanvasExecutionTaskSummarySchema } from '@bailian-studio/canvas-contracts'
 import { apiClient } from '@bailian-studio/lib-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '@/stores/canvas-store'
@@ -19,6 +20,16 @@ function assetUrl(asset: AssetItem): string | undefined {
   return asset.url ?? asset.downloadUrl ?? asset.thumbnailUrl
 }
 
+function isTerminalExecution(summary: CanvasExecutionTaskSummary): boolean {
+  return summary.status === 'succeeded' || summary.status === 'failed' || summary.status === 'cancelled'
+}
+
+type SettledCanvasExecutionStatus = Exclude<CanvasExecutionStatus, 'idle' | 'submitting' | 'cancelling'>
+
+function toUiExecutionStatus(status: CanvasExecutionTaskSummary['status']): SettledCanvasExecutionStatus {
+  return status === 'queued' ? 'running' : status
+}
+
 /**
  * Canvas-level execution lifecycle. The server is authoritative for task
  * progress; this hook only hydrates completed asset IDs into node previews.
@@ -28,6 +39,7 @@ export function useCanvasExecution() {
   const revision = useCanvasStore(state => state.revision)
   const updateNodeData = useCanvasStore(state => state.updateNodeData)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const eventSourceRef = useRef<EventSource | null>(null)
   const runIdRef = useRef(0)
   const [status, setStatus] = useState<CanvasExecutionStatus>('idle')
   const [taskId, setTaskId] = useState<string | undefined>()
@@ -37,6 +49,8 @@ export function useCanvasExecution() {
     runIdRef.current += 1
     if (timerRef.current !== null) clearTimeout(timerRef.current)
     timerRef.current = null
+    eventSourceRef.current?.close()
+    eventSourceRef.current = null
   }, [])
 
   const applySummary = useCallback(
@@ -110,35 +124,85 @@ export function useCanvasExecution() {
       if (runIdRef.current !== runId) return
       setTaskId(execution.id)
       await applySummary(execution, runId)
-      if (execution.status === 'succeeded' || execution.status === 'failed' || execution.status === 'cancelled') {
-        setStatus(execution.status)
+      if (isTerminalExecution(execution)) {
+        setStatus(toUiExecutionStatus(execution.status))
         if (execution.error !== undefined) setError(execution.error)
         return
       }
       setStatus('running')
       const startedAt = Date.now()
+      let fallbackActive = false
+      let finished = false
+
+      const clearFallback = () => {
+        fallbackActive = false
+        if (timerRef.current !== null) clearTimeout(timerRef.current)
+        timerRef.current = null
+      }
+      const finish = async (next: CanvasExecutionTaskSummary): Promise<void> => {
+        if (runIdRef.current !== runId || finished) return
+        await applySummary(next, runId)
+        if (runIdRef.current !== runId || finished) return
+        if (isTerminalExecution(next)) {
+          finished = true
+          clearFallback()
+          eventSourceRef.current?.close()
+          eventSourceRef.current = null
+          setStatus(toUiExecutionStatus(next.status))
+          if (next.error !== undefined) setError(next.error)
+          return
+        }
+        setStatus('running')
+      }
       const poll = async (): Promise<void> => {
-        if (runIdRef.current !== runId) return
+        if (runIdRef.current !== runId || finished || !fallbackActive) return
         if (Date.now() - startedAt > MAX_POLL_MS) {
+          finished = true
+          clearFallback()
+          eventSourceRef.current?.close()
+          eventSourceRef.current = null
           setStatus('failed')
           setError('画布执行超时，可稍后重新运行')
           return
         }
         try {
           const next = await apiClient.getCanvasExecution(documentId, execution.id)
-          if (runIdRef.current !== runId) return
-          await applySummary(next, runId)
-          if (next.status === 'succeeded' || next.status === 'failed' || next.status === 'cancelled') {
-            setStatus(next.status)
-            if (next.error !== undefined) setError(next.error)
-            return
-          }
+          await finish(next)
         } catch {
           // Keep polling through transient network errors.
         }
-        timerRef.current = setTimeout(() => void poll(), POLL_INTERVAL_MS)
+        if (runIdRef.current === runId && fallbackActive && !finished) {
+          timerRef.current = setTimeout(() => void poll(), POLL_INTERVAL_MS)
+        }
       }
-      timerRef.current = setTimeout(() => void poll(), POLL_INTERVAL_MS)
+      const startFallback = () => {
+        if (runIdRef.current !== runId || finished || fallbackActive) return
+        fallbackActive = true
+        void poll()
+      }
+
+      try {
+        const source = new EventSource(apiClient.canvasExecutionEventsUrl(documentId, execution.id), {
+          withCredentials: true,
+        })
+        eventSourceRef.current = source
+        source.addEventListener('open', clearFallback)
+        source.addEventListener('error', startFallback)
+        source.addEventListener('canvas.execution', event => {
+          if (runIdRef.current !== runId || finished) return
+          let next: CanvasExecutionTaskSummary
+          try {
+            next = CanvasExecutionTaskSummarySchema.parse(JSON.parse((event as MessageEvent<string>).data))
+          } catch {
+            return
+          }
+          if (next.id !== execution.id) return
+          void finish(next)
+        })
+      } catch {
+        // 浏览器不支持 EventSource 时，回退到已有的任务查询轮询。
+        startFallback()
+      }
     } catch (nextError) {
       if (runIdRef.current !== runId) return
       setStatus('failed')
@@ -156,7 +220,7 @@ export function useCanvasExecution() {
       const execution = await apiClient.cancelCanvasExecution(documentId, taskId)
       if (runIdRef.current !== runId) return
       await applySummary(execution, runId)
-      setStatus(execution.status === 'queued' ? 'running' : execution.status)
+      setStatus(toUiExecutionStatus(execution.status))
       if (execution.error !== undefined) setError(execution.error)
     } catch (nextError) {
       if (runIdRef.current !== runId) return

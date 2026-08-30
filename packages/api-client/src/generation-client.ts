@@ -485,6 +485,8 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   executeCanvas(id: string, input: ExecuteCanvasInput): Promise<CanvasExecutionTaskSummary>
   /** `GET /api/canvases/:id/executions/:taskId` —— 查询画布执行状态。 */
   getCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
+  /** `GET /api/canvases/:id/executions/:taskId/events` —— 订阅画布执行状态 SSE。 */
+  canvasExecutionEventsUrl(id: string, taskId: string): string
   /** `POST /api/canvases/:id/executions/:taskId/cancel` —— 取消画布执行。 */
   cancelCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
   deleteAsset(id: string): Promise<void>
@@ -1398,6 +1400,10 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         CanvasExecutionTaskResponseSchema,
       )
       return data.execution
+    },
+
+    canvasExecutionEventsUrl(id, taskId) {
+      return `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}/events`
     },
 
     async cancelCanvasExecution(id, taskId) {

@@ -33,7 +33,10 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - 节点按拓扑层推进，同层节点在并发上限内并行；并发上限由 Worker 组合根配置，默认值为 4。
 - API 提供整张 Canvas 任务的幂等取消：只允许取消 queued/running 任务，原子释放租约，并尽力请求已创建的
   子 generation 取消。子 generation 是否能立即停止仍取决于现有 Provider 生命周期。
-- SSE 进度推送和节点级重跑尚未实现；当前状态通过任务查询轮询获取。
+- `GET /api/canvases/:id/executions/:taskId/events` 提供 Canvas 专属 SSE。API 以短周期读取
+  `task_records` 的新 `updatedAt` 快照，只发送变化后的完整 execution summary，不建立独立运行态副本；
+  终态事件发送后关闭连接，客户端在 SSE 不可用时降级为任务查询轮询。
+- 节点级重跑和结果缓存尚未实现。
 - 资产 ID 和画布 revision 都在服务端重新校验；客户端不能通过任务查询跨用户读取执行状态。
 
-下一阶段可在不改变当前 generation 语义的前提下增加实时事件流、节点级重跑和可复用的节点结果缓存。
+下一阶段可在不改变当前 generation 语义的前提下增加节点级重跑和可复用的节点结果缓存。

@@ -1099,6 +1099,9 @@ describe('createApiClient', () => {
         idempotencyKey: 'run-1',
       }),
     ).toEqual(execution)
+    expect(client.canvasExecutionEventsUrl('canvas 1', execution.id)).toBe(
+      'http://api.test/api/canvases/canvas%201/executions/canvas_execution_1/events',
+    )
     expect(await client.getCanvasExecution('canvas_1', execution.id)).toMatchObject({ status: 'running' })
     expect(await client.cancelCanvasExecution('canvas_1', execution.id)).toMatchObject({ status: 'cancelled' })
     expect(calls.map(call => [call.method, call.url])).toEqual([

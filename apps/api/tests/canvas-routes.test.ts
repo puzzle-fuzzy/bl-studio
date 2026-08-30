@@ -83,6 +83,17 @@ function createFakeTaskRepository() {
   }
 }
 
+async function readUntilReader(reader: ReadableStreamDefaultReader<Uint8Array>, marker: string): Promise<string> {
+  const decoder = new TextDecoder()
+  let text = ''
+  for (;;) {
+    const next = await reader.read()
+    if (next.done) return text
+    text += decoder.decode(next.value, { stream: true })
+    if (text.includes(marker)) return text
+  }
+}
+
 beforeEach(() => {
   document = {
     id: 'canvas-1',
@@ -269,5 +280,70 @@ describe('canvas routes', () => {
       id: execution.id,
       status: 'cancelled',
     })
+  })
+
+  it('streams the initial canvas execution and subsequent task changes', async () => {
+    document = {
+      ...document,
+      snapshot: {
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'mediaNode',
+            position: { x: 0, y: 0 },
+            data: {
+              kind: 'image',
+              status: 'empty',
+              prompt: 'a lantern',
+              modelId: 'qwen-image',
+              referenceAssetIds: [],
+            },
+          },
+        ],
+        edges: [],
+      },
+    }
+    const taskRepository = createFakeTaskRepository()
+    const app = createTestApp({
+      authService: createFakeAuthService(() => user),
+      canvasRepository: createFakeCanvasRepository(),
+      taskQueueRepository: taskRepository,
+    }).app
+    const executionResponse = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/execute', {
+        method: 'POST',
+        headers: {
+          cookie: 'bailian_studio_session=fake-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ expectedRevision: 1, idempotencyKey: 'run-events' }),
+      }),
+    )
+    const execution = (await executionResponse.json()).data.execution as { id: string }
+    const response = await app.handle(
+      new Request(`http://localhost/api/canvases/canvas-1/executions/${execution.id}/events`, {
+        headers: { cookie: 'bailian_studio_session=fake-token' },
+      }),
+    )
+    expect(response.status).toBe(200)
+    expect(response.headers.get('content-type')).toContain('text/event-stream')
+    const reader = response.body?.getReader()
+    if (reader === undefined) throw new Error('expected readable body')
+
+    const connected = await reader.read()
+    expect(new TextDecoder().decode(connected.value)).toContain('event: connected')
+    const initial = await reader.read()
+    expect(new TextDecoder().decode(initial.value)).toContain('event: canvas.execution')
+
+    const stored = taskRepository.tasks.get(execution.id)
+    if (stored === undefined) throw new Error('expected stored canvas task')
+    taskRepository.tasks.set(execution.id, {
+      ...stored,
+      status: 'running',
+      updatedAt: '2026-08-30T00:00:01.000Z',
+    })
+    const live = await readUntilReader(reader, '"status":"running"')
+    expect(live).toContain('event: canvas.execution')
+    await reader.cancel()
   })
 })

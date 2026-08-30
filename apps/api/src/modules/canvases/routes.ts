@@ -1,4 +1,5 @@
 import { createHash, randomUUID } from 'node:crypto'
+import { encodeSSE } from '@bailian-studio/event-bus'
 import {
   CreateCanvasInputSchema,
   CanvasExecutionTaskInputSchema,
@@ -25,6 +26,14 @@ const ListCanvasesQuerySchema = z
     limit: z.coerce.number().int().min(1).max(100).optional(),
   })
   .strict()
+
+const CANVAS_SSE_POLL_INTERVAL_MS = 1_000
+const CANVAS_SSE_HEARTBEAT_INTERVAL_MS = 15_000
+const CANVAS_SSE_RESPONSE_HEADERS = {
+  'content-type': 'text/event-stream; charset=utf-8',
+  'cache-control': 'no-cache, no-transform',
+  connection: 'keep-alive',
+} as const
 
 export function createCanvasRoutes(deps: ApiDependencies) {
   return new Elysia({ prefix: '/api/canvases' })
@@ -137,6 +146,120 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         data: { execution: toCanvasExecutionSummary(task) },
       }
     })
+    .get('/:id/executions/:taskId/events', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const task = await deps.taskQueueRepository.getTask(params.taskId)
+      if (task === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas execution not found: ${params.taskId}`)
+      }
+      assertCanvasExecutionTaskOwner(task, user.id, params.id)
+
+      const initialSummary = toCanvasExecutionSummary(task)
+      const lastEventId = request.headers.get('last-event-id')?.trim()
+      const encoder = new TextEncoder()
+      let cancelStream = () => {}
+
+      return new Response(
+        new ReadableStream({
+          start(controller) {
+            let closed = false
+            let currentEventId = canvasExecutionEventId(task)
+            let pollTimer: ReturnType<typeof setTimeout> | undefined
+            let heartbeatTimer: ReturnType<typeof setInterval> | undefined
+
+            const cleanup = () => {
+              if (closed) return
+              closed = true
+              if (pollTimer !== undefined) clearTimeout(pollTimer)
+              if (heartbeatTimer !== undefined) clearInterval(heartbeatTimer)
+            }
+            const close = () => {
+              cleanup()
+              try {
+                controller.close()
+              } catch {
+                // 客户端断开时，ReadableStream 可能已经被底层关闭。
+              }
+            }
+            const send = (message: { id?: string; event: string; data: unknown }) => {
+              if (closed) return
+              try {
+                controller.enqueue(encoder.encode(encodeSSE(message)))
+              } catch {
+                close()
+              }
+            }
+            cancelStream = cleanup
+
+            send({
+              event: 'connected',
+              data: { serverTime: new Date().toISOString() },
+            })
+            if (lastEventId !== currentEventId) {
+              send({
+                id: currentEventId,
+                event: 'canvas.execution',
+                data: initialSummary,
+              })
+            }
+
+            const isTerminal =
+              initialSummary.status === 'succeeded' ||
+              initialSummary.status === 'failed' ||
+              initialSummary.status === 'cancelled'
+            if (isTerminal) {
+              close()
+              return
+            }
+
+            const poll = async (): Promise<void> => {
+              if (closed) return
+              try {
+                const nextTask = await deps.taskQueueRepository.getTask(task.id)
+                if (nextTask === undefined) {
+                  close()
+                  return
+                }
+                assertCanvasExecutionTaskOwner(nextTask, user.id, params.id)
+                const nextEventId = canvasExecutionEventId(nextTask)
+                if (nextEventId !== currentEventId) {
+                  currentEventId = nextEventId
+                  const nextSummary = toCanvasExecutionSummary(nextTask)
+                  send({
+                    id: nextEventId,
+                    event: 'canvas.execution',
+                    data: nextSummary,
+                  })
+                  if (
+                    nextSummary.status === 'succeeded' ||
+                    nextSummary.status === 'failed' ||
+                    nextSummary.status === 'cancelled'
+                  ) {
+                    close()
+                    return
+                  }
+                }
+              } catch {
+                // 保持流打开，下一轮继续读取；权限/数据异常不会把内部细节发给客户端。
+              }
+              if (!closed) pollTimer = setTimeout(() => void poll(), CANVAS_SSE_POLL_INTERVAL_MS)
+            }
+
+            heartbeatTimer = setInterval(() => {
+              send({
+                event: 'heartbeat',
+                data: { serverTime: new Date().toISOString() },
+              })
+            }, CANVAS_SSE_HEARTBEAT_INTERVAL_MS)
+            pollTimer = setTimeout(() => void poll(), CANVAS_SSE_POLL_INTERVAL_MS)
+          },
+          cancel() {
+            cancelStream()
+          },
+        }),
+        { headers: CANVAS_SSE_RESPONSE_HEADERS },
+      )
+    })
     .post('/:id/executions/:taskId/cancel', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const task = await deps.taskQueueRepository.getTask(params.taskId)
@@ -220,6 +343,20 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       })
       return { success: true, data: { document } }
     })
+}
+
+function canvasExecutionEventId(task: TaskRecord): string {
+  return createHash('sha256')
+    .update(
+      JSON.stringify({
+        id: task.id,
+        status: task.status,
+        updatedAt: task.updatedAt,
+        input: task.input,
+        errorJson: task.errorJson ?? null,
+      }),
+    )
+    .digest('hex')
 }
 
 async function cancelCanvasNodeGenerations(task: TaskRecord, userId: string, deps: ApiDependencies): Promise<void> {
