@@ -75,7 +75,7 @@ export function FeedbackPage() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-lg font-semibold">反馈管理</h1>
         <Select value={status} onValueChange={setStatus}>
           <SelectTrigger className="w-32"><SelectValue /></SelectTrigger>

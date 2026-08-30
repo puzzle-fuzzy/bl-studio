@@ -168,7 +168,7 @@ function CanvasTaskContextSection({ context }: { context: AdminCanvasTaskContext
         <DetailField label="本次费用" value={`${centsToYuan(accountedCents)} 元`} />
       </dl>
 
-      <div className="overflow-x-auto rounded-lg border">
+      <div className="rounded-lg border">
         <Table className="min-w-[820px]">
           <TableHeader>
             <TableRow>
@@ -593,8 +593,7 @@ export function TasksPage() {
           ) : items.length === 0 ? (
             <p className="p-6 text-center text-sm text-muted-foreground">暂无任务</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table className="min-w-[1480px]">
+            <Table className="min-w-[1480px]">
                 <TableHeader>
                   <TableRow>
                     <TableHead className="w-80">任务 ID</TableHead>
@@ -664,8 +663,7 @@ export function TasksPage() {
                     </TableRow>
                   ))}
                 </TableBody>
-              </Table>
-            </div>
+            </Table>
           )}
         </CardContent>
       </Card>

@@ -204,7 +204,7 @@ export function AnalyticsPage() {
               <CardContent className="space-y-2">
                 {retentionStages.map((stage, index) => (
                   <div key={stage.label} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
+                    <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 text-sm">
                       <span>{index + 1}. {stage.label}</span>
                       <span className="text-muted-foreground">{stage.value} 人 · {stage.pct}%</span>
                     </div>
