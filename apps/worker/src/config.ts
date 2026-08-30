@@ -2,7 +2,7 @@ import { isValidDashScopeWorkspaceId } from '@bailian-studio/provider-dashscope'
 
 export interface WorkerEnv {
   readonly databaseUrl: string
-  readonly dashscopeApiKey: string
+  readonly dashscopeApiKey?: string
   readonly bailianWorkspaceId?: string
   readonly errorLocale: 'zh-CN' | 'en-US'
   readonly workerId: string
@@ -31,8 +31,15 @@ export function readWorkerEnv(
   pid: number = process.pid,
 ): WorkerEnv {
   const databaseUrl = requiredValue(source['DATABASE_URL'], 'DATABASE_URL')
-  const dashscopeApiKey = requiredValue(source['DASHSCOPE_API_KEY'], 'DASHSCOPE_API_KEY')
-  if (optionalValue(source['NODE_ENV'])?.toLowerCase() === 'production') {
+  const dashscopeApiKey = optionalValue(source['DASHSCOPE_API_KEY'])
+  const isProduction = optionalValue(source['NODE_ENV'])?.toLowerCase() === 'production'
+  if (isProduction && dashscopeApiKey === undefined) {
+    throw configError(
+      'DASHSCOPE_API_KEY 环境变量不能为空',
+      'DASHSCOPE_API_KEY environment variable is required',
+    )
+  }
+  if (isProduction) {
     validateProductionStorage(source)
   }
   const bailianWorkspaceId = optionalValue(source['BAILIAN_WORKSPACE_ID'])
@@ -69,7 +76,7 @@ export function readWorkerEnv(
 
   return Object.freeze({
     databaseUrl,
-    dashscopeApiKey,
+    ...(dashscopeApiKey === undefined ? {} : { dashscopeApiKey }),
     ...(bailianWorkspaceId === undefined ? {} : { bailianWorkspaceId }),
     errorLocale: localeValue,
     workerId,

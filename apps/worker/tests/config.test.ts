@@ -30,13 +30,16 @@ describe('worker environment boundary', () => {
     })
   })
 
-  it('rejects missing or blank secrets with bilingual diagnostics', () => {
+  it('requires the database everywhere and the provider key in production', () => {
     expect(() => readWorkerEnv({ DASHSCOPE_API_KEY: 'key' })).toThrow(
       'DATABASE_URL 环境变量不能为空 / DATABASE_URL environment variable is required',
     )
-    expect(() => readWorkerEnv({ DATABASE_URL: 'db', DASHSCOPE_API_KEY: '   ' })).toThrow(
+    expect(() => readWorkerEnv({ DATABASE_URL: 'db', NODE_ENV: 'production' })).toThrow(
       'DASHSCOPE_API_KEY 环境变量不能为空 / DASHSCOPE_API_KEY environment variable is required',
     )
+    expect(readWorkerEnv({ DATABASE_URL: 'db', DASHSCOPE_API_KEY: '   ' })).toMatchObject({
+      databaseUrl: 'db',
+    })
   })
 
   it('rejects invalid locale and workspace identifiers before startup', () => {

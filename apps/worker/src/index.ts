@@ -82,16 +82,20 @@ async function main(): Promise<void> {
   })
 
   const providerRegistry = createProviderRegistry({
-    dashscope: {
-      apiKey: env.dashscopeApiKey,
-      ...(env.bailianWorkspaceId === undefined
-        ? {}
-        : { workspaceId: env.bailianWorkspaceId }),
-      errorLocale: env.errorLocale,
-      ...(env.dashscopeRequestTimeoutMs === undefined
-        ? {}
-        : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
-    },
+    ...(env.dashscopeApiKey === undefined
+      ? {}
+      : {
+          dashscope: {
+            apiKey: env.dashscopeApiKey,
+            ...(env.bailianWorkspaceId === undefined
+              ? {}
+              : { workspaceId: env.bailianWorkspaceId }),
+            errorLocale: env.errorLocale,
+            ...(env.dashscopeRequestTimeoutMs === undefined
+              ? {}
+              : { requestTimeoutMs: env.dashscopeRequestTimeoutMs }),
+          },
+        }),
   })
   const storage = createStorageFromEnv({ env: process.env })
 
