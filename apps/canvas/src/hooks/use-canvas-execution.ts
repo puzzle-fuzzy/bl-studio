@@ -1,7 +1,4 @@
-import type {
-  AssetItem,
-  CanvasExecutionTaskSummary,
-} from '@bailian-studio/api-client'
+import type { AssetItem, CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
 import { apiClient } from '@bailian-studio/lib-client'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useCanvasStore } from '@/stores/canvas-store'
@@ -13,6 +10,7 @@ export type CanvasExecutionStatus =
   | 'idle'
   | 'submitting'
   | 'running'
+  | 'cancelling'
   | 'succeeded'
   | 'failed'
   | 'cancelled'
@@ -26,9 +24,9 @@ function assetUrl(asset: AssetItem): string | undefined {
  * progress; this hook only hydrates completed asset IDs into node previews.
  */
 export function useCanvasExecution() {
-  const documentId = useCanvasStore((state) => state.documentId)
-  const revision = useCanvasStore((state) => state.revision)
-  const updateNodeData = useCanvasStore((state) => state.updateNodeData)
+  const documentId = useCanvasStore(state => state.documentId)
+  const revision = useCanvasStore(state => state.revision)
+  const updateNodeData = useCanvasStore(state => state.updateNodeData)
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const runIdRef = useRef(0)
   const [status, setStatus] = useState<CanvasExecutionStatus>('idle')
@@ -42,16 +40,20 @@ export function useCanvasExecution() {
   }, [])
 
   const applySummary = useCallback(
-    async (
-      summary: CanvasExecutionTaskSummary,
-      runId: number,
-    ): Promise<void> => {
+    async (summary: CanvasExecutionTaskSummary, runId: number): Promise<void> => {
       for (const node of summary.nodeStatuses) {
         if (runIdRef.current !== runId) return
         if (node.status === 'failed') {
           updateNodeData(node.nodeId, {
             status: 'error',
             errorMessage: node.error ?? '画布节点执行失败',
+          })
+          continue
+        }
+        if (summary.status === 'cancelled' && node.status !== 'succeeded') {
+          updateNodeData(node.nodeId, {
+            status: 'error',
+            errorMessage: node.error ?? '画布执行已取消',
           })
           continue
         }
@@ -96,6 +98,7 @@ export function useCanvasExecution() {
       return
     }
     stop()
+    setTaskId(undefined)
     const runId = runIdRef.current
     setStatus('submitting')
     setError(undefined)
@@ -107,11 +110,7 @@ export function useCanvasExecution() {
       if (runIdRef.current !== runId) return
       setTaskId(execution.id)
       await applySummary(execution, runId)
-      if (
-        execution.status === 'succeeded' ||
-        execution.status === 'failed' ||
-        execution.status === 'cancelled'
-      ) {
+      if (execution.status === 'succeeded' || execution.status === 'failed' || execution.status === 'cancelled') {
         setStatus(execution.status)
         if (execution.error !== undefined) setError(execution.error)
         return
@@ -126,17 +125,10 @@ export function useCanvasExecution() {
           return
         }
         try {
-          const next = await apiClient.getCanvasExecution(
-            documentId,
-            execution.id,
-          )
+          const next = await apiClient.getCanvasExecution(documentId, execution.id)
           if (runIdRef.current !== runId) return
           await applySummary(next, runId)
-          if (
-            next.status === 'succeeded' ||
-            next.status === 'failed' ||
-            next.status === 'cancelled'
-          ) {
+          if (next.status === 'succeeded' || next.status === 'failed' || next.status === 'cancelled') {
             setStatus(next.status)
             if (next.error !== undefined) setError(next.error)
             return
@@ -150,13 +142,30 @@ export function useCanvasExecution() {
     } catch (nextError) {
       if (runIdRef.current !== runId) return
       setStatus('failed')
-      setError(
-        nextError instanceof Error ? nextError.message : String(nextError),
-      )
+      setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
   }, [applySummary, documentId, revision, stop])
 
+  const cancel = useCallback(async () => {
+    if (documentId === undefined || taskId === undefined || (status !== 'submitting' && status !== 'running')) return
+    stop()
+    const runId = runIdRef.current
+    setStatus('cancelling')
+    setError(undefined)
+    try {
+      const execution = await apiClient.cancelCanvasExecution(documentId, taskId)
+      if (runIdRef.current !== runId) return
+      await applySummary(execution, runId)
+      setStatus(execution.status === 'queued' ? 'running' : execution.status)
+      if (execution.error !== undefined) setError(execution.error)
+    } catch (nextError) {
+      if (runIdRef.current !== runId) return
+      setStatus('running')
+      setError(nextError instanceof Error ? nextError.message : String(nextError))
+    }
+  }, [applySummary, documentId, status, stop, taskId])
+
   useEffect(() => () => stop(), [stop])
 
-  return { execute, stop, status, taskId, error }
+  return { execute, cancel, stop, status, taskId, error }
 }

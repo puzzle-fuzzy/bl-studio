@@ -485,6 +485,8 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   executeCanvas(id: string, input: ExecuteCanvasInput): Promise<CanvasExecutionTaskSummary>
   /** `GET /api/canvases/:id/executions/:taskId` —— 查询画布执行状态。 */
   getCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
+  /** `POST /api/canvases/:id/executions/:taskId/cancel` —— 取消画布执行。 */
+  cancelCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
   deleteAsset(id: string): Promise<void>
 
   /** `POST /api/auth/logout` —— 注销，服务端软删 session 让 cookie 失效。 */
@@ -1392,6 +1394,16 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
       const data = await unwrapData(
         `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}`,
         { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        CanvasExecutionTaskResponseSchema,
+      )
+      return data.execution
+    },
+
+    async cancelCanvasExecution(id, taskId) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}/cancel`,
+        { method: 'POST', credentials: 'include' },
         fetchImpl,
         CanvasExecutionTaskResponseSchema,
       )

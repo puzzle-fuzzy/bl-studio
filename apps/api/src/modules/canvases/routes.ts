@@ -56,10 +56,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         documentId: params.id,
       })
       if (document === undefined) {
-        throw new CanvasRepositoryError(
-          'CANVAS_NOT_FOUND',
-          `Canvas not found: ${params.id}`,
-        )
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas not found: ${params.id}`)
       }
       if (document.revision !== input.expectedRevision) {
         throw new CanvasRepositoryError(
@@ -72,11 +69,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         )
       }
 
-      const assetKinds = await resolveCanvasAssetKinds(
-        document.snapshot.nodes,
-        deps,
-        user.id,
-      )
+      const assetKinds = await resolveCanvasAssetKinds(document.snapshot.nodes, deps, user.id)
       const plan = compileCanvasGraph({
         snapshot: document.snapshot,
         assetKinds,
@@ -87,12 +80,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
           : `canvas_execution_${createHash('sha256').update(`${user.id}:${document.id}:${input.idempotencyKey}`).digest('hex').slice(0, 48)}`
       const existing = await deps.taskQueueRepository.getTask(taskId)
       if (existing !== undefined) {
-        assertCanvasExecutionTaskOwner(
-          existing,
-          user.id,
-          document.id,
-          document.revision,
-        )
+        assertCanvasExecutionTaskOwner(existing, user.id, document.id, document.revision)
         return {
           success: true,
           data: { execution: toCanvasExecutionSummary(existing) },
@@ -129,12 +117,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         if (input.idempotencyKey === undefined) throw error
         const concurrent = await deps.taskQueueRepository.getTask(taskId)
         if (concurrent === undefined) throw error
-        assertCanvasExecutionTaskOwner(
-          concurrent,
-          user.id,
-          document.id,
-          document.revision,
-        )
+        assertCanvasExecutionTaskOwner(concurrent, user.id, document.id, document.revision)
         created = concurrent
       }
       return {
@@ -146,15 +129,53 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const task = await deps.taskQueueRepository.getTask(params.taskId)
       if (task === undefined) {
-        throw new CanvasRepositoryError(
-          'CANVAS_NOT_FOUND',
-          `Canvas execution not found: ${params.taskId}`,
-        )
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas execution not found: ${params.taskId}`)
       }
       assertCanvasExecutionTaskOwner(task, user.id, params.id)
       return {
         success: true,
         data: { execution: toCanvasExecutionSummary(task) },
+      }
+    })
+    .post('/:id/executions/:taskId/cancel', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const task = await deps.taskQueueRepository.getTask(params.taskId)
+      if (task === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas execution not found: ${params.taskId}`)
+      }
+      assertCanvasExecutionTaskOwner(task, user.id, params.id)
+      if (task.status === 'succeeded' || task.status === 'failed' || task.status === 'cancelled') {
+        return {
+          success: true,
+          data: { execution: toCanvasExecutionSummary(task) },
+        }
+      }
+
+      const now = new Date().toISOString()
+      const cancelled = await deps.taskQueueRepository.cancelTask({
+        taskId: task.id,
+        userId: user.id,
+        type: 'canvas.execute',
+        now,
+        updatedBy: user.id,
+        error: {
+          category: 'cancelled',
+          message: 'Canvas execution cancelled by user',
+          retriable: false,
+          code: 'CANVAS_EXECUTION_CANCELLED',
+        },
+      })
+      const finalTask = cancelled ?? (await deps.taskQueueRepository.getTask(task.id))
+      if (finalTask === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas execution not found: ${params.taskId}`)
+      }
+      assertCanvasExecutionTaskOwner(finalTask, user.id, params.id)
+      if (finalTask.status === 'cancelled') {
+        await cancelCanvasNodeGenerations(finalTask, user.id, deps)
+      }
+      return {
+        success: true,
+        data: { execution: toCanvasExecutionSummary(finalTask) },
       }
     })
     .get('/:id', async ({ request, params, set }) => {
@@ -165,12 +186,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       })
       if (document === undefined) {
         set.status = 404
-        return requestErrorResponseBody(
-          request,
-          'CANVAS_NOT_FOUND',
-          'Canvas not found',
-          set,
-        )
+        return requestErrorResponseBody(request, 'CANVAS_NOT_FOUND', 'Canvas not found', set)
       }
       return { success: true, data: { document } }
     })
@@ -206,6 +222,24 @@ export function createCanvasRoutes(deps: ApiDependencies) {
     })
 }
 
+async function cancelCanvasNodeGenerations(task: TaskRecord, userId: string, deps: ApiDependencies): Promise<void> {
+  const parsed = CanvasExecutionTaskInputSchema.safeParse(task.input)
+  if (!parsed.success) return
+  const generationIds = new Set(
+    Object.values(parsed.data.nodeRuns)
+      .map(run => run.generationId)
+      .filter((generationId): generationId is string => generationId !== undefined),
+  )
+  await Promise.allSettled(
+    [...generationIds].map(recordId =>
+      deps.generationRepository.requestGenerationCancel({
+        recordId,
+        userId,
+      }),
+    ),
+  )
+}
+
 async function resolveCanvasAssetKinds(
   nodes: ReadonlyArray<{ data: Record<string, unknown> }>,
   deps: ApiDependencies,
@@ -215,12 +249,10 @@ async function resolveCanvasAssetKinds(
   for (const node of nodes) {
     const value = node.data['referenceAssetIds']
     if (!Array.isArray(value)) continue
-    for (const assetId of value)
-      if (typeof assetId === 'string' && assetId.trim().length > 0)
-        ids.add(assetId)
+    for (const assetId of value) if (typeof assetId === 'string' && assetId.trim().length > 0) ids.add(assetId)
   }
   const entries = await Promise.all(
-    [...ids].map(async (assetId) => {
+    [...ids].map(async assetId => {
       const asset = await deps.assetRepository.getUserAsset({
         userId,
         assetId,
@@ -228,12 +260,7 @@ async function resolveCanvasAssetKinds(
       return asset === undefined ? undefined : ([assetId, asset.kind] as const)
     }),
   )
-  return new Map(
-    entries.filter(
-      (entry): entry is readonly [string, CanvasExecutionAssetKind] =>
-        entry !== undefined,
-    ),
-  )
+  return new Map(entries.filter((entry): entry is readonly [string, CanvasExecutionAssetKind] => entry !== undefined))
 }
 
 function assertCanvasExecutionTaskOwner(
@@ -249,44 +276,33 @@ function assertCanvasExecutionTaskOwner(
     task.userId !== userId ||
     !parsed.success ||
     parsed.data.documentId !== documentId ||
-    (expectedRevision !== undefined &&
-      parsed.data.documentRevision !== expectedRevision)
+    (expectedRevision !== undefined && parsed.data.documentRevision !== expectedRevision)
   ) {
-    throw new CanvasRepositoryError(
-      'CANVAS_NOT_FOUND',
-      'Canvas execution not found',
-    )
+    throw new CanvasRepositoryError('CANVAS_NOT_FOUND', 'Canvas execution not found')
   }
 }
 
 function toCanvasExecutionSummary(task: TaskRecord) {
   const parsed = CanvasExecutionTaskInputSchema.safeParse(task.input)
   if (!parsed.success) {
-    throw new CanvasExecutionError(
-      'CANVAS_EXECUTION_INVALID_TASK_INPUT',
-      'Canvas execution task input is invalid',
-    )
+    throw new CanvasExecutionError('CANVAS_EXECUTION_INVALID_TASK_INPUT', 'Canvas execution task input is invalid')
   }
   return {
     id: task.id,
     documentId: parsed.data.documentId,
     documentRevision: parsed.data.documentRevision,
     status: task.status,
-    nodeStatuses: parsed.data.plan.nodes.map((node) => {
+    nodeStatuses: parsed.data.plan.nodes.map(node => {
       const run = parsed.data.nodeRuns[node.nodeId]
       return {
         nodeId: node.nodeId,
         status: run?.status ?? 'queued',
-        ...(run?.generationId === undefined
-          ? {}
-          : { generationId: run.generationId }),
+        ...(run?.generationId === undefined ? {} : { generationId: run.generationId }),
         ...(run?.assetIds === undefined ? {} : { assetIds: run.assetIds }),
         ...(run?.error === undefined ? {} : { error: run.error }),
       }
     }),
-    ...(task.errorJson?.message === undefined
-      ? {}
-      : { error: task.errorJson.message }),
+    ...(task.errorJson?.message === undefined ? {} : { error: task.errorJson.message }),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   }

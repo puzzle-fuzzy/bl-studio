@@ -1,12 +1,9 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import { CanvasRepositoryError } from '@bailian-studio/canvas-repository'
-import type {
-  CanvasDocument,
-  CanvasSnapshot,
-  CanvasVersion,
-} from '@bailian-studio/canvas-contracts'
+import type { CanvasDocument, CanvasSnapshot, CanvasVersion } from '@bailian-studio/canvas-contracts'
 import type { TaskRecord } from '@bailian-studio/task-engine'
+import type { CancelTaskInput } from '@bailian-studio/task-repository'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -33,10 +30,7 @@ function createFakeCanvasRepository(): CanvasRepository {
     },
     async saveDocument(input) {
       if (input.expectedRevision !== document.revision) {
-        throw new CanvasRepositoryError(
-          'CANVAS_REVISION_CONFLICT',
-          'revision conflict',
-        )
+        throw new CanvasRepositoryError('CANVAS_REVISION_CONFLICT', 'revision conflict')
       }
       document = {
         ...document,
@@ -70,6 +64,21 @@ function createFakeTaskRepository() {
       enqueues += 1
       tasks.set(task.id, task)
       return task
+    },
+    async cancelTask(input: CancelTaskInput) {
+      const task = tasks.get(input.taskId)
+      if (task === undefined || (task.status !== 'queued' && task.status !== 'running')) return undefined
+      const cancelled = {
+        ...task,
+        status: 'cancelled' as const,
+        lockedBy: undefined,
+        lockedUntil: undefined,
+        completedAt: input.now,
+        updatedAt: input.now,
+        errorJson: input.error,
+      }
+      tasks.set(task.id, cancelled)
+      return cancelled
     },
   }
 }
@@ -187,9 +196,7 @@ describe('canvas routes', () => {
       },
       body: JSON.stringify({ expectedRevision: 1, idempotencyKey: 'run-1' }),
     }
-    const first = await app.handle(
-      new Request('http://localhost/api/canvases/canvas-1/execute', init),
-    )
+    const first = await app.handle(new Request('http://localhost/api/canvases/canvas-1/execute', init))
     expect(first.status).toBe(200)
     const firstExecution = (await first.json()).data.execution
     expect(firstExecution).toMatchObject({
@@ -198,22 +205,69 @@ describe('canvas routes', () => {
       nodeStatuses: [{ nodeId: 'node-1', status: 'queued' }],
     })
 
-    const second = await app.handle(
-      new Request('http://localhost/api/canvases/canvas-1/execute', init),
-    )
+    const second = await app.handle(new Request('http://localhost/api/canvases/canvas-1/execute', init))
     expect(second.status).toBe(200)
     expect((await second.json()).data.execution.id).toBe(firstExecution.id)
     expect(taskRepository.enqueues).toBe(1)
 
     const read = await app.handle(
-      new Request(
-        `http://localhost/api/canvases/canvas-1/executions/${firstExecution.id}`,
-        {
-          headers: { cookie: 'bailian_studio_session=fake-token' },
-        },
-      ),
+      new Request(`http://localhost/api/canvases/canvas-1/executions/${firstExecution.id}`, {
+        headers: { cookie: 'bailian_studio_session=fake-token' },
+      }),
     )
     expect(read.status).toBe(200)
     expect((await read.json()).data.execution.id).toBe(firstExecution.id)
+  })
+
+  it('cancels a queued canvas execution and makes the terminal state readable', async () => {
+    document = {
+      ...document,
+      snapshot: {
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'mediaNode',
+            position: { x: 0, y: 0 },
+            data: {
+              kind: 'image',
+              status: 'empty',
+              prompt: 'a lantern',
+              modelId: 'qwen-image',
+              referenceAssetIds: [],
+            },
+          },
+        ],
+        edges: [],
+      },
+    }
+    const taskRepository = createFakeTaskRepository()
+    const app = createTestApp({
+      authService: createFakeAuthService(() => user),
+      canvasRepository: createFakeCanvasRepository(),
+      taskQueueRepository: taskRepository,
+    }).app
+    const executionResponse = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/execute', {
+        method: 'POST',
+        headers: {
+          cookie: 'bailian_studio_session=fake-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ expectedRevision: 1, idempotencyKey: 'run-cancel' }),
+      }),
+    )
+    const execution = (await executionResponse.json()).data.execution
+
+    const cancelled = await app.handle(
+      new Request(`http://localhost/api/canvases/canvas-1/executions/${execution.id}/cancel`, {
+        method: 'POST',
+        headers: { cookie: 'bailian_studio_session=fake-token' },
+      }),
+    )
+    expect(cancelled.status).toBe(200)
+    expect((await cancelled.json()).data.execution).toMatchObject({
+      id: execution.id,
+      status: 'cancelled',
+    })
   })
 })

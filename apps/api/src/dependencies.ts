@@ -49,10 +49,7 @@ export interface GithubOAuthConfig {
 }
 
 export interface ApiDependencies {
-  readonly auditOutboxRepository: Pick<
-    AuditOutboxRepository,
-    'listFailed' | 'requeueFailed'
-  >
+  readonly auditOutboxRepository: Pick<AuditOutboxRepository, 'listFailed' | 'requeueFailed'>
   /** API 横切审计写入的最小 port。 */
   readonly auditRepository: AuditRepository
   readonly authService: AuthService
@@ -82,10 +79,7 @@ export interface ApiDependencies {
   /** 当前用户 Canvas 文档、版本和乐观并发控制。 */
   readonly canvasRepository: CanvasRepository
   /** Canvas 编排任务的独立队列写入/读取端口。 */
-  readonly taskQueueRepository: Pick<
-    TaskQueueRepository,
-    'getTask' | 'enqueueTask'
-  >
+  readonly taskQueueRepository: Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask'>
   /** 用户用量读模型的窄持久化 port。 */
   readonly usageRepository: UsageRepository
   readonly generationApplicationService: GenerationApplicationService

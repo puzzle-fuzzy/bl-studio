@@ -8,17 +8,9 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { CanvasExecutionTaskInput } from '@bailian-studio/canvas-contracts'
 import { processCanvasExecutionTask } from '../src/canvas-task-handler'
-import {
-  createRecordingLogger,
-  makeArtifact,
-  makeRecord,
-  makeTask,
-  NOW,
-} from './fixtures'
+import { createRecordingLogger, makeArtifact, makeRecord, makeTask, NOW } from './fixtures'
 
-function canvasInput(
-  overrides: Partial<CanvasExecutionTaskInput> = {},
-): CanvasExecutionTaskInput {
+function canvasInput(overrides: Partial<CanvasExecutionTaskInput> = {}): CanvasExecutionTaskInput {
   return {
     documentId: 'canvas_1',
     documentRevision: 3,
@@ -95,6 +87,67 @@ describe('processCanvasExecutionTask', () => {
       },
     })
     expect(created).toBe(1)
+  })
+
+  it('starts independent nodes in parallel while respecting the task limit', async () => {
+    const calls: CreateGenerationInput[] = []
+    let active = 0
+    let maxActive = 0
+    const repository = {
+      createGeneration: async (request: CreateGenerationInput) => {
+        calls.push(request)
+        const generationId = `generation_${calls.length}`
+        active += 1
+        maxActive = Math.max(maxActive, active)
+        await new Promise(resolve => setTimeout(resolve, 5))
+        active -= 1
+        return createdGeneration(makeRecord({ id: generationId, status: 'submitting' }))
+      },
+      getGenerationRecord: async () => undefined,
+      listArtifactsForRecord: async () => [],
+    }
+    const input = canvasInput({
+      plan: {
+        nodes: [
+          {
+            nodeId: 'node_a',
+            kind: 'image',
+            modelId: 'qwen-image',
+            params: { prompt: 'a' },
+            assetRefs: {},
+            dependencyBindings: {},
+            dependsOn: [],
+          },
+          {
+            nodeId: 'node_b',
+            kind: 'image',
+            modelId: 'qwen-image',
+            params: { prompt: 'b' },
+            assetRefs: {},
+            dependencyBindings: {},
+            dependsOn: [],
+          },
+        ],
+      },
+    })
+
+    const result = await processCanvasExecutionTask(task(input), {
+      repository,
+      maxParallelNodes: 2,
+      logger: createRecordingLogger(),
+    })
+
+    expect(result).toMatchObject({
+      status: 'retry',
+      nextInput: {
+        nodeRuns: {
+          node_a: { status: 'generating', generationId: 'generation_1' },
+          node_b: { status: 'generating', generationId: 'generation_2' },
+        },
+      },
+    })
+    expect(calls).toHaveLength(2)
+    expect(maxActive).toBe(2)
   })
 
   it('waits for the generated asset projection, then records stable asset IDs', async () => {

@@ -26,10 +26,7 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
-import {
-  resolveArtifactLocalRoot,
-  type StorageAdapter,
-} from '@bailian-studio/storage'
+import { resolveArtifactLocalRoot, type StorageAdapter } from '@bailian-studio/storage'
 import { type App, createApp } from './app'
 import type { ApiDependencies } from './dependencies'
 import { readArtifactConfig } from './lib/artifact-config'
@@ -67,66 +64,38 @@ export interface TestAppContext {
   readonly generationSseHub: GenerationSseHub
 }
 
-export function createTestApp(
-  overrides: TestAppOverrides = {},
-): TestAppContext {
+export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext {
   const generationSseHub = overrides.generationSseHub ?? new GenerationSseHub()
-  const generationRepository =
-    overrides.generationRepository ??
-    missing<GenerationRepository>('generationRepository')
+  const generationRepository = overrides.generationRepository ?? missing<GenerationRepository>('generationRepository')
   const generationDiagnosticsRepository =
     overrides.generationDiagnosticsRepository ??
     missing<GenerationDiagnosticsRepository>('generationDiagnosticsRepository')
-  const auditRepository =
-    overrides.auditRepository ?? missing<AuditRepository>('auditRepository')
-  const assetRepository =
-    overrides.assetRepository ??
-    missing<ApiDependencies['assetRepository']>('assetRepository')
-  const shareRepository =
-    overrides.shareRepository ??
-    missing<ApiDependencies['shareRepository']>('shareRepository')
+  const auditRepository = overrides.auditRepository ?? missing<AuditRepository>('auditRepository')
+  const assetRepository = overrides.assetRepository ?? missing<ApiDependencies['assetRepository']>('assetRepository')
+  const shareRepository = overrides.shareRepository ?? missing<ApiDependencies['shareRepository']>('shareRepository')
   const publicShareRepository =
-    overrides.publicShareRepository ??
-    missing<ApiDependencies['publicShareRepository']>('publicShareRepository')
+    overrides.publicShareRepository ?? missing<ApiDependencies['publicShareRepository']>('publicShareRepository')
   const socialRepository =
-    overrides.socialRepository ??
-    missing<ApiDependencies['socialRepository']>('socialRepository')
+    overrides.socialRepository ?? missing<ApiDependencies['socialRepository']>('socialRepository')
   const notificationRepository =
-    overrides.notificationRepository ??
-    missing<ApiDependencies['notificationRepository']>('notificationRepository')
+    overrides.notificationRepository ?? missing<ApiDependencies['notificationRepository']>('notificationRepository')
   const promptLibraryRepository =
-    overrides.promptLibraryRepository ??
-    missing<ApiDependencies['promptLibraryRepository']>(
-      'promptLibraryRepository',
-    )
+    overrides.promptLibraryRepository ?? missing<ApiDependencies['promptLibraryRepository']>('promptLibraryRepository')
   const feedbackRepository =
-    overrides.feedbackRepository ??
-    missing<ApiDependencies['feedbackRepository']>('feedbackRepository')
+    overrides.feedbackRepository ?? missing<ApiDependencies['feedbackRepository']>('feedbackRepository')
   const contentReportRepository =
-    overrides.contentReportRepository ??
-    missing<ApiDependencies['contentReportRepository']>(
-      'contentReportRepository',
-    )
+    overrides.contentReportRepository ?? missing<ApiDependencies['contentReportRepository']>('contentReportRepository')
   const adminRepository =
     overrides.adminRepository ??
     ({
-      gallery:
-        overrides.adminGalleryRepository ??
-        missing<AdminGalleryRepository>('adminRepository.gallery'),
-      tasks:
-        overrides.adminTaskRepository ??
-        missing<AdminTaskRepository>('adminRepository.tasks'),
-      analytics:
-        overrides.analyticsRepository ??
-        missing<AnalyticsRepository>('adminRepository.analytics'),
+      gallery: overrides.adminGalleryRepository ?? missing<AdminGalleryRepository>('adminRepository.gallery'),
+      tasks: overrides.adminTaskRepository ?? missing<AdminTaskRepository>('adminRepository.tasks'),
+      analytics: overrides.analyticsRepository ?? missing<AnalyticsRepository>('adminRepository.analytics'),
     } satisfies AdminRepository)
-  const usageRepository =
-    overrides.usageRepository ?? missing<UsageRepository>('usageRepository')
+  const usageRepository = overrides.usageRepository ?? missing<UsageRepository>('usageRepository')
   const creativeAssetRepository =
-    overrides.creativeAssetRepository ??
-    missing<CreativeAssetRepository>('creativeAssetRepository')
-  const generationLimits =
-    overrides.generationLimits ?? readGenerationLimits({})
+    overrides.creativeAssetRepository ?? missing<CreativeAssetRepository>('creativeAssetRepository')
+  const generationLimits = overrides.generationLimits ?? readGenerationLimits({})
   const generationApplicationService =
     overrides.generationApplicationService ??
     createGenerationApplicationService({
@@ -135,12 +104,9 @@ export function createTestApp(
       limits: generationLimits,
       creativeAssetRepository,
     })
-  const directorRepository =
-    overrides.directorRepository ??
-    missing<DirectorRepository>('directorRepository')
+  const directorRepository = overrides.directorRepository ?? missing<DirectorRepository>('directorRepository')
   const directorApplicationService =
-    overrides.directorApplicationService ??
-    createDirectorApplicationService({ repository: directorRepository })
+    overrides.directorApplicationService ?? createDirectorApplicationService({ repository: directorRepository })
   const creativeAssetApplicationService =
     overrides.creativeAssetApplicationService ??
     createCreativeAssetApplicationService({
@@ -149,16 +115,11 @@ export function createTestApp(
   const dependencies: ApiDependencies = {
     auditOutboxRepository:
       overrides.auditOutboxRepository ??
-      missing<Pick<AuditOutboxRepository, 'listFailed' | 'requeueFailed'>>(
-        'auditOutboxRepository',
-      ),
+      missing<Pick<AuditOutboxRepository, 'listFailed' | 'requeueFailed'>>('auditOutboxRepository'),
     auditRepository,
     authService: overrides.authService ?? missing<AuthService>('authService'),
-    ...(overrides.githubOAuth !== undefined
-      ? { githubOAuth: overrides.githubOAuth }
-      : {}),
-    creditLedger:
-      overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
+    ...(overrides.githubOAuth !== undefined ? { githubOAuth: overrides.githubOAuth } : {}),
+    creditLedger: overrides.creditLedger ?? missing<CreditLedger>('creditLedger'),
     generationRepository,
     generationDiagnosticsRepository,
     assetRepository,
@@ -170,31 +131,24 @@ export function createTestApp(
     feedbackRepository,
     contentReportRepository,
     adminRepository,
-    canvasRepository:
-      overrides.canvasRepository ??
-      missing<CanvasRepository>('canvasRepository'),
+    canvasRepository: overrides.canvasRepository ?? missing<CanvasRepository>('canvasRepository'),
     taskQueueRepository:
       overrides.taskQueueRepository ??
-      missing<Pick<TaskQueueRepository, 'getTask' | 'enqueueTask'>>(
-        'taskQueueRepository',
-      ),
+      missing<Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask'>>('taskQueueRepository'),
     usageRepository,
     generationApplicationService,
     directorRepository,
     directorApplicationService,
     creativeAssetRepository,
     creativeAssetApplicationService,
-    mediaRepository:
-      overrides.mediaRepository ?? missing<MediaRepository>('mediaRepository'),
+    mediaRepository: overrides.mediaRepository ?? missing<MediaRepository>('mediaRepository'),
     storage: overrides.storage ?? missing<StorageAdapter>('storage'),
     generationSseHub,
-    artifactLocalRoot:
-      overrides.artifactLocalRoot ?? resolveArtifactLocalRoot({}),
+    artifactLocalRoot: overrides.artifactLocalRoot ?? resolveArtifactLocalRoot({}),
     cookieSecure: overrides.cookieSecure ?? false,
     generationLimits,
     allowedOrigins: overrides.allowedOrigins ?? getAllowedOrigins({}),
-    requestGuardConfig:
-      overrides.requestGuardConfig ?? readRequestGuardConfig({}),
+    requestGuardConfig: overrides.requestGuardConfig ?? readRequestGuardConfig({}),
     rateLimitConfig: overrides.rateLimitConfig ?? readApiRateLimitConfig({}),
     assetConfig: overrides.assetConfig ?? readAssetConfig({}),
     artifactConfig: overrides.artifactConfig ?? readArtifactConfig({}),

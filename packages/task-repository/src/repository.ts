@@ -10,6 +10,7 @@ import { toTaskRecord } from './mappers'
 import {
   TaskRepositoryError,
   type ClaimNextQueuedTaskInput,
+  type CancelTaskInput,
   type CancelQueuedTasksInput,
   type FindTaskInput,
   type RenewTaskLockInput,
@@ -25,35 +26,21 @@ export interface CreateTaskQueueRepositoryOptions {
 }
 
 /** 在调用方事务中写入任务，保持业务记录与任务的复合原子性。 */
-export async function enqueueTask(
-  tx: BailianStudioDbTransaction,
-  task: TaskRecord,
-): Promise<TaskRecord> {
-  const [inserted] = await tx
-    .insert(taskRecords)
-    .values(taskInsertValues(task))
-    .returning()
+export async function enqueueTask(tx: BailianStudioDbTransaction, task: TaskRecord): Promise<TaskRecord> {
+  const [inserted] = await tx.insert(taskRecords).values(taskInsertValues(task)).returning()
 
   if (inserted === undefined) {
-    throw new TaskRepositoryError(
-      'DATABASE_ERROR',
-      `Failed to insert task: ${task.id}`,
-    )
+    throw new TaskRepositoryError('DATABASE_ERROR', `Failed to insert task: ${task.id}`)
   }
 
   return toTaskRecord(inserted)
 }
 
 /** 在调用方事务内读取一条任务，封闭 task_records 的查询与领域映射细节。 */
-async function findTask(
-  source: TaskQueueQuerySource,
-  input: FindTaskInput,
-): Promise<TaskRecord | undefined> {
+async function findTask(source: TaskQueueQuerySource, input: FindTaskInput): Promise<TaskRecord | undefined> {
   const conditions = []
-  if (input.recordId !== undefined)
-    conditions.push(eq(taskRecords.recordId, input.recordId))
-  if (input.type !== undefined)
-    conditions.push(eq(taskRecords.type, input.type))
+  if (input.recordId !== undefined) conditions.push(eq(taskRecords.recordId, input.recordId))
+  if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
   if (input.statuses !== undefined && input.statuses.length > 0) {
     conditions.push(inArray(taskRecords.status, [...input.statuses]))
   }
@@ -72,10 +59,7 @@ async function findTask(
 }
 
 /** 在调用方事务内按状态机规则取消 queued 任务，避免业务仓储直接更新 task_records。 */
-async function cancelQueuedTasks(
-  tx: BailianStudioDbTransaction,
-  input: CancelQueuedTasksInput,
-): Promise<number> {
+async function cancelQueuedTasks(tx: BailianStudioDbTransaction, input: CancelQueuedTasksInput): Promise<number> {
   if (input.recordIds.length === 0) return 0
 
   const rows = await tx
@@ -103,8 +87,7 @@ async function cancelQueuedTasks(
         lockedBy: null,
         lockedUntil: null,
         completedAt: new Date(cancelled.completedAt ?? input.now),
-        errorJson:
-          cancelled.errorJson === undefined ? null : { ...cancelled.errorJson },
+        errorJson: cancelled.errorJson === undefined ? null : { ...cancelled.errorJson },
         updatedAt: new Date(cancelled.updatedAt),
         updatedBy: input.updatedBy,
       })
@@ -130,18 +113,16 @@ export function createTaskQueueTransactionStore(): TaskQueueTransactionStore {
  * 业务记录与初始任务的复合写入仍由业务 repository 在自己的 transaction 中完成；
  * 本对象负责跨业务域共享的 claim/lease/save 生命周期，避免 Worker 依赖上帝接口。
  */
-export function createTaskQueueRepository(
-  options: CreateTaskQueueRepositoryOptions,
-): TaskQueueRepository {
+export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOptions): TaskQueueRepository {
   const { db } = options
 
   return {
     async enqueueTask(task) {
-      return db.transaction((tx) => enqueueTask(tx, task))
+      return db.transaction(tx => enqueueTask(tx, task))
     },
 
     async claimNextQueuedTask(input: ClaimNextQueuedTaskInput) {
-      return db.transaction(async (tx) => {
+      return db.transaction(async tx => {
         const rows = await tx.execute<{ id: string }>(sql`
           select *
           from task_records
@@ -155,17 +136,10 @@ export function createTaskQueueRepository(
         const [selected] = rows
         if (selected === undefined) return undefined
 
-        const [selectedTaskRow] = await tx
-          .select()
-          .from(taskRecords)
-          .where(eq(taskRecords.id, selected.id))
-          .limit(1)
+        const [selectedTaskRow] = await tx.select().from(taskRecords).where(eq(taskRecords.id, selected.id)).limit(1)
 
         if (selectedTaskRow === undefined) {
-          throw new TaskRepositoryError(
-            'TASK_NOT_FOUND',
-            `Task not found: ${selected.id}`,
-          )
+          throw new TaskRepositoryError('TASK_NOT_FOUND', `Task not found: ${selected.id}`)
         }
 
         let claimedTask: ReturnType<typeof transitionTask>
@@ -204,10 +178,7 @@ export function createTaskQueueRepository(
           .returning()
 
         if (savedTask === undefined) {
-          throw new TaskRepositoryError(
-            'DATABASE_ERROR',
-            `Failed to claim task: ${claimedTask.id}`,
-          )
+          throw new TaskRepositoryError('DATABASE_ERROR', `Failed to claim task: ${claimedTask.id}`)
         }
 
         return toTaskRecord(savedTask)
@@ -255,21 +226,49 @@ export function createTaskQueueRepository(
 
       if (saved === undefined) {
         if (options?.expectedWorkerId !== undefined) return undefined
-        throw new TaskRepositoryError(
-          'TASK_NOT_FOUND',
-          `Task not found: ${task.id}`,
-        )
+        throw new TaskRepositoryError('TASK_NOT_FOUND', `Task not found: ${task.id}`)
       }
 
       return toTaskRecord(saved)
     },
 
+    async cancelTask(input: CancelTaskInput) {
+      return db.transaction(async tx => {
+        const conditions = [
+          eq(taskRecords.id, input.taskId),
+          inArray(taskRecords.status, ['queued', 'running']),
+          isNull(taskRecords.deletedAt),
+        ]
+        if (input.userId !== undefined) conditions.push(eq(taskRecords.userId, input.userId))
+        if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
+
+        const [row] = await tx
+          .select()
+          .from(taskRecords)
+          .where(and(...conditions))
+          .limit(1)
+          .for('update')
+        if (row === undefined) return undefined
+
+        const cancelled = transitionTask(toTaskRecord(row), {
+          type: 'cancel',
+          ...(input.error === undefined ? {} : { error: input.error }),
+          now: input.now,
+        })
+        const [saved] = await tx
+          .update(taskRecords)
+          .set({
+            ...taskInsertValues(cancelled),
+            updatedBy: input.updatedBy,
+          })
+          .where(eq(taskRecords.id, input.taskId))
+          .returning()
+        return saved === undefined ? undefined : toTaskRecord(saved)
+      })
+    },
+
     async getTask(id) {
-      const [row] = await db
-        .select()
-        .from(taskRecords)
-        .where(eq(taskRecords.id, id))
-        .limit(1)
+      const [row] = await db.select().from(taskRecords).where(eq(taskRecords.id, id)).limit(1)
 
       return row === undefined ? undefined : toTaskRecord(row)
     },

@@ -1,13 +1,5 @@
-import type {
-  BailianStudioDb,
-  BailianStudioDbTransaction,
-} from '@bailian-studio/db'
-import type {
-  TaskError,
-  TaskRecord,
-  TaskStatus,
-  TaskType,
-} from '@bailian-studio/task-engine'
+import type { BailianStudioDb, BailianStudioDbTransaction } from '@bailian-studio/db'
+import type { TaskError, TaskRecord, TaskStatus, TaskType } from '@bailian-studio/task-engine'
 
 /** Worker 认领下一条可执行任务所需的租约信息。 */
 export interface ClaimNextQueuedTaskInput {
@@ -48,6 +40,16 @@ export interface CancelQueuedTasksInput {
   updatedBy: string
 }
 
+/** 取消一条独立任务；可选 userId/type 用于调用方的原子归属护栏。 */
+export interface CancelTaskInput {
+  taskId: string
+  userId?: string
+  type?: TaskType
+  error?: TaskError
+  now: string
+  updatedBy: string
+}
+
 export type TaskRepositoryErrorCode = 'TASK_NOT_FOUND' | 'DATABASE_ERROR'
 
 export class TaskRepositoryError extends Error {
@@ -65,14 +67,10 @@ export class TaskRepositoryError extends Error {
 export interface TaskQueueRepository {
   /** 创建一个不依附其它业务事务的后台任务（例如 Canvas 编排任务）。 */
   enqueueTask(task: TaskRecord): Promise<TaskRecord>
-  claimNextQueuedTask(
-    input: ClaimNextQueuedTaskInput,
-  ): Promise<TaskRecord | undefined>
+  claimNextQueuedTask(input: ClaimNextQueuedTaskInput): Promise<TaskRecord | undefined>
   renewTaskLock(input: RenewTaskLockInput): Promise<TaskRecord | undefined>
-  saveTask(
-    task: TaskRecord,
-    options?: SaveTaskOptions,
-  ): Promise<TaskRecord | undefined>
+  saveTask(task: TaskRecord, options?: SaveTaskOptions): Promise<TaskRecord | undefined>
+  cancelTask(input: CancelTaskInput): Promise<TaskRecord | undefined>
   getTask(id: string): Promise<TaskRecord | undefined>
 }
 
@@ -83,16 +81,7 @@ export interface TaskQueueRepository {
  * 的序列化、插入和回读，避免各业务域复制 Drizzle 写入细节。
  */
 export interface TaskQueueTransactionStore {
-  enqueueTask(
-    tx: BailianStudioDbTransaction,
-    task: TaskRecord,
-  ): Promise<TaskRecord>
-  findTask(
-    source: TaskQueueQuerySource,
-    input: FindTaskInput,
-  ): Promise<TaskRecord | undefined>
-  cancelQueuedTasks(
-    tx: BailianStudioDbTransaction,
-    input: CancelQueuedTasksInput,
-  ): Promise<number>
+  enqueueTask(tx: BailianStudioDbTransaction, task: TaskRecord): Promise<TaskRecord>
+  findTask(source: TaskQueueQuerySource, input: FindTaskInput): Promise<TaskRecord | undefined>
+  cancelQueuedTasks(tx: BailianStudioDbTransaction, input: CancelQueuedTasksInput): Promise<number>
 }

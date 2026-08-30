@@ -16,18 +16,9 @@ import type {
 import type { AssetRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { TaskQueueRepository } from '@bailian-studio/task-repository'
-import {
-  createLogger,
-  MetricsCollector,
-  type Logger,
-  type MetricsSnapshot,
-} from '@bailian-studio/shared'
+import { createLogger, MetricsCollector, type Logger, type MetricsSnapshot } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
-import {
-  transitionTask,
-  type TaskError,
-  type TaskRecord,
-} from '@bailian-studio/task-engine'
+import { transitionTask, type TaskError, type TaskRecord } from '@bailian-studio/task-engine'
 import type { ProviderRegistry } from './providers'
 import {
   createTaskExecutor,
@@ -44,12 +35,11 @@ export interface WorkerLoopConfig {
   generationRecoveryRepository: GenerationRecoveryRepository
   providerRequestAuditRepository: ProviderRequestAuditRepository
   /** 任务生命周期的最小持久化端口；必须由 worker 组合根显式注入。 */
-  taskRepository: Pick<
-    TaskQueueRepository,
-    'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'
-  >
+  taskRepository: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
   /** Canvas 编排任务读取最终生成资产投影所需的最小仓库。 */
   assetRepository?: AssetRepository
+  /** 单个 Canvas 任务的同层并行上限，默认由 handler 使用 4。 */
+  canvasMaxParallelNodes?: number
   /** 可选的审计 outbox 消费句柄，由 worker 组合根注入。 */
   auditOutboxRepository?: Pick<AuditOutboxRepository, 'drain'>
   directorRepository?: DirectorRepository
@@ -110,10 +100,7 @@ export class WorkerLoop {
   /** P1-26：当前在途任务数（认领后未落终态）。 */
   private inFlight = 0
   private readonly executor: TaskExecutor
-  private readonly taskRepository: Pick<
-    TaskQueueRepository,
-    'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'
-  >
+  private readonly taskRepository: Pick<TaskQueueRepository, 'claimNextQueuedTask' | 'renewTaskLock' | 'saveTask'>
   private readonly logger: Logger
   private readonly lockDurationMs: number
   private readonly lockHeartbeatMs: number
@@ -134,22 +121,15 @@ export class WorkerLoop {
     const metrics = config.metrics ?? new MetricsCollector()
     this.executor = createTaskExecutor({
       repository: config.repository,
-      ...(config.assetRepository === undefined
-        ? {}
-        : { assetRepository: config.assetRepository }),
+      ...(config.assetRepository === undefined ? {} : { assetRepository: config.assetRepository }),
+      ...(config.canvasMaxParallelNodes === undefined ? {} : { canvasMaxParallelNodes: config.canvasMaxParallelNodes }),
       providerRequestAuditRepository: config.providerRequestAuditRepository,
-      ...(config.directorRepository === undefined
-        ? {}
-        : { directorRepository: config.directorRepository }),
+      ...(config.directorRepository === undefined ? {} : { directorRepository: config.directorRepository }),
       providerRegistry: config.providerRegistry,
       modelRegistry: config.modelRegistry,
       storage: config.storage,
-      ...(config.mediaRepository !== undefined
-        ? { mediaRepository: config.mediaRepository }
-        : {}),
-      ...(config.mediaProcessor !== undefined
-        ? { mediaProcessor: config.mediaProcessor }
-        : {}),
+      ...(config.mediaRepository !== undefined ? { mediaRepository: config.mediaRepository } : {}),
+      ...(config.mediaProcessor !== undefined ? { mediaProcessor: config.mediaProcessor } : {}),
       ...(config.generationSubmitTimeoutMs !== undefined
         ? { generationSubmitTimeoutMs: config.generationSubmitTimeoutMs }
         : {}),
@@ -159,12 +139,8 @@ export class WorkerLoop {
       ...(config.artifactPersistTimeoutMs !== undefined
         ? { artifactPersistTimeoutMs: config.artifactPersistTimeoutMs }
         : {}),
-      ...(config.artifactFetch === undefined
-        ? {}
-        : { artifactFetch: config.artifactFetch }),
-      ...(config.generationQuota === undefined
-        ? {}
-        : { generationQuota: config.generationQuota }),
+      ...(config.artifactFetch === undefined ? {} : { artifactFetch: config.artifactFetch }),
+      ...(config.generationQuota === undefined ? {} : { generationQuota: config.generationQuota }),
       ...(config.logger !== undefined ? { logger: config.logger } : {}),
       metrics,
     })
@@ -178,9 +154,7 @@ export class WorkerLoop {
     // - errorBackoff 5s：迭代抛错后退避，防止错误风暴打满 CPU。
     // - worker 存活心跳 5s：与任务租约分离，存活 ≠ 持有某任务锁。
     this.lockDurationMs = config.lockDurationMs ?? 90_000
-    this.lockHeartbeatMs =
-      config.lockHeartbeatMs ??
-      Math.max(1_000, Math.floor(this.lockDurationMs / 3))
+    this.lockHeartbeatMs = config.lockHeartbeatMs ?? Math.max(1_000, Math.floor(this.lockDurationMs / 3))
     this.pollIntervalMs = config.pollIntervalMs ?? 100
     this.idleSleepMs = config.idleSleepMs ?? 1000
     this.errorBackoffMs = config.errorBackoffMs ?? 5_000
@@ -188,8 +162,7 @@ export class WorkerLoop {
     this.auditOutboxIntervalMs = config.auditOutboxIntervalMs ?? 5_000
     this.auditOutboxBatchSize = config.auditOutboxBatchSize ?? 25
     this.auditOutboxMaxAttempts = config.auditOutboxMaxAttempts ?? 5
-    this.staleGenerationSweepIntervalMs =
-      config.staleGenerationSweepIntervalMs ?? 60_000
+    this.staleGenerationSweepIntervalMs = config.staleGenerationSweepIntervalMs ?? 60_000
     this.concurrency = config.concurrency ?? 3
     this.creditLedger = config.creditLedger
     this.metricsLogIntervalMs = config.metricsLogIntervalMs ?? 60_000
@@ -224,7 +197,7 @@ export class WorkerLoop {
           }
           this.inFlight += 1
           void this.runTask(task)
-            .catch((error) => {
+            .catch(error => {
               this.logger.error('task.background_failed', {
                 taskId: task.id,
                 traceId: task.traceId,
@@ -302,9 +275,7 @@ export class WorkerLoop {
     }
   }
 
-  private async drainAuditOutbox(
-    repository: Pick<AuditOutboxRepository, 'drain'>,
-  ): Promise<void> {
+  private async drainAuditOutbox(repository: Pick<AuditOutboxRepository, 'drain'>): Promise<void> {
     const startedAt = Date.now()
     try {
       const result = await repository.drain({
@@ -314,41 +285,21 @@ export class WorkerLoop {
         now: currentIso(),
       })
       if (result.claimed > 0) {
-        this.metrics.increment(
-          'worker.audit_outbox.events',
-          { status: 'claimed' },
-          result.claimed,
-        )
+        this.metrics.increment('worker.audit_outbox.events', { status: 'claimed' }, result.claimed)
       }
       if (result.delivered > 0) {
-        this.metrics.increment(
-          'worker.audit_outbox.events',
-          { status: 'delivered' },
-          result.delivered,
-        )
+        this.metrics.increment('worker.audit_outbox.events', { status: 'delivered' }, result.delivered)
       }
       if (result.retried > 0) {
-        this.metrics.increment(
-          'worker.audit_outbox.events',
-          { status: 'retried' },
-          result.retried,
-        )
+        this.metrics.increment('worker.audit_outbox.events', { status: 'retried' }, result.retried)
       }
       if (result.failed > 0) {
-        this.metrics.increment(
-          'worker.audit_outbox.events',
-          { status: 'failed' },
-          result.failed,
-        )
+        this.metrics.increment('worker.audit_outbox.events', { status: 'failed' }, result.failed)
       }
       this.metrics.increment('worker.audit_outbox.drain', {
         status: 'completed',
       })
-      this.metrics.timing(
-        'worker.audit_outbox.drain_ms',
-        Date.now() - startedAt,
-        { status: 'completed' },
-      )
+      this.metrics.timing('worker.audit_outbox.drain_ms', Date.now() - startedAt, { status: 'completed' })
       if (result.claimed > 0) {
         this.logger.info('audit_outbox.drained', {
           claimed: result.claimed,
@@ -359,11 +310,7 @@ export class WorkerLoop {
       }
     } catch (error) {
       this.metrics.increment('worker.audit_outbox.drain', { status: 'error' })
-      this.metrics.timing(
-        'worker.audit_outbox.drain_ms',
-        Date.now() - startedAt,
-        { status: 'error' },
-      )
+      this.metrics.timing('worker.audit_outbox.drain_ms', Date.now() - startedAt, { status: 'error' })
       // 审计投递不应打断 generation 消费；未完成的 outbox 会在下一轮恢复。
       this.logger.error('audit_outbox.drain_failed', {
         error: errorMessage(error),
@@ -394,7 +341,7 @@ export class WorkerLoop {
         workerId: this.config.workerId,
         startedAt,
       })
-      void registration.catch((error) => {
+      void registration.catch(error => {
         this.logger.error('worker.heartbeat_register_failed', {
           error: errorMessage(error),
         })
@@ -408,10 +355,7 @@ export class WorkerLoop {
     const touchHeartbeat = async (): Promise<void> => {
       if (touch === undefined) return
       try {
-        const heartbeat = await touch.call(
-          this.config.repository,
-          this.config.workerId,
-        )
+        const heartbeat = await touch.call(this.config.repository, this.config.workerId)
         if (heartbeat === undefined) {
           this.logger.warn('worker.heartbeat_missing', {
             workerId: this.config.workerId,
@@ -453,11 +397,8 @@ export class WorkerLoop {
 
   private async sweepStaleGenerations(): Promise<void> {
     const repo = this.config.repository
-    const listStuck =
-      this.config.generationRecoveryRepository.listStuckGenerationRecords
-    let records: Awaited<
-      ReturnType<GenerationRecoveryRepository['listStuckGenerationRecords']>
-    >
+    const listStuck = this.config.generationRecoveryRepository.listStuckGenerationRecords
+    let records: Awaited<ReturnType<GenerationRecoveryRepository['listStuckGenerationRecords']>>
     try {
       records = await listStuck({ now: currentIso() })
     } catch (error) {
@@ -540,10 +481,7 @@ export class WorkerLoop {
       await lease.stop()
       if (lease.isLost()) return
 
-      const saved = await this.saveTaskIfOwned(
-        task,
-        applyTaskOutcome(task, outcome),
-      )
+      const saved = await this.saveTaskIfOwned(task, applyTaskOutcome(task, outcome))
       if (saved)
         this.logger.info('task.outcome', {
           taskId: task.id,
@@ -630,9 +568,7 @@ export class WorkerLoop {
             taskId: task.id,
             workerId,
             now: now.toISOString(),
-            lockedUntil: new Date(
-              now.getTime() + this.lockDurationMs,
-            ).toISOString(),
+            lockedUntil: new Date(now.getTime() + this.lockDurationMs).toISOString(),
           })
 
           if (renewed === undefined) {
@@ -677,15 +613,10 @@ export class WorkerLoop {
   }
 
   /** 仅当认领该任务的 worker 仍持有任务行时才保存结果。 */
-  private async saveTaskIfOwned(
-    task: TaskRecord,
-    nextTask: TaskRecord,
-  ): Promise<boolean> {
+  private async saveTaskIfOwned(task: TaskRecord, nextTask: TaskRecord): Promise<boolean> {
     const saved = await this.taskRepository.saveTask(
       nextTask,
-      task.lockedBy === undefined
-        ? undefined
-        : { expectedWorkerId: task.lockedBy },
+      task.lockedBy === undefined ? undefined : { expectedWorkerId: task.lockedBy },
     )
     if (saved !== undefined) return true
 
@@ -705,15 +636,10 @@ interface TaskLease {
 }
 
 /** 把处理器产出转换为 task-engine 状态迁移（succeed / fail / retry / cancel）。 */
-function applyTaskOutcome(
-  task: TaskRecord,
-  outcome: TaskProcessOutcome,
-): TaskRecord {
+function applyTaskOutcome(task: TaskRecord, outcome: TaskProcessOutcome): TaskRecord {
   const now = currentIso()
   const withNextInput = (nextTask: TaskRecord): TaskRecord =>
-    outcome.nextInput === undefined
-      ? nextTask
-      : { ...nextTask, input: outcome.nextInput }
+    outcome.nextInput === undefined ? nextTask : { ...nextTask, input: outcome.nextInput }
   switch (outcome.status) {
     case 'succeeded':
       return withNextInput(
@@ -721,12 +647,8 @@ function applyTaskOutcome(
           type: 'succeed',
           output: {
             artifacts: outcome.output.artifacts,
-            ...(outcome.output.usage !== undefined
-              ? { usage: outcome.output.usage }
-              : {}),
-            ...(outcome.output.raw !== undefined
-              ? { raw: outcome.output.raw }
-              : {}),
+            ...(outcome.output.usage !== undefined ? { usage: outcome.output.usage } : {}),
+            ...(outcome.output.raw !== undefined ? { raw: outcome.output.raw } : {}),
           },
           now,
         }),
@@ -740,9 +662,7 @@ function applyTaskOutcome(
         }),
       )
     case 'failed':
-      return withNextInput(
-        transitionTask(task, { type: 'fail', error: outcome.error, now }),
-      )
+      return withNextInput(transitionTask(task, { type: 'fail', error: outcome.error, now }))
     case 'retry':
       return withNextInput(
         transitionTask(task, {
@@ -755,9 +675,7 @@ function applyTaskOutcome(
     case 'cancelled':
       // 取消走 task-engine 的 cancel 转换（而非 fail），让 task 状态与 generation
       // 记录都正确反映 cancelled 终态。
-      return withNextInput(
-        transitionTask(task, { type: 'cancel', error: outcome.error, now }),
-      )
+      return withNextInput(transitionTask(task, { type: 'cancel', error: outcome.error, now }))
   }
 }
 
@@ -770,10 +688,7 @@ function errorMessage(error: unknown): string {
   if (!(error instanceof Error)) return String(error)
   const parts: string[] = [error.message]
   let current: unknown = error.cause
-  while (
-    current instanceof Error &&
-    current.message !== parts[parts.length - 1]
-  ) {
+  while (current instanceof Error && current.message !== parts[parts.length - 1]) {
     parts.push(current.message)
     current = current.cause
   }
@@ -794,5 +709,5 @@ function currentIso(): string {
 }
 
 function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms))
+  return new Promise(resolve => setTimeout(resolve, ms))
 }

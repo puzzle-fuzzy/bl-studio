@@ -13,11 +13,7 @@ import type {
 } from '@bailian-studio/generation-repository'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
-import {
-  createLogger,
-  MetricsCollector,
-  type Logger,
-} from '@bailian-studio/shared'
+import { createLogger, MetricsCollector, type Logger } from '@bailian-studio/shared'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import { processArtifactPersistTask } from './artifact-task-handler'
@@ -36,6 +32,7 @@ export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 export interface TaskExecutorDeps {
   readonly repository: GenerationRepository
   readonly assetRepository?: AssetRepository
+  readonly canvasMaxParallelNodes?: number
   readonly providerRequestAuditRepository: ProviderRequestAuditRepository
   readonly directorRepository?: DirectorRepository
   readonly providerRegistry: ProviderRegistry
@@ -86,27 +83,20 @@ export class TaskExecutor {
     if (task.type === 'canvas.execute') {
       return processCanvasExecutionTask(task, {
         repository: this.deps.repository,
-        ...(this.deps.assetRepository === undefined
+        ...(this.deps.assetRepository === undefined ? {} : { assetRepository: this.deps.assetRepository }),
+        ...(this.deps.generationQuota === undefined ? {} : { generationQuota: this.deps.generationQuota }),
+        ...(this.deps.canvasMaxParallelNodes === undefined
           ? {}
-          : { assetRepository: this.deps.assetRepository }),
-        ...(this.deps.generationQuota === undefined
-          ? {}
-          : { generationQuota: this.deps.generationQuota }),
+          : { maxParallelNodes: this.deps.canvasMaxParallelNodes }),
         logger: this.logger,
       })
     }
     if (task.type === 'director.phase') {
       return processDirectorPhaseTask(task, {
         repository: this.deps.repository,
-        ...(this.deps.directorRepository === undefined
-          ? {}
-          : { directorRepository: this.deps.directorRepository }),
-        ...(this.deps.mediaRepository === undefined
-          ? {}
-          : { mediaRepository: this.deps.mediaRepository }),
-        ...(this.deps.generationQuota === undefined
-          ? {}
-          : { generationQuota: this.deps.generationQuota }),
+        ...(this.deps.directorRepository === undefined ? {} : { directorRepository: this.deps.directorRepository }),
+        ...(this.deps.mediaRepository === undefined ? {} : { mediaRepository: this.deps.mediaRepository }),
+        ...(this.deps.generationQuota === undefined ? {} : { generationQuota: this.deps.generationQuota }),
         modelRegistry: this.deps.modelRegistry,
         logger: this.logger,
       })
@@ -116,12 +106,8 @@ export class TaskExecutor {
         repository: this.deps.repository,
         storage: this.deps.storage,
         logger: this.logger,
-        ...(this.deps.mediaProcessor === undefined
-          ? {}
-          : { mediaProcessor: this.deps.mediaProcessor }),
-        ...(this.deps.artifactFetch === undefined
-          ? {}
-          : { artifactFetch: this.deps.artifactFetch }),
+        ...(this.deps.mediaProcessor === undefined ? {} : { mediaProcessor: this.deps.mediaProcessor }),
+        ...(this.deps.artifactFetch === undefined ? {} : { artifactFetch: this.deps.artifactFetch }),
       })
     }
 
@@ -129,12 +115,8 @@ export class TaskExecutor {
       return processMediaTask(task, {
         storage: this.deps.storage,
         logger: this.logger,
-        ...(this.deps.mediaRepository === undefined
-          ? {}
-          : { mediaRepository: this.deps.mediaRepository }),
-        ...(this.deps.mediaProcessor === undefined
-          ? {}
-          : { mediaProcessor: this.deps.mediaProcessor }),
+        ...(this.deps.mediaRepository === undefined ? {} : { mediaRepository: this.deps.mediaRepository }),
+        ...(this.deps.mediaProcessor === undefined ? {} : { mediaProcessor: this.deps.mediaProcessor }),
       })
     }
 
@@ -159,9 +141,7 @@ export class TaskExecutor {
         ...(this.deps.artifactPersistTimeoutMs === undefined
           ? {}
           : { maxDurationMs: this.deps.artifactPersistTimeoutMs }),
-        ...(this.deps.artifactFetch === undefined
-          ? {}
-          : { artifactFetch: this.deps.artifactFetch }),
+        ...(this.deps.artifactFetch === undefined ? {} : { artifactFetch: this.deps.artifactFetch }),
       })
     }
 
@@ -182,11 +162,7 @@ export class TaskExecutor {
     })
   }
 
-  private recordTaskMetrics(
-    task: TaskRecord,
-    outcome: string,
-    durationMs: number,
-  ): void {
+  private recordTaskMetrics(task: TaskRecord, outcome: string, durationMs: number): void {
     this.metrics.increment('worker.task', { type: task.type, outcome })
     this.metrics.timing('worker.task.duration', durationMs, {
       type: task.type,

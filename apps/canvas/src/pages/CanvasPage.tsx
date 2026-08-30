@@ -1,9 +1,4 @@
-import {
-  useCallback,
-  useEffect,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-} from 'react'
+import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -17,13 +12,9 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { History, ImagePlus, Loader2, Play, Video } from 'lucide-react'
+import { History, ImagePlus, Loader2, Play, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
-import {
-  MediaNode,
-  type MediaKind,
-  type MediaNodeData,
-} from '../components/canvas/MediaNode'
+import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
 import { useCanvasExecution } from '../hooks/use-canvas-execution'
@@ -42,18 +33,13 @@ interface CanvasMenu {
 
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
-  const { saveStatus, versions, refreshVersions, restoreVersion } =
-    useCanvasPersistence()
-  const {
-    execute,
-    status: executionStatus,
-    error: executionError,
-  } = useCanvasExecution()
-  const nodes = useCanvasStore((state) => state.nodes)
-  const edges = useCanvasStore((state) => state.edges)
-  const onNodesChange = useCanvasStore((state) => state.onNodesChange)
-  const onEdgesChange = useCanvasStore((state) => state.onEdgesChange)
-  const onConnect = useCanvasStore((state) => state.onConnect)
+  const { saveStatus, versions, refreshVersions, restoreVersion } = useCanvasPersistence()
+  const { execute, cancel, status: executionStatus, error: executionError } = useCanvasExecution()
+  const nodes = useCanvasStore(state => state.nodes)
+  const edges = useCanvasStore(state => state.edges)
+  const onNodesChange = useCanvasStore(state => state.onNodesChange)
+  const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
+  const onConnect = useCanvasStore(state => state.onConnect)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [showVersions, setShowVersions] = useState(false)
@@ -78,24 +64,22 @@ export function CanvasPage() {
       ? '提交中…'
       : executionStatus === 'running'
         ? '执行中…'
-        : executionStatus === 'succeeded'
-          ? '执行完成'
-          : executionStatus === 'failed'
-            ? '执行失败'
-            : executionStatus === 'cancelled'
-              ? '已取消'
-              : '运行画布'
+        : executionStatus === 'cancelling'
+          ? '取消中…'
+          : executionStatus === 'succeeded'
+            ? '执行完成'
+            : executionStatus === 'failed'
+              ? '执行失败'
+              : executionStatus === 'cancelled'
+                ? '已取消'
+                : '运行画布'
 
   // 点击菜单外部或按 Esc 关闭右键菜单。
   useEffect(() => {
     if (menu === null) return
     const onPointerDown = (event: MouseEvent) => {
       const target = event.target
-      if (
-        target instanceof Element &&
-        target.closest('[data-canvas-menu]') !== null
-      )
-        return
+      if (target instanceof Element && target.closest('[data-canvas-menu]') !== null) return
       setMenu(null)
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -196,19 +180,11 @@ export function CanvasPage() {
     <div className="relative h-full min-h-0">
       {/* 工具栏：添加不同类型的节点 */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => addMediaNode('image')}
-        >
+        <Button size="sm" variant="secondary" onClick={() => addMediaNode('image')}>
           <ImagePlus className="mr-1 size-3.5" aria-hidden />
           图片
         </Button>
-        <Button
-          size="sm"
-          variant="secondary"
-          onClick={() => addMediaNode('video')}
-        >
+        <Button size="sm" variant="secondary" onClick={() => addMediaNode('video')}>
           <Video className="mr-1 size-3.5" aria-hidden />
           视频
         </Button>
@@ -228,7 +204,8 @@ export function CanvasPage() {
           disabled={
             saveStatus !== 'saved' ||
             executionStatus === 'submitting' ||
-            executionStatus === 'running'
+            executionStatus === 'running' ||
+            executionStatus === 'cancelling'
           }
           onClick={() => void execute()}
           title={executionError}
@@ -240,12 +217,13 @@ export function CanvasPage() {
           )}
           {executionLabel}
         </Button>
-        <Button
-          size="sm"
-          variant="ghost"
-          onClick={() => setShowVersions((open) => !open)}
-          aria-expanded={showVersions}
-        >
+        {(executionStatus === 'submitting' || executionStatus === 'running') && (
+          <Button size="sm" variant="ghost" onClick={() => void cancel()} title="取消当前画布执行">
+            <X className="mr-1 size-3.5" aria-hidden />
+            取消
+          </Button>
+        )}
+        <Button size="sm" variant="ghost" onClick={() => setShowVersions(open => !open)} aria-expanded={showVersions}>
           <History className="mr-1 size-3.5" aria-hidden />
           版本
         </Button>
@@ -255,17 +233,13 @@ export function CanvasPage() {
         <div className="absolute top-14 right-3 z-20 w-64 rounded-xl border bg-surface/95 p-2 shadow-lg backdrop-blur">
           <div className="mb-1 flex items-center justify-between px-1">
             <span className="text-xs font-medium">版本历史</span>
-            <span className="text-[10px] text-muted-foreground">
-              恢复会创建新版本
-            </span>
+            <span className="text-[10px] text-muted-foreground">恢复会创建新版本</span>
           </div>
           <div className="max-h-64 space-y-1 overflow-y-auto">
             {versions.length === 0 ? (
-              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">
-                暂无版本
-              </p>
+              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无版本</p>
             ) : (
-              versions.map((version) => (
+              versions.map(version => (
                 <div
                   key={version.id}
                   className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-accent"
@@ -311,12 +285,7 @@ export function CanvasPage() {
         className="bg-canvas"
         proOptions={{ hideAttribution: true }}
       >
-        <Background
-          variant={BackgroundVariant.Dots}
-          gap={20}
-          size={1.5}
-          color="var(--border)"
-        />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border)" />
         <Controls
           className="!bottom-4 !left-4 flex gap-1 rounded-lg border bg-surface p-1 [&>button]:!border-0 [&>button]:!bg-transparent [&>button]:!text-muted-foreground [&>button:hover]:!bg-accent"
           showInteractive={false}

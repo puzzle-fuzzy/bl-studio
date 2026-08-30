@@ -19,12 +19,7 @@ import type {
   CanvasSnapshot,
 } from '@bailian-studio/canvas-contracts'
 
-export type CanvasExecutionAssetKind =
-  | 'image'
-  | 'video'
-  | 'audio'
-  | 'text'
-  | 'archive'
+export type CanvasExecutionAssetKind = 'image' | 'video' | 'audio' | 'text' | 'archive'
 
 export type CanvasExecutionErrorCode =
   | 'CANVAS_EXECUTION_INVALID_GRAPH'
@@ -94,11 +89,9 @@ export function compileCanvasGraph({
     const kind = readNodeKind(node)
     const modelId = readString(node.data, 'modelId')
     if (modelId === undefined) {
-      throw new CanvasExecutionError(
-        'CANVAS_EXECUTION_MODEL_NOT_FOUND',
-        `Canvas node ${node.id} has no modelId`,
-        { nodeId: node.id },
-      )
+      throw new CanvasExecutionError('CANVAS_EXECUTION_MODEL_NOT_FOUND', `Canvas node ${node.id} has no modelId`, {
+        nodeId: node.id,
+      })
     }
     const model = getModelById(modelId)
     if (model === undefined) {
@@ -123,10 +116,7 @@ export function compileCanvasGraph({
     nodeById.set(node.id, { node, kind, modelId, model })
   }
 
-  const incoming = new Map<
-    string,
-    Array<{ sourceId: string; edgeId: string }>
-  >()
+  const incoming = new Map<string, Array<{ sourceId: string; edgeId: string }>>()
   const outgoing = new Map<string, string[]>()
   const indegree = new Map<string, number>()
   const edgeIds = new Set<string>()
@@ -158,10 +148,7 @@ export function compileCanvasGraph({
     }
     const pair = `${edge.source}\u0000${edge.target}\u0000${edge.sourceHandle ?? ''}\u0000${edge.targetHandle ?? ''}`
     if (endpointPairs.has(pair)) {
-      throw invalidGraph(
-        `Canvas contains duplicate connection ${edge.source} → ${edge.target}`,
-        { edgeId: edge.id },
-      )
+      throw invalidGraph(`Canvas contains duplicate connection ${edge.source} → ${edge.target}`, { edgeId: edge.id })
     }
     endpointPairs.add(pair)
     incoming.get(edge.target)?.push({ sourceId: edge.source, edgeId: edge.id })
@@ -170,24 +157,16 @@ export function compileCanvasGraph({
   }
 
   const topologicalOrder = topologicalSort(
-    snapshot.nodes.map((node) => node.id),
+    snapshot.nodes.map(node => node.id),
     outgoing,
     indegree,
   )
-  const planNodes = topologicalOrder.map((nodeId) => {
+  const planNodes = topologicalOrder.map(nodeId => {
     const context = nodeById.get(nodeId)
     if (context === undefined) {
-      throw invalidGraph(
-        `Canvas node ${nodeId} disappeared during compilation`,
-        { nodeId },
-      )
+      throw invalidGraph(`Canvas node ${nodeId} disappeared during compilation`, { nodeId })
     }
-    return compileNode(
-      context,
-      incoming.get(nodeId) ?? [],
-      nodeById,
-      assetKinds,
-    )
+    return compileNode(context, incoming.get(nodeId) ?? [], nodeById, assetKinds)
   })
 
   return { nodes: planNodes }
@@ -214,10 +193,10 @@ function compileNode(
   for (const edge of incomingEdges) {
     const source = nodeById.get(edge.sourceId)
     if (source === undefined) {
-      throw invalidGraph(
-        `Canvas node ${node.id} has an unknown upstream node`,
-        { nodeId: node.id, sourceId: edge.sourceId },
-      )
+      throw invalidGraph(`Canvas node ${node.id} has an unknown upstream node`, {
+        nodeId: node.id,
+        sourceId: edge.sourceId,
+      })
     }
     references.push({
       id: source.node.id,
@@ -237,9 +216,7 @@ function compileNode(
     references.push({ id: assetId, kind: kindForAsset })
   }
 
-  const mediaParameters = model.parameters.filter(
-    (parameter) => parameter.type === 'media',
-  )
+  const mediaParameters = model.parameters.filter(parameter => parameter.type === 'media')
   const remaining = [...references]
   const assetRefs: Record<string, string[]> = {}
   const dependencyBindings: Record<string, string[]> = {}
@@ -249,9 +226,7 @@ function compileNode(
     const mediaKind = parameter.mediaKind
     if (mediaKind === undefined) continue
     const capacity = parameter.maxItems ?? 1
-    const selected = remaining
-      .filter((reference) => reference.kind === mediaKind)
-      .slice(0, capacity)
+    const selected = remaining.filter(reference => reference.kind === mediaKind).slice(0, capacity)
     if (selected.length === 0) {
       if (parameter.required === true || (parameter.minItems ?? 0) > 0) {
         throw new CanvasExecutionError(
@@ -262,37 +237,30 @@ function compileNode(
       }
       continue
     }
-    const selectedIds = new Set(selected.map((reference) => reference.id))
+    const selectedIds = new Set(selected.map(reference => reference.id))
     for (let index = remaining.length - 1; index >= 0; index -= 1) {
       const reference = remaining[index]
-      if (reference !== undefined && selectedIds.has(reference.id))
-        remaining.splice(index, 1)
+      if (reference !== undefined && selectedIds.has(reference.id)) remaining.splice(index, 1)
     }
 
-    const staticIds = selected
-      .filter((reference) => reference.sourceNodeId === undefined)
-      .map((reference) => reference.id)
+    const staticIds = selected.filter(reference => reference.sourceNodeId === undefined).map(reference => reference.id)
     const upstreamIds = selected
-      .filter((reference) => reference.sourceNodeId !== undefined)
-      .map((reference) => reference.sourceNodeId as string)
+      .filter(reference => reference.sourceNodeId !== undefined)
+      .map(reference => reference.sourceNodeId as string)
     if (staticIds.length > 0) assetRefs[parameter.name] = staticIds
     if (upstreamIds.length > 0) dependencyBindings[parameter.name] = upstreamIds
-    validationParams[parameter.name] = selected.map(
-      (reference) => `canvas://${reference.id}`,
-    )
+    validationParams[parameter.name] = selected.map(reference => `canvas://${reference.id}`)
   }
 
   if (remaining.length > 0) {
-    const unsupported = remaining
-      .map((reference) => `${reference.kind}:${reference.id}`)
-      .join(', ')
+    const unsupported = remaining.map(reference => `${reference.kind}:${reference.id}`).join(', ')
     throw new CanvasExecutionError(
       'CANVAS_EXECUTION_INPUT_UNSUPPORTED',
       `Canvas node ${node.id} has inputs unsupported by model ${modelId}: ${unsupported}`,
       {
         nodeId: node.id,
         modelId,
-        inputs: remaining.map((reference) => reference.id),
+        inputs: remaining.map(reference => reference.id),
       },
     )
   }
@@ -305,7 +273,7 @@ function compileNode(
       {
         nodeId: node.id,
         modelId,
-        issues: validation.errors.map((issue) => ({
+        issues: validation.errors.map(issue => ({
           code: issue.code,
           field: issue.field,
           message: issue.message,
@@ -316,7 +284,7 @@ function compileNode(
 
   const params = { ...validation.params }
   for (const parameter of mediaParameters) delete params[parameter.name]
-  const dependsOn = [...new Set(incomingEdges.map((edge) => edge.sourceId))]
+  const dependsOn = [...new Set(incomingEdges.map(edge => edge.sourceId))]
   return {
     nodeId: node.id,
     kind,
@@ -334,7 +302,7 @@ function topologicalSort(
   initialIndegree: ReadonlyMap<string, number>,
 ): string[] {
   const indegree = new Map(initialIndegree)
-  const queue = nodeIds.filter((nodeId) => indegree.get(nodeId) === 0)
+  const queue = nodeIds.filter(nodeId => indegree.get(nodeId) === 0)
   const order: string[] = []
   while (queue.length > 0) {
     const nodeId = queue.shift()
@@ -374,43 +342,26 @@ function readNodeKind(node: CanvasNode): 'image' | 'video' {
   return kind
 }
 
-function readString(
-  data: Record<string, unknown>,
-  key: string,
-): string | undefined {
+function readString(data: Record<string, unknown>, key: string): string | undefined {
   const value = data[key]
-  return typeof value === 'string' && value.trim().length > 0
-    ? value
-    : undefined
+  return typeof value === 'string' && value.trim().length > 0 ? value : undefined
 }
 
 function readAssetIds(node: CanvasNode): string[] {
   const value = node.data['referenceAssetIds']
   if (value === undefined) return []
-  if (
-    !Array.isArray(value) ||
-    value.some((item) => typeof item !== 'string' || item.trim().length === 0)
-  ) {
+  if (!Array.isArray(value) || value.some(item => typeof item !== 'string' || item.trim().length === 0)) {
     throw invalidGraph(`Canvas node ${node.id} has invalid referenceAssetIds`, {
       nodeId: node.id,
     })
   }
-  return [...new Set(value.map((item) => item.trim()))]
+  return [...new Set(value.map(item => item.trim()))]
 }
 
-function invalidGraph(
-  message: string,
-  details?: Readonly<Record<string, unknown>>,
-): CanvasExecutionError {
-  return new CanvasExecutionError(
-    'CANVAS_EXECUTION_INVALID_GRAPH',
-    message,
-    details,
-  )
+function invalidGraph(message: string, details?: Readonly<Record<string, unknown>>): CanvasExecutionError {
+  return new CanvasExecutionError('CANVAS_EXECUTION_INVALID_GRAPH', message, details)
 }
 
-export function isCanvasExecutionModelCategory(
-  value: ModelCategory,
-): value is 'image' | 'video' {
+export function isCanvasExecutionModelCategory(value: ModelCategory): value is 'image' | 'video' {
   return value === 'image' || value === 'video'
 }

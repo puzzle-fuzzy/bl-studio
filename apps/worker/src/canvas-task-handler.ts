@@ -5,10 +5,7 @@ import type {
   GenerationQuotaLimits,
   GenerationRepository,
 } from '@bailian-studio/generation-repository'
-import {
-  CanvasExecutionTaskInputSchema,
-  type CanvasExecutionTaskInput,
-} from '@bailian-studio/canvas-contracts'
+import { CanvasExecutionTaskInputSchema, type CanvasExecutionTaskInput } from '@bailian-studio/canvas-contracts'
 import type { Logger } from '@bailian-studio/shared'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { TaskProcessOutcome } from './task-contracts'
@@ -23,13 +20,13 @@ export interface CanvasExecutionTaskHandlerDeps {
   >
   readonly assetRepository?: Pick<AssetRepository, 'getUserAsset'>
   readonly generationQuota?: GenerationQuotaLimits
+  /** 单个 Canvas 任务内允许同时运行的节点数；默认 4。 */
+  readonly maxParallelNodes?: number
   readonly logger: Logger
 }
 
 interface GenerationRepositoryPort {
-  createGeneration(
-    input: Parameters<GenerationRepository['createGeneration']>[0],
-  ): Promise<CreateGenerationResult>
+  createGeneration(input: Parameters<GenerationRepository['createGeneration']>[0]): Promise<CreateGenerationResult>
   getGenerationRecord(id: string): Promise<GenerationRecord | undefined>
   listArtifactsForRecord: GenerationRepository['listArtifactsForRecord']
 }
@@ -54,254 +51,251 @@ export async function processCanvasExecutionTask(
     )
   }
   if (task.userId === undefined || task.userId.length === 0) {
-    return failed(
-      'Canvas execution task is missing its user scope',
-      'CANVAS_EXECUTION_USER_MISSING',
-    )
+    return failed('Canvas execution task is missing its user scope', 'CANVAS_EXECUTION_USER_MISSING')
   }
 
-  const input = parsed.data
-  const planNode = input.plan.nodes.find(
-    (node) => input.nodeRuns[node.nodeId]?.status !== 'succeeded',
+  let nextInput = parsed.data
+  const generatingNodes = nextInput.plan.nodes.filter(node => nextInput.nodeRuns[node.nodeId]?.status === 'generating')
+  const generationResults = await Promise.all(
+    generatingNodes.map(node => inspectGeneratingNode(task, node, nextInput.nodeRuns[node.nodeId], deps)),
   )
-  if (planNode === undefined) {
-    return {
-      status: 'succeeded',
-      output: { artifacts: [] },
-      nextInput: input,
-    }
-  }
-
-  const currentRun = input.nodeRuns[planNode.nodeId]
-  if (currentRun?.status === 'failed') {
-    return failed(
-      currentRun.error ?? `Canvas node ${planNode.nodeId} failed`,
-      'CANVAS_NODE_FAILED',
-      { nodeId: planNode.nodeId },
-      input,
-    )
-  }
-
-  if (currentRun?.generationId === undefined) {
-    const dependencyResult = resolveDependencyAssetRefs(planNode, input)
-    if (dependencyResult.waiting) {
-      return retry(
-        'Waiting for upstream canvas nodes',
-        'CANVAS_DEPENDENCY_WAITING',
-        input,
-        dependencyResult.details,
-      )
-    }
-    if (dependencyResult.error !== undefined) {
-      return failed(
-        dependencyResult.error.message,
-        dependencyResult.error.code,
-        dependencyResult.error.details,
-        input,
-      )
-    }
-
-    try {
-      const created = await deps.repository.createGeneration({
-        userId: task.userId,
-        modelId: planNode.modelId,
-        params: planNode.params,
-        ...(Object.keys(dependencyResult.assetRefs).length > 0
-          ? { assetRefs: dependencyResult.assetRefs }
-          : {}),
-        ...(task.traceId === undefined ? {} : { traceId: task.traceId }),
-        idempotencyKey: `canvas:${task.id}:${planNode.nodeId}`,
-        ...(deps.generationQuota === undefined
-          ? {}
-          : { quota: deps.generationQuota }),
-      })
-      const nextInput = withNodeRun(input, planNode.nodeId, {
-        status: 'generating',
-        generationId: created.record.id,
-      })
-      deps.logger.info('canvas.node_generation_queued', {
+  for (const result of generationResults) {
+    if (result.kind === 'succeeded') {
+      nextInput = withNodeRun(nextInput, result.nodeId, result.run)
+      deps.logger.info('canvas.node_succeeded', {
         taskId: task.id,
-        nodeId: planNode.nodeId,
-        generationId: created.record.id,
-        modelId: planNode.modelId,
+        nodeId: result.nodeId,
+        generationId: result.run.generationId,
+        assetIds: result.run.assetIds,
       })
-      return retry(
-        'Canvas node generation queued',
-        'CANVAS_NODE_QUEUED',
-        nextInput,
-        { nodeId: planNode.nodeId },
-      )
-    } catch (error) {
-      return failed(
-        error instanceof Error ? error.message : String(error),
-        'CANVAS_NODE_GENERATION_CREATE_FAILED',
-        { nodeId: planNode.nodeId },
-        input,
-      )
+    } else if (result.kind === 'failed') {
+      nextInput = withNodeRun(nextInput, result.nodeId, result.run)
     }
   }
+  const waitingResult = generationResults.find(result => result.kind === 'waiting')
 
-  const generation = await deps.repository.getGenerationRecord(
-    currentRun.generationId,
+  const failedNode = nextInput.plan.nodes.find(node => nextInput.nodeRuns[node.nodeId]?.status === 'failed')
+  const activeGeneratingNode = nextInput.plan.nodes.some(
+    node => nextInput.nodeRuns[node.nodeId]?.status === 'generating',
   )
-  if (generation === undefined) {
-    const message = `Generation record not found: ${currentRun.generationId}`
+  if (failedNode !== undefined && !activeGeneratingNode) {
+    const run = nextInput.nodeRuns[failedNode.nodeId]
     return failed(
-      message,
-      'CANVAS_GENERATION_NOT_FOUND',
-      {
-        nodeId: planNode.nodeId,
-        generationId: currentRun.generationId,
-      },
-      withNodeRun(input, planNode.nodeId, {
-        status: 'failed',
-        generationId: currentRun.generationId,
-        error: message,
+      run?.error ?? `Canvas node ${failedNode.nodeId} failed`,
+      'CANVAS_NODE_FAILED',
+      { nodeId: failedNode.nodeId },
+      nextInput,
+    )
+  }
+  const userId = task.userId
+
+  const readyNodes = nextInput.plan.nodes.filter(node => {
+    const run = nextInput.nodeRuns[node.nodeId]
+    if (run?.status === 'succeeded' || run?.status === 'generating' || run?.status === 'failed') return false
+    return node.dependsOn.every(dependencyNodeId => nextInput.nodeRuns[dependencyNodeId]?.status === 'succeeded')
+  })
+  const activeNodeCount = nextInput.plan.nodes.filter(
+    node => nextInput.nodeRuns[node.nodeId]?.status === 'generating',
+  ).length
+  const maxParallelNodes = Math.max(1, deps.maxParallelNodes ?? 4)
+  const slots = Math.max(0, maxParallelNodes - activeNodeCount)
+  const batch = readyNodes.slice(0, slots)
+
+  if (batch.length > 0) {
+    const startResults = await Promise.all(
+      batch.map(async node => {
+        const dependencyResult = resolveDependencyAssetRefs(node, nextInput)
+        if (dependencyResult.waiting) {
+          return { nodeId: node.nodeId, waiting: true as const }
+        }
+        if (dependencyResult.error !== undefined) {
+          return { nodeId: node.nodeId, error: dependencyResult.error }
+        }
+        try {
+          const created = await deps.repository.createGeneration({
+            userId,
+            modelId: node.modelId,
+            params: node.params,
+            ...(Object.keys(dependencyResult.assetRefs).length > 0 ? { assetRefs: dependencyResult.assetRefs } : {}),
+            ...(task.traceId === undefined ? {} : { traceId: task.traceId }),
+            idempotencyKey: `canvas:${task.id}:${node.nodeId}`,
+            ...(deps.generationQuota === undefined ? {} : { quota: deps.generationQuota }),
+          })
+          return { nodeId: node.nodeId, created }
+        } catch (error) {
+          return {
+            nodeId: node.nodeId,
+            error: {
+              message: error instanceof Error ? error.message : String(error),
+              code: 'CANVAS_NODE_GENERATION_CREATE_FAILED',
+              details: { nodeId: node.nodeId },
+            },
+          }
+        }
       }),
     )
+    let createdCount = 0
+    let failedCount = 0
+    for (const result of startResults) {
+      if (result.created !== undefined) {
+        createdCount += 1
+        nextInput = withNodeRun(nextInput, result.nodeId, {
+          status: 'generating',
+          generationId: result.created.record.id,
+        })
+        deps.logger.info('canvas.node_generation_queued', {
+          taskId: task.id,
+          nodeId: result.nodeId,
+          generationId: result.created.record.id,
+          modelId: nextInput.plan.nodes.find(node => node.nodeId === result.nodeId)?.modelId,
+        })
+      } else if (result.error !== undefined) {
+        failedCount += 1
+        nextInput = withNodeRun(nextInput, result.nodeId, {
+          status: 'failed',
+          error: result.error.message,
+        })
+      }
+    }
+    if (failedCount > 0 && createdCount === 0) {
+      const failure = startResults.find(result => result.error !== undefined)
+      return failed(
+        failure?.error?.message ?? 'Canvas node generation could not start',
+        failure?.error?.code ?? 'CANVAS_NODE_GENERATION_CREATE_FAILED',
+        failure?.error?.details,
+        nextInput,
+      )
+    }
+    return retry(
+      createdCount > 0 ? 'Canvas nodes queued; advancing graph in parallel' : 'Waiting for canvas node dependencies',
+      createdCount > 0 ? 'CANVAS_NODES_QUEUED' : 'CANVAS_DEPENDENCY_WAITING',
+      nextInput,
+    )
+  }
+
+  const hasPendingNode = nextInput.plan.nodes.some(node => nextInput.nodeRuns[node.nodeId]?.status !== 'succeeded')
+  if (!hasPendingNode) return { status: 'succeeded', output: { artifacts: [] }, nextInput }
+  if (activeGeneratingNode) {
+    return retry(
+      'Waiting for canvas node generations',
+      waitingResult?.code ?? 'CANVAS_GENERATION_WAITING',
+      nextInput,
+      waitingResult?.details,
+    )
+  }
+  return retry('Waiting for upstream canvas nodes', 'CANVAS_DEPENDENCY_WAITING', nextInput)
+}
+
+type CanvasNodeRun = CanvasExecutionTaskInput['nodeRuns'][string]
+type CanvasPlanNode = CanvasExecutionTaskInput['plan']['nodes'][number]
+
+type NodeInspectionResult =
+  | { kind: 'waiting'; nodeId: string; code: string; details?: Readonly<Record<string, unknown>> }
+  | { kind: 'succeeded'; nodeId: string; run: CanvasNodeRun }
+  | { kind: 'failed'; nodeId: string; run: CanvasNodeRun }
+
+async function inspectGeneratingNode(
+  task: TaskRecord,
+  planNode: CanvasPlanNode,
+  currentRun: CanvasNodeRun | undefined,
+  deps: CanvasExecutionTaskHandlerDeps,
+): Promise<NodeInspectionResult> {
+  const generationId = currentRun?.generationId
+  if (generationId === undefined) {
+    return {
+      kind: 'failed',
+      nodeId: planNode.nodeId,
+      run: {
+        status: 'failed',
+        error: 'Canvas node is marked generating without a generation ID',
+      },
+    }
+  }
+
+  const generation = await deps.repository.getGenerationRecord(generationId)
+  if (generation === undefined) {
+    return failedNodeInspection(planNode.nodeId, generationId, `Generation record not found: ${generationId}`)
   }
   if (generation.status === 'failed' || generation.status === 'cancelled') {
     const message =
       typeof generation.errorJson?.['message'] === 'string'
         ? String(generation.errorJson['message'])
         : `Canvas node generation ${generation.status}`
-    return failed(
-      message,
-      'CANVAS_GENERATION_FAILED',
-      {
-        nodeId: planNode.nodeId,
-        generationId: generation.id,
-        status: generation.status,
-      },
-      withNodeRun(input, planNode.nodeId, {
-        status: 'failed',
-        generationId: generation.id,
-        error: message,
-      }),
-    )
+    return failedNodeInspection(planNode.nodeId, generation.id, message)
   }
   if (generation.status !== 'succeeded') {
-    return retry(
-      'Waiting for canvas node generation',
-      'CANVAS_GENERATION_WAITING',
-      input,
-      {
-        nodeId: planNode.nodeId,
-        generationId: generation.id,
-        status: generation.status,
-      },
-    )
+    return {
+      kind: 'waiting',
+      nodeId: planNode.nodeId,
+      code: 'CANVAS_GENERATION_WAITING',
+      details: { nodeId: planNode.nodeId, generationId: generation.id, status: generation.status },
+    }
   }
 
-  if (deps.assetRepository === undefined) {
-    return failed(
-      'Canvas execution asset repository is not configured',
-      'CANVAS_ASSET_REPOSITORY_MISSING',
-      {
-        nodeId: planNode.nodeId,
-      },
-      input,
-    )
+  const assetRepository = deps.assetRepository
+  if (assetRepository === undefined) {
+    return failedNodeInspection(planNode.nodeId, generation.id, 'Canvas execution asset repository is not configured')
   }
 
-  const artifacts = (
-    await deps.repository.listArtifactsForRecord(generation.id)
-  ).filter((artifact) => artifact.kind === planNode.kind)
-  const failedArtifact = artifacts.find(
-    (artifact) => artifact.status === 'failed',
+  const artifacts = (await deps.repository.listArtifactsForRecord(generation.id)).filter(
+    artifact => artifact.kind === planNode.kind,
   )
+  const failedArtifact = artifacts.find(artifact => artifact.status === 'failed')
   if (failedArtifact !== undefined) {
-    const message = 'Canvas node artifact persistence failed'
-    return failed(
-      message,
-      'CANVAS_OUTPUT_PERSIST_FAILED',
-      {
-        nodeId: planNode.nodeId,
-        generationId: generation.id,
-        artifactId: failedArtifact.id,
-      },
-      withNodeRun(input, planNode.nodeId, {
-        status: 'failed',
-        generationId: generation.id,
-        error: message,
-      }),
-    )
+    return failedNodeInspection(planNode.nodeId, generation.id, 'Canvas node artifact persistence failed')
   }
   if (artifacts.length === 0) {
-    const message =
-      'Canvas node generation completed without a matching media artifact'
-    return failed(
-      message,
-      'CANVAS_OUTPUT_MISSING',
-      {
-        nodeId: planNode.nodeId,
-        generationId: generation.id,
-        expectedKind: planNode.kind,
-      },
-      withNodeRun(input, planNode.nodeId, {
-        status: 'failed',
-        generationId: generation.id,
-        error: message,
-      }),
+    return failedNodeInspection(
+      planNode.nodeId,
+      generation.id,
+      'Canvas node generation completed without a matching media artifact',
     )
   }
 
-  const assetIds = artifacts.map(
-    (artifact) => `asset_generation_${artifact.id}`,
-  )
+  const assetIds = artifacts.map(artifact => `asset_generation_${artifact.id}`)
   try {
     const assets = await Promise.all(
-      assetIds.map((assetId) =>
-        deps.assetRepository?.getUserAsset({
+      assetIds.map(assetId =>
+        assetRepository.getUserAsset({
           userId: task.userId as string,
           assetId,
         }),
       ),
     )
-    if (assets.some((asset) => asset === undefined)) {
-      return retry(
-        'Waiting for generated assets to become ready',
-        'CANVAS_ASSET_WAITING',
-        input,
-        {
-          nodeId: planNode.nodeId,
-          generationId: generation.id,
-        },
-      )
-    }
-  } catch (error) {
-    return retry(
-      'Generated asset projection is temporarily unavailable',
-      'CANVAS_ASSET_READ_RETRY',
-      input,
-      {
+    if (assets.some(asset => asset === undefined)) {
+      return {
+        kind: 'waiting',
         nodeId: planNode.nodeId,
-        error: error instanceof Error ? error.message : String(error),
-      },
-    )
+        code: 'CANVAS_ASSET_WAITING',
+        details: { nodeId: planNode.nodeId, generationId: generation.id },
+      }
+    }
+  } catch {
+    return {
+      kind: 'waiting',
+      nodeId: planNode.nodeId,
+      code: 'CANVAS_ASSET_READ_RETRY',
+      details: { nodeId: planNode.nodeId, generationId: generation.id },
+    }
   }
 
-  const nextInput = withNodeRun(input, planNode.nodeId, {
-    status: 'succeeded',
-    generationId: generation.id,
-    assetIds,
-  })
-  deps.logger.info('canvas.node_succeeded', {
-    taskId: task.id,
+  return {
+    kind: 'succeeded',
     nodeId: planNode.nodeId,
-    generationId: generation.id,
-    assetIds,
-  })
-  const hasPendingNode = nextInput.plan.nodes.some(
-    (node) => nextInput.nodeRuns[node.nodeId]?.status !== 'succeeded',
-  )
-  if (!hasPendingNode)
-    return { status: 'succeeded', output: { artifacts: [] }, nextInput }
-  return retry(
-    'Canvas node completed; advancing graph',
-    'CANVAS_NODE_ADVANCE',
-    nextInput,
-  )
+    run: {
+      status: 'succeeded',
+      generationId: generation.id,
+      assetIds,
+    },
+  }
+}
+
+function failedNodeInspection(nodeId: string, generationId: string, message: string): NodeInspectionResult {
+  return {
+    kind: 'failed',
+    nodeId,
+    run: { status: 'failed', generationId, error: message },
+  }
 }
 
 function resolveDependencyAssetRefs(
@@ -318,14 +312,9 @@ function resolveDependencyAssetRefs(
   }
 } {
   const assetRefs: Record<string, string[]> = Object.fromEntries(
-    Object.entries(planNode.assetRefs).map(([parameter, ids]) => [
-      parameter,
-      [...ids],
-    ]),
+    Object.entries(planNode.assetRefs).map(([parameter, ids]) => [parameter, [...ids]]),
   )
-  for (const [parameter, upstreamNodeIds] of Object.entries(
-    planNode.dependencyBindings,
-  )) {
+  for (const [parameter, upstreamNodeIds] of Object.entries(planNode.dependencyBindings)) {
     const refs = assetRefs[parameter] ?? []
     for (const upstreamNodeId of upstreamNodeIds) {
       const upstream = input.nodeRuns[upstreamNodeId]
@@ -376,9 +365,7 @@ function retry(
     status: 'retry',
     nextRunAt: new Date(
       Date.now() +
-        (code === 'CANVAS_NODE_ADVANCE' || code === 'CANVAS_NODE_QUEUED'
-          ? NODE_ADVANCE_DELAY_MS
-          : NODE_POLL_DELAY_MS),
+        (code === 'CANVAS_NODE_ADVANCE' || code === 'CANVAS_NODE_QUEUED' ? NODE_ADVANCE_DELAY_MS : NODE_POLL_DELAY_MS),
     ).toISOString(),
     error: {
       category: 'system',
@@ -404,9 +391,7 @@ function failed(
       message,
       retriable: false,
       code,
-      ...(details !== undefined &&
-      typeof details === 'object' &&
-      details !== null
+      ...(details !== undefined && typeof details === 'object' && details !== null
         ? { details: details as Record<string, unknown> }
         : {}),
     },

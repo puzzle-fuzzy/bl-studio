@@ -143,12 +143,16 @@ flowchart LR
 - API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、
   缺失/越权素材和不支持的媒体输入；任务提交以 `(user, canvas, idempotencyKey)` 的确定性任务 ID
   提供幂等边界。
-- Worker 按拓扑顺序推进节点。每个 Canvas 媒体节点都通过现有 `GenerationRepository` 创建普通
+- Worker 按拓扑顺序推进节点；同一依赖层的就绪节点会并行创建 generation，默认并发上限为 4，
+  可由 Worker 组合根调整。每个 Canvas 媒体节点都通过现有 `GenerationRepository` 创建普通
   generation，因此继续复用额度预留、provider 审计、artifact 持久化和资产投影；上游节点只向下游
   传递稳定的 `asset_generation_*` ID。
 - Canvas worker 会等待 artifact persist 完成并确认 user asset 投影 ready 后才推进下游；不会把
-  provider 临时 URL 写入任务或画布快照。当前第一版按节点顺序执行，并默认每个上游节点向下游提供
-  第一个输出资产。
+  provider 临时 URL 写入任务或画布快照。每个节点仍以可恢复的 `nodeRuns` 状态推进，并默认每个
+  上游节点向下游提供第一个输出资产。
+- 用户可以取消仍处于 queued/running 的整张 Canvas 任务；任务状态会原子地变为 cancelled、释放租约，
+  并尽力向已创建的子 generation 发出取消请求。Provider 是否已经停止执行由现有 generation/provider
+  生命周期决定，因此取消接口不承诺已发出的外部请求能够瞬时中断。
 
 ## 4. 领域模型归属
 
@@ -389,4 +393,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译与 worker 编排的第一版也已落地；下一步应优先补同层并行调度、整图取消、实时进度事件和节点级重跑。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度和整图取消已经落地；下一步应优先补实时进度事件和节点级重跑/缓存。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
