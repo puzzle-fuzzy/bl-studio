@@ -1,4 +1,4 @@
-import { DirectorLocationsResultSchema, type DirectorLocationsResult } from '@bailian-studio/shared'
+import { DirectorLocationsResultSchema, type DirectorLocationsResult } from '@bailian-studio/director-contracts'
 
 export type DirectorLocationsParseMode = 'strict-json' | 'normalized-json' | 'repaired-json' | 'invalid'
 

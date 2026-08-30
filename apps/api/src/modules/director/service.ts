@@ -6,7 +6,8 @@
  * buildDirectorVideoGenerationInput 构造同一批参数——两套构造器需保持一致，
  * 统一放在 service 层减少漂移面。
  */
-import { ValidationError, type CreateDirectorPhaseRunInput, type DirectorAssemblyPreflight, type DirectorAssemblySettingsInput, type DirectorMusicEstimate, type DirectorPhase, type DirectorPhaseRun, type DirectorVideoEstimate } from '@bailian-studio/shared'
+import type { CreateDirectorPhaseRunInput, DirectorAssemblyPreflight, DirectorAssemblySettingsInput, DirectorMusicEstimate, DirectorPhase, DirectorPhaseRun, DirectorVideoEstimate } from '@bailian-studio/director-contracts'
+import { ValidationError } from '@bailian-studio/shared'
 import { DirectorRepositoryError, type DirectorProjectRepositoryDetail, type DirectorRepository } from '@bailian-studio/director-repository'
 import {
   estimatePriceCents,

@@ -578,6 +578,12 @@ describe('package boundary rules', () => {
         "import { listModels } from '@bailian-studio/model-core'",
       ),
     ).toBe(true)
+    expect(
+      matchesRule(
+        'packages/api-client',
+        "import { DirectorProjectDetailSchema } from '@bailian-studio/director-contracts'",
+      ),
+    ).toBe(false)
 
     // storage 只允许叶子 shared。
     expect(
@@ -612,5 +618,32 @@ describe('package boundary rules', () => {
         "import { GenerationStatus } from '@bailian-studio/event-bus'",
       ),
     ).toBe(true)
+  })
+
+  it('keeps director contracts independent from runtime packages', () => {
+    expect(
+      matchesRule(
+        'packages/director-contracts',
+        "import { z } from 'zod'",
+      ),
+    ).toBe(false)
+    expect(
+      matchesRule(
+        'packages/director-contracts',
+        "import { createDb } from '@bailian-studio/db'",
+      ),
+    ).toBe(true)
+    expect(
+      matchesRule(
+        'packages/director-contracts',
+        "import { app } from '../../apps/api'",
+      ),
+    ).toBe(true)
+    expect(
+      matchesRule(
+        'packages/director-repository',
+        "import { DirectorProjectDetail } from '@bailian-studio/director-contracts'",
+      ),
+    ).toBe(false)
   })
 })

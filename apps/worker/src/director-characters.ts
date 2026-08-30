@@ -1,4 +1,4 @@
-import { DirectorCharactersResultSchema, type DirectorCharactersResult } from '@bailian-studio/shared'
+import { DirectorCharactersResultSchema, type DirectorCharactersResult } from '@bailian-studio/director-contracts'
 
 /**
  * Character generation is a downstream contract, so malformed provider output

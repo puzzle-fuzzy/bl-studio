@@ -22,18 +22,20 @@
 ## 2. 各包 import 禁令（check-package-boundaries.ts 的 rules 表）
 
 `packages/api-client` 是传输契约层，允许依赖 `@bailian-studio/shared`、
-`@bailian-studio/creative-asset-contracts`、`@bailian-studio/canvas-contracts` 与 `zod`；
+`@bailian-studio/creative-asset-contracts`、`@bailian-studio/canvas-contracts`、
+`@bailian-studio/director-contracts` 与 `zod`；
 它不得依赖执行层、数据库、应用层或其他运行时包。共享契约只保留一份，避免 API、
 Worker 与前端各自维护不同的 wire schema。
 
 | 包 | 禁止 import |
 |---|---|
 | `packages/shared` | 任何其它 `@bailian-studio/*`（叶子包） |
+| `packages/director-contracts` | 任何其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope)`、apps、services |
 | `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|event-bus)`、apps、services、elysia、react |
 | `packages/generation-repository` | `@bailian-studio/provider-dashscope`、services、apps、react、elysia |
 | `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|event-bus)`、services、apps、react、elysia |
-| `packages/director-repository` | 除 `@bailian-studio/(db\|shared\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
+| `packages/director-repository` | 除 `@bailian-studio/(db\|director-contracts\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/credit-ledger` | 除 `@bailian-studio/(db\|shared)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/media-repository` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|event-bus\|storage\|auth)`、services、apps、react、elysia |
 | `packages/auth` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|task-engine\|event-bus\|storage)`、services、apps、react、elysia |

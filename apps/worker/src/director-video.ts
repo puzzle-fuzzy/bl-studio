@@ -1,5 +1,5 @@
 import { validateModelParams, type FrozenModelManifest, type ReferenceFormat } from '@bailian-studio/model-core'
-import type { DirectorAsset, DirectorShot } from '@bailian-studio/shared'
+import type { DirectorAsset, DirectorShot } from '@bailian-studio/director-contracts'
 
 const REFERENCE_ASSET_KINDS = new Set<DirectorAsset['kind']>([
   'uploaded_reference',

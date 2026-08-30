@@ -234,7 +234,7 @@ export const rules: Array<{
       // contracts，其余 workspace 包仍然禁止——用 importSpecifier
       // 只匹配真实 import，不误伤源内自我引述的注释。
       importSpecifier(
-        String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b|canvas-contracts\b)[a-z-]+`,
+        String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b|canvas-contracts\b|director-contracts\b)[a-z-]+`,
       ),
       importsApps,
       importsServices,
@@ -295,13 +295,24 @@ export const rules: Array<{
   {
     scope: 'packages/director-repository',
     banned: [
-      // 导演 repository：只许依赖 db 和 shared（域契约）；
+      // 导演 repository：只许依赖 db、director-contracts 和 task-repository；
       // 禁入 provider、任务引擎、其他 repository、app 运行时与后端服务。
       importSpecifier(
-        String.raw`@bailian-studio\/(?!director-repository\b|shared\b|db\b|task-repository\b)[a-z-]+`,
+        String.raw`@bailian-studio\/(?!director-repository\b|director-contracts\b|db\b|task-repository\b)[a-z-]+`,
       ),
       importsApps,
       importsServices,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/director-contracts',
+    banned: [
+      // 导演契约是纯 zod + 纯函数包，不能反向依赖任何运行时、持久化或应用层。
+      importSpecifier(String.raw`@bailian-studio\/(?!director-contracts\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsReact,
       importsElysia,
     ],
   },

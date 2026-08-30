@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { DirectorProjectRepositoryDetail, DirectorRepository } from '@bailian-studio/director-repository'
-import type { DirectorPhaseRun } from '@bailian-studio/shared'
+import type { DirectorPhaseRun } from '@bailian-studio/director-contracts'
 import { createDirectorApplicationService } from '../src/modules/director/service'
 
 function projectWithShots(shots: Array<Record<string, unknown>>): DirectorProjectRepositoryDetail {

@@ -1,4 +1,4 @@
-import { DirectorStoryboardResultSchema, type DirectorStoryboardResult } from '@bailian-studio/shared'
+import { DirectorStoryboardResultSchema, type DirectorStoryboardResult } from '@bailian-studio/director-contracts'
 
 /**
  * Storyboard output is persisted as reviewable shot cards. Rejecting partial

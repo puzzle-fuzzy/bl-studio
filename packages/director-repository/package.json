@@ -13,7 +13,7 @@
   },
   "dependencies": {
     "@bailian-studio/db": "workspace:*",
-    "@bailian-studio/shared": "workspace:*",
+    "@bailian-studio/director-contracts": "workspace:*",
     "@bailian-studio/task-repository": "workspace:*",
     "drizzle-orm": "catalog:"
   },

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { getModelById } from '@bailian-studio/model-core'
-import type { DirectorAsset } from '@bailian-studio/shared'
+import type { DirectorAsset } from '@bailian-studio/director-contracts'
 import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirectorVideoRunSummary } from '../src/director-video'
 
 const shot = {

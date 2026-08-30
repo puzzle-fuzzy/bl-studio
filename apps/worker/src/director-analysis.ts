@@ -1,4 +1,4 @@
-import { DirectorAnalysisResultSchema, DirectorScriptChatOutputSchema, type DirectorAnalysisResult, type DirectorScriptChatOutput } from '@bailian-studio/shared'
+import { DirectorAnalysisResultSchema, DirectorScriptChatOutputSchema, type DirectorAnalysisResult, type DirectorScriptChatOutput } from '@bailian-studio/director-contracts'
 
 export type DirectorScriptChatParseMode = 'strict-json' | 'normalized-json' | 'invalid'
 

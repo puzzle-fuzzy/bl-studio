@@ -54,6 +54,7 @@ COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-com
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-contracts/package.json ./packages/director-contracts/
 COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
@@ -101,6 +102,7 @@ COPY packages/creative-asset-compiler/package.json ./packages/creative-asset-com
 COPY packages/creative-asset-repository/package.json ./packages/creative-asset-repository/
 COPY packages/db/package.json ./packages/db/
 COPY packages/design-tokens/package.json ./packages/design-tokens/
+COPY packages/director-contracts/package.json ./packages/director-contracts/
 COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/

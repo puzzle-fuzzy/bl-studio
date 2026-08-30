@@ -348,11 +348,15 @@ CreativeGenerationRequest
 
 项目/资产/版本/参考图 API 已有 typed client 和 response schema。Web 页面只使用 client，不直接拼接 `/api/creative/*`，同时保留分页 cursor、搜索、空态、错误和恢复语义。
 
+### 6.7 `packages/director-contracts`（已实现）
+
+导演工作流的 wire schema、阶段/状态枚举、脚本与分镜类型、实体候选协议，以及合成预检纯函数统一由该包拥有。它只依赖 Zod，不依赖 DB、repository、API、Worker、Provider 或 UI；`director-repository`、API、Worker 和 `api-client` 都从包根导入，`shared` 不再转发导演领域契约。
+
 ## 7. 当前实现与目标的差距
 
 | 当前情况 | 问题 | 调整策略 |
 | --- | --- | --- |
-| 创意协议曾位于 `shared` | shared 逐渐成为万能包，领域边界变模糊 | 已提取 `creative-asset-contracts`，后续仅在规则复杂度增长时提取 domain 包 |
+| 创意协议曾位于 `shared` | shared 逐渐成为万能包，领域边界变模糊 | 已提取 `creative-asset-contracts` 和 `director-contracts`，通用包只保留横切能力 |
 | generation repository 直接读取 creative 表做准入校验 | 生成持久化层承担了部分资产域规则 | 短期保留数据库事务防线；先让 compiler/service 负责正常路径，后续将校验收敛为可注入的快照准入接口 |
 | `creativeContext` 已能持久化 | API/前端自行拼 provider 参数会产生漂移 | 已由 compiler 统一生成 provider-neutral 输入 |
 | worker 已有物理资产 URL 解析 | 只能解决文件访问，不能解决语义资产映射 | 继续保留；它只消费 compiler 生成的持久化输入 |
@@ -378,6 +382,7 @@ CreativeGenerationRequest
 ### Phase 1：契约和纯规则收敛（contracts 已完成，domain 延后）
 
 - 提取 `creative-asset-contracts`；已同步 `shared`、generation repository、API 和测试的 import。
+- 提取 `director-contracts`；已同步 `shared`、director repository、API、Worker、api-client 和测试的 import，并在包边界门禁中锁定其纯契约职责。
 - `creative-asset-domain` 暂不单独创建，避免在规则尚未复杂到需要额外包边界时增加维护成本。
 - 保持协议版本 1，禁止同时维护两套 schema。
 

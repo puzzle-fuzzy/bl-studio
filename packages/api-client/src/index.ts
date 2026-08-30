@@ -91,7 +91,7 @@ export {
   DIRECTOR_PHASE_RUN_STATUS,
   DIRECTOR_PHASE_STATUS,
   DIRECTOR_PROJECT_STATUS,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/director-contracts'
 export type {
   AssetItem,
   AssetCapabilities,

@@ -218,13 +218,13 @@ apps/web 18 个测试文件 = 17 个 `src/lib/*` + 1 个 store；components/page
 - [ ] **[P2-1]** 错误码双词表：6 个类型化错误类经 `http-errors.ts` 穷举映射，但 gallery/shares/notifications/models 路由绕开它手写字符串码（`'GALLERY_ITEM_NOT_FOUND'` 等，gallery/routes.ts:200,334,396-400），`MODEL_NOT_FOUND` 同时存在于两套词表。方案：路由级条件码进类型化注册表，或每模块扩类型化错误类。
 - [ ] **[P2-2]** 认证默认开放：每个受保护 handler 手工 `requireAuthUser`（当前覆盖完整、已核验），但安全模型依赖"每个新路由记得调用"。方案：模块级 guard 插件，未显式标记 public 的路由默认拒绝，让遗漏成为注册期错误。
 - [ ] **[P2-3]** worker 无死信/再驱动：耗尽 `maxAttempts` 的 `director.phase`/`media.*` 任务永久 failed，仅 generation 域有用户重试路由。方案：至少补 admin 再入队动作。
-- [ ] **[P2-4]** 生产存储校验在 api/worker 两处重复（`env.ts:99-102` / `config.ts:155-163`），`localhost:5002` 默认值同样两份。方案：下沉 shared。
+- [x] **[P2-4]** 生产存储校验在 api/worker 两处重复（`env.ts:99-102` / `config.ts:155-163`），`localhost:5002` 默认值同样两份。已下沉到 `@bailian-studio/storage` 的共享生产配置校验。
 - [ ] **[P2-5]** director 路由校验错误中文消息（`director/routes.ts:364` 等）与其余 API 英文消息不一致；director-repository 代码风格（tab/双引号/裸 UUID id）与全仓不符。方案：错误文案统一走 locale 机制，格式随下次触碰收敛。
 - [x] **[P2-6→已完成 2026-08-29]** 单 schema 文件 1,483 行 42 表混 8 个域（packages/db/src/schema.ts），audit 列样板重复 30+ 次。已拆为 `src/schema/*.ts` 7 个域文件（见"第三批"）。
 - [ ] **[P2-7]** push/migrate 双轨 + baseline 脚本 + 审计约束脚本 = 三套 schema 协调机制；`0042_backfill_consolidation.sql` 在链内做破坏性数据回填。方案：开发库收敛到 migrate（漂移门禁已就位，收敛成本低）。
 - [x] **[P2-8→已完成]** `providerCancelStatus` 注释写 `'none'`，代码实写 `'not_requested'/'succeeded'/'unsupported'`，且列无 CHECK（schema.ts:241-242）；`generation_records.status` 同样无 CHECK，与全 schema 惯例不符。方案：下次迁移补 CHECK 并修注释。
-- [ ] **[P2-9]** shared 正在重演"万能包"：director 域契约（557 行 director.ts + 162 行 director-assembly.ts，~30 个 zod 导出）挤在 logger/metrics/errors/validation 里——creative-asset 当年正是因此拆出 contracts 包。方案：抽 `director-contracts`。
-- [ ] **[P2-10]** `credit-ledger.releaseStaleReservations` 候选扫描无锁，与在途 settle 竞态时可能提前释放（CHECK + JS 守卫保证不坏账，但可能 succeeded-but-uncharged 或 settle 假失败）。方案：候选行 `for update` 或循环内复查。
+- [x] **[P2-9]** shared 正在重演"万能包"：director 域契约（557 行 director.ts + 162 行 director-assembly.ts，~30 个 zod 导出）挤在 logger/metrics/errors/validation 里——已抽出纯 `director-contracts` 包，并同步 API、Worker、repository、api-client 与边界门禁。
+- [x] **[P2-10]** `credit-ledger.releaseStaleReservations` 候选扫描无锁，与在途 settle 竞态时可能提前释放（CHECK + JS 守卫保证不坏账，但可能 succeeded-but-uncharged 或 settle 假失败）。已通过候选行 `for update` 与账户锁后复查，串行化 settle/refund 线性化点。
 - [ ] **[P2-11]** `event-bus` 名不副实：212 行纯协议（SSE 事件映射 + 编码），真实管道是 outbox+LISTEN 在 generation-repository/api 组装。方案：更名 `sse-protocol` 或并入 shared，避免误导。
 - [ ] **[P2-12]** media-repository `readAssemblyInput` 手写类型守卫并 `flatMap` 静默丢弃畸形输入（repository.ts:44-68）；generation-repository `safeParseJsonRecord` 同模式。方案：DB 回读用 zod schema，畸形行显式计数告警。
 - [ ] **[P2-13]** 15 个 shell 脚本无 shellcheck/shfmt 门禁；`env_value()` awk 解析器复制 6 份（deploy-prod/prod-observability/rollback/prod-web/prod-status/sync-dashscope-key）。这些脚本以 root 经 SSH 跑生产。方案：加 shellcheck 门禁 + 抽公共 sourcing。

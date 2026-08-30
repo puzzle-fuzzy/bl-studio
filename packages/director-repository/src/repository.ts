@@ -33,7 +33,7 @@ import {
 	type DirectorScriptMessage,
 	type DirectorScriptVersion,
 	type DirectorScriptVersionSummary,
-} from "@bailian-studio/shared";
+} from "@bailian-studio/director-contracts";
 import { and, desc, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { DirectorRepositoryError } from "./errors";
 import type {

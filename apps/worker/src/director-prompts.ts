@@ -1,4 +1,4 @@
-import { DirectorPromptRebuildResultSchema, type DirectorPromptRebuildResult } from '@bailian-studio/shared'
+import { DirectorPromptRebuildResultSchema, type DirectorPromptRebuildResult } from '@bailian-studio/director-contracts'
 
 export interface DirectorPromptRebuildShotInput {
   id: string

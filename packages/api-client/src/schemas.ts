@@ -87,7 +87,7 @@ import {
   type DirectorEntityMention,
   type ListDirectorEntityCandidatesInput,
   type ReviewDirectorEntityCandidateInput,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/director-contracts'
 
 export {
   CreateDirectorPhaseRunSchema,

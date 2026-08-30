@@ -22,7 +22,7 @@ import type {
   UpdateDirectorShotInput,
   DirectorAssemblyPreflight,
   DirectorAssemblySettingsInput,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/director-contracts'
 
 export type { AttachDirectorAssetInput, CreateDirectorPhaseRunInput, CreateDirectorProjectInput, UpdateDirectorProjectInput }
 export type { UpdateDirectorShotInput }

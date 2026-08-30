@@ -24,6 +24,7 @@
     "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/creative-asset-compiler": "workspace:*",
     "@bailian-studio/creative-asset-repository": "workspace:*",
+    "@bailian-studio/director-contracts": "workspace:*",
     "@bailian-studio/director-repository": "workspace:*",
     "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",

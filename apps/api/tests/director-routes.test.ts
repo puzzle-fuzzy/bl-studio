@@ -3,7 +3,7 @@ import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
-import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorEntityCandidate, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorScriptVersion, type DirectorShot } from '@bailian-studio/shared'
+import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorEntityCandidate, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorScriptVersion, type DirectorShot } from '@bailian-studio/director-contracts'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 

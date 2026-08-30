@@ -5,7 +5,7 @@
  * 生成质量与解析成功率，独立成模块便于评审与后续按阶段单测。解析器已各自
  * 位于 director-analysis / director-characters / ... 模块，与这里一一对应。
  */
-import type { DirectorAnalysisResult, DirectorCharacter, DirectorCharactersResult, DirectorLocation, DirectorLocationsResult } from '@bailian-studio/shared'
+import type { DirectorAnalysisResult, DirectorCharacter, DirectorCharactersResult, DirectorLocation, DirectorLocationsResult } from '@bailian-studio/director-contracts'
 import { stringInput } from './director-text-phase'
 import type { DirectorPhaseRunForWorker } from '@bailian-studio/director-repository'
 

@@ -1,4 +1,4 @@
-import { DirectorDialogueResultSchema, type DirectorDialogueResult } from '@bailian-studio/shared'
+import { DirectorDialogueResultSchema, type DirectorDialogueResult } from '@bailian-studio/director-contracts'
 
 export interface DirectorDialogueShotInput {
   id: string

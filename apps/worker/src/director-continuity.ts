@@ -1,4 +1,4 @@
-import { DirectorContinuityResultSchema, type DirectorContinuityResult } from '@bailian-studio/shared'
+import { DirectorContinuityResultSchema, type DirectorContinuityResult } from '@bailian-studio/director-contracts'
 
 export interface DirectorContinuityShotInput {
   id: string

@@ -1,5 +1,5 @@
 {
-  "name": "@bailian-studio/api-client",
+  "name": "@bailian-studio/director-contracts",
   "version": "0.1.0",
   "type": "module",
   "private": true,
@@ -8,17 +8,15 @@
   },
   "scripts": {
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test": "vitest run tests"
+    "test": "vitest run tests",
+    "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
-    "@bailian-studio/canvas-contracts": "workspace:*",
-    "@bailian-studio/creative-asset-contracts": "workspace:*",
-    "@bailian-studio/director-contracts": "workspace:*",
-    "@bailian-studio/shared": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {
-    "typescript": "catalog:"
+    "typescript": "catalog:",
+    "vitest": "catalog:"
   },
   "author": {
     "name": "烟熏三文鱼",

@@ -75,6 +75,7 @@
         "@bailian-studio/creative-asset-contracts": "workspace:*",
         "@bailian-studio/creative-asset-repository": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
+        "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
         "@bailian-studio/event-bus": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
@@ -193,6 +194,7 @@
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/canvas-execution": "workspace:*",
         "@bailian-studio/credit-ledger": "workspace:*",
+        "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/director-repository": "workspace:*",
         "@bailian-studio/generation-repository": "workspace:*",
         "@bailian-studio/media-repository": "workspace:*",
@@ -265,6 +267,7 @@
       "dependencies": {
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/creative-asset-contracts": "workspace:*",
+        "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/shared": "workspace:*",
         "zod": "catalog:",
       },
@@ -429,12 +432,23 @@
         "typescript": "catalog:",
       },
     },
+    "packages/director-contracts": {
+      "name": "@bailian-studio/director-contracts",
+      "version": "0.1.0",
+      "dependencies": {
+        "zod": "catalog:",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
     "packages/director-repository": {
       "name": "@bailian-studio/director-repository",
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/db": "workspace:*",
-        "@bailian-studio/shared": "workspace:*",
+        "@bailian-studio/director-contracts": "workspace:*",
         "@bailian-studio/task-repository": "workspace:*",
         "drizzle-orm": "catalog:",
       },
@@ -722,6 +736,8 @@
     "@bailian-studio/db": ["@bailian-studio/db@workspace:packages/db"],
 
     "@bailian-studio/design-tokens": ["@bailian-studio/design-tokens@workspace:packages/design-tokens"],
+
+    "@bailian-studio/director-contracts": ["@bailian-studio/director-contracts@workspace:packages/director-contracts"],
 
     "@bailian-studio/director-repository": ["@bailian-studio/director-repository@workspace:packages/director-repository"],
 

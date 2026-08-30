@@ -9,11 +9,10 @@ import {
   ListDirectorProjectsSchema,
   UpdateDirectorProjectSchema,
   UpdateDirectorShotSchema,
-  createLogger,
-  validateInput,
   ListDirectorEntityCandidatesSchema,
   ReviewDirectorEntityCandidateSchema,
-} from '@bailian-studio/shared'
+} from '@bailian-studio/director-contracts'
+import { createLogger, validateInput } from '@bailian-studio/shared'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
