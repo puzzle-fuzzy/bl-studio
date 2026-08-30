@@ -142,7 +142,8 @@ flowchart LR
   用户编辑内容以及稳定的生成/素材资产 ID，不保存 `status`、错误文本等运行态；`canvas.execute` 任务输入保存一次
   编译后的 plan 和可恢复的 `nodeRuns` 游标。
 - Canvas 节点卡片保留单节点快捷生成作为试错入口；它直接创建普通 generation，不进入整图 `nodeRuns`
-  或运行记录，但会保存 generation ID 并在刷新后恢复轮询；没有 ID 的旧“生成中”状态降级为可编辑状态。
+  或运行记录，但会保存 generation ID 并在刷新后恢复轮询；生成完成后按确定性 `asset_generation_<artifactId>`
+  回溯输出资产，列表查询只作为兼容回退；没有 ID 的旧“生成中”状态降级为可编辑状态。
   两条入口共享资产 ID 协议，但 UI 互斥：整图执行期间不能提交单节点，单节点生成期间不能启动整图执行，
   从而避免两条生命周期竞争写回同一节点结果。
 - API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、

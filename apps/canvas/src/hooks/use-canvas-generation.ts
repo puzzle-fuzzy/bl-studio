@@ -13,6 +13,29 @@ interface GenerateOptions {
   assetRefs?: Record<string, string | string[]>
 }
 
+async function resolveGeneratedAssetId(artifactId: string, kind: 'image' | 'video'): Promise<string | undefined> {
+  const projectionId = `asset_generation_${artifactId}`
+  try {
+    const asset = await apiClient.getAsset(projectionId)
+    if (asset.kind === kind) return asset.id
+  }
+  catch {
+    // 兼容旧部署或资产投影短暂延迟，继续使用列表回退。
+  }
+
+  try {
+    const assets = await apiClient.listAssets({
+      source: 'generation',
+      kind,
+      limit: 100,
+    })
+    return assets.items.find(item => item.id === projectionId)?.id
+  }
+  catch {
+    return undefined
+  }
+}
+
 export interface MediaGenerationResult {
   /** 普通 generation 的稳定 ID；生成中时用于刷新页面后恢复轮询。 */
   generationId?: string
@@ -83,20 +106,9 @@ export function useCanvasGeneration(
           return
         }
 
-        // 生成产物会由后端投影到 user_assets；只把已存在的投影交给下游节点。
-        // 资产查询失败不影响当前预览，但会让该节点暂时不能作为参考输入。
-        let assetId: string | undefined
-        try {
-          const assets = await apiClient.listAssets({
-            source: 'generation',
-            kind: media.kind,
-            limit: 100,
-          })
-          assetId = assets.items.find(item => item.id === `asset_generation_${media.id}`)?.id
-        }
-        catch {
-          // 作品库查询失败时仍展示已完成的产物。
-        }
+        // 生成产物会由后端投影到 user_assets；优先按确定性 ID 单条读取，避免资产量
+        // 超过列表窗口时丢失下游绑定。读取失败仍展示预览，但暂时不能作为参考输入。
+        const assetId = await resolveGeneratedAssetId(media.id, media.kind)
 
         onStatusChange('ready', {
           url: media.readUrl,
