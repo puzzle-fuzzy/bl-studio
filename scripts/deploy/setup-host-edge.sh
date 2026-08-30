@@ -7,30 +7,30 @@
 # 日志入口 basic_auth 密码 = GRAFANA_ADMIN_PASSWORD（apr1 哈希，nginx 稳定支持）。
 set -euo pipefail
 
-# 参数：deploy 目录（含 nginx/，根目录旁有 .env.prod-infra），默认 /opt/bailian-studio/deploy。
+# 参数：deploy 目录（含 nginx/ 与 env/），默认 /opt/bailian-studio/deploy。
 DEPLOY_DIR="${1:-/opt/bailian-studio/deploy}"
-ENV_INFRA="$DEPLOY_DIR/../.env.prod-infra"
+ENV_PROD="$DEPLOY_DIR/env/.env.prod"
 NGINX_CONFD="/etc/nginx/conf.d"
 ACME_ROOT="/var/www/bailian-acme"
 HTPASSWD_FILE="/etc/nginx/htpasswd.bailian-logs"
-# 域名清单优先读 .env.prod-infra 的 SITE_DOMAIN / LOGS_DOMAIN（部署脚本同一来源），
+# 域名清单优先读 .env.prod 的 SITE_DOMAIN / LOGS_DOMAIN（部署脚本同一来源），
 # 缺失才回退默认值（P2-34：换域名不再需要改脚本）。
 # 注意：模板文件需按 `<域名>.conf` 命名，部署时随 deploy/nginx/ rsync 到服务器。
-SITE_DOMAIN="$(awk -F= '$1=="SITE_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_INFRA" | tail -n 1)"
-LOGS_DOMAIN="$(awk -F= '$1=="LOGS_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_INFRA" | tail -n 1)"
+SITE_DOMAIN="$(awk -F= '$1=="SITE_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_PROD" | tail -n 1)"
+LOGS_DOMAIN="$(awk -F= '$1=="LOGS_DOMAIN" {sub(/^[^=]*=/,""); print}' "$ENV_PROD" | tail -n 1)"
 SITE_DOMAIN="${SITE_DOMAIN:-create.yxswy.com}"
 LOGS_DOMAIN="${LOGS_DOMAIN:-logs.yxswy.com}"
 DOMAINS=("$SITE_DOMAIN" "$LOGS_DOMAIN")
 
-[[ -f "$ENV_INFRA" ]] || { echo "缺少 $ENV_INFRA" >&2; exit 1; }
+[[ -f "$ENV_PROD" ]] || { echo "缺少 $ENV_PROD" >&2; exit 1; }
 
-env_val() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_INFRA" | tail -n 1; }
+env_val() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_PROD" | tail -n 1; }
 
 LE_EMAIL="$(env_val LE_EMAIL)"
 GRAFANA_USER="$(env_val GRAFANA_ADMIN_USER)"
 GRAFANA_PASSWORD="$(env_val GRAFANA_ADMIN_PASSWORD)"
 GRAFANA_USER="${GRAFANA_USER:-viewer}"
-[[ -n "$LE_EMAIL" ]] || { echo "缺少 LE_EMAIL（.env.prod-infra）" >&2; exit 1; }
+[[ -n "$LE_EMAIL" ]] || { echo "缺少 LE_EMAIL（.env.prod）" >&2; exit 1; }
 [[ -n "$GRAFANA_PASSWORD" ]] || { echo "缺少 GRAFANA_ADMIN_PASSWORD" >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo "服务器缺少 openssl" >&2; exit 1; }
 

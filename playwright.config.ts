@@ -1,21 +1,29 @@
+import { existsSync } from 'node:fs'
+import { resolve } from 'node:path'
 import { defineConfig } from '@playwright/test'
 
-const databaseUrl = 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
+// 本地 E2E 由统一的 deploy/env/.env.test 提供配置；CI 则通过 job env 注入同名变量。
+// 使用 Node 原生 loader，避免为测试配置额外引入一套 dotenv 读取路径。
+const testEnvFile = resolve(process.cwd(), 'deploy/env/.env.test')
+if (existsSync(testEnvFile)) process.loadEnvFile(testEnvFile)
+
+const databaseUrl = process.env.DATABASE_URL
+  ?? 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
 
 // 保持浏览器 smoke 测试自包含：API 使用隔离的测试数据库，
 // Web 客户端通过固定 5003 端口访问 API，且不需要 provider key 或 Worker 进程，
 // 因为测试在生成任务进入 queued 状态后就结束了。
 const inheritedTestEnv: Record<string, string> = {
   DATABASE_URL: databaseUrl,
-  AUTH_JWT_SECRET: 'e2e-only-secret-do-not-use-in-production',
-  NODE_ENV: 'test',
-  CORS_ALLOWED_ORIGINS: 'http://127.0.0.1:5002',
-  ERROR_LOCALE: 'zh-CN',
-  GENERATION_DAILY_TASK_LIMIT: '0',
-  GENERATION_DAILY_COST_LIMIT_CENTS: '0',
-  API_RATE_LIMIT_ENABLED: 'true',
-  VITE_API_ORIGIN: 'http://127.0.0.1:5003',
-  VITE_WEB_ORIGIN: 'http://127.0.0.1:5002',
+  AUTH_JWT_SECRET: process.env.AUTH_JWT_SECRET ?? 'e2e-only-secret-do-not-use-in-production',
+  NODE_ENV: process.env.NODE_ENV ?? 'test',
+  CORS_ALLOWED_ORIGINS: process.env.CORS_ALLOWED_ORIGINS ?? 'http://127.0.0.1:5002',
+  ERROR_LOCALE: process.env.ERROR_LOCALE ?? 'zh-CN',
+  GENERATION_DAILY_TASK_LIMIT: process.env.GENERATION_DAILY_TASK_LIMIT ?? '0',
+  GENERATION_DAILY_COST_LIMIT_CENTS: process.env.GENERATION_DAILY_COST_LIMIT_CENTS ?? '0',
+  API_RATE_LIMIT_ENABLED: process.env.API_RATE_LIMIT_ENABLED ?? 'true',
+  VITE_API_ORIGIN: process.env.VITE_API_ORIGIN ?? 'http://127.0.0.1:5003',
+  VITE_WEB_ORIGIN: process.env.VITE_WEB_ORIGIN ?? 'http://127.0.0.1:5002',
 }
 
 for (const [key, value] of Object.entries(inheritedTestEnv)) {
@@ -45,7 +53,7 @@ export default defineConfig({
       timeout: 120_000,
     },
     {
-      command: 'bun run --cwd apps/web dev --host 127.0.0.1',
+      command: 'bun run --cwd apps/studio dev --host 127.0.0.1',
       url: 'http://127.0.0.1:5002/login',
       reuseExistingServer: process.env.CI !== 'true',
       timeout: 120_000,

@@ -13,8 +13,9 @@ import postgres, { type Sql } from 'postgres'
  * 刻意不用浏览器：React 重写后前端测试只覆盖纯函数层（见 CLAUDE.md），
  * 此处聚焦真实 API 契约与持久化闭环，比 UI 选择器稳定得多。
  */
-const databaseUrl = 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
-const apiOrigin = 'http://127.0.0.1:5003'
+const databaseUrl = process.env.DATABASE_URL
+  ?? 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
+const apiOrigin = process.env.E2E_API_ORIGIN ?? 'http://127.0.0.1:5003'
 const email = `asset-loop-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`
 const userId = `user_asset_loop_${Date.now()}_${Math.random().toString(16).slice(2)}`
 const password = 'asset-loop-password-123'

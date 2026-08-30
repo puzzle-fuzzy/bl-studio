@@ -1,8 +1,9 @@
 # 生产栈编排（单机 Docker Compose，接入宿主机 nginx 边缘）。
 #
-# 用法：所有命令都带 `--env-file .env.prod-infra` 做变量插值；
-# 应用容器（api/worker/migrate）的运行机密来自 `.env.production`（gitignored）。
-# 部署通过 `pnpm run deploy:prod`（scripts/deploy/deploy-prod.sh）完成。
+# 用法：所有命令都带 `--env-file deploy/env/.env.prod`（服务器上为
+# `$DEPLOY_REMOTE_DIR/deploy/env/.env.prod`）做变量插值；应用、基础设施和
+# 备份参数统一来自这一个 gitignored 文件。
+# 部署通过 `bun run deploy:prod`（scripts/deploy/deploy-prod.sh）完成。
 #
 # 边缘拓扑：HTTPS 由**宿主机 nginx** 终止（与 dev/lunar/p2p 等子域名同一套运维），
 # 它把 create.yxswy.com 反代到 127.0.0.1:5002（web），logs.yxswy.com 反代到
@@ -10,7 +11,7 @@
 #
 # 观测栈（loki/alloy/grafana）放在 `observability` profile：默认 `up -d` 只启动
 # 核心（postgres/migrate/api/worker/web/backup），上线稳定后再
-# `pnpm run prod:observability:up` 启用日志采集。
+# `bun run prod:observability:up` 启用日志采集。
 name: bailian-studio-prod
 
 # 公共日志轮转：json-file 驱动、单文件 20 MiB、最多 3 份，防止容器日志无限增长。
@@ -52,9 +53,9 @@ services:
     # 超限只重启自己（restart: unless-stopped），应用不受影响。
     mem_limit: 512m
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required in .env.prod-infra}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required in .env.prod-infra}
-      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB required in .env.prod-infra}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER required in .env.prod}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD required in .env.prod}
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB required in .env.prod}
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -70,8 +71,8 @@ services:
     image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     pull_policy: never
     env_file:
-      - ${BAILIAN_STUDIO_ENV_FILE:-../../.env.production}
-    command: ["pnpm", "exec", "drizzle-kit", "migrate", "--config", "packages/db/drizzle.config.ts"]
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.prod}
+    command: ["bun", "x", "drizzle-kit", "migrate", "--config", "packages/db/drizzle.config.ts"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -85,7 +86,7 @@ services:
     image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     pull_policy: never
     env_file:
-      - ${BAILIAN_STUDIO_ENV_FILE:-../../.env.production}
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.prod}
     environment:
       # 生产强制 JSON-lines 日志，供 Alloy 按字段采集解析。
       LOG_FORMAT: json
@@ -121,14 +122,14 @@ services:
     image: bailian-studio-runtime:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     pull_policy: never
     env_file:
-      - ${BAILIAN_STUDIO_ENV_FILE:-../../.env.production}
+      - ${BAILIAN_STUDIO_ENV_FILE:-../env/.env.prod}
     environment:
       LOG_FORMAT: json
       # 静态 ffmpeg/ffprobe 挂载路径（见 x-ffmpeg-mounts）；显式指向，不依赖 PATH。
       FFMPEG_PATH: /usr/local/bin/ffmpeg
       FFPROBE_PATH: /usr/local/bin/ffprobe
     volumes: *ffmpeg-mounts
-    command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
+    command: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
     restart: unless-stopped
     depends_on:
       migrate:
@@ -140,7 +141,7 @@ services:
     mem_limit: 384m
 
   web:
-    # nginx 静态文件 + /api 反代（apps/web 生产镜像）。只绑定 127.0.0.1，
+    # nginx 静态文件 + /api 反代（apps/studio 生产镜像）。只绑定 127.0.0.1，
     # 供宿主机 nginx 反代访问；不向公网暴露。
     image: bailian-studio-web:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     pull_policy: never
@@ -161,12 +162,18 @@ services:
     image: bailian-studio-backup:${BAILIAN_STUDIO_RELEASE_TAG:?BAILIAN_STUDIO_RELEASE_TAG must be a full Git commit SHA}
     restart: unless-stopped
     mem_limit: 128m
-    env_file:
-      - ../../.env.prod-backup
     environment:
       DATABASE_URL: postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB}
       BACKUP_DIR: ${BACKUP_DIR:-/backups}
       BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+      BACKUP_OSS_UPLOAD: ${BACKUP_OSS_UPLOAD:?BACKUP_OSS_UPLOAD required in .env.prod}
+      BACKUP_OSS_DISABLED_ACK: ${BACKUP_OSS_DISABLED_ACK:-}
+      BACKUP_OSS_PREFIX: ${BACKUP_OSS_PREFIX:-bailian-studio/backups}
+      OSS_REGION: ${OSS_REGION:-}
+      OSS_BUCKET: ${OSS_BUCKET:-}
+      OSS_ACCESS_KEY_ID: ${OSS_ACCESS_KEY_ID:-}
+      OSS_ACCESS_KEY_SECRET: ${OSS_ACCESS_KEY_SECRET:-}
+      OSS_ENDPOINT: ${OSS_ENDPOINT:-}
     volumes:
       - backups:/backups
     entrypoint:
@@ -233,10 +240,10 @@ services:
     ports:
       - "127.0.0.1:5300:3000"
     environment:
-      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER required in .env.prod-infra}
-      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required in .env.prod-infra}
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:?GRAFANA_ADMIN_USER required in .env.prod}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:?GRAFANA_ADMIN_PASSWORD required in .env.prod}
       # 外部经宿主机 nginx 的 basic_auth 保护，Grafana 关闭匿名与自助注册。
-      GF_SERVER_ROOT_URL: https://${LOGS_DOMAIN:?LOGS_DOMAIN required in .env.prod-infra}
+      GF_SERVER_ROOT_URL: https://${LOGS_DOMAIN:?LOGS_DOMAIN required in .env.prod}
       GF_AUTH_ANONYMOUS_ENABLED: "false"
       GF_USERS_ALLOW_SIGN_UP: "false"
     volumes:
@@ -256,12 +263,14 @@ services:
     image: docker:27.5.1-cli
     restart: unless-stopped
     mem_limit: 64m
-    env_file:
-      - ../../.env.prod-infra
     environment:
       MONITOR_PROJECT: bailian-studio-prod
       MONITOR_WEB_URL: http://web:5002
       MONITOR_STATE_FILE: /var/lib/bailian-monitor/last-state
+      MONITOR_INTERVAL_SECONDS: ${MONITOR_INTERVAL_SECONDS:-60}
+      MONITOR_BACKUP_MAX_AGE_HOURS: ${MONITOR_BACKUP_MAX_AGE_HOURS:-30}
+      MONITOR_DISK_USED_PERCENT: ${MONITOR_DISK_USED_PERCENT:-85}
+      MONITOR_ALERT_WEBHOOK_URL: ${MONITOR_ALERT_WEBHOOK_URL:-}
     command: ["/usr/local/bin/production-monitor.sh", "loop"]
     volumes:
       # watchdog 只调用 docker ps/inspect/exec；socket 本身仍是高权限能力，不能暴露到公网。
@@ -269,6 +278,8 @@ services:
       # 只读宿主机挂载仅用于 df /host，脚本不读取宿主机文件内容。
       - /:/host:ro
       - monitor_state:/var/lib/bailian-monitor
+      # 注意：此挂载路径依赖远端服务器的目录布局（$DEPLOY_REMOTE_DIR/deploy/scripts/），
+      # 由 deploy-prod.sh 预先同步。本地直接运行 compose.prod.yaml 时此挂载会静默失效。
       - ../scripts/production-monitor.sh:/usr/local/bin/production-monitor.sh:ro
     depends_on:
       api:

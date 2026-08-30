@@ -198,7 +198,7 @@ beforeAll(async () => {
     idempotencyKey: 'fixture:api-contract-user',
     actorUserId: CONTRACT_USER_ID,
   })
-  await generationHandle.repository.createUserAsset({
+  await generationHandle.assetRepository.createUserAsset({
     id: 'contract_video_asset',
     userId: CONTRACT_USER_ID,
     kind: 'video',
@@ -209,7 +209,7 @@ beforeAll(async () => {
     storageProvider: 'local',
     storageKey: 'user_uploads/api_contract_user/video.mp4',
   })
-  await generationHandle.repository.createUserAsset({
+  await generationHandle.assetRepository.createUserAsset({
     id: CONTRACT_IMAGE_ASSET_ID,
     userId: CONTRACT_USER_ID,
     kind: 'image',
@@ -220,7 +220,7 @@ beforeAll(async () => {
     storageProvider: 'local',
     storageKey: 'user_uploads/api_contract_user/reference.png',
   })
-  await generationHandle.repository.createUserAsset({
+  await generationHandle.assetRepository.createUserAsset({
     id: CONTRACT_DELETABLE_ASSET_ID,
     userId: CONTRACT_USER_ID,
     kind: 'image',
@@ -233,6 +233,18 @@ beforeAll(async () => {
   app = createTestApp({
     authService: contractAuthService,
     generationRepository: generationHandle.repository,
+    generationDiagnosticsRepository: generationHandle.generationDiagnosticsRepository,
+    assetRepository: generationHandle.assetRepository,
+    auditRepository: generationHandle.auditRepository,
+    contentReportRepository: generationHandle.contentReportRepository,
+    feedbackRepository: generationHandle.feedbackRepository,
+    notificationRepository: generationHandle.notificationRepository,
+    promptLibraryRepository: generationHandle.promptLibraryRepository,
+    providerRequestAuditRepository: generationHandle.providerRequestAuditRepository,
+    shareRepository: generationHandle.shareRepository,
+    publicShareRepository: generationHandle.publicShareRepository,
+    socialRepository: generationHandle.socialRepository,
+    usageRepository: generationHandle.usageRepository,
     creditLedger,
     mediaRepository: mediaHandle.repository,
     storage: new ContractStorage(),
@@ -405,7 +417,7 @@ describe('API success response contracts', () => {
 
     expect(response.status).toBe(204)
     expect(await response.text()).toBe('')
-    await expect(generationHandle.repository.getUserAsset({
+    await expect(generationHandle.assetRepository.getUserAsset({
       userId: CONTRACT_USER_ID,
       assetId: CONTRACT_DELETABLE_ASSET_ID,
     })).resolves.toBeUndefined()

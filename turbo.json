@@ -30,9 +30,16 @@
     "API_TRUST_PROXY",
     "COOKIE_SECURE",
     "CORS_ALLOWED_ORIGINS",
+    "API_RATE_LIMIT_ENABLED",
     "OSS_KEY_PREFIX",
+    "GENERATION_DAILY_TASK_LIMIT",
+    "GENERATION_DAILY_COST_LIMIT_CENTS",
+    "GENERATION_DAILY_QUOTA_MODE",
     "VITE_API_ORIGIN",
     "VITE_WEB_ORIGIN",
+    "VITE_LEGAL_ENTITY",
+    "VITE_LEGAL_CONTACT_EMAIL",
+    "VITE_LEGAL_EFFECTIVE_DATE",
     "NODE_ENV"
   ],
   "tasks": {
@@ -40,6 +47,17 @@
       "dependsOn": ["^build"],
       "outputs": ["dist/**"]
     },
+    "@bailian-studio/auth#build": { "outputs": [] },
+    "@bailian-studio/creative-asset-repository#build": { "outputs": [] },
+    "@bailian-studio/credit-ledger#build": { "outputs": [] },
+    "@bailian-studio/db#build": { "outputs": [] },
+    "@bailian-studio/director-repository#build": { "outputs": [] },
+    "@bailian-studio/generation-repository#build": { "outputs": [] },
+    "@bailian-studio/media-repository#build": { "outputs": [] },
+    "@bailian-studio/persistence-runtime#build": { "outputs": [] },
+    "@bailian-studio/storage#build": { "outputs": [] },
+    "@bailian-studio/api#build": { "outputs": [] },
+    "@bailian-studio/worker#build": { "outputs": [] },
     "dev": {
       "cache": false,
       "persistent": true

@@ -1,0 +1,201 @@
+import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import {
+  Background,
+  BackgroundVariant,
+  Controls,
+  MiniMap,
+  ReactFlow,
+  type FinalConnectionState,
+  type Node,
+  type NodeTypes,
+  type XYPosition,
+  useReactFlow,
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
+import { ImagePlus, Video } from 'lucide-react'
+import { Button } from '@bailian-studio/ui'
+import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
+import { useCanvasStore } from '../stores/canvas-store'
+
+const nodeTypes: NodeTypes = { mediaNode: MediaNode }
+
+let nextNodeId = 1
+
+interface CanvasMenu {
+  x: number
+  y: number
+  flow: XYPosition
+  /** 从右桩拉线到空白区弹出菜单时，记录来源节点，创建后自动连线。 */
+  connectFrom?: string
+}
+
+/** 画布页面：全屏 React Flow 画布 + 工具栏。 */
+export function CanvasPage() {
+  const nodes = useCanvasStore(state => state.nodes)
+  const edges = useCanvasStore(state => state.edges)
+  const onNodesChange = useCanvasStore(state => state.onNodesChange)
+  const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
+  const onConnect = useCanvasStore(state => state.onConnect)
+  const { screenToFlowPosition } = useReactFlow()
+  const [menu, setMenu] = useState<CanvasMenu | null>(null)
+
+  // 点击菜单外部或按 Esc 关闭右键菜单。
+  useEffect(() => {
+    if (menu === null) return
+    const onPointerDown = (event: MouseEvent) => {
+      const target = event.target
+      if (target instanceof Element && target.closest('[data-canvas-menu]') !== null) return
+      setMenu(null)
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setMenu(null)
+    }
+    window.addEventListener('mousedown', onPointerDown)
+    window.addEventListener('keydown', onKeyDown)
+    return () => {
+      window.removeEventListener('mousedown', onPointerDown)
+      window.removeEventListener('keydown', onKeyDown)
+    }
+  }, [menu])
+
+  const addMediaNode = useCallback((kind: MediaKind, position?: XYPosition) => {
+    const id = `media_${Date.now()}_${nextNodeId++}`
+    const newNode: Node<MediaNodeData> = {
+      id,
+      type: 'mediaNode',
+      position: position ?? { x: 100 + Math.random() * 300, y: 100 + Math.random() * 200 },
+      data: {
+        kind,
+        status: 'empty',
+        prompt: '',
+        modelId: '',
+        referenceUrls: [],
+        aspectRatio: '1:1',
+      },
+    }
+    useCanvasStore.getState().addNode(newNode)
+  }, [])
+
+  /** 右键画布/拉线落空：在落点创建空白媒体节点（有来源时自动连线）。 */
+  const addEmptyNode = useCallback((kind: MediaKind) => {
+    if (menu === null) return
+    const nodeId = `media_${Date.now()}_${nextNodeId++}`
+    const newNode: Node<MediaNodeData> = {
+      id: nodeId,
+      type: 'mediaNode',
+      position: menu.flow,
+      data: {
+        kind,
+        status: 'empty',
+        prompt: '',
+        modelId: '',
+        referenceUrls: [],
+        aspectRatio: '1:1',
+      },
+    }
+    useCanvasStore.getState().addNode(newNode)
+    if (menu.connectFrom !== undefined) {
+      useCanvasStore.getState().onConnect({
+        source: menu.connectFrom,
+        target: nodeId,
+        sourceHandle: null,
+        targetHandle: null,
+      })
+    }
+    setMenu(null)
+  }, [menu])
+
+  const onPaneContextMenu = useCallback((event: ReactMouseEvent | MouseEvent) => {
+    event.preventDefault()
+    setMenu({
+      x: Math.min(event.clientX, window.innerWidth - 190),
+      y: Math.min(event.clientY, window.innerHeight - 140),
+      flow: screenToFlowPosition({ x: event.clientX, y: event.clientY }),
+    })
+  }, [screenToFlowPosition])
+
+  /** 从右桩拉线松手在空白区域：弹出与右键相同的菜单，创建后自动连线。 */
+  const onConnectEnd = useCallback((event: MouseEvent | TouchEvent, state: FinalConnectionState) => {
+    if (state.isValid || state.fromNode?.id === undefined) return
+    const point = 'changedTouches' in event ? event.changedTouches[0] : event
+    if (point === undefined) return
+    setMenu({
+      x: Math.min(point.clientX, window.innerWidth - 190),
+      y: Math.min(point.clientY, window.innerHeight - 140),
+      flow: screenToFlowPosition({ x: point.clientX, y: point.clientY }),
+      connectFrom: state.fromNode.id,
+    })
+  }, [screenToFlowPosition])
+
+  return (
+    <div className="relative h-full min-h-0">
+      {/* 工具栏：添加不同类型的节点 */}
+      <div className="absolute top-3 left-3 z-10 flex gap-1.5 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
+        <Button size="sm" variant="secondary" onClick={() => addMediaNode('image')}>
+          <ImagePlus className="mr-1 size-3.5" aria-hidden />
+          图片
+        </Button>
+        <Button size="sm" variant="secondary" onClick={() => addMediaNode('video')}>
+          <Video className="mr-1 size-3.5" aria-hidden />
+          视频
+        </Button>
+      </div>
+
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        nodeTypes={nodeTypes}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onConnectEnd={onConnectEnd}
+        onPaneContextMenu={onPaneContextMenu}
+        fitView
+        minZoom={0.2}
+        maxZoom={3}
+        className="bg-canvas"
+        proOptions={{ hideAttribution: true }}
+      >
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1.5} color="var(--border)" />
+        <Controls
+          className="!bottom-4 !left-4 flex gap-1 rounded-lg border bg-surface p-1 [&>button]:!border-0 [&>button]:!bg-transparent [&>button]:!text-muted-foreground [&>button:hover]:!bg-accent"
+          showInteractive={false}
+        />
+        <MiniMap
+          pannable
+          zoomable
+          className="!right-4 !bottom-4 !m-0 rounded-lg border !bg-surface/90"
+          nodeColor="var(--primary)"
+        />
+      </ReactFlow>
+
+      {menu !== null && (
+        <div
+          data-canvas-menu
+          role="menu"
+          className="fixed z-50 min-w-36 rounded-xl border bg-surface p-1 shadow-lg"
+          style={{ left: menu.x, top: menu.y }}
+        >
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-foreground hover:bg-accent"
+            onClick={() => addEmptyNode('image')}
+          >
+            <ImagePlus className="size-4 text-muted-foreground" aria-hidden />
+            图片节点
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="flex w-full items-center gap-2 rounded-lg px-3 py-1.5 text-sm text-foreground hover:bg-accent"
+            onClick={() => addEmptyNode('video')}
+          >
+            <Video className="size-4 text-muted-foreground" aria-hidden />
+            视频节点
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}

@@ -22,7 +22,7 @@
 - [x] **[P2·后端]** `shares/routes.ts` 私有 `contentTypeForPath` 缺 `.webp`（共享版 `lib/artifact-content-types.ts` 有），webp 分享产物会以 octet-stream 下发。已改为复用共享实现。
 - [x] **[P2·后端]** `admin/routes.ts` 从 `../assets/routes` 导入 `assetWithReadUrl`，违反"模块只经组合根获得能力"的边界约定。已下沉到 `assets/service.ts`。
 - [x] **[P2·工程]** `turbo.json` globalPassThroughEnv 缺 `VITE_LEGAL_ENTITY/CONTACT_EMAIL/EFFECTIVE_DATE` 与 `GENERATION_DAILY_*`（限额变化会命中过期缓存）。已补。
-- [x] **[P2·工程]** `.gitignore` 白名单引用了不存在的 `.env.prod-backup.example`，且 `prod:up` 手动路径因缺该 env 文件而失败。已补模板文件。
+- [x] **[P2·工程]** 环境文件曾分散在根目录且生产备份需要额外 `.env.prod-backup`；现已统一为 `deploy/env/.env.dev`、`.env.test`、`.env.prod`，备份变量由 Compose 显式投影。
 
 ### 第二批：pnpm → bun + turbo 包管理迁移（2026-08-29）
 

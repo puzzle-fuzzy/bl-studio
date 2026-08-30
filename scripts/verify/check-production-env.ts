@@ -161,7 +161,7 @@ export function checkProductionEnvironment(
 }
 
 /**
- * 校验基础设施专用环境（.env.prod-infra）：Caddy/Postgres/Grafana/
+ * 校验生产环境中的基础设施配置（.env.prod）：Nginx/Postgres/Grafana/
  * 备份/部署参数。只做格式、占位与强度检查，不联网、不打印任何值。
  */
 export function checkProductionInfrastructure(
@@ -256,7 +256,7 @@ export function checkProductionInfrastructure(
     addIssue(
       'BACKUP_OSS_UPLOAD',
       'OSS 灾备已关闭：备份与 DB 在同一台宿主机磁盘，整机故障/误删卷时无恢复路径。' +
-        '开启灾备（BACKUP_OSS_UPLOAD=true 且 .env.production 具备完整 OSS 配置）或显式接受该风险' +
+        '开启灾备（BACKUP_OSS_UPLOAD=true 且 .env.prod 具备完整 OSS 配置）或显式接受该风险' +
         '（BACKUP_OSS_DISABLED_ACK=confirmed）',
     )
   }
@@ -420,7 +420,7 @@ function inspectProductionReleaseSource(): ProductionReleaseSourceState {
 }
 
 if (import.meta.main) {
-  // 子命令 `infra`：只校验基础设施专用 env（.env.prod-infra）。
+  // 子命令 `infra`：只校验统一生产 env 中的基础设施配置。
   if (process.argv[2] === 'infra') {
     const result = checkProductionInfrastructure()
     if (result.issues.length > 0) {

@@ -6,10 +6,10 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-ENV_INFRA="$REPO_ROOT/.env.prod-infra"
-[[ -f "$ENV_INFRA" ]] || { echo "缺少 $ENV_INFRA" >&2; exit 1; }
+ENV_PROD="$REPO_ROOT/deploy/env/.env.prod"
+[[ -f "$ENV_PROD" ]] || { echo "缺少 $ENV_PROD" >&2; exit 1; }
 
-env_value() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_INFRA" | tail -n 1; }
+env_value() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_PROD" | tail -n 1; }
 DEPLOY_HOST="$(env_value DEPLOY_HOST)"
 DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY)"
 DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR)"
@@ -25,7 +25,7 @@ if [[ -n "$DEPLOY_SSH_KEY" && ! -f "$DEPLOY_SSH_KEY" ]]; then
 fi
 DEPLOY_SSH_KNOWN_HOSTS="$(resolve_deploy_ssh_known_hosts "$DEPLOY_SSH_KEY")"
 
-COMPOSE="docker compose --env-file $DEPLOY_REMOTE_DIR/.env.prod-infra --profile observability -f $REMOTE_DEPLOY/docker/compose.prod.yaml"
+COMPOSE="docker compose --env-file $REMOTE_DEPLOY/env/.env.prod --profile observability -f $REMOTE_DEPLOY/docker/compose.prod.yaml"
 OBSERVABILITY_SERVICES="loki alloy grafana monitor"
 
 ssh_cmd() {

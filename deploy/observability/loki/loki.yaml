@@ -2,7 +2,7 @@
 #
 # 存储：本机文件系统（命名卷 loki_data 挂到 /loki）；保留期 31 天。
 # 注意 Loki 不支持 YAML 内 ${} 插值，retention 写死默认；如需调整保留期，改这里
-# 并在部署时重启 loki（.env.prod-infra 的 LOKI_RETENTION_DAYS 仅作文档/预检提示）。
+# 并在部署时重启 loki（.env.prod 的 LOKI_RETENTION_DAYS 仅作文档/预检提示）。
 
 auth_enabled: false
 

@@ -5,17 +5,17 @@
  * 重复入账。grant 会自动为用户建积分账户（若不存在）。
  *
  * 环境变量：
- *   DATABASE_URL          必填，指向目标库（生产由容器内 .env.production 注入）
+ *   DATABASE_URL          必填，指向目标库（生产由容器内 deploy/env/.env.prod 注入）
  *   GRANT_AMOUNT_CENTS     每个用户发放的积分数（默认 2000）
  *   GRANT_REASON           入账原因（默认「维护赠金」）
  *   GRANT_KEY_PREFIX       幂等键前缀（默认 grant-<amount>-<日期>；改日期的前缀可再发一次）
  *
  * 生产执行（服务器上，见 docs/03-ops.md）：
  *   docker run --rm --network bailian-studio-prod_backend \
- *     --env-file /opt/bailian-studio/.env.production \
+ *     --env-file /opt/bailian-studio/deploy/env/.env.prod \
  *     -e GRANT_AMOUNT_CENTS=2000 \
  *     -v /opt/bailian-studio/scripts/db/grant-credits.ts:/app/scripts/db/grant-credits.ts:ro \
- *     bailian-studio-runtime:<SHA> pnpm exec tsx scripts/db/grant-credits.ts
+ *     bailian-studio-runtime:<SHA> bun x tsx scripts/db/grant-credits.ts
  */
 import postgres from 'postgres'
 import { createCreditLedgerFromUrl } from '../../packages/credit-ledger/src/index'

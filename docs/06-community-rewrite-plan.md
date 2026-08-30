@@ -203,7 +203,7 @@
 ### 6.3 验证流程
 
 ```
-pnpm exec dotenv -e .env.test -- pnpm run verify   # 需 test DB: pnpm run db:test:up
+bun x dotenv -e deploy/env/.env.test -- bun run verify   # 需 test DB: bun run db:test:up
 ```
 
 含：baseline + boundaries + manifests + typecheck + 全仓测试。改跨包 import 后 `pnpm run check:boundaries` 必跑。schema 变更后 dev/test 两库各 `db:push`。

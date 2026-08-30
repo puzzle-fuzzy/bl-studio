@@ -6,16 +6,15 @@
 # BAILIAN_STUDIO_RELEASE_TAG 指回旧 SHA，再在服务器上 `up -d --no-build`。
 # 不重传镜像、不重跑迁移（迁移只前向推进；回滚后代码/数据不一致需另行处理）。
 #
-# 用法：pnpm run deploy:rollback <40位完整 Git SHA>
-# 前置：.env.prod-infra 存在且含 DEPLOY_HOST / DEPLOY_REMOTE_DIR，
+# 用法：bun run deploy:rollback <40位完整 Git SHA>
+# 前置：deploy/env/.env.prod 存在且含 DEPLOY_HOST / DEPLOY_REMOTE_DIR，
 #       旧 SHA 已全量部署过（镜像已在服务器）。
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 
-ENV_APP="$REPO_ROOT/.env.production"
-ENV_INFRA="$REPO_ROOT/.env.prod-infra"
+ENV_PROD="$REPO_ROOT/deploy/env/.env.prod"
 
 DRY_RUN=false
 if [[ "${1:-}" == "--dry-run" ]]; then
@@ -25,14 +24,13 @@ fi
 
 SHA="${1:-}"
 if ! [[ "$SHA" =~ ^[0-9a-f]{40}$ ]]; then
-  echo "用法：pnpm run deploy:rollback [--dry-run] <40位完整 Git SHA>（如 pnpm run deploy:rollback \$(git rev-parse HEAD~1)）" >&2
+  echo "用法：bun run deploy:rollback [--dry-run] <40位完整 Git SHA>（如 bun run deploy:rollback \$(git rev-parse HEAD~1)）" >&2
   exit 1
 fi
 
 fail() { echo "回滚失败：$*" >&2; exit 1; }
 
-[[ -f "$ENV_APP" ]] || fail "缺少 $ENV_APP"
-[[ -f "$ENV_INFRA" ]] || fail "缺少 $ENV_INFRA"
+[[ -f "$ENV_PROD" ]] || fail "缺少 $ENV_PROD"
 
 # 与 deploy-prod.sh 相同的 dotenv 安全读取（只取首个 = 后内容，不展开 $/空格）。
 env_value() {
@@ -40,9 +38,9 @@ env_value() {
   awk -F= -v k="$key" '$1==k { sub(/^[^=]*=/,""); print }' "$file" | tail -n 1
 }
 
-DEPLOY_HOST="$(env_value DEPLOY_HOST "$ENV_INFRA")"
-DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR "$ENV_INFRA")"
-DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY "$ENV_INFRA")"
+DEPLOY_HOST="$(env_value DEPLOY_HOST "$ENV_PROD")"
+DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR "$ENV_PROD")"
+DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY "$ENV_PROD")"
 [[ -n "$DEPLOY_HOST" ]] || fail "缺少 DEPLOY_HOST"
 [[ -n "$DEPLOY_REMOTE_DIR" ]] || fail "缺少 DEPLOY_REMOTE_DIR"
 
@@ -59,11 +57,11 @@ ssh_cmd() {
 
 echo "==> 确认旧镜像 $SHA 已在服务器（不重传）"
 if ! ssh_cmd "docker image inspect bailian-studio-runtime:$SHA >/dev/null 2>&1 && docker image inspect bailian-studio-web:$SHA >/dev/null 2>&1"; then
-  fail "服务器缺少 bailian-studio-{runtime,web}:$SHA（可能从未全量部署过）。请改用 pnpm run deploy:prod 重新部署。"
+  fail "服务器缺少 bailian-studio-{runtime,web}:$SHA（可能从未全量部署过）。请改用 bun run deploy:prod 重新部署。"
 fi
 
 REMOTE_DEPLOY="$DEPLOY_REMOTE_DIR/deploy"
-COMPOSE="docker compose --env-file $DEPLOY_REMOTE_DIR/.env.prod-infra -f $REMOTE_DEPLOY/docker/compose.prod.yaml"
+COMPOSE="docker compose --env-file $REMOTE_DEPLOY/env/.env.prod -f $REMOTE_DEPLOY/docker/compose.prod.yaml"
 if [[ "$DRY_RUN" == true ]]; then
   echo "==> dry-run：仅检查旧镜像与远程 Compose 配置，不修改 env、不 rsync、不启动服务"
   ssh_cmd "$COMPOSE config --services >/dev/null"
@@ -71,7 +69,7 @@ if [[ "$DRY_RUN" == true ]]; then
   exit 0
 fi
 
-# 把 tag 幂等写回本地两个 env 文件（与 deploy-prod.sh 的注入方式一致）。
+# 把 tag 幂等写回本地统一生产 env（与 deploy-prod.sh 的注入方式一致）。
 inject_tag() {
   local file="$1"
   if grep -q '^BAILIAN_STUDIO_RELEASE_TAG=' "$file"; then
@@ -81,13 +79,12 @@ inject_tag() {
     printf 'BAILIAN_STUDIO_RELEASE_TAG=%s\n' "$SHA" >> "$file"
   fi
 }
-inject_tag "$ENV_APP"
-inject_tag "$ENV_INFRA"
+inject_tag "$ENV_PROD"
 
 # 把更新后的 env 同步到服务器（本地 docker context 默认 Desktop，必须走 SSH 在服务器上 up）。
-ssh_cmd "mkdir -p $REMOTE_DEPLOY"
-deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$ENV_APP" "$ENV_INFRA" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
-ssh_cmd "chmod 600 $DEPLOY_REMOTE_DIR/.env.production $DEPLOY_REMOTE_DIR/.env.prod-infra"
+ssh_cmd "mkdir -p $REMOTE_DEPLOY/env"
+deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "$ENV_PROD" "$DEPLOY_HOST:$REMOTE_DEPLOY/env/"
+ssh_cmd "chmod 600 $REMOTE_DEPLOY/env/.env.prod"
 
 echo "==> 服务器上复用旧镜像滚动 up（--no-build --pull never）"
 ssh_cmd "$COMPOSE up -d --no-build --pull never"

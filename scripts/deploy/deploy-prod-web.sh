@@ -10,19 +10,17 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$REPO_ROOT"
 trap 'rm -f "$REPO_ROOT"/web-*.tar' EXIT
 
-ENV_INFRA="$REPO_ROOT/.env.prod-infra"
-ENV_APP="$REPO_ROOT/.env.production"
-[[ -f "$ENV_INFRA" ]] || { echo "缺少 $ENV_INFRA" >&2; exit 1; }
-[[ -f "$ENV_APP" ]] || { echo "缺少 $ENV_APP" >&2; exit 1; }
+ENV_PROD="$REPO_ROOT/deploy/env/.env.prod"
+[[ -f "$ENV_PROD" ]] || { echo "缺少 $ENV_PROD" >&2; exit 1; }
 
-env_value() { local file="${2:-$ENV_INFRA}"; awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$file" | tail -n 1; }
+env_value() { awk -F= -v k="$1" '$1==k { sub(/^[^=]*=/,""); print }' "$ENV_PROD" | tail -n 1; }
 DEPLOY_HOST="$(env_value DEPLOY_HOST)"
 DEPLOY_SSH_KEY="$(env_value DEPLOY_SSH_KEY)"
 DEPLOY_REMOTE_DIR="$(env_value DEPLOY_REMOTE_DIR)"
 SITE_DOMAIN="$(env_value SITE_DOMAIN)"
-LEGAL_ENTITY="$(env_value VITE_LEGAL_ENTITY "$ENV_APP")"
-LEGAL_CONTACT_EMAIL="$(env_value VITE_LEGAL_CONTACT_EMAIL "$ENV_APP")"
-LEGAL_EFFECTIVE_DATE="$(env_value VITE_LEGAL_EFFECTIVE_DATE "$ENV_APP")"
+LEGAL_ENTITY="$(env_value VITE_LEGAL_ENTITY)"
+LEGAL_CONTACT_EMAIL="$(env_value VITE_LEGAL_CONTACT_EMAIL)"
+LEGAL_EFFECTIVE_DATE="$(env_value VITE_LEGAL_EFFECTIVE_DATE)"
 DEPLOY_PLATFORM="$(env_value DEPLOY_PLATFORM)"
 [[ -n "$DEPLOY_HOST" ]] || { echo "缺少 DEPLOY_HOST" >&2; exit 1; }
 [[ -n "$SITE_DOMAIN" ]] || { echo "缺少 SITE_DOMAIN" >&2; exit 1; }
@@ -64,7 +62,7 @@ docker save -o "web-$SHA.tar" "bailian-studio-web:$SHA"
 deploy_rsync "$DEPLOY_SSH_KEY" "$DEPLOY_SSH_KNOWN_HOSTS" "web-$SHA.tar" "$DEPLOY_HOST:$DEPLOY_REMOTE_DIR/"
 
 echo "==> 服务器 load + 重建 web 容器"
-ssh_cmd "docker load -i $DEPLOY_REMOTE_DIR/web-$SHA.tar && rm -f $DEPLOY_REMOTE_DIR/web-$SHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$SHA docker compose --env-file $DEPLOY_REMOTE_DIR/.env.prod-infra -f $REMOTE_DEPLOY/docker/compose.prod.yaml up -d --no-deps web"
+ssh_cmd "docker load -i $DEPLOY_REMOTE_DIR/web-$SHA.tar && rm -f $DEPLOY_REMOTE_DIR/web-$SHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$SHA docker compose --env-file $REMOTE_DEPLOY/env/.env.prod -f $REMOTE_DEPLOY/docker/compose.prod.yaml up -d --no-deps web"
 bash "$REPO_ROOT/scripts/verify/verify-web-release.sh" "$EXPECTED_INDEX_ASSET" "$SITE_DOMAIN" "$SERVER_HOST"
 
 echo "==> web 已更新（tag ${SHA:0:12}）"

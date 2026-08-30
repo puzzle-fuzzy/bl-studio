@@ -10,11 +10,11 @@
 
 | 事实 | 说明 |
 |---|---|
-| 服务器 = **共享机** | `root@101.35.246.159`（SSH 别名 `yxswy-server`，见 `~/.ssh/config`）。同一台机器还跑着 p2p-transmission、webrtc-camera-share、digital-companion、lunar-oracle-postgres、mihomo 等约 9 个容器 + 宿主机 nginx。**不是 bailian-studio 专用机**。 |
+| 服务器 = **共享机** | SSH 别名 `yxswy-server`（主机/用户/凭据只存于本机 `~/.ssh/config`，仓库不落任何服务器地址）。同一台机器还跑着 p2p-transmission、webrtc-camera-share、digital-companion、lunar-oracle-postgres、mihomo 等约 9 个容器 + 宿主机 nginx。**不是 bailian-studio 专用机**。 |
 | **HTTPS 边缘 = 宿主机 nginx + certbot** | 80/443 被宿主机 nginx 独占。**不要部署 Caddy**（本仓库曾内置 Caddy，已因此移除）。create/logs.yxswy.com 通过 `/etc/nginx/conf.d/*.conf` 反代到 `127.0.0.1:5002`（web）/ `127.0.0.1:5300`（grafana）。 |
 | 服务器 **2C2G** | 内存 1.9G，可用约 1G + 2G swap。所有容器都设了 `mem_limit`；观测栈（loki 256m/alloy 128m/grafana 192m）限额更紧，超限只重启自己。 |
 | 服务器 **x86_64**、本机 **arm64** | 本机构镜像必须 `--platform linux/amd64`（deploy 脚本已处理，`DEPLOY_PLATFORM=linux/amd64`）。Dockerfile 用 `TARGETARCH` 自动分架构。 |
-| 本机 **Clash fake-ip 劫持 DNS** | 本地 `dig`/`curl` 看到的域名 IP 是 `198.18.0.x`（假）。**查 DNS 必须在服务器上**：`ssh yxswy-server 'getent hosts create.yxswy.com'` 应返回 `101.35.246.159`。 |
+| 本机 **Clash fake-ip 劫持 DNS** | 本地 `dig`/`curl` 看到的域名 IP 是 `198.18.0.x`（假）。**查 DNS 必须在服务器上**：`ssh yxswy-server 'getent hosts create.yxswy.com'` 应返回 `~/.ssh/config` 中 `yxswy-server` 的同一台主机。 |
 | **证书是 SAN 多域名** | certbot 一次为 create + logs 签发一份证书，只存在 `/etc/letsencrypt/live/create.yxswy.com/`。**logs 站点也要引用 create 的证书路径**，不存在 `live/logs.yxswy.com/`。 |
 | 运行时用户是 **bun** | 生产镜像以 `bun` 用户运行（Dockerfile 末尾 `USER bun`）。无 `node` 用户。 |
 | Node 必须 ≥24 | 镜像内是官方二进制 Node 24（apt 的 nodejs 是 v20，会让 worker 因缺 `import.meta.main` 静默退出 0）。 |
@@ -26,20 +26,19 @@
 ### 2.1 前置条件（一次性）
 
 ```bash
-# 1) 两个 gitignored env 已填真实值
-cp .env.production.example .env.production
-cp .env.prod-infra.example .env.prod-infra
-#    - .env.production 的 DATABASE_URL 内嵌密码必须与 .env.prod-infra 的 POSTGRES_PASSWORD 一致
-#    - .env.prod-infra 填 LE_EMAIL、GRAFANA_ADMIN_USER/PASSWORD、DEPLOY_HOST=yxswy-server
+# 1) 统一的 gitignored env 已填真实值
+cp deploy/env/.env.example deploy/env/.env.prod
+#    - .env.prod 的 DATABASE_URL 内嵌密码必须与 POSTGRES_PASSWORD 一致
+#    - .env.prod 填 LE_EMAIL、GRAFANA_ADMIN_USER/PASSWORD、DEPLOY_HOST=yxswy-server
 #    - 服务器上的 .env 文件权限已被部署脚本 chmod 600
 
-# 2) 预检（两个都要过）
-pnpm run check:production-env            # 应用 env（脚本内部会加载 .env.production）
-pnpm run check:production-env:infra      # 基础设施 env（.env.prod-infra）
+# 2) 预检（应用与基础设施共用一个 env 文件）
+bun x dotenv -e deploy/env/.env.prod -- bun run check:production-env
+bun x dotenv -e deploy/env/.env.prod -- bun run check:production-env:infra
 
 # 3) SSH 通 + DNS 对（在服务器上查，别在本地查）
 ssh yxswy-server 'docker --version && getent hosts create.yxswy.com'
-#    应输出 Docker 版本 + "101.35.246.159 create.yxswy.com"
+#    应输出 Docker 版本 + 域名解析到本机（与 hostname -I 对照）
 
 # 4) 工作区干净
 git status --porcelain   # 必须无输出
@@ -57,8 +56,8 @@ git status --porcelain   # 必须无输出
 >
 > | 改动范围 | 命令 | 传输 |
 > |---|---|---|
-> | **只改前端**（apps/web、apps/admin） | `pnpm run deploy:prod:web` | ~20MB，不动 api/worker/runtime |
-> | **改了后端 / 前后端同改 / 改了 DB schema** | `pnpm run verify && pnpm run deploy:prod` | 全量（runtime 镜像，瘦身后 ~240MB） |
+> | **只改前端**（apps/web、apps/admin） | `bun run deploy:prod:web` | ~20MB，不动 api/worker/runtime |
+> | **改了后端 / 前后端同改 / 改了 DB schema** | `bun run verify && bun run deploy:prod` | 全量（runtime 镜像，瘦身后 ~240MB） |
 >
 > `deploy:prod` 现在会在「上一次提交只改前端」时打印 web-only 提示（非阻断）。日常前端热修
 > 一律走 web-only，只有后端变更才全量重传 runtime 镜像。
@@ -69,8 +68,8 @@ Windows PowerShell 支持本地安装、dev/test 数据库、typecheck、测试�
 rehearsal 使用 Linux 容器，首次运行前执行：
 
 ```powershell
-pnpm run fetch:static-ffmpeg:windows
-pnpm run deploy:rehearsal:up
+bun run fetch:static-ffmpeg:windows
+bun run deploy:rehearsal:up
 ```
 
 `deploy:prod`、`deploy:prod:web`、备份、回滚和观测脚本依赖 Bash、rsync、awk 及
@@ -80,7 +79,7 @@ Linux 远程命令，必须在 Linux/WSL 或 Linux CI 执行；不要在普通 W
 ### 2.2 一键发布
 
 ```bash
-pnpm run verify && pnpm run deploy:prod
+bun run verify && bun run deploy:prod
 ```
 
 `deploy:prod` 内部流程（了解它才能排查）：
@@ -102,19 +101,20 @@ pnpm run verify && pnpm run deploy:prod
 docker ps --format '{{.Names}} {{.Status}}' | grep bailian
 #    web Up / api Up (healthy) / worker Up / postgres Up (healthy) / backup Up
 
-# 从本机（用 --resolve 绕过本地 fake-ip DNS）
-curl -sS --resolve create.yxswy.com:443:101.35.246.159 https://create.yxswy.com/api/health/ready
+# 从本机（用 --resolve 绕过本地 fake-ip DNS；服务器 IP 从 SSH 配置解析，不写进仓库）
+SERVER_IP=$(ssh yxswy-server 'hostname -I' | awk '{print $1}')
+curl -sS --resolve create.yxswy.com:443:$SERVER_IP https://create.yxswy.com/api/health/ready
 #    {"success":true,"data":{"status":"ok","checks":{"database":"ok","storage":"ok","worker":"ok"}}}
-curl -sS -o /dev/null -w "%{http_code}\n" --resolve logs.yxswy.com:443:101.35.246.159 https://logs.yxswy.com/
+curl -sS -o /dev/null -w "%{http_code}\n" --resolve logs.yxswy.com:443:$SERVER_IP https://logs.yxswy.com/
 #    401（basic_auth 保护，正确）
 ```
 
 **首次部署 / 新库（或 model_costs 表为空）时，追加一次性播种模型成本**（幂等，`on conflict do nothing`，不会覆盖 admin 已调成本）：
 
 ```bash
-docker compose --env-file /opt/bailian-studio/.env.prod-infra \
+docker compose --env-file /opt/bailian-studio/deploy/env/.env.prod \
   -f /opt/bailian-studio/deploy/docker/compose.prod.yaml \
-  run --rm migrate pnpm exec tsx scripts/db/seed-model-costs.ts
+  run --rm migrate bunx tsx scripts/db/seed-model-costs.ts
 #   输出：Seeded N model cost rows.（admin「分析 → 维护模型成本」可再调）
 ```
 
@@ -122,7 +122,7 @@ docker compose --env-file /opt/bailian-studio/.env.prod-infra \
 
 ### Windows / WSL 发布说明
 
-在 Windows clone 上执行 `pnpm run deploy:prod` 时，脚本会使用仓库相对路径调用 Node/tsx，避免 WSL 路径被 Windows Node 错误转换。`DEPLOY_SSH_KEY` 可以填写 Windows 风格的 `C:/...` 路径；脚本会自动解析挂载路径、复用同目录的 `known_hosts`，并在 WSL 中调用 Windows OpenSSH，避免私钥权限和主机指纹不一致导致发布挂起。
+在 Windows clone 上执行 `bun run deploy:prod` 时，脚本会使用仓库相对路径调用 Node/tsx，避免 WSL 路径被 Windows Node 错误转换。`DEPLOY_SSH_KEY` 可以填写 Windows 风格的 `C:/...` 路径；脚本会自动解析挂载路径、复用同目录的 `known_hosts`，并在 WSL 中调用 Windows OpenSSH，避免私钥权限和主机指纹不一致导致发布挂起。
 
 ## 3. 分步手动流程（一键失败时用）
 
@@ -130,12 +130,12 @@ docker compose --env-file /opt/bailian-studio/.env.prod-infra \
 
 ```bash
 # 在服务器上（/opt/bailian-studio 下）
-COMPOSE="docker compose --env-file /opt/bailian-studio/.env.prod-infra -f /opt/bailian-studio/deploy/docker/compose.prod.yaml"
+COMPOSE="docker compose --env-file /opt/bailian-studio/deploy/env/.env.prod -f /opt/bailian-studio/deploy/docker/compose.prod.yaml"
 
 $COMPOSE pull postgres            # 核心基础镜像（观测栈启用时另 pull loki alloy grafana）
 $COMPOSE run --rm migrate         # 迁移（幂等）
 $COMPOSE up -d --no-build --pull never   # 启动核心栈
-bash /opt/bailian-studio/scripts/deploy/setup-host-edge.sh /opt/bailian-studio/deploy  # 边缘（幂等）
+bash /opt/bailian-studio/deploy/scripts/setup-host-edge.sh /opt/bailian-studio/deploy  # 边缘（幂等）
 $COMPOSE ps                       # 看状态
 $COMPOSE logs api --tail 50       # 看日志
 ```
@@ -144,9 +144,9 @@ $COMPOSE logs api --tail 50       # 看日志
 
 ## 4. 增量发版
 
-改代码 → `pnpm run verify` → `pnpm run deploy:prod`。每次按**新 commit SHA** 重建镜像（层缓存让构建很快），迁移幂等，边缘脚本幂等。
+改代码 → `bun run verify` → `bun run deploy:prod`。每次按**新 commit SHA** 重建镜像（层缓存让构建很快），迁移幂等，边缘脚本幂等。
 
-> **成本提示**：`deploy:prod` 会把 runtime 镜像（生产依赖 `pnpm install --prod` 后
+> **成本提示**：`deploy:prod` 会把 runtime 镜像（生产依赖 `bun install --prod` 后
 > ~380MB；2026-08 起 ffmpeg/ffprobe 改为宿主机静态挂载，进一步瘦到 ~240MB）一起重传，
 > 即使只改了前端。前端热修用下面的 web-only 路径省带宽、且不动 api/worker。
 >
@@ -158,7 +158,7 @@ $COMPOSE logs api --tail 50       # 看日志
 
 ### 4.1 web-only 快速发版（只改前端时用，传输 ~20MB、不动 api/worker）
 
-> 已有脚本封装 `pnpm run deploy:prod:web`（`scripts/deploy/deploy-prod-web.sh`，含工作区
+> 已有脚本封装 `bun run deploy:prod:web`（`scripts/deploy/deploy-prod-web.sh`，含工作区
 > 预检/镜像构建/rsync/服务器 load/仅重建 web 容器，行为与下方手抄命令等价）。以下为
 > 手抄路径（脚本不可用或想逐步入肉时参考）：
 
@@ -170,7 +170,7 @@ docker build --platform linux/amd64 -f deploy/docker/Dockerfile --target web \
   -t "bailian-studio-web:$NEWSHA" .
 docker save -o "web-$NEWSHA.tar" "bailian-studio-web:$NEWSHA"
 rsync -az "web-$NEWSHA.tar" yxswy-server:/opt/bailian-studio/
-ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /opt/bailian-studio/web-$NEWSHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$NEWSHA docker compose --env-file /opt/bailian-studio/.env.prod-infra -f /opt/bailian-studio/deploy/docker/compose.prod.yaml up -d --no-deps web"
+ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /opt/bailian-studio/web-$NEWSHA.tar && BAILIAN_STUDIO_RELEASE_TAG=$NEWSHA docker compose --env-file /opt/bailian-studio/deploy/env/.env.prod -f /opt/bailian-studio/deploy/docker/compose.prod.yaml up -d --no-deps web"
 ```
 
 > 注意：这只把 web 容器切到新 SHA，`BAILIAN_STUDIO_RELEASE_TAG` 仍是旧 SHA（api/worker
@@ -184,14 +184,14 @@ ssh yxswy-server "docker load -i /opt/bailian-studio/web-$NEWSHA.tar && rm -f /o
 观测栈（loki/alloy/grafana）在 `observability` profile，核心稳定后再启用：
 
 ```bash
-pnpm run prod:observability:up     # 启用 loki/alloy/grafana
-pnpm run prod:observability:down   # 停用
-pnpm run logs:prune                # 内存/磁盘吃紧时删除 24h 前旧日志（需 loki 已启）
-pnpm run prod:mem                  # 看服务器内存 + 容器占用
+bun run prod:observability:up     # 启用 loki/alloy/grafana
+bun run prod:observability:down   # 停用
+bun run logs:prune                # 内存/磁盘吃紧时删除 24h 前旧日志（需 loki 已启）
+bun run prod:mem                  # 看服务器内存 + 容器占用
 ```
 
 启用后 `https://logs.yxswy.com`（basic_auth 密码 = `GRAFANA_ADMIN_PASSWORD`）进入 Grafana，
-3 个预置仪表盘可查日志（日志浏览器 / 错误面板 / 按 traceId/taskId/recordId 拉链路）。
+4 个预置仪表盘可查日志和审计 outbox 运营数据（日志浏览器 / 错误面板 / 按 traceId、taskId、recordId 拉链路 / 审计 Outbox 运营）。审计面板读取 Worker 的结构化指标快照，不新增 Prometheus 或独立持久化指标服务。
 
 ---
 
@@ -201,8 +201,8 @@ pnpm run prod:mem                  # 看服务器内存 + 容器占用
 
 ```bash
 git checkout <旧SHA>      # 切回旧版本
-pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
-# 或只切镜像 tag：把 .env.prod-infra 的 BAILIAN_STUDIO_RELEASE_TAG 改成旧 SHA 后 pnpm run prod:up
+bun run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
+# 或只切镜像 tag：把 deploy/env/.env.prod 的 BAILIAN_STUDIO_RELEASE_TAG 改成旧 SHA 后 bun run prod:up
 ```
 
 ---
@@ -218,7 +218,7 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
    → 镜像里 Node 是 v20（apt nodejs），没有 `import.meta.main`，worker 的 `main()` 永不执行。规避：Dockerfile 用官方二进制 Node ≥24（已改）。
 3. **`chown: invalid user: 'node:node'`（rehearsal artifact-init）**
    → 运行时镜像只有 `bun` 用户。规避：改为 `chown -R bun:bun`。
-4. **rehearsal 起不来但本机 `pnpm run dev` 正常**
+4. **rehearsal 起不来但本机 `bun run dev` 正常**
    → 是镜像/容器环境问题，不是代码问题。先 `docker compose -f .../rehearsal.yml run --rm <svc>` 单独跑该服务看真实报错。
 
 ### B. bash 脚本（deploy/setup/backup 一律注意）
@@ -241,7 +241,7 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
 12. **`docker inspect bailian-studio-prod-api` 找不到容器**
     → 容器名带 `-1` 后缀（`bailian-studio-prod-api-1`）。规避：用 `$COMPOSE ps api --format '{{.Status}}'` 解析。
 13. **共享机内存吃紧 / 容器被 OOM 杀**
-    → 2C2G 还跑着 9 个别的容器。规避：所有容器设 `mem_limit`；观测栈限额更紧；吃紧时 `pnpm run logs:prune`。
+    → 2C2G 还跑着 9 个别的容器。规避：所有容器设 `mem_limit`；观测栈限额更紧；吃紧时 `bun run logs:prune`。
 
 ### D. 网络
 14. **`docker build` 报 `could not fetch content descriptor ... not found`**
@@ -250,8 +250,8 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
     → 腾讯云到 Docker Hub 慢。规避：耐心等待；基础镜像拉过一次就常驻。
 
 ### E. 本地开发
-16. **`pnpm run verify` 大量测试报 `DATABASE_URL is required`**
-    → 缺 gitignored 的 `.env.test`。规避：`cp .env.test.example .env.test`；`db:test:up` 起 test DB。
+16. **`bun run verify` 大量测试报 `DATABASE_URL is required`**
+    → 缺 gitignored 的 `deploy/env/.env.test`。规避：`cp deploy/env/.env.example deploy/env/.env.test` 后改 test DB；`db:test:up` 起 test DB。
 
 ### F. rsync / 文件传输
 17. **`rsync -az deploy/nginx/ server:/opt/.../deploy/` 后服务器上文件位置不对**
@@ -270,5 +270,5 @@ pnpm run deploy:prod      # 会用旧 SHA 重新构建/传输/部署
 
 - **先读**：`docs/04-deployment-playbook.md`（本手册）+ `docs/03-ops.md`（运维：日志/备份/回滚/故障）。
 - **CLAUDE.md** 已在此指向本手册，新会话会自动加载。
-- 关键命令：`pnpm run verify && pnpm run deploy:prod`（一键）；`pnpm run prod:observability:up`（开日志）；`pnpm run logs:prune`（清旧日志）。
-- 安全红线：两个 `.env*` 生产文件 gitignored，**绝不在日志/命令输出里打印凭据值**；只验证键是否存在。
+- 关键命令：`bun run verify && bun run deploy:prod`（一键）；`bun run prod:observability:up`（开日志）；`bun run logs:prune`（清旧日志）。
+- 安全红线：`deploy/env/.env.prod` gitignored，**绝不在日志/命令输出里打印凭据值**；只验证键是否存在。

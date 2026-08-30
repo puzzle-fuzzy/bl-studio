@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import react from '@vitejs/plugin-react'
 import { defineConfig } from 'vite'
 
-const workspaceRoot = fileURLToPath(new URL('../..', import.meta.url))
+const envRoot = fileURLToPath(new URL('../../deploy/env', import.meta.url))
 const adminRoot = fileURLToPath(new URL('.', import.meta.url))
 
 /**
@@ -23,7 +23,7 @@ export default defineConfig({
       },
     },
   },
-  envDir: workspaceRoot,
+  envDir: envRoot,
   plugins: [tailwindcss(), react()],
   resolve: {
     alias: {

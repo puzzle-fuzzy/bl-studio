@@ -4,7 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
-    "dev": "vite --host",
+    "dev": "vite --host --mode dev",
     "build": "tsc -p tsconfig.app.json --noEmit && vite build",
     "typecheck": "tsc -p tsconfig.app.json --noEmit",
     "test": "vitest run",
@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@bailian-studio/api-client": "workspace:*",
+    "@bailian-studio/lib-client": "workspace:*",
+    "@bailian-studio/ui": "workspace:*",
+    "@tanstack/react-query": "catalog:",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "lucide-react": "catalog:",

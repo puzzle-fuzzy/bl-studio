@@ -7,8 +7,9 @@ import { DEV_DATABASE_URL, TEST_DATABASE_URL } from '../packages/db/src/defaults
  * P2-33：本地 dev/test 数据库连接串的三处来源一致性。
  *
  * defaults.ts 是规范来源（canonical）；package.json 的 db:* 脚本因 drizzle-kit
- * 子进程不读 env-file（见 defaults.ts 注释）必须内联 URL，.env.example /
- * .env.test.example 又要文档化同一份。三处任何一处改串而漏改其余，这里就红。
+ * 子进程不读 env-file（见 defaults.ts 注释）必须内联 URL；
+ * deploy/env/.env.example 负责文档化 dev 默认串。test 的实际连接串由
+ * deploy/env/.env.test 提供，不提交模板副本。
  */
 const repoRoot = fileURLToPath(new URL('..', import.meta.url))
 
@@ -39,10 +40,9 @@ describe('数据库连接串三处来源一致（P2-33）', () => {
     }
   })
 
-  it('.env.example / .env.test.example 的 DATABASE_URL 与 defaults.ts 一致', () => {
+  it('deploy/env/.env.example 的 DATABASE_URL 与 defaults.ts 一致', () => {
     const expected: ReadonlyArray<readonly [string, string]> = [
-      ['.env.example', DEV_DATABASE_URL],
-      ['.env.test.example', TEST_DATABASE_URL],
+      ['deploy/env/.env.example', DEV_DATABASE_URL],
     ]
     for (const [file, expectedUrl] of expected) {
       const url = envFileDatabaseUrl(`${repoRoot}${file}`)

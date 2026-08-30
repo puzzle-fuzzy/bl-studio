@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process'
 
 const deployHost = process.env['DEPLOY_HOST']?.trim()
 if (!deployHost) {
-  console.error('缺少 DEPLOY_HOST，请先配置 .env.prod-infra')
+  console.error('缺少 DEPLOY_HOST，请先配置 deploy/env/.env.prod')
   process.exit(2)
 }
 

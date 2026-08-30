@@ -1,4 +1,7 @@
-# 仓库目录规范迁移决策
+# 仓库目录规范迁移决策（历史记录）
+
+> 本文记录 2026-08-24 的迁移过程；其中环境文件仍放根目录的约定已被
+> `docs/decisions/2026-08-30-environment-and-repository-layout.md` superseded。
 
 ## 决策
 

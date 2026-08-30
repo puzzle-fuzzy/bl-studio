@@ -16,13 +16,13 @@ services:
       timeout: 2s
       retries: 20
     # Named volume: routine `docker compose down` keeps the dev schema/data.
-    # Use `pnpm run db:reset` (or `down -v`) only when an intentional reset is needed.
+    # Use `bun run db:reset` (or `down -v`) only when an intentional reset is needed.
     volumes:
       - bailian-studio-postgres-dev-data:/var/lib/postgresql/data
 
   # Development-only SMTP sink. It accepts mail without credentials and keeps
   # verification links out of application logs. Production must use a real
-    # authenticated SMTP provider; see .env.production.example.
+    # authenticated SMTP provider; see deploy/env/.env.example.
   bailian-studio-mailpit-dev:
     image: axllent/mailpit:v1.30.3
     container_name: bailian-studio-mailpit-dev

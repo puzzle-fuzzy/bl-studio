@@ -7,7 +7,7 @@
     ".": "./src/index.ts"
   },
   "scripts": {
-    "dev": "bun --env-file=../../.env src/index.ts",
+    "dev": "bun --env-file=../../deploy/env/.env.dev src/index.ts",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test": "vitest run tests",
     "build": "tsc -p tsconfig.json --noEmit"
@@ -15,6 +15,7 @@
   "dependencies": {
     "@elysia/cors": "^1.4.2",
     "@bailian-studio/auth": "workspace:*",
+    "@bailian-studio/audit-repository": "workspace:*",
     "@bailian-studio/credit-ledger": "workspace:*",
     "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/creative-asset-compiler": "workspace:*",
@@ -23,6 +24,7 @@
     "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/generation-repository": "workspace:*",
     "@bailian-studio/media-repository": "workspace:*",
+    "@bailian-studio/persistence-runtime": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/shared": "workspace:*",
     "@bailian-studio/storage": "workspace:*",

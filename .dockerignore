@@ -14,9 +14,9 @@ var
 **/var
 .env
 .env.local
-.env.test
-.env.production
-.env.prod-infra
+.env.prod
+deploy/env/.env
+deploy/env/.env.*
 .env*.example
 *.log
 Dockerfile*

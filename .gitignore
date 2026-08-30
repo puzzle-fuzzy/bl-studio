@@ -6,16 +6,11 @@ coverage/
 *.log
 .DS_Store
 
-# 本地环境文件（绝不提交；模板例外）
+# 本地环境文件（绝不提交；只保留基础模板）
 .env
 .env.*
-!.env.example
-!.env.test.example
-!.env.production.example
-!.env.prod-infra.example
-!.env.prod-backup.example
-.env.local
-.env.*.local
+deploy/env/.env.*
+!deploy/env/.env.example
 
 # 本地工具状态
 .codegraph/
@@ -32,3 +27,4 @@ tests/e2e/.playwright
 
 # 本地 rehearsal 用的静态 ffmpeg/ffprobe（fetch-static-ffmpeg.sh 下载，不入库）
 infra/ffmpeg/
+reference-materials/
