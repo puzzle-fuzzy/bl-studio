@@ -55,6 +55,7 @@ export interface CanvasState {
     nodes: Node[]
     edges: Edge[]
   }) => void
+  setTitle: (title: string) => void
   setRevision: (revision: number) => void
   setSaveStatus: (status: CanvasSaveStatus) => void
   setCanvasExecutionBusy: (busy: CanvasExecutionBusy) => void
@@ -170,6 +171,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     catch {
       // QuotaExceeded 等：服务端文档仍是权威状态
     }
+  },
+
+  setTitle: (title) => {
+    const normalizedTitle = title.trim()
+    if (normalizedTitle.length === 0 || normalizedTitle.length > 120) return
+    set({ title: normalizedTitle })
+    persist(get)
   },
 
   setRevision: (revision) => set({ revision }),

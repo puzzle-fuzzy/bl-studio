@@ -98,6 +98,10 @@ function summaryOf(document: CanvasDocument): CanvasDocumentSummary {
   }
 }
 
+function documentSignature(title: string, snapshot: ReturnType<typeof toCanvasSnapshot>): string {
+  return JSON.stringify({ title, snapshot })
+}
+
 function applyCachedDocument(documentId: string, title: string, revision: number): boolean {
   const storage = browserDraftStorage()
   if (storage === undefined) return false
@@ -123,10 +127,10 @@ export function useCanvasPersistence() {
   const edges = useCanvasStore(state => state.edges)
   const documentId = useCanvasStore(state => state.documentId)
   const revision = useCanvasStore(state => state.revision)
+  const title = useCanvasStore(state => state.title)
   const hydrated = useCanvasStore(state => state.hydrated)
   const saveStatus = useCanvasStore(state => state.saveStatus)
   const setSaveStatus = useCanvasStore(state => state.setSaveStatus)
-  const lastSavedSignature = useRef<string | undefined>(undefined)
   const savingRef = useRef(false)
   const savePromiseRef = useRef<Promise<void> | undefined>(undefined)
   const saveTokenRef = useRef<symbol | undefined>(undefined)
@@ -145,14 +149,15 @@ export function useCanvasPersistence() {
   const [documentDirectoryError, setDocumentDirectoryError] = useState<string | undefined>()
   const [versions, setVersions] = useState<CanvasVersion[]>([])
   const [saveTick, setSaveTick] = useState(0)
+  const [lastSavedSignature, setLastSavedSignature] = useState<string | undefined>()
 
-  const currentSnapshotSignature = useMemo(
-    () => JSON.stringify(toCanvasSnapshot(nodes, edges)),
-    [edges, nodes],
+  const currentDocumentSignature = useMemo(
+    () => documentSignature(title, toCanvasSnapshot(nodes, edges)),
+    [edges, nodes, title],
   )
   const isDirty = hydrated
     && documentId !== undefined
-    && currentSnapshotSignature !== lastSavedSignature.current
+    && currentDocumentSignature !== lastSavedSignature
 
   const invalidatePendingSave = useCallback(() => {
     operationEpochRef.current += 1
@@ -175,8 +180,8 @@ export function useCanvasPersistence() {
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
       const document = await hydrateAssetUrls(await apiClient.getCanvas(id))
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+      setLastSavedSignature(documentSignature(document.title, document.snapshot))
       applyDocument(document)
-      lastSavedSignature.current = JSON.stringify(document.snapshot)
       setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
       setSaveStatus('saved')
     } catch (error) {
@@ -213,8 +218,8 @@ export function useCanvasPersistence() {
       expectedRevision: state.revision,
     }))
     if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+    setLastSavedSignature(documentSignature(document.title, document.snapshot))
     applyDocument(document)
-    lastSavedSignature.current = JSON.stringify(document.snapshot)
     setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
     setSaveStatus('saved')
     await refreshVersions()
@@ -237,8 +242,8 @@ export function useCanvasPersistence() {
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
       const hydratedDocument = await hydrateAssetUrls(document)
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      setLastSavedSignature(documentSignature(hydratedDocument.title, hydratedDocument.snapshot))
       applyDocument(hydratedDocument)
-      lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
       versionsRequestRef.current += 1
       setVersions([])
       setSaveStatus('saved')
@@ -249,7 +254,7 @@ export function useCanvasPersistence() {
         shouldUseCachedDocument(error)
         && applyCachedDocument(nextDocumentId, summary?.title ?? '未命名画布', summary?.revision ?? 1)
       ) {
-        lastSavedSignature.current = undefined
+        setLastSavedSignature(undefined)
         versionsRequestRef.current += 1
         setVersions([])
         setSaveStatus('error')
@@ -279,8 +284,8 @@ export function useCanvasPersistence() {
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
       const hydratedDocument = await hydrateAssetUrls(document)
       if (disposedRef.current || operationEpochRef.current !== operationEpoch) return false
+      setLastSavedSignature(documentSignature(hydratedDocument.title, hydratedDocument.snapshot))
       applyDocument(hydratedDocument)
-      lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
       versionsRequestRef.current += 1
       setDocuments(current => [
         summaryOf(hydratedDocument),
@@ -358,8 +363,8 @@ export function useCanvasPersistence() {
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
           const hydratedDocument = await hydrateAssetUrls(document)
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+          setLastSavedSignature(documentSignature(hydratedDocument.title, hydratedDocument.snapshot))
           applyDocument(hydratedDocument)
-          lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
           setDocuments([summaryOf(hydratedDocument)])
           setDocumentNextCursor(undefined)
           setSaveStatus('saved')
@@ -373,15 +378,15 @@ export function useCanvasPersistence() {
         catch (error) {
           if (!shouldUseCachedDocument(error) || disposedRef.current || operationEpochRef.current !== operationEpoch) throw error
           if (!applyCachedDocument(summary.id, summary.title, summary.revision)) throw error
-          lastSavedSignature.current = undefined
+          setLastSavedSignature(undefined)
           setSaveStatus('error')
           return
         }
         if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
         const hydratedDocument = await hydrateAssetUrls(document)
         if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+        setLastSavedSignature(documentSignature(hydratedDocument.title, hydratedDocument.snapshot))
         applyDocument(hydratedDocument)
-        lastSavedSignature.current = JSON.stringify(hydratedDocument.snapshot)
         setSaveStatus('saved')
       } catch (error) {
         if (!disposedRef.current) {
@@ -391,7 +396,7 @@ export function useCanvasPersistence() {
             && state.documentId !== undefined
             && applyCachedDocument(state.documentId, state.title, state.revision ?? 1)
           ) {
-            lastSavedSignature.current = undefined
+            setLastSavedSignature(undefined)
             setSaveStatus('error')
             return
           }
@@ -407,6 +412,7 @@ export function useCanvasPersistence() {
     })()
     return () => {
       disposedRef.current = true
+      operationEpochRef.current += 1
       documentDirectoryRequestRef.current += 1
       documentDirectoryLoadingRef.current = false
       if (timerRef.current !== null) clearTimeout(timerRef.current)
@@ -416,8 +422,8 @@ export function useCanvasPersistence() {
   useEffect(() => {
     if (!hydrated || documentId === undefined || revision === undefined) return
     const snapshot = toCanvasSnapshot(nodes, edges)
-    const signature = JSON.stringify(snapshot)
-    if (signature === lastSavedSignature.current) return
+    const signature = documentSignature(title, snapshot)
+    if (signature === lastSavedSignature) return
     if (savingRef.current) {
       pendingSaveRef.current = true
       return
@@ -436,17 +442,18 @@ export function useCanvasPersistence() {
           if (state.documentId === undefined || state.revision === undefined) return
           const saved = await apiClient.saveCanvas(state.documentId, {
             expectedRevision: state.revision,
+            title: state.title,
             snapshot,
           })
           if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+          setLastSavedSignature(documentSignature(saved.title, saved.snapshot))
           useCanvasStore.getState().setRevision(saved.revision)
-          lastSavedSignature.current = JSON.stringify(saved.snapshot)
           setDocuments(current => current.map(summary => summary.id === saved.id ? summaryOf(saved) : summary))
           setSaveStatus('saved')
-          if (JSON.stringify(toCanvasSnapshot(
-            useCanvasStore.getState().nodes,
-            useCanvasStore.getState().edges,
-          )) !== lastSavedSignature.current) {
+          if (documentSignature(
+            useCanvasStore.getState().title,
+            toCanvasSnapshot(useCanvasStore.getState().nodes, useCanvasStore.getState().edges),
+          ) !== documentSignature(saved.title, saved.snapshot)) {
             setSaveStatus('saving')
           }
         } catch (error) {
@@ -472,7 +479,7 @@ export function useCanvasPersistence() {
     return () => {
       if (timerRef.current !== null) clearTimeout(timerRef.current)
     }
-  }, [documentId, edges, hydrated, nodes, revision, saveTick, setSaveStatus])
+  }, [documentId, edges, hydrated, nodes, revision, saveTick, setSaveStatus, title])
 
   return {
     createDocument,

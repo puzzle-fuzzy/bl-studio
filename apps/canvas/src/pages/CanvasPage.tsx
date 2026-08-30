@@ -16,7 +16,7 @@ import type { CanvasExecutionTaskSummary, GenerationDiagnostics } from '@bailian
 import type { CanvasPreflightIssue } from '@bailian-studio/canvas-validation'
 import { apiClient } from '@bailian-studio/lib-client'
 import { CircleAlert, FilePlus2, History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
-import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
+import { Button, Input, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
 import { MediaNode } from '../components/canvas/MediaNode'
 import { CanvasExecutionDiagnosticsPanel } from '../components/canvas/CanvasExecutionDiagnosticsPanel'
 import { useCanvasStore } from '../stores/canvas-store'
@@ -83,6 +83,8 @@ export function CanvasPage() {
   ))
   const selectedNodeId = nodes.find(node => node.selected)?.id
   const documentId = useCanvasStore(state => state.documentId)
+  const documentTitle = useCanvasStore(state => state.title)
+  const setDocumentTitle = useCanvasStore(state => state.setTitle)
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
   const onConnect = useCanvasStore(state => state.onConnect)
@@ -104,6 +106,21 @@ export function CanvasPage() {
   const [generationDiagnostics, setGenerationDiagnostics] = useState<GenerationDiagnostics | undefined>()
   const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
   const [diagnosticsError, setDiagnosticsError] = useState<string | undefined>()
+  const [titleDraft, setTitleDraft] = useState(documentTitle)
+
+  useEffect(() => {
+    setTitleDraft(documentTitle)
+  }, [documentId, documentTitle])
+
+  const commitDocumentTitle = useCallback(() => {
+    const nextTitle = titleDraft.trim()
+    if (nextTitle.length === 0) {
+      setTitleDraft(documentTitle)
+      return
+    }
+    setDocumentTitle(nextTitle)
+    setTitleDraft(nextTitle)
+  }, [documentTitle, setDocumentTitle, titleDraft])
 
   const preflight = useMemo(
     () => models === undefined
@@ -387,6 +404,21 @@ export function CanvasPage() {
       {/* 工具栏：添加不同类型的节点 */}
       <div className="absolute top-3 left-3 z-10 flex gap-1.5 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
         <div className="flex items-center gap-1 border-r pr-1">
+          <Input
+            aria-label="画布标题"
+            value={titleDraft}
+            maxLength={120}
+            onChange={event => setTitleDraft(event.target.value)}
+            onBlur={commitDocumentTitle}
+            onKeyDown={event => {
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                event.currentTarget.blur()
+              }
+            }}
+            disabled={documentActionsLocked || documentId === undefined}
+            className="h-7 w-32 border-0 bg-transparent px-2 text-xs shadow-none"
+          />
           <Select
             value={documentId ?? ''}
             onValueChange={handleDocumentChange}

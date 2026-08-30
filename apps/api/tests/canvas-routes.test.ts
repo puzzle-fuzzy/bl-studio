@@ -35,6 +35,7 @@ function createFakeCanvasRepository(): CanvasRepository {
       document = {
         ...document,
         revision: document.revision + 1,
+        title: input.title ?? document.title,
         snapshot: input.snapshot,
         currentVersionId: `version-${document.revision + 1}`,
       }
@@ -170,11 +171,14 @@ describe('canvas routes', () => {
           cookie: 'bailian_studio_session=fake-token',
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ expectedRevision: 1, snapshot }),
+        body: JSON.stringify({ expectedRevision: 1, title: '重命名后的画布', snapshot }),
       }),
     )
     expect(saved.status).toBe(200)
-    expect((await saved.json()).data.document.revision).toBe(2)
+    expect((await saved.json()).data.document).toMatchObject({
+      revision: 2,
+      title: '重命名后的画布',
+    })
   })
 
   it('maps optimistic concurrency conflicts to 409', async () => {

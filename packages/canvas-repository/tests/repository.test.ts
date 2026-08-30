@@ -40,6 +40,7 @@ describe('canvas repository', () => {
       userId: 'canvas-repository-test',
       documentId: document.id,
       expectedRevision: 1,
+      title: '重命名后的画布',
       snapshot: {
         nodes: [{
           id: 'node-1',
@@ -51,6 +52,7 @@ describe('canvas repository', () => {
       },
     })
     expect(saved.revision).toBe(2)
+    expect(saved.title).toBe('重命名后的画布')
 
     await expect(repository.saveDocument({
       userId: 'canvas-repository-test',

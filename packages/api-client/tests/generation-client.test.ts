@@ -1290,6 +1290,35 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://api.test/api/canvases?limit=10&cursor=previous+page')
   })
 
+  it('saves a canvas title with the optimistic revision', async () => {
+    const document = {
+      id: 'canvas_1',
+      title: '重命名后的画布',
+      revision: 2,
+      updatedAt: '2026-08-30T00:00:01.000Z',
+      createdAt: '2026-08-30T00:00:00.000Z',
+      currentVersionId: 'version_2',
+      snapshot: { nodes: [], edges: [] },
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { document } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.saveCanvas('canvas 1', {
+      expectedRevision: 1,
+      title: '重命名后的画布',
+      snapshot: { nodes: [], edges: [] },
+    })).resolves.toEqual(document)
+    expect(calls[0]?.method).toBe('PATCH')
+    expect(calls[0]?.url).toBe('http://api.test/api/canvases/canvas%201')
+    expect(calls[0]?.body).toBe(JSON.stringify({
+      expectedRevision: 1,
+      title: '重命名后的画布',
+      snapshot: { nodes: [], edges: [] },
+    }))
+  })
+
   it('lists canvas execution history with a keyset cursor', async () => {
     const execution = {
       id: 'canvas_execution_history_1',

@@ -1,6 +1,6 @@
-import { act, renderHook, waitFor } from '@testing-library/react'
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
 import type { CanvasDocument, CanvasDocumentSummary, ListCanvasesResult } from '@bailian-studio/api-client'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCanvasPersistence } from './use-canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
 
@@ -9,6 +9,7 @@ const apiClientMock = vi.hoisted(() => ({
   getAsset: vi.fn(),
   getCanvas: vi.fn(),
   listCanvases: vi.fn(),
+  saveCanvas: vi.fn(),
 }))
 
 vi.mock('@bailian-studio/lib-client', () => ({ apiClient: apiClientMock }))
@@ -51,8 +52,13 @@ function resetCanvasStore() {
 
 describe('useCanvasPersistence document directory', () => {
   beforeEach(() => {
+    cleanup()
     vi.clearAllMocks()
     resetCanvasStore()
+  })
+
+  afterEach(() => {
+    cleanup()
   })
 
   it('loads the next directory page and prevents duplicate in-flight requests', async () => {
@@ -102,7 +108,7 @@ describe('useCanvasPersistence document directory', () => {
     })
 
     const { result } = renderHook(() => useCanvasPersistence())
-    await waitFor(() => expect(useCanvasStore.getState().documentId).toBe('first'))
+    await waitFor(() => expect(result.current.documentLoading).toBe(false))
 
     let staleSwitch!: Promise<boolean>
     let currentSwitch!: Promise<boolean>
@@ -122,5 +128,40 @@ describe('useCanvasPersistence document directory', () => {
 
     expect(useCanvasStore.getState().documentId).toBe('third')
     expect(useCanvasStore.getState().title).toBe('third')
+  })
+
+  it('persists a renamed document through the revisioned save path', async () => {
+    const first = documentSummary('first')
+    apiClientMock.listCanvases.mockResolvedValue({ items: [first] })
+    apiClientMock.getCanvas.mockResolvedValue(document('first'))
+    apiClientMock.saveCanvas.mockImplementation(async (
+      id: string,
+      input: { expectedRevision: number; snapshot: CanvasDocument['snapshot']; title: string },
+    ) => ({
+      ...document(id),
+      revision: input.expectedRevision + 1,
+      title: input.title,
+      snapshot: input.snapshot,
+    }))
+
+    const { result, rerender } = renderHook(() => useCanvasPersistence())
+    await waitFor(() => expect(result.current.documentLoading).toBe(false))
+    expect(apiClientMock.getCanvas).toHaveBeenCalledTimes(1)
+    await act(async () => {
+      await Promise.resolve()
+    })
+    expect(result.current.isDirty).toBe(false)
+
+    act(() => useCanvasStore.getState().setTitle('我的首个画布'))
+    await waitFor(() => expect(apiClientMock.saveCanvas).toHaveBeenCalledWith('first', {
+      expectedRevision: 1,
+      title: '我的首个画布',
+      snapshot: { nodes: [], edges: [] },
+    }), { timeout: 1_500 })
+    await act(async () => {
+      await new Promise(resolve => setTimeout(resolve, 50))
+    })
+    rerender()
+    expect(result.current.isDirty).toBe(false)
   })
 })
