@@ -105,25 +105,16 @@ export function useCanvasExecution() {
     [updateNodeData],
   )
 
-  const execute = useCallback(async () => {
-    if (documentId === undefined || revision === undefined) {
-      setError('画布尚未完成保存')
-      setStatus('failed')
-      return
-    }
-    stop()
-    setTaskId(undefined)
-    const runId = runIdRef.current
-    setStatus('submitting')
-    setError(undefined)
-    try {
-      const execution = await apiClient.executeCanvas(documentId, {
-        expectedRevision: revision,
-        idempotencyKey: `canvas:${documentId}:${revision}:${Date.now()}`,
-      })
+  const trackExecution = useCallback(
+    async (
+      execution: CanvasExecutionTaskSummary,
+      runId: number,
+      canvasId: string,
+    ): Promise<void> => {
+      if (runIdRef.current !== runId) return
+      await applySummary(execution, runId)
       if (runIdRef.current !== runId) return
       setTaskId(execution.id)
-      await applySummary(execution, runId)
       if (isTerminalExecution(execution)) {
         setStatus(toUiExecutionStatus(execution.status))
         if (execution.error !== undefined) setError(execution.error)
@@ -166,7 +157,7 @@ export function useCanvasExecution() {
           return
         }
         try {
-          const next = await apiClient.getCanvasExecution(documentId, execution.id)
+          const next = await apiClient.getCanvasExecution(canvasId, execution.id)
           await finish(next)
         } catch {
           // Keep polling through transient network errors.
@@ -182,7 +173,7 @@ export function useCanvasExecution() {
       }
 
       try {
-        const source = new EventSource(apiClient.canvasExecutionEventsUrl(documentId, execution.id), {
+        const source = new EventSource(apiClient.canvasExecutionEventsUrl(canvasId, execution.id), {
           withCredentials: true,
         })
         eventSourceRef.current = source
@@ -203,12 +194,57 @@ export function useCanvasExecution() {
         // 浏览器不支持 EventSource 时，回退到已有的任务查询轮询。
         startFallback()
       }
+    },
+    [applySummary],
+  )
+
+  const execute = useCallback(async () => {
+    if (documentId === undefined || revision === undefined) {
+      setError('画布尚未完成保存')
+      setStatus('failed')
+      return
+    }
+    stop()
+    setTaskId(undefined)
+    const runId = runIdRef.current
+    setStatus('submitting')
+    setError(undefined)
+    try {
+      const execution = await apiClient.executeCanvas(documentId, {
+        expectedRevision: revision,
+        idempotencyKey: `canvas:${documentId}:${revision}:${Date.now()}`,
+      })
+      if (runIdRef.current !== runId) return
+      await trackExecution(execution, runId, documentId)
     } catch (nextError) {
       if (runIdRef.current !== runId) return
       setStatus('failed')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [applySummary, documentId, revision, stop])
+  }, [documentId, revision, stop, trackExecution])
+
+  const retryNode = useCallback(async (nodeId: string) => {
+    if (
+      documentId === undefined
+      || taskId === undefined
+      || (status !== 'succeeded' && status !== 'failed' && status !== 'cancelled')
+    ) return
+    stop()
+    const runId = runIdRef.current
+    setStatus('submitting')
+    setError(undefined)
+    try {
+      const execution = await apiClient.retryCanvasNode(documentId, taskId, nodeId, {
+        idempotencyKey: `canvas-node:${documentId}:${taskId}:${nodeId}:${Date.now()}`,
+      })
+      if (runIdRef.current !== runId) return
+      await trackExecution(execution, runId, documentId)
+    } catch (nextError) {
+      if (runIdRef.current !== runId) return
+      setStatus('failed')
+      setError(nextError instanceof Error ? nextError.message : String(nextError))
+    }
+  }, [documentId, status, stop, taskId, trackExecution])
 
   const cancel = useCallback(async () => {
     if (documentId === undefined || taskId === undefined || (status !== 'submitting' && status !== 'running')) return
@@ -231,5 +267,5 @@ export function useCanvasExecution() {
 
   useEffect(() => () => stop(), [stop])
 
-  return { execute, cancel, stop, status, taskId, error }
+  return { execute, cancel, retryNode, stop, status, taskId, error }
 }

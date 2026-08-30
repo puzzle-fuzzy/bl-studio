@@ -39,6 +39,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` 从已结束任务派生新的
   `canvas.execute`。服务端通过纯函数计算目标节点及下游失效范围，并复用成功节点的 `assetIds`；原任务
   不原地改写，派生任务带有 `rerun.sourceExecutionId` / `rerun.nodeId` 元数据和独立幂等边界。
+- Canvas 页面通过选中节点后的“重跑节点”操作调用该接口，并继续使用 Canvas execution SSE；SSE 不可用时
+  使用同一个 fallback polling 实现。
 - 这仍是执行快照内的结果复用，不是跨任务的通用结果缓存；跨任务缓存需要下一阶段再定义 fingerprint、
   资产版本和计费命中规则。
 - 资产 ID 和画布 revision 都在服务端重新校验；客户端不能通过任务查询跨用户读取执行状态。

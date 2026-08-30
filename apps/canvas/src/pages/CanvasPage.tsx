@@ -12,7 +12,7 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { History, ImagePlus, Loader2, Play, Video, X } from 'lucide-react'
+import { History, ImagePlus, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
 import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
 import { useCanvasStore } from '../stores/canvas-store'
@@ -34,9 +34,16 @@ interface CanvasMenu {
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
   const { saveStatus, versions, refreshVersions, restoreVersion } = useCanvasPersistence()
-  const { execute, cancel, status: executionStatus, error: executionError } = useCanvasExecution()
+  const {
+    execute,
+    cancel,
+    retryNode,
+    status: executionStatus,
+    error: executionError,
+  } = useCanvasExecution()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
+  const selectedNodeId = nodes.find(node => node.selected)?.id
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
   const onConnect = useCanvasStore(state => state.onConnect)
@@ -223,6 +230,18 @@ export function CanvasPage() {
             取消
           </Button>
         )}
+        {selectedNodeId !== undefined
+          && (executionStatus === 'succeeded' || executionStatus === 'failed' || executionStatus === 'cancelled') && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => void retryNode(selectedNodeId)}
+              title="只重跑选中节点及其下游节点"
+            >
+              <RefreshCw className="mr-1 size-3.5" aria-hidden />
+              重跑节点
+            </Button>
+          )}
         <Button size="sm" variant="ghost" onClick={() => setShowVersions(open => !open)} aria-expanded={showVersions}>
           <History className="mr-1 size-3.5" aria-hidden />
           版本
