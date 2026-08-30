@@ -83,6 +83,8 @@ const CANVAS_EXECUTION_STATUS: Record<CanvasExecutionErrorCode, number> = {
   CANVAS_EXECUTION_REQUIRED_INPUT_MISSING: 400,
   CANVAS_EXECUTION_MODEL_VALIDATION_FAILED: 400,
   CANVAS_EXECUTION_INVALID_TASK_INPUT: 500,
+  CANVAS_EXECUTION_NODE_NOT_FOUND: 404,
+  CANVAS_EXECUTION_NOT_RETRYABLE: 409,
 }
 
 const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, number> = {
@@ -272,6 +274,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof CanvasRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
+  if (error instanceof CanvasExecutionError) {
     return {
       success: false,
       error: {

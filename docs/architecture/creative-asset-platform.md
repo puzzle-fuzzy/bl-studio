@@ -156,6 +156,9 @@ flowchart LR
 - Canvas 执行状态通过 `GET /api/canvases/:id/executions/:taskId/events` 提供 SSE；API 只读取
   `task_records` 的变化并推送最新完整快照，避免引入第二份运行状态。客户端以 SSE 为主，连接不可用时
   降级为原有任务查询轮询，终态事件发送后关闭连接。
+- 用户可以通过 `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` 从一条已结束的执行派生新任务；
+  新任务保留成功节点的稳定资产结果，只将目标节点及其下游置回 `queued`。失败任务中的其它失败分支也会
+  一并失效，取消任务中的非成功节点不会被复用。原任务保持不可变，接口使用幂等键保护派生任务创建。
 
 ## 4. 领域模型归属
 

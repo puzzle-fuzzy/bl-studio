@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { compileCanvasGraph, CanvasExecutionError } from '../src/index'
-import type { CanvasSnapshot } from '@bailian-studio/canvas-contracts'
+import { compileCanvasGraph, CanvasExecutionError, prepareCanvasNodeRerun } from '../src/index'
+import type { CanvasExecutionTaskInput, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
 
 function snapshot(
   nodes: CanvasSnapshot['nodes'],
@@ -135,6 +135,79 @@ describe('compileCanvasGraph', () => {
           ]),
         }),
       'CANVAS_EXECUTION_REQUIRED_INPUT_MISSING',
+    )
+  })
+})
+
+describe('prepareCanvasNodeRerun', () => {
+  it('resets the selected node and all descendants while preserving unrelated successes', () => {
+    const input: CanvasExecutionTaskInput = {
+      documentId: 'canvas-1',
+      documentRevision: 3,
+      plan: {
+        nodes: [
+          { nodeId: 'source', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: [] },
+          { nodeId: 'target', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: ['source'] },
+          { nodeId: 'downstream', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: ['target'] },
+          { nodeId: 'other', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: [] },
+        ],
+      },
+      nodeRuns: {
+        source: { status: 'succeeded', assetIds: ['asset-source'] },
+        target: { status: 'failed', error: 'provider failed' },
+        downstream: { status: 'queued' },
+        other: { status: 'succeeded', assetIds: ['asset-other'] },
+      },
+    }
+
+    const next = prepareCanvasNodeRerun(input, 'target', 'failed')
+
+    expect(next.nodeRuns).toEqual({
+      source: { status: 'succeeded', assetIds: ['asset-source'] },
+      target: { status: 'queued' },
+      downstream: { status: 'queued' },
+      other: { status: 'succeeded', assetIds: ['asset-other'] },
+    })
+  })
+
+  it('does not carry cancelled generations into a new run', () => {
+    const input: CanvasExecutionTaskInput = {
+      documentId: 'canvas-1',
+      documentRevision: 3,
+      plan: {
+        nodes: [
+          { nodeId: 'source', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: [] },
+          { nodeId: 'target', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: ['source'] },
+        ],
+      },
+      nodeRuns: {
+        source: { status: 'succeeded', assetIds: ['asset-source'] },
+        target: { status: 'generating', generationId: 'generation-target' },
+      },
+    }
+
+    const next = prepareCanvasNodeRerun(input, 'target', 'cancelled')
+
+    expect(next.nodeRuns).toEqual({
+      source: { status: 'succeeded', assetIds: ['asset-source'] },
+      target: { status: 'queued' },
+    })
+  })
+
+  it('rejects a node that is absent from the execution plan', () => {
+    const input: CanvasExecutionTaskInput = {
+      documentId: 'canvas-1',
+      documentRevision: 1,
+      plan: {
+        nodes: [{ nodeId: 'source', kind: 'image', modelId: 'qwen-image', params: {}, assetRefs: {}, dependencyBindings: {}, dependsOn: [] }],
+      },
+      nodeRuns: {},
+    }
+
+    expect(() => prepareCanvasNodeRerun(input, 'missing', 'succeeded')).toThrowError(
+      new CanvasExecutionError('CANVAS_EXECUTION_NODE_NOT_FOUND', 'Canvas node missing is not present in the execution plan', {
+        nodeId: 'missing',
+      }),
     )
   })
 })

@@ -230,6 +230,111 @@ describe('canvas routes', () => {
     expect((await read.json()).data.execution.id).toBe(firstExecution.id)
   })
 
+  it('derives an idempotent node rerun and preserves successful nodes', async () => {
+    const taskRepository = createFakeTaskRepository()
+    taskRepository.tasks.set('source-execution', {
+      id: 'source-execution',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      status: 'failed',
+      priority: 1,
+      input: {
+        documentId: 'canvas-1',
+        documentRevision: 1,
+        plan: {
+          nodes: [
+            {
+              nodeId: 'source',
+              kind: 'image',
+              modelId: 'qwen-image',
+              params: {},
+              assetRefs: {},
+              dependencyBindings: {},
+              dependsOn: [],
+            },
+            {
+              nodeId: 'target',
+              kind: 'image',
+              modelId: 'qwen-image',
+              params: {},
+              assetRefs: {},
+              dependencyBindings: {},
+              dependsOn: ['source'],
+            },
+            {
+              nodeId: 'downstream',
+              kind: 'image',
+              modelId: 'qwen-image',
+              params: {},
+              assetRefs: {},
+              dependencyBindings: {},
+              dependsOn: ['target'],
+            },
+          ],
+        },
+        nodeRuns: {
+          source: { status: 'succeeded', assetIds: ['asset-source'] },
+          target: { status: 'failed', error: 'provider failed' },
+          downstream: { status: 'queued' },
+        },
+      },
+      attempts: 1,
+      maxAttempts: 1000,
+      nextRunAt: '2026-08-30T00:00:00.000Z',
+      userId: user.id,
+      traceId: 'trace-source',
+      createdAt: '2026-08-30T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:02.000Z',
+    })
+    const app = createTestApp({
+      authService: createFakeAuthService(() => user),
+      canvasRepository: createFakeCanvasRepository(),
+      taskQueueRepository: taskRepository,
+    }).app
+    const init = {
+      method: 'POST',
+      headers: {
+        cookie: 'bailian_studio_session=fake-token',
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ idempotencyKey: 'node-retry-1' }),
+    }
+    const first = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/executions/source-execution/nodes/target/retry', init),
+    )
+    expect(first.status).toBe(200)
+    const firstExecution = (await first.json()).data.execution
+    expect(firstExecution).toMatchObject({
+      documentId: 'canvas-1',
+      status: 'queued',
+      nodeStatuses: [
+        { nodeId: 'source', status: 'succeeded', assetIds: ['asset-source'] },
+        { nodeId: 'target', status: 'queued' },
+        { nodeId: 'downstream', status: 'queued' },
+      ],
+    })
+    expect(taskRepository.tasks.get(firstExecution.id)?.input).toMatchObject({
+      rerun: { sourceExecutionId: 'source-execution', nodeId: 'target' },
+    })
+
+    const second = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/executions/source-execution/nodes/target/retry', init),
+    )
+    expect(second.status).toBe(200)
+    expect((await second.json()).data.execution.id).toBe(firstExecution.id)
+    expect(taskRepository.enqueues).toBe(1)
+
+    taskRepository.tasks.set('source-execution', {
+      ...taskRepository.tasks.get('source-execution')!,
+      status: 'running',
+    })
+    const active = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/executions/source-execution/nodes/target/retry', init),
+    )
+    expect(active.status).toBe(409)
+    expect((await active.json()).error.code).toBe('CANVAS_EXECUTION_NOT_RETRYABLE')
+  })
+
   it('cancels a queued canvas execution and makes the terminal state readable', async () => {
     document = {
       ...document,

@@ -95,6 +95,12 @@ export const ExecuteCanvasInputSchema = z
   })
   .strict()
 
+export const RetryCanvasNodeInputSchema = z
+  .object({
+    idempotencyKey: z.string().trim().min(1).max(256).optional(),
+  })
+  .strict()
+
 export const CanvasExecutionPlanNodeSchema = z
   .object({
     nodeId: z.string().trim().min(1).max(120),
@@ -136,6 +142,13 @@ export const CanvasExecutionTaskInputSchema = z
       z.string().trim().min(1).max(120),
       CanvasExecutionNodeRunSchema,
     ),
+    rerun: z
+      .object({
+        sourceExecutionId: z.string().trim().min(1).max(200),
+        nodeId: z.string().trim().min(1).max(120),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
 
@@ -198,6 +211,7 @@ export type RestoreCanvasInput = z.infer<typeof RestoreCanvasInputSchema>
 export type ListCanvasesResult = z.infer<typeof ListCanvasesResponseSchema>
 export type CanvasVersionsResult = z.infer<typeof CanvasVersionsResponseSchema>
 export type ExecuteCanvasInput = z.infer<typeof ExecuteCanvasInputSchema>
+export type RetryCanvasNodeInput = z.infer<typeof RetryCanvasNodeInputSchema>
 export type CanvasExecutionPlanNode = z.infer<
   typeof CanvasExecutionPlanNodeSchema
 >

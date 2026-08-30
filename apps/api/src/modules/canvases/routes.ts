@@ -4,12 +4,14 @@ import {
   CreateCanvasInputSchema,
   CanvasExecutionTaskInputSchema,
   ExecuteCanvasInputSchema,
+  RetryCanvasNodeInputSchema,
   RestoreCanvasInputSchema,
   SaveCanvasInputSchema,
 } from '@bailian-studio/canvas-contracts'
 import {
   CanvasExecutionError,
   compileCanvasGraph,
+  prepareCanvasNodeRerun,
   type CanvasExecutionAssetKind,
 } from '@bailian-studio/canvas-execution'
 import { CanvasRepositoryError } from '@bailian-studio/canvas-repository'
@@ -127,6 +129,77 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         const concurrent = await deps.taskQueueRepository.getTask(taskId)
         if (concurrent === undefined) throw error
         assertCanvasExecutionTaskOwner(concurrent, user.id, document.id, document.revision)
+        created = concurrent
+      }
+      return {
+        success: true,
+        data: { execution: toCanvasExecutionSummary(created) },
+      }
+    })
+    .post('/:id/executions/:taskId/nodes/:nodeId/retry', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(RetryCanvasNodeInputSchema, body)
+      const sourceTask = await deps.taskQueueRepository.getTask(params.taskId)
+      if (sourceTask === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas execution not found: ${params.taskId}`)
+      }
+      assertCanvasExecutionTaskOwner(sourceTask, user.id, params.id)
+      if (sourceTask.status !== 'succeeded' && sourceTask.status !== 'failed' && sourceTask.status !== 'cancelled') {
+        throw new CanvasExecutionError(
+          'CANVAS_EXECUTION_NOT_RETRYABLE',
+          `Canvas execution ${sourceTask.id} is still active`,
+          { taskId: sourceTask.id, status: sourceTask.status },
+        )
+      }
+
+      const sourceInput = CanvasExecutionTaskInputSchema.parse(sourceTask.input)
+      const rerunInput = prepareCanvasNodeRerun(sourceInput, params.nodeId, sourceTask.status)
+      const taskId =
+        input.idempotencyKey === undefined
+          ? `canvas_node_execution_${randomUUID()}`
+          : `canvas_node_execution_${createHash('sha256')
+              .update(`${user.id}:${params.id}:${params.taskId}:${params.nodeId}:${input.idempotencyKey}`)
+              .digest('hex')
+              .slice(0, 48)}`
+      const existing = await deps.taskQueueRepository.getTask(taskId)
+      if (existing !== undefined) {
+        assertCanvasExecutionTaskOwner(existing, user.id, params.id, sourceInput.documentRevision)
+        return {
+          success: true,
+          data: { execution: toCanvasExecutionSummary(existing) },
+        }
+      }
+
+      const now = new Date().toISOString()
+      const task: TaskRecord = {
+        id: taskId,
+        type: 'canvas.execute',
+        domain: 'canvas',
+        status: 'queued',
+        priority: 1,
+        input: {
+          ...rerunInput,
+          rerun: {
+            sourceExecutionId: sourceTask.id,
+            nodeId: params.nodeId,
+          },
+        },
+        attempts: 0,
+        maxAttempts: Math.min(10_000, Math.max(1_000, rerunInput.plan.nodes.length * 50)),
+        nextRunAt: now,
+        userId: user.id,
+        traceId: randomUUID(),
+        createdAt: now,
+        updatedAt: now,
+      }
+      let created: TaskRecord
+      try {
+        created = await deps.taskQueueRepository.enqueueTask(task)
+      } catch (error) {
+        if (input.idempotencyKey === undefined) throw error
+        const concurrent = await deps.taskQueueRepository.getTask(taskId)
+        if (concurrent === undefined) throw error
+        assertCanvasExecutionTaskOwner(concurrent, user.id, params.id, sourceInput.documentRevision)
         created = concurrent
       }
       return {

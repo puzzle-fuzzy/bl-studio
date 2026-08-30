@@ -43,6 +43,7 @@ export type {
   CanvasVersion,
   CreateCanvasInput,
   ExecuteCanvasInput,
+  RetryCanvasNodeInput,
   ListCanvasesResult,
   RestoreCanvasInput,
   SaveCanvasInput,

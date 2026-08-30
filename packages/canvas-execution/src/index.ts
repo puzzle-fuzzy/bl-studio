@@ -15,6 +15,7 @@ import {
 import type {
   CanvasExecutionPlan,
   CanvasExecutionPlanNode,
+  CanvasExecutionTaskInput,
   CanvasNode,
   CanvasSnapshot,
 } from '@bailian-studio/canvas-contracts'
@@ -32,6 +33,8 @@ export type CanvasExecutionErrorCode =
   | 'CANVAS_EXECUTION_REQUIRED_INPUT_MISSING'
   | 'CANVAS_EXECUTION_MODEL_VALIDATION_FAILED'
   | 'CANVAS_EXECUTION_INVALID_TASK_INPUT'
+  | 'CANVAS_EXECUTION_NODE_NOT_FOUND'
+  | 'CANVAS_EXECUTION_NOT_RETRYABLE'
 
 export class CanvasExecutionError extends Error {
   constructor(
@@ -49,6 +52,70 @@ export interface CompileCanvasGraphOptions {
   /** Required when the snapshot contains manually selected asset IDs. */
   assetKinds?: ReadonlyMap<string, CanvasExecutionAssetKind>
   getModelById?: (id: string) => FrozenModelManifest | undefined
+}
+
+/**
+ * 为一个已结束的 Canvas 执行准备节点级重跑输入。
+ *
+ * 运行任务保持不可变；新任务只复用仍然成功的 nodeRuns。目标节点的所有
+ * 下游节点都会被置回 queued，因为它们的输入依赖可能已经改变。cancelled
+ * 任务中的非成功节点也不能安全复用（对应的 generation 可能已被取消），
+ * 因此一并重新排队。
+ */
+export function prepareCanvasNodeRerun(
+  input: CanvasExecutionTaskInput,
+  nodeId: string,
+  sourceStatus: 'succeeded' | 'failed' | 'cancelled',
+): CanvasExecutionTaskInput {
+  const target = input.plan.nodes.find(node => node.nodeId === nodeId)
+  if (target === undefined) {
+    throw new CanvasExecutionError(
+      'CANVAS_EXECUTION_NODE_NOT_FOUND',
+      `Canvas node ${nodeId} is not present in the execution plan`,
+      { nodeId },
+    )
+  }
+
+  const resetNodeIds = new Set([target.nodeId])
+  let changed = true
+  while (changed) {
+    changed = false
+    for (const node of input.plan.nodes) {
+      if (node.dependsOn.some(dependencyNodeId => resetNodeIds.has(dependencyNodeId))) {
+        if (!resetNodeIds.has(node.nodeId)) {
+          resetNodeIds.add(node.nodeId)
+          changed = true
+        }
+      }
+    }
+  }
+
+  if (sourceStatus === 'failed') {
+    for (const node of input.plan.nodes) {
+      if (input.nodeRuns[node.nodeId]?.status !== 'failed') continue
+      resetNodeIds.add(node.nodeId)
+      changed = true
+    }
+    while (changed) {
+      changed = false
+      for (const node of input.plan.nodes) {
+        if (node.dependsOn.some(dependencyNodeId => resetNodeIds.has(dependencyNodeId))) {
+          if (!resetNodeIds.has(node.nodeId)) {
+            resetNodeIds.add(node.nodeId)
+            changed = true
+          }
+        }
+      }
+    }
+  } else if (sourceStatus === 'cancelled') {
+    for (const node of input.plan.nodes) {
+      if (input.nodeRuns[node.nodeId]?.status !== 'succeeded') resetNodeIds.add(node.nodeId)
+    }
+  }
+
+  const nodeRuns = { ...input.nodeRuns }
+  for (const resetNodeId of resetNodeIds) nodeRuns[resetNodeId] = { status: 'queued' }
+  return { ...input, nodeRuns }
 }
 
 interface Reference {

@@ -18,6 +18,7 @@ import {
   type CanvasDocument,
   type CanvasExecutionTaskSummary,
   type ExecuteCanvasInput,
+  type RetryCanvasNodeInput,
   type CanvasVersion,
   type CreateCanvasInput,
   type ListCanvasesResult,
@@ -487,6 +488,13 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   getCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
   /** `GET /api/canvases/:id/executions/:taskId/events` —— 订阅画布执行状态 SSE。 */
   canvasExecutionEventsUrl(id: string, taskId: string): string
+  /** `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` —— 派生节点级重跑。 */
+  retryCanvasNode(
+    id: string,
+    taskId: string,
+    nodeId: string,
+    input?: RetryCanvasNodeInput,
+  ): Promise<CanvasExecutionTaskSummary>
   /** `POST /api/canvases/:id/executions/:taskId/cancel` —— 取消画布执行。 */
   cancelCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
   deleteAsset(id: string): Promise<void>
@@ -1404,6 +1412,21 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
 
     canvasExecutionEventsUrl(id, taskId) {
       return `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}/events`
+    },
+
+    async retryCanvasNode(id, taskId, nodeId, input) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/executions/${encodeURIComponent(taskId)}/nodes/${encodeURIComponent(nodeId)}/retry`,
+        {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(input ?? {}),
+          credentials: 'include',
+        },
+        fetchImpl,
+        CanvasExecutionTaskResponseSchema,
+      )
+      return data.execution
     },
 
     async cancelCanvasExecution(id, taskId) {

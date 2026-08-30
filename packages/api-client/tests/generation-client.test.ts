@@ -1090,6 +1090,10 @@ describe('createApiClient', () => {
         success: true,
         data: { execution: { ...execution, status: 'cancelled' as const } },
       }),
+      jsonResponse({
+        success: true,
+        data: { execution: { ...execution, status: 'queued' as const } },
+      }),
     ])
     const client = createApiClient({ baseUrl: 'http://api.test', fetch })
 
@@ -1104,11 +1108,15 @@ describe('createApiClient', () => {
     )
     expect(await client.getCanvasExecution('canvas_1', execution.id)).toMatchObject({ status: 'running' })
     expect(await client.cancelCanvasExecution('canvas_1', execution.id)).toMatchObject({ status: 'cancelled' })
+    expect(await client.retryCanvasNode('canvas 1', execution.id, 'node 1', { idempotencyKey: 'retry-1' }))
+      .toMatchObject({ status: 'queued' })
     expect(calls.map(call => [call.method, call.url])).toEqual([
       ['POST', 'http://api.test/api/canvases/canvas_1/execute'],
       ['GET', 'http://api.test/api/canvases/canvas_1/executions/canvas_execution_1'],
       ['POST', 'http://api.test/api/canvases/canvas_1/executions/canvas_execution_1/cancel'],
+      ['POST', 'http://api.test/api/canvases/canvas%201/executions/canvas_execution_1/nodes/node%201/retry'],
     ])
+    expect(calls[3]?.body).toBe(JSON.stringify({ idempotencyKey: 'retry-1' }))
   })
 
   it('registers without a session and completes the verified email lifecycle', async () => {

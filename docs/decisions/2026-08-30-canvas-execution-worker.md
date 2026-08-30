@@ -36,7 +36,11 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - `GET /api/canvases/:id/executions/:taskId/events` 提供 Canvas 专属 SSE。API 以短周期读取
   `task_records` 的新 `updatedAt` 快照，只发送变化后的完整 execution summary，不建立独立运行态副本；
   终态事件发送后关闭连接，客户端在 SSE 不可用时降级为任务查询轮询。
-- 节点级重跑和结果缓存尚未实现。
+- `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` 从已结束任务派生新的
+  `canvas.execute`。服务端通过纯函数计算目标节点及下游失效范围，并复用成功节点的 `assetIds`；原任务
+  不原地改写，派生任务带有 `rerun.sourceExecutionId` / `rerun.nodeId` 元数据和独立幂等边界。
+- 这仍是执行快照内的结果复用，不是跨任务的通用结果缓存；跨任务缓存需要下一阶段再定义 fingerprint、
+  资产版本和计费命中规则。
 - 资产 ID 和画布 revision 都在服务端重新校验；客户端不能通过任务查询跨用户读取执行状态。
 
-下一阶段可在不改变当前 generation 语义的前提下增加节点级重跑和可复用的节点结果缓存。
+下一阶段可在不改变当前 generation 语义的前提下增加 Canvas 页面节点重跑入口，并继续定义可复用的节点结果缓存。
