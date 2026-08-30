@@ -1,4 +1,4 @@
-import type { BailianStudioDbTransaction } from '@bailian-studio/db'
+import type { BailianStudioDb, BailianStudioDbTransaction } from '@bailian-studio/db'
 import type { TaskRecord, TaskStatus, TaskType } from '@bailian-studio/task-engine'
 
 /** Worker 认领下一条可执行任务所需的租约信息。 */
@@ -28,6 +28,8 @@ export interface FindTaskInput {
   statuses?: readonly TaskStatus[]
   excludeTaskId?: string
 }
+
+export type TaskQueueQuerySource = BailianStudioDb | BailianStudioDbTransaction
 
 export type TaskRepositoryErrorCode = 'TASK_NOT_FOUND' | 'DATABASE_ERROR'
 
@@ -59,7 +61,7 @@ export interface TaskQueueRepository {
 export interface TaskQueueTransactionStore {
   enqueueTask(tx: BailianStudioDbTransaction, task: TaskRecord): Promise<TaskRecord>
   findTask(
-    tx: BailianStudioDbTransaction,
+    source: TaskQueueQuerySource,
     input: FindTaskInput,
   ): Promise<TaskRecord | undefined>
 }

@@ -118,11 +118,9 @@ import {
 } from "./id";
 import {
 	type GenerationRecordRow,
-	type TaskRecordRow,
 	toGenerationArtifact,
 	toGenerationEvent,
 	toGenerationRecord,
-	toTaskRecord,
 	toWorkerHeartbeat,
 } from "./mappers";
 import type {
@@ -1208,25 +1206,11 @@ function completionOutput(
 	};
 }
 
-/** 取某条 record 最早创建的那条任务（用于幂等场景下还原 createGeneration 的返回值）。 */
-async function getFirstTaskForRecord(
-	db: BailianStudioDb | BailianStudioTx,
-	recordId: string,
-): Promise<TaskRecordRow | undefined> {
-	const [task] = await db
-		.select()
-		.from(taskRecords)
-		.where(eq(taskRecords.recordId, recordId))
-		.orderBy(asc(taskRecords.createdAt))
-		.limit(1);
-	return task;
-}
-
 /** 幂等命中的记录必须能找到对应任务，否则视为数据不一致并抛错。 */
 function requireTaskForIdempotentRecord(
-	task: TaskRecordRow | undefined,
+	task: TaskRecord | undefined,
 	recordId: string,
-): TaskRecordRow {
+): TaskRecord {
 	if (!task) {
 		throw new GenerationRepositoryError(
 			"DATABASE_ERROR",
@@ -1394,6 +1378,7 @@ async function toGenerationRecordsWithAssetRefs(
  */
 async function getIdempotentGenerationResult(
 	db: BailianStudioDb | BailianStudioTx,
+	taskQueueTransactionStore: TaskQueueTransactionStore,
 	userId: string,
 	idempotencyKey: string,
 	expected: ExpectedIdempotentRequest,
@@ -1439,7 +1424,7 @@ async function getIdempotentGenerationResult(
 	}
 
 	const task = requireTaskForIdempotentRecord(
-		await getFirstTaskForRecord(db, existing.id),
+		await taskQueueTransactionStore.findTask(db, { recordId: existing.id }),
 		existing.id,
 	);
 	const [event] = await db
@@ -1456,7 +1441,7 @@ async function getIdempotentGenerationResult(
 	}
 	return {
 		record: toGenerationRecord(existing, existingRefs),
-		task: toTaskRecord(task),
+		task,
 		event: toGenerationEvent(event),
 	};
 }
@@ -1726,6 +1711,7 @@ export function createGenerationRepository(
 					if (input.idempotencyKey) {
 						const existingResult = await getIdempotentGenerationResult(
 							tx,
+							taskQueueTransactionStore,
 							input.userId,
 							input.idempotencyKey,
 							expectedRequest,
@@ -1929,6 +1915,7 @@ export function createGenerationRepository(
 
 				const existingResult = await getIdempotentGenerationResult(
 					db,
+					taskQueueTransactionStore,
 					input.userId,
 					input.idempotencyKey,
 					expectedRequest,
@@ -2279,25 +2266,19 @@ export function createGenerationRepository(
 				// P1-22：插入前查重——同一 record 已存在非终态 poll 任务（上一次 submit 在
 				// 落成功态前崩溃/锁丢失、重跑 submit 续轮询）时不重复插，否则 poll 任务会
 				// 随重跑指数增长。
-				const [existingPoll] = await tx
-					.select()
-					.from(taskRecords)
-					.where(
-						and(
-							eq(taskRecords.recordId, updatedRecord.id),
-							eq(taskRecords.type, "generation.poll"),
-							inArray(taskRecords.status, ["queued", "running"]),
-							...(input.excludeTaskId === undefined
-								? []
-								: [sql`${taskRecords.id} <> ${input.excludeTaskId}`]),
-						),
-					)
-					.limit(1);
+				const existingPoll = await taskQueueTransactionStore.findTask(tx, {
+					recordId: updatedRecord.id,
+					type: "generation.poll",
+					statuses: ["queued", "running"],
+					...(input.excludeTaskId === undefined
+						? {}
+						: { excludeTaskId: input.excludeTaskId }),
+				});
 
 				if (existingPoll) {
 					return {
 						record: toGenerationRecord(updatedRecord),
-						task: toTaskRecord(existingPoll),
+						task: existingPoll,
 					};
 				}
 

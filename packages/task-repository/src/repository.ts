@@ -1,5 +1,10 @@
 import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm'
-import { taskInsertValues, taskRecords, type BailianStudioDb, type BailianStudioDbTransaction } from '@bailian-studio/db'
+import {
+  taskInsertValues,
+  taskRecords,
+  type BailianStudioDb,
+  type BailianStudioDbTransaction,
+} from '@bailian-studio/db'
 import { transitionTask } from '@bailian-studio/task-engine'
 import { toTaskRecord } from './mappers'
 import {
@@ -10,6 +15,7 @@ import {
   type SaveTaskOptions,
   type TaskQueueRepository,
   type TaskQueueTransactionStore,
+  type TaskQueueQuerySource,
 } from './types'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 
@@ -36,7 +42,7 @@ export async function enqueueTask(
 
 /** 在调用方事务内读取一条任务，封闭 task_records 的查询与领域映射细节。 */
 async function findTask(
-  tx: BailianStudioDbTransaction,
+  source: TaskQueueQuerySource,
   input: FindTaskInput,
 ): Promise<TaskRecord | undefined> {
   const conditions = []
@@ -49,7 +55,7 @@ async function findTask(
     conditions.push(ne(taskRecords.id, input.excludeTaskId))
   }
 
-  const [row] = await tx
+  const [row] = await source
     .select()
     .from(taskRecords)
     .where(conditions.length === 0 ? undefined : and(...conditions))

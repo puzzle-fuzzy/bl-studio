@@ -9,6 +9,7 @@ export type {
   RenewTaskLockInput,
   SaveTaskOptions,
   TaskQueueRepository,
+  TaskQueueQuerySource,
   TaskQueueTransactionStore,
 } from './types'
 export { toTaskRecord, type TaskRecordRow } from './mappers'

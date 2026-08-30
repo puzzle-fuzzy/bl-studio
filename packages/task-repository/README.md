@@ -6,7 +6,7 @@
 - `renewTaskLock`：只允许当前 worker 在租约仍有效时续租；
 - `saveTask`：保存状态机结果，并在传入 owner 时阻止旧 worker 覆盖新 worker；
 - `getTask`：按 id 读取任务；
-- `findTask`：在调用方业务事务内按关联记录、类型和状态筛选一条任务。
+- `findTask`：按关联记录、类型和状态筛选一条任务；调用方可传入正在执行的业务事务以保持读取一致性。
 - `enqueueTask`：在调用方已开启的业务事务中写入初始/后续任务，并返回映射后的领域记录。
 
 状态转换仍由无数据库依赖的 `@bailian-studio/task-engine` 负责，日期/JSON 转换和 Drizzle 查询留在本包。`enqueueTask` 接收业务 repository 已开启的事务句柄，因此仍保持“业务记录 + 初始任务”单事务；事务的开启与业务记录写入责任不被任务包夺走。
