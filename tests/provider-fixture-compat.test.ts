@@ -3,13 +3,13 @@ import {
   listModels,
   qwenImage,
   wanxTextToVideo,
+  type FrozenModelManifest,
 } from '@bailian-studio/dashscope-manifests'
 import {
   validateModelParams,
   type DeepReadonly,
-  type FrozenModelManifest,
   type ModelParameter,
-} from '../packages/model-core/src'
+} from '@bailian-studio/model-core'
 import { buildDashScopeRequest, parseDashScopeOutput } from '../packages/provider-dashscope/src'
 
 const FIXTURE_URL = 'https://fixture.invalid/media'
