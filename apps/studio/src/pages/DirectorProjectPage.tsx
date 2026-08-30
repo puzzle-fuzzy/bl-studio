@@ -23,6 +23,7 @@ import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
 import { usePhaseReview } from '@/hooks/use-phase-review'
 import { usePreferredModel } from '@/hooks/use-preferred-model'
+import { resolveActiveDirectorPhase } from '@/lib/director-phase'
 import { AnalysisReview, applyDirectorVideoProgress, CharactersReview, DirectorContinuityReview, DirectorDialogueReview, DirectorPromptRebuildReview, DirectorVideoShotList, LocationsReview, PhaseStatusPanel, ReferenceEntityGroup, ScreenplayChatWorkspace, StoryboardReview } from '@/components/director/review-components'
 
 type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
@@ -337,32 +338,10 @@ export function DirectorProjectPage() {
         const continuityState = next.phases.find(state => state.phase === 'continuity')
         const promptRebuildState = next.phases.find(state => state.phase === 'rebuild')
         const dialogueState = next.phases.find(state => state.phase === 'dialogue')
-        if (analysisState?.status === 'queued' || analysisState?.status === 'running') {
-          setActiveRunId(analysisState.activeRunId ?? undefined)
-          setActivePhase('analyze')
-        } else if (charactersState?.status === 'queued' || charactersState?.status === 'running') {
-          setActiveRunId(charactersState.activeRunId ?? undefined)
-          setActivePhase('characters')
-        } else if (locationsState?.status === 'queued' || locationsState?.status === 'running') {
-          setActiveRunId(locationsState.activeRunId ?? undefined)
-          setActivePhase('locations')
-        } else {
-          const storyboardState = next.phases.find(state => state.phase === 'storyboard')
-          if (storyboardState?.status === 'queued' || storyboardState?.status === 'running') {
-            setActiveRunId(storyboardState.activeRunId ?? undefined)
-            setActivePhase('storyboard')
-          } else {
-            const videosState = next.phases.find(state => state.phase === 'videos')
-            if (videosState?.status === 'queued' || videosState?.status === 'running') {
-              setActiveRunId(videosState.activeRunId ?? undefined)
-              setActivePhase('videos')
-            }
-          }
-        }
-        const activeState = next.phases.find(state => state.status === 'queued' || state.status === 'running')
-        if (activeState !== undefined) {
-          setActiveRunId(activeState.activeRunId ?? activeState.lastRunId ?? undefined)
-          setActivePhase(activeState.phase)
+        const activePhaseState = resolveActiveDirectorPhase(next.phases)
+        if (activePhaseState !== undefined) {
+          setActiveRunId(activePhaseState.runId)
+          setActivePhase(activePhaseState.phase)
         }
         if (analysisState?.lastRunId !== null && analysisState?.lastRunId !== undefined) {
           void apiClient.getDirectorPhaseRun(id, 'analyze', analysisState.lastRunId)
