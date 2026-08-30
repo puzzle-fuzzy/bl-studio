@@ -10,6 +10,11 @@ Canvas 不直接把 React Flow 节点交给 provider，也不把一次运行过�
 请求 `POST /api/canvases/:id/execute` 时，基于当前 `revision` 编译成 provider-neutral 的
 `CanvasExecutionPlan`，再创建一个 `canvas.execute` 任务。
 
+Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错；它直接创建普通 generation，不进入
+`canvas.execute` 的 `nodeRuns` 和运行记录。两条入口共享资产 ID、模型校验和结果持久化，但页面保证
+互斥：整图任务执行期间禁用单节点提交，单节点生成期间禁用“运行画布”，避免两个生命周期竞争写回
+同一个节点结果。需要完整拓扑、缓存、节点级重跑和统一运行记录时，应使用整图入口。
+
 执行计划包含：拓扑排序后的媒体节点、模型 ID、已通过 manifest 校验的非媒体参数、静态资产 ID、
 以及“媒体参数 → 上游节点”的依赖绑定。编译器是纯包 `@bailian-studio/canvas-execution`，
 不读取数据库、环境变量或 URL。

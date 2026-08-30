@@ -45,12 +45,20 @@ export function useCanvasExecution() {
   const [taskId, setTaskId] = useState<string | undefined>()
   const [error, setError] = useState<string | undefined>()
 
+  const setExecutionStatus = useCallback((next: CanvasExecutionStatus) => {
+    setStatus(next)
+    useCanvasStore.getState().setCanvasExecutionBusy(
+      next === 'submitting' || next === 'running' || next === 'cancelling',
+    )
+  }, [])
+
   const stop = useCallback(() => {
     runIdRef.current += 1
     if (timerRef.current !== null) clearTimeout(timerRef.current)
     timerRef.current = null
     eventSourceRef.current?.close()
     eventSourceRef.current = null
+    useCanvasStore.getState().setCanvasExecutionBusy(false)
   }, [])
 
   const applySummary = useCallback(
@@ -116,11 +124,11 @@ export function useCanvasExecution() {
       if (runIdRef.current !== runId) return
       setTaskId(execution.id)
       if (isTerminalExecution(execution)) {
-        setStatus(toUiExecutionStatus(execution.status))
+        setExecutionStatus(toUiExecutionStatus(execution.status))
         if (execution.error !== undefined) setError(execution.error)
         return
       }
-      setStatus('running')
+      setExecutionStatus('running')
       const startedAt = Date.now()
       let fallbackActive = false
       let finished = false
@@ -139,11 +147,11 @@ export function useCanvasExecution() {
           clearFallback()
           eventSourceRef.current?.close()
           eventSourceRef.current = null
-          setStatus(toUiExecutionStatus(next.status))
+          setExecutionStatus(toUiExecutionStatus(next.status))
           if (next.error !== undefined) setError(next.error)
           return
         }
-        setStatus('running')
+        setExecutionStatus('running')
       }
       const poll = async (): Promise<void> => {
         if (runIdRef.current !== runId || finished || !fallbackActive) return
@@ -152,7 +160,7 @@ export function useCanvasExecution() {
           clearFallback()
           eventSourceRef.current?.close()
           eventSourceRef.current = null
-          setStatus('failed')
+          setExecutionStatus('failed')
           setError('画布执行超时，可稍后重新运行')
           return
         }
@@ -195,19 +203,19 @@ export function useCanvasExecution() {
         startFallback()
       }
     },
-    [applySummary],
+    [applySummary, setExecutionStatus],
   )
 
   const execute = useCallback(async () => {
     if (documentId === undefined || revision === undefined) {
       setError('画布尚未完成保存')
-      setStatus('failed')
+      setExecutionStatus('failed')
       return
     }
     stop()
     setTaskId(undefined)
     const runId = runIdRef.current
-    setStatus('submitting')
+    setExecutionStatus('submitting')
     setError(undefined)
     try {
       const execution = await apiClient.executeCanvas(documentId, {
@@ -218,10 +226,10 @@ export function useCanvasExecution() {
       await trackExecution(execution, runId, documentId)
     } catch (nextError) {
       if (runIdRef.current !== runId) return
-      setStatus('failed')
+      setExecutionStatus('failed')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [documentId, revision, stop, trackExecution])
+  }, [documentId, revision, setExecutionStatus, stop, trackExecution])
 
   const retryNode = useCallback(async (nodeId: string) => {
     if (
@@ -231,7 +239,7 @@ export function useCanvasExecution() {
     ) return
     stop()
     const runId = runIdRef.current
-    setStatus('submitting')
+    setExecutionStatus('submitting')
     setError(undefined)
     try {
       const execution = await apiClient.retryCanvasNode(documentId, taskId, nodeId, {
@@ -241,29 +249,29 @@ export function useCanvasExecution() {
       await trackExecution(execution, runId, documentId)
     } catch (nextError) {
       if (runIdRef.current !== runId) return
-      setStatus('failed')
+      setExecutionStatus('failed')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [documentId, status, stop, taskId, trackExecution])
+  }, [documentId, setExecutionStatus, status, stop, taskId, trackExecution])
 
   const cancel = useCallback(async () => {
     if (documentId === undefined || taskId === undefined || (status !== 'submitting' && status !== 'running')) return
     stop()
     const runId = runIdRef.current
-    setStatus('cancelling')
+    setExecutionStatus('cancelling')
     setError(undefined)
     try {
       const execution = await apiClient.cancelCanvasExecution(documentId, taskId)
       if (runIdRef.current !== runId) return
       await applySummary(execution, runId)
-      setStatus(toUiExecutionStatus(execution.status))
+      setExecutionStatus(toUiExecutionStatus(execution.status))
       if (execution.error !== undefined) setError(execution.error)
     } catch (nextError) {
       if (runIdRef.current !== runId) return
-      setStatus('running')
+      setExecutionStatus('running')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [applySummary, documentId, status, stop, taskId])
+  }, [applySummary, documentId, setExecutionStatus, status, stop, taskId])
 
   const loadExecution = useCallback(async (executionId: string) => {
     if (documentId === undefined) return
@@ -276,14 +284,14 @@ export function useCanvasExecution() {
       if (runIdRef.current !== runId) return
       await applySummary(execution, runId)
       if (runIdRef.current !== runId) return
-      setStatus(toUiExecutionStatus(execution.status))
+      setExecutionStatus(toUiExecutionStatus(execution.status))
       if (execution.error !== undefined) setError(execution.error)
     } catch (nextError) {
       if (runIdRef.current !== runId) return
-      setStatus('failed')
+      setExecutionStatus('failed')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [applySummary, documentId, stop])
+  }, [applySummary, documentId, setExecutionStatus, stop])
 
   useEffect(() => () => stop(), [stop])
 

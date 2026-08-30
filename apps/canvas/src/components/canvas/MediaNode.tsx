@@ -69,6 +69,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const { data: models } = useModelCatalog()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
+  const canvasExecutionBusy = useCanvasStore(state => state.canvasExecutionBusy)
   const updateNodeData = useCanvasStore(state => state.updateNodeData)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
 
@@ -321,15 +322,17 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
                 ))}
               </SelectContent>
             </Select>
-            <Button
-              size="sm"
-              className="h-7 shrink-0 px-3 text-xs"
+              <Button
+                size="sm"
+                className="h-7 shrink-0 px-3 text-xs"
               disabled={
                 prompt.trim().length === 0
                 || modelId.length === 0
                 || nodeData.status === 'generating'
+                || canvasExecutionBusy
                 || referenceError !== undefined
               }
+              title={canvasExecutionBusy ? '画布正在执行，请等待整图任务完成后再生成单节点' : undefined}
               onClick={handleGenerate}
             >
               <Send className="mr-1 size-3" aria-hidden />

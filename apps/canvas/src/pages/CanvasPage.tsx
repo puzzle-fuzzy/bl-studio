@@ -46,6 +46,9 @@ export function CanvasPage() {
   } = useCanvasExecution()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
+  const hasNodeGenerationInFlight = nodes.some(node => (
+    (node.data as Partial<MediaNodeData>).status === 'generating'
+  ))
   const selectedNodeId = nodes.find(node => node.selected)?.id
   const documentId = useCanvasStore(state => state.documentId)
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
@@ -266,12 +269,13 @@ export function CanvasPage() {
           variant="secondary"
           disabled={
             saveStatus !== 'saved' ||
+            hasNodeGenerationInFlight ||
             executionStatus === 'submitting' ||
             executionStatus === 'running' ||
             executionStatus === 'cancelling'
           }
           onClick={() => void execute()}
-          title={executionError}
+          title={hasNodeGenerationInFlight ? '请等待节点生成完成后再运行画布' : executionError}
         >
           {executionStatus === 'submitting' || executionStatus === 'running' ? (
             <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />

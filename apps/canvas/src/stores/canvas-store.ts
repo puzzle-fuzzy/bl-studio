@@ -20,6 +20,7 @@ import {
 const STORAGE_KEY = 'bailian-studio:canvas:v1'
 
 export type CanvasSaveStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'conflict' | 'error'
+export type CanvasExecutionBusy = boolean
 
 export interface CanvasState {
   nodes: Node[]
@@ -29,6 +30,8 @@ export interface CanvasState {
   title: string
   hydrated: boolean
   saveStatus: CanvasSaveStatus
+  /** Canvas 级 Worker 任务进行中时，阻止节点快捷生成与之并发写入结果。 */
+  canvasExecutionBusy: CanvasExecutionBusy
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
@@ -45,6 +48,7 @@ export interface CanvasState {
   }) => void
   setRevision: (revision: number) => void
   setSaveStatus: (status: CanvasSaveStatus) => void
+  setCanvasExecutionBusy: (busy: CanvasExecutionBusy) => void
 }
 
 function loadFromStorage(): { nodes: Node[]; edges: Edge[] } | null {
@@ -81,6 +85,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   title: '未命名画布',
   hydrated: false,
   saveStatus: 'idle',
+  canvasExecutionBusy: false,
 
   onNodesChange: (changes) => {
     set(state => ({ nodes: applyNodeChanges(changes, state.nodes) }))
@@ -130,16 +135,17 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   clear: () => {
-    set({ nodes: [], edges: [] })
+    set({ nodes: [], edges: [], canvasExecutionBusy: false })
     localStorage.removeItem(STORAGE_KEY)
   },
 
   setDocument: ({ id, revision, title, nodes, edges }) => {
-    set({ documentId: id, revision, title, nodes, edges, hydrated: true })
+    set({ documentId: id, revision, title, nodes, edges, hydrated: true, canvasExecutionBusy: false })
     saveToStorage(nodes, edges)
   },
 
   setRevision: (revision) => set({ revision }),
 
   setSaveStatus: (saveStatus) => set({ saveStatus }),
+  setCanvasExecutionBusy: (canvasExecutionBusy) => set({ canvasExecutionBusy }),
 }))
