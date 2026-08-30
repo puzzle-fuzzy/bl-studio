@@ -8,7 +8,6 @@ import {
 	assetDerivatives,
 	generationArtifacts,
 	generationRecords,
-	taskRecords,
 	type BailianStudioDb,
 	type BailianStudioDbTransaction,
 	userAssets,
@@ -515,29 +514,19 @@ export function createAssetRepository({ db, taskQueueTransactionStore }: CreateA
 
 			const derivativeIds = derivatives.map((derivative) => derivative.id);
 			if (derivativeIds.length > 0) {
-				await tx
-					.update(taskRecords)
-					.set({
-						status: "cancelled",
-						completedAt: new Date(now),
-						errorJson: {
-							category: "cancelled",
-							message:
-								"Thumbnail task cancelled because the source asset was deleted",
-							retriable: false,
-							code: "THUMBNAIL_SOURCE_DELETED",
-						},
-						updatedAt: new Date(now),
-						updatedBy: input.userId,
-					})
-					.where(
-						and(
-							eq(taskRecords.type, "media.thumbnail"),
-							eq(taskRecords.status, "queued"),
-							inArray(taskRecords.recordId, derivativeIds),
-							isNull(taskRecords.deletedAt),
-						),
-					);
+				await taskQueueTransactionStore.cancelQueuedTasks(tx, {
+					recordIds: derivativeIds,
+					type: "media.thumbnail",
+					error: {
+						category: "cancelled",
+						message:
+							"Thumbnail task cancelled because the source asset was deleted",
+						retriable: false,
+						code: "THUMBNAIL_SOURCE_DELETED",
+					},
+					now,
+					updatedBy: input.userId,
+				});
 			}
 			return true;
 		});

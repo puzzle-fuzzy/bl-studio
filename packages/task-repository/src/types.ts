@@ -1,5 +1,5 @@
 import type { BailianStudioDb, BailianStudioDbTransaction } from '@bailian-studio/db'
-import type { TaskRecord, TaskStatus, TaskType } from '@bailian-studio/task-engine'
+import type { TaskError, TaskRecord, TaskStatus, TaskType } from '@bailian-studio/task-engine'
 
 /** Worker 认领下一条可执行任务所需的租约信息。 */
 export interface ClaimNextQueuedTaskInput {
@@ -30,6 +30,15 @@ export interface FindTaskInput {
 }
 
 export type TaskQueueQuerySource = BailianStudioDb | BailianStudioDbTransaction
+
+/** 在业务事务内取消仍处于 queued 的一组任务。 */
+export interface CancelQueuedTasksInput {
+  recordIds: readonly string[]
+  type: TaskType
+  error?: TaskError
+  now: string
+  updatedBy: string
+}
 
 export type TaskRepositoryErrorCode = 'TASK_NOT_FOUND' | 'DATABASE_ERROR'
 
@@ -64,4 +73,8 @@ export interface TaskQueueTransactionStore {
     source: TaskQueueQuerySource,
     input: FindTaskInput,
   ): Promise<TaskRecord | undefined>
+  cancelQueuedTasks(
+    tx: BailianStudioDbTransaction,
+    input: CancelQueuedTasksInput,
+  ): Promise<number>
 }

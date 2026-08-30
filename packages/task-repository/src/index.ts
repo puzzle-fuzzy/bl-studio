@@ -5,6 +5,7 @@ export type { TaskQueueRepositoryHandle } from './factory'
 export { TaskRepositoryError, type TaskRepositoryErrorCode } from './types'
 export type {
   ClaimNextQueuedTaskInput,
+  CancelQueuedTasksInput,
   FindTaskInput,
   RenewTaskLockInput,
   SaveTaskOptions,

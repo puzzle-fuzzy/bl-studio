@@ -84,6 +84,50 @@ describe('task queue repository', () => {
     expect(found).toMatchObject({ id: task.id, recordId: 'media-1', type: 'media.process' })
   })
 
+  it('cancels only queued matching tasks through the transaction store', async () => {
+    await seedTask(makeTask({
+      id: 'thumbnail-queued',
+      type: 'media.thumbnail',
+      domain: 'media',
+      recordId: 'derivative-1',
+    }))
+    await seedTask(makeTask({
+      id: 'thumbnail-running',
+      type: 'media.thumbnail',
+      domain: 'media',
+      status: 'running',
+      recordId: 'derivative-1',
+      lockedBy: 'worker-1',
+      lockedUntil: new Date(Date.now() + 60_000).toISOString(),
+    }))
+
+    const now = new Date().toISOString()
+    const cancelled = await db.transaction(tx =>
+      createTaskQueueTransactionStore().cancelQueuedTasks(tx, {
+        recordIds: ['derivative-1'],
+        type: 'media.thumbnail',
+        error: {
+          category: 'cancelled',
+          message: 'source deleted',
+          retriable: false,
+          code: 'SOURCE_DELETED',
+        },
+        now,
+        updatedBy: 'user-1',
+      }),
+    )
+
+    expect(cancelled).toBe(1)
+    await expect(createTaskQueueRepository({ db }).getTask('thumbnail-queued')).resolves.toMatchObject({
+      status: 'cancelled',
+      completedAt: now,
+      errorJson: { code: 'SOURCE_DELETED' },
+    })
+    await expect(createTaskQueueRepository({ db }).getTask('thumbnail-running')).resolves.toMatchObject({
+      status: 'running',
+    })
+  })
+
   it('claims distinct tasks under concurrency', async () => {
     const repository = createTaskQueueRepository({ db })
     await seedTask(makeTask({ id: 'task-a', priority: 1 }))

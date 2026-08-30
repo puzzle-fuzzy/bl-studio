@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm'
 import {
   taskInsertValues,
   taskRecords,
@@ -10,6 +10,7 @@ import { toTaskRecord } from './mappers'
 import {
   TaskRepositoryError,
   type ClaimNextQueuedTaskInput,
+  type CancelQueuedTasksInput,
   type FindTaskInput,
   type RenewTaskLockInput,
   type SaveTaskOptions,
@@ -65,6 +66,49 @@ async function findTask(
   return row === undefined ? undefined : toTaskRecord(row)
 }
 
+/** 在调用方事务内按状态机规则取消 queued 任务，避免业务仓储直接更新 task_records。 */
+async function cancelQueuedTasks(
+  tx: BailianStudioDbTransaction,
+  input: CancelQueuedTasksInput,
+): Promise<number> {
+  if (input.recordIds.length === 0) return 0
+
+  const rows = await tx
+    .select()
+    .from(taskRecords)
+    .where(
+      and(
+        eq(taskRecords.type, input.type),
+        eq(taskRecords.status, 'queued'),
+        inArray(taskRecords.recordId, [...input.recordIds]),
+        isNull(taskRecords.deletedAt),
+      ),
+    )
+
+  for (const row of rows) {
+    const cancelled = transitionTask(toTaskRecord(row), {
+      type: 'cancel',
+      ...(input.error === undefined ? {} : { error: input.error }),
+      now: input.now,
+    })
+    await tx
+      .update(taskRecords)
+      .set({
+        status: cancelled.status,
+        lockedBy: null,
+        lockedUntil: null,
+        completedAt: new Date(cancelled.completedAt ?? input.now),
+        errorJson:
+          cancelled.errorJson === undefined ? null : { ...cancelled.errorJson },
+        updatedAt: new Date(cancelled.updatedAt),
+        updatedBy: input.updatedBy,
+      })
+      .where(eq(taskRecords.id, row.id))
+  }
+
+  return rows.length
+}
+
 /**
  * 创建业务 repository 使用的事务内任务写入端口。
  *
@@ -72,7 +116,7 @@ async function findTask(
  * 注入 generation、media、director，而不是让各 repository 隐式持有函数依赖。
  */
 export function createTaskQueueTransactionStore(): TaskQueueTransactionStore {
-  return { enqueueTask, findTask }
+  return { cancelQueuedTasks, enqueueTask, findTask }
 }
 
 /**

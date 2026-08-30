@@ -40,7 +40,7 @@
 
 Worker 的 `TaskQueueRepository` 注入已从可选兼容路径变为强制依赖；generation、media、director
 由组合根注入同一个 `TaskQueueTransactionStore`，业务记录和初始任务继续放在各自同一个事务中。
-事务 store 统一任务写入和业务事务内窄查询约定，但不升级为 request-scoped transaction context。
+事务 store 统一任务写入、业务事务内窄查询和 queued 任务取消约定，但不升级为 request-scoped transaction context。
 
 生成详情诊断读取已进一步从 `GenerationRepository` 核心接口移入独立的
 `GenerationDiagnosticsRepository`。它是只读投影边界，允许联合读取 generation、task 和

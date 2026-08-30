@@ -89,7 +89,7 @@
 - 成本估算/结算只 import model-core 的纯函数（`estimateModelCost` / `calculateUsageCostCents`）；禁止 provider-dashscope、DashScope HTTP、解析 provider 端点、维护第二份契约/价格表。
 
 ### packages/task-repository（任务生命周期持久化）
-- **拥有**：`task_records` 的 claim、租约续期、状态保存、按 id 读取，以及业务事务内按关联记录/类型/状态筛选任务；负责 Drizzle 行与 task-engine 领域记录之间的日期/JSON 映射。
+- **拥有**：`task_records` 的 claim、租约续期、状态保存、按 id 读取、业务事务内按关联记录/类型/状态筛选任务，以及 queued 任务取消；负责 Drizzle 行与 task-engine 领域记录之间的日期/JSON 映射。
 - **不拥有**：状态机规则、业务记录 + 初始任务的复合生产事务、Provider 执行或 API 编排；状态转换由 `task-engine` 负责，生产事务暂由各业务 repository 保持原子性。
 - Worker 只依赖这里的最小生命周期 port；generation-repository 不承担任务生命周期 port。
 
