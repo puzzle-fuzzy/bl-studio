@@ -9,7 +9,12 @@ import {
   type Node,
   type NodeChange,
 } from '@xyflow/react'
-import { normalizeStoredCanvasEdge, normalizeStoredCanvasNode } from '@/lib/media-node-data'
+import {
+  browserDraftStorage,
+  clearCanvasDraft,
+  loadCanvasBootstrapDraft,
+  writeCanvasDraft,
+} from '@/lib/canvas-draft-storage'
 
 /**
  * 画布状态（Krea 式）：节点 + 边 + 服务端持久化，localStorage 仅作离线草稿兜底。
@@ -17,8 +22,6 @@ import { normalizeStoredCanvasEdge, normalizeStoredCanvasNode } from '@/lib/medi
  * 服务端 canvas 文档 API 负责 revision 并发和版本历史；localStorage 只保留
  * 当前编辑快照，避免网络异常时立即丢失画布操作。
  */
-
-const STORAGE_KEY = 'bailian-studio:canvas:v1'
 
 export type CanvasSaveStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'conflict' | 'error'
 export type CanvasExecutionBusy = boolean
@@ -53,49 +56,33 @@ export interface CanvasState {
   setCanvasExecutionBusy: (busy: CanvasExecutionBusy) => void
 }
 
-function loadFromStorage(): { nodes: Node[]; edges: Edge[] } | null {
+function persist(get: () => CanvasState): void {
+  const storage = browserDraftStorage()
+  if (storage === undefined) return
+  const state = get()
   try {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw === null) return null
-    const parsed: unknown = JSON.parse(raw)
-    if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return null
-    const record = Object.fromEntries(Object.entries(parsed))
-    if (!Array.isArray(record.nodes) || !Array.isArray(record.edges)) return null
-    return {
-      nodes: record.nodes.flatMap(node => {
-        const normalized = normalizeStoredCanvasNode(node)
-        return normalized === undefined ? [] : [normalized]
-      }),
-      edges: record.edges.flatMap(edge => {
-        const normalized = normalizeStoredCanvasEdge(edge)
-        return normalized === undefined ? [] : [normalized]
-      }),
-    }
-  }
-  catch {
-    return null
-  }
-}
-
-function saveToStorage(nodes: Node[], edges: Edge[]): void {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify({ nodes, edges }))
+    writeCanvasDraft(storage, {
+      ...(state.documentId === undefined ? {} : { documentId: state.documentId }),
+      ...(state.revision === undefined ? {} : { revision: state.revision }),
+      title: state.title,
+      nodes: state.nodes,
+      edges: state.edges,
+    })
   }
   catch {
     // QuotaExceeded 等：静默，画布仍可交互
   }
 }
 
-function persist(get: () => CanvasState): void {
-  saveToStorage(get().nodes, get().edges)
-}
-
-const initial = loadFromStorage()
+const draftStorage = browserDraftStorage()
+const initial = draftStorage === undefined ? null : loadCanvasBootstrapDraft(draftStorage)
 
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: initial?.nodes ?? [],
   edges: initial?.edges ?? [],
-  title: '未命名画布',
+  ...(initial?.documentId === undefined ? {} : { documentId: initial.documentId }),
+  ...(initial?.revision === undefined ? {} : { revision: initial.revision }),
+  title: initial?.title ?? '未命名画布',
   hydrated: false,
   saveStatus: 'idle',
   canvasExecutionBusy: false,
@@ -157,13 +144,22 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   },
 
   clear: () => {
+    const documentId = get().documentId
     set({ nodes: [], edges: [], canvasExecutionBusy: false })
-    localStorage.removeItem(STORAGE_KEY)
+    const storage = browserDraftStorage()
+    if (storage !== undefined) clearCanvasDraft(storage, documentId)
   },
 
   setDocument: ({ id, revision, title, nodes, edges }) => {
     set({ documentId: id, revision, title, nodes, edges, hydrated: true, canvasExecutionBusy: false })
-    saveToStorage(nodes, edges)
+    const storage = browserDraftStorage()
+    if (storage === undefined) return
+    try {
+      writeCanvasDraft(storage, { documentId: id, revision, title, nodes, edges })
+    }
+    catch {
+      // QuotaExceeded 等：服务端文档仍是权威状态
+    }
   },
 
   setRevision: (revision) => set({ revision }),
