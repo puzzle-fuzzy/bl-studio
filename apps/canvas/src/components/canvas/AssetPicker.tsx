@@ -44,6 +44,7 @@ export function AssetPicker({
   const [error, setError] = useState<string | undefined>()
   const [nextCursors, setNextCursors] = useState<Partial<Record<MediaKind, string>>>({})
   const requestKeyRef = useRef(0)
+  const loadingMoreRef = useRef(false)
   const mediaKinds = useMemo(
     () => [...new Set(allowedKinds.length > 0 ? allowedKinds : [kind])],
     [allowedKinds, kind],
@@ -60,6 +61,7 @@ export function AssetPicker({
     let disposed = false
     const requestKey = requestKeyRef.current + 1
     requestKeyRef.current = requestKey
+    loadingMoreRef.current = false
     setLoading(true)
     setLoadingMore(false)
     setError(undefined)
@@ -95,8 +97,9 @@ export function AssetPicker({
   const hasMore = Object.keys(nextCursors).length > 0
 
   const loadMore = async () => {
-    if (loadingMore || !hasMore) return
+    if (loadingMoreRef.current || !hasMore) return
     const requestKey = requestKeyRef.current
+    loadingMoreRef.current = true
     setLoadingMore(true)
     setError(undefined)
     try {
@@ -128,7 +131,10 @@ export function AssetPicker({
       if (requestKeyRef.current === requestKey) setError('更多素材加载失败，请重试')
     }
     finally {
-      if (requestKeyRef.current === requestKey) setLoadingMore(false)
+      if (requestKeyRef.current === requestKey) {
+        loadingMoreRef.current = false
+        setLoadingMore(false)
+      }
     }
   }
 
