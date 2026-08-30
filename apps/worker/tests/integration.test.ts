@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createIsolatedGenerationRepository, createTestUser, grantTestCredits, type IsolatedGenerationRepository } from '@bailian-studio/generation-repository'
 import { CanvasExecutionTaskInputSchema } from '@bailian-studio/canvas-contracts'
-import { getModelById } from '@bailian-studio/dashscope-manifests'
+import { getModelById, modelCatalog } from '@bailian-studio/dashscope-manifests'
 import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteInput, ProviderExecuteOutput, ProviderRunner } from '../src/providers'
@@ -74,6 +74,7 @@ function buildLoop(
     providerRequestAuditRepository: iso.providerRequestAuditRepository,
     providerRegistry: registry,
     modelRegistry: { getModelById },
+    modelCatalog,
     storage: new FakeStorageAdapter(),
     mediaProcessor: new FakeMediaProcessor(),
     pollIntervalMs: 5,

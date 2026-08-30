@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { GenerationInputAsset, GenerationRecord } from '@bailian-studio/generation-repository'
-import { getModelById } from '@bailian-studio/dashscope-manifests'
+import { getModelById, modelCatalog } from '@bailian-studio/dashscope-manifests'
 import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
 import { MetricsCollector } from '@bailian-studio/shared'
 import type { TaskError } from '@bailian-studio/task-engine'
@@ -54,6 +54,7 @@ function setup(opts: {
     providerRequestAuditRepository: repo,
     providerRegistry: registry,
     modelRegistry: { getModelById: () => opts.manifestMissing === true ? undefined : opts.manifest ?? qwenImage },
+    modelCatalog,
     storage,
     logger,
     metrics,
@@ -815,6 +816,7 @@ describe('TaskExecutor.processTask', () => {
       mediaProcessor: processor,
       providerRegistry: registry,
       modelRegistry: { getModelById: () => qwenImage },
+      modelCatalog,
       storage,
       logger: createRecordingLogger(),
     })
@@ -852,6 +854,7 @@ describe('TaskExecutor.processTask', () => {
       mediaProcessor: processor,
       providerRegistry: new ProviderRegistry(),
       modelRegistry: { getModelById: () => qwenImage },
+      modelCatalog,
       storage: new FakeStorageAdapter(),
       logger: createRecordingLogger(),
     })

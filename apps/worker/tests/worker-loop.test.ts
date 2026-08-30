@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { GenerationRecoveryRepository } from '@bailian-studio/generation-repository'
+import { modelCatalog } from '@bailian-studio/dashscope-manifests'
 import { MetricsCollector } from '@bailian-studio/shared'
 import { ProviderRegistry } from '../src/providers'
 import type { ProviderExecuteOutput } from '../src/providers'
@@ -45,6 +46,7 @@ function buildLoop(overrides: Partial<ConstructorParameters<typeof WorkerLoop>[0
     providerRequestAuditRepository: repo,
     providerRegistry: registry,
     modelRegistry: { getModelById: () => qwenImage },
+    modelCatalog,
     storage: new FakeStorageAdapter(),
     taskRepository: {
       claimNextQueuedTask: input => repo.claimNextQueuedTask(),
@@ -417,6 +419,7 @@ describe('WorkerLoop', () => {
         providerRequestAuditRepository: repo,
         providerRegistry: registry,
         modelRegistry: { getModelById: () => qwenImage },
+        modelCatalog,
         storage: new FakeStorageAdapter(),
         taskRepository: {
           claimNextQueuedTask: claim,

@@ -5,7 +5,7 @@ These instructions apply to Worker source. Read `../../../docs/bailian/PACKAGE_B
 - `bailian-runtime.ts` may read the immutable adapter snapshot for the startup gate; it must not rebuild coverage logic.
 - `config.ts` may use the adapter's stable workspace/locale validation helpers; it must not inspect SDK catalog internals.
 - Provider HTTP execution belongs under `providers/` through `@bailian-studio/provider-dashscope`.
-- Task handlers consume normalized `ProviderRunner` results and own orchestration only. They must not understand SDK payload/response schemas or call DashScope.
+- Task handlers consume normalized `ProviderRunner` results and composition-root injected `modelRegistry`/`modelCatalog` ports, and own orchestration only. They must not understand SDK payload/response schemas or call DashScope.
 - `provider-error-mapping.ts` may convert stable provider errors into task errors; it must not maintain an independent provider error-code catalog.
 - Never import the external SDK, use package subpaths, deep-import package sources, or bypass the provider with literal DashScope HTTP calls.
 - Keep generation, media, and artifact handlers single-purpose and preserve structured bilingual diagnostics across boundaries.

@@ -23,6 +23,7 @@ import type { ProviderRegistry } from './providers'
 import {
   createTaskExecutor,
   type ModelRegistryLookup,
+  type ModelCatalogLookup,
   type TaskExecutor,
   type TaskProcessOutcome,
 } from './task-executor'
@@ -45,6 +46,7 @@ export interface WorkerLoopConfig {
   directorRepository?: DirectorRepository
   providerRegistry: ProviderRegistry
   modelRegistry: ModelRegistryLookup
+  modelCatalog: ModelCatalogLookup
   storage: StorageAdapter
   mediaRepository?: MediaRepository
   /** 由组合根创建的媒体处理器。 */
@@ -127,6 +129,7 @@ export class WorkerLoop {
       ...(config.directorRepository === undefined ? {} : { directorRepository: config.directorRepository }),
       providerRegistry: config.providerRegistry,
       modelRegistry: config.modelRegistry,
+      modelCatalog: config.modelCatalog,
       storage: config.storage,
       ...(config.mediaRepository !== undefined ? { mediaRepository: config.mediaRepository } : {}),
       ...(config.mediaProcessor !== undefined ? { mediaProcessor: config.mediaProcessor } : {}),

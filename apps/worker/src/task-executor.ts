@@ -25,9 +25,9 @@ import type { MediaProcessor } from './media-processor'
 import type { ProviderRegistry } from './providers'
 import { processThumbnailTask } from './thumbnail-task-handler'
 import { processCanvasExecutionTask } from './canvas-task-handler'
-import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
+import type { ModelCatalogLookup, ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
-export type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
+export type { ModelCatalogLookup, ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 export interface TaskExecutorDeps {
   readonly repository: GenerationRepository
@@ -37,6 +37,7 @@ export interface TaskExecutorDeps {
   readonly directorRepository?: DirectorRepository
   readonly providerRegistry: ProviderRegistry
   readonly modelRegistry: ModelRegistryLookup
+  readonly modelCatalog: ModelCatalogLookup
   readonly storage: StorageAdapter
   readonly mediaRepository?: MediaRepository
   readonly mediaProcessor?: MediaProcessor
@@ -99,6 +100,7 @@ export class TaskExecutor {
         ...(this.deps.mediaRepository === undefined ? {} : { mediaRepository: this.deps.mediaRepository }),
         ...(this.deps.generationQuota === undefined ? {} : { generationQuota: this.deps.generationQuota }),
         modelRegistry: this.deps.modelRegistry,
+        modelCatalog: this.deps.modelCatalog,
         logger: this.logger,
       })
     }

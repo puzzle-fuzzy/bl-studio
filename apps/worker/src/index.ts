@@ -5,7 +5,7 @@
  * 并一直运行直到收到停止信号。
  */
 
-import { getModelById } from '@bailian-studio/dashscope-manifests'
+import { getModelById, modelCatalog } from '@bailian-studio/dashscope-manifests'
 import { createWorkerPersistenceRuntime } from '@bailian-studio/persistence-runtime'
 import { createStorageFromEnv } from '@bailian-studio/storage'
 import { readGenerationLimits } from '@bailian-studio/shared'
@@ -112,6 +112,7 @@ async function main(): Promise<void> {
     mediaRepository: persistence.mediaRepository,
     providerRegistry,
     modelRegistry: { getModelById },
+    modelCatalog,
     storage,
     mediaProcessor: createFfmpegMediaProcessor({
       ...(env.ffmpegPath === undefined ? {} : { ffmpegPath: env.ffmpegPath }),

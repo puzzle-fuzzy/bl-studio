@@ -2,7 +2,6 @@ import type { DirectorPhaseRunForWorker, DirectorRepository } from '@bailian-stu
 import type { GenerationQuotaLimits, GenerationRepository } from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import { validateModelParams } from '@bailian-studio/model-core'
-import { getBailianOperationCapability } from '@bailian-studio/dashscope-manifests'
 import { DirectorAnalysisResultSchema, DirectorAssemblyPlanSchema, DirectorCharactersResultSchema, DirectorLocationsResultSchema } from '@bailian-studio/director-contracts'
 import type { Logger } from '@bailian-studio/shared'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
@@ -17,7 +16,7 @@ import { buildDirectorVideoGenerationInput, DirectorVideoInputError, parseDirect
 import { analysisPrompt, charactersPrompt, entityExtractionPrompt, locationsPrompt, runInputSnapshot, scriptChatPrompt, storyboardPrompt, type RunInputSnapshot } from './director-llm-prompts'
 import { parseEntityExtractionOutput } from './director-entities'
 import { completePhase, failed, failPhase, isRecord, readTextOutput, retryUntilGenerationCompletes, runTextPhase, stringInput } from './director-text-phase'
-import type { ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
+import type { ModelCatalogLookup, ModelRegistryLookup, TaskProcessOutcome } from './task-contracts'
 
 const MAX_ANALYSIS_STORY_LENGTH = 30_000
 
@@ -26,6 +25,7 @@ export interface DirectorPhaseTaskHandlerDeps {
   readonly directorRepository?: DirectorRepository
   readonly mediaRepository?: MediaRepository
   readonly modelRegistry: ModelRegistryLookup
+  readonly modelCatalog: ModelCatalogLookup
   readonly logger: Logger
   /**
    * 阶段任务创建 generation 时的原子准入限额。与 API 路径共用同一解析器，
@@ -665,7 +665,7 @@ async function processMusicPhase(
   snapshot: RunInputSnapshot,
 ): Promise<TaskProcessOutcome> {
   const manifest = deps.modelRegistry.getModelById(modelId)
-  if (manifest === undefined || manifest.availability.enabled === false || getBailianOperationCapability(manifest.id) !== 'music.generate') {
+  if (manifest === undefined || manifest.availability.enabled === false || deps.modelCatalog.getById(manifest.id)?.operation !== 'music.generate') {
     return failPhase(run.id, {
       category: 'validation',
       message: `Music model is unavailable: ${modelId}`,

@@ -147,7 +147,7 @@ Worker 与前端各自维护不同的 wire schema。
 ### apps/worker
 - 禁止 `@bailian-studio/api`、`@bailian-studio/db`、import api sibling / apps、字面 DashScope HTTP 调用。
 - 持久化通过 `@bailian-studio/persistence-runtime` 取得进程级共享句柄；只有 `LISTEN/NOTIFY` 监听器保留独立长连接。
-- DashScope 执行一律经 `@bailian-studio/provider-dashscope`；任务 handler 只消费归一化 `ProviderRunner` 结果，不直接理解 provider 请求/响应 schema。
+- DashScope 执行一律经 `@bailian-studio/provider-dashscope`；任务 handler 只消费归一化 `ProviderRunner` 结果，并通过组合根注入的 `modelRegistry`/`modelCatalog` 读取模型，不直接理解 provider 请求/响应 schema 或 operation map。
 
 ### apps/studio / apps/writer / apps/canvas / apps/admin
 - 可 import `@bailian-studio/model-core`（表单提交前实时校验）与 `@bailian-studio/api-client`（线缆契约）；禁止 deep-import 执行层源码。
