@@ -835,6 +835,7 @@ describe('createApiClient', () => {
       recordId: 'rec_1',
       userId: 'user_1',
       kind: 'image',
+      assetId: 'asset_generation_artifact_1',
       sourceUrl: 'https://cdn.test/a.png',
       mimeType: 'image/png',
       storageProvider: 'local',
@@ -851,6 +852,7 @@ describe('createApiClient', () => {
     const result = await client.listGenerationArtifacts('rec_1')
 
     expect(result.items[0]?.readUrl).toBe('/signed/generations/rec_1/artifact_1.png?ttl=3600')
+    expect(result.items[0]?.assetId).toBe('asset_generation_artifact_1')
     expect(result.items[0]?.status).toBe('stored')
     expect(calls[0]?.url).toBe('http://api.test/api/generations/rec_1/artifacts')
   })

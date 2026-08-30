@@ -204,8 +204,9 @@ function safeParseJsonRecord(value: unknown): Record<string, unknown> | null {
 function toGenerationArtifactWithThumbnail(
 	artifact: typeof generationArtifacts.$inferSelect,
 	thumbnail?: typeof assetDerivatives.$inferSelect | null,
+	assetId?: string,
 ): GenerationArtifact {
-	const item = toGenerationArtifact(artifact);
+	const item = toGenerationArtifact(artifact, assetId);
 	if (thumbnail === undefined || thumbnail === null) return item;
 	return {
 		...item,
@@ -2657,12 +2658,13 @@ export function createGenerationRepository(
 			}
 
 			const rows = await db
-				.select({ artifact: generationArtifacts, thumbnail: assetDerivatives })
+				.select({ artifact: generationArtifacts, asset: userAssets, thumbnail: assetDerivatives })
 				.from(generationArtifacts)
 				.leftJoin(
 					userAssets,
 					and(
 						eq(userAssets.generationArtifactId, generationArtifacts.id),
+						eq(userAssets.userId, generationArtifacts.userId),
 						isNull(userAssets.deletedAt),
 					),
 				)
@@ -2684,7 +2686,7 @@ export function createGenerationRepository(
 			const hasMore = rows.length > limit;
 			const page = hasMore ? rows.slice(0, limit) : rows;
 			const items = page.map((row) =>
-				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail),
+				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail, row.asset?.id),
 			);
 
 			const last = page[page.length - 1];
@@ -2981,12 +2983,13 @@ export function createGenerationRepository(
 		/** 列出某条 generation 的所有产物，按创建时间升序。 */
 		async listArtifactsForRecord(recordId) {
 			const rows = await db
-				.select({ artifact: generationArtifacts, thumbnail: assetDerivatives })
+				.select({ artifact: generationArtifacts, asset: userAssets, thumbnail: assetDerivatives })
 				.from(generationArtifacts)
 				.leftJoin(
 					userAssets,
 					and(
 						eq(userAssets.generationArtifactId, generationArtifacts.id),
+						eq(userAssets.userId, generationArtifacts.userId),
 						isNull(userAssets.deletedAt),
 					),
 				)
@@ -3005,7 +3008,7 @@ export function createGenerationRepository(
 				);
 
 			return rows.map((row) =>
-				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail),
+				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail, row.asset?.id),
 			);
 		},
 
@@ -3015,12 +3018,13 @@ export function createGenerationRepository(
 			if (uniqueRecordIds.length === 0) return [];
 
 			const rows = await db
-				.select({ artifact: generationArtifacts, thumbnail: assetDerivatives })
+				.select({ artifact: generationArtifacts, asset: userAssets, thumbnail: assetDerivatives })
 				.from(generationArtifacts)
 				.leftJoin(
 					userAssets,
 					and(
 						eq(userAssets.generationArtifactId, generationArtifacts.id),
+						eq(userAssets.userId, generationArtifacts.userId),
 						isNull(userAssets.deletedAt),
 					),
 				)
@@ -3040,7 +3044,7 @@ export function createGenerationRepository(
 				);
 
 			return rows.map((row) =>
-				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail),
+				toGenerationArtifactWithThumbnail(row.artifact, row.thumbnail, row.asset?.id),
 			);
 		},
 
@@ -3057,7 +3061,7 @@ export function createGenerationRepository(
 				)
 				.orderBy(asc(generationArtifacts.createdAt));
 
-			return rows.map(toGenerationArtifact);
+			return rows.map((row) => toGenerationArtifact(row));
 		},
 
 		/** 标记产物已落存储：写入 storage* 字段、清掉 errorJson、状态翻 stored。 */

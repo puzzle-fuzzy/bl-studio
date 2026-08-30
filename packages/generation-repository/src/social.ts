@@ -315,7 +315,7 @@ export function createSocialRepository(db: BailianStudioDb): SocialRepository {
 				),
 			)
 			.orderBy(asc(generationArtifacts.createdAt), asc(generationArtifacts.id));
-		const artifacts = artifactRows.map(toGenerationArtifact);
+		const artifacts = artifactRows.map((artifact) => toGenerationArtifact(artifact));
 		const [likeCount, liked, favorited] = await Promise.all([
 			countLikesByRecords(db, [input.recordId]).then(
 				(map) => map.get(input.recordId) ?? 0,

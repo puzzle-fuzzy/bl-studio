@@ -13,8 +13,14 @@ interface GenerateOptions {
   assetRefs?: Record<string, string | string[]>
 }
 
-async function resolveGeneratedAssetId(artifactId: string, kind: 'image' | 'video'): Promise<string | undefined> {
-  const projectionId = `asset_generation_${artifactId}`
+async function resolveGeneratedAssetId(
+  artifact: { id: string; assetId?: string },
+  kind: 'image' | 'video',
+): Promise<string | undefined> {
+  if (artifact.assetId !== undefined) return artifact.assetId
+
+  // 兼容尚未返回 assetId 的旧 API；新 API 的正常路径不再猜测投影 ID。
+  const projectionId = `asset_generation_${artifact.id}`
   try {
     const asset = await apiClient.getAsset(projectionId)
     if (asset.kind === kind) return asset.id
@@ -106,9 +112,10 @@ export function useCanvasGeneration(
           return
         }
 
-        // 生成产物会由后端投影到 user_assets；优先按确定性 ID 单条读取，避免资产量
-        // 超过列表窗口时丢失下游绑定。读取失败仍展示预览，但暂时不能作为参考输入。
-        const assetId = await resolveGeneratedAssetId(media.id, media.kind)
+        // 生成产物读模型会返回已投影 user_assets 的权威 assetId，避免资产量超过列表
+        // 窗口时丢失下游绑定。旧 API 没有该字段时才走兼容回退；读取失败仍展示预览，
+        // 但暂时不能作为参考输入。
+        const assetId = await resolveGeneratedAssetId(media, media.kind)
 
         onStatusChange('ready', {
           url: media.readUrl,

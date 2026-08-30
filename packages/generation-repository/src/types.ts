@@ -234,6 +234,8 @@ export interface GenerationArtifact {
   recordId: string
   userId: string
   kind: ArtifactKind
+  /** 已落库 user_assets 的权威 ID；仅 owner/Worker 读模型在关联存在时返回。 */
+  assetId?: string
   sourceUrl?: string
   text?: string
   mimeType?: string

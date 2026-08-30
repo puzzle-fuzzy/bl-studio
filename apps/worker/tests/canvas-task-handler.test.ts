@@ -252,6 +252,7 @@ describe('processCanvasExecutionTask', () => {
       id: 'artifact_1',
       recordId: generated.id,
       kind: 'image',
+      assetId: 'asset_generation_artifact_1',
       status: 'stored',
     })
     let assetReady = false
@@ -306,6 +307,41 @@ describe('processCanvasExecutionTask', () => {
         },
       },
     })
+  })
+
+  it('waits for an authoritative artifact asset association instead of reconstructing its ID', async () => {
+    const generated = makeRecord({ id: 'generation_without_asset_id', status: 'succeeded' })
+    const artifact = makeArtifact({
+      id: 'artifact_without_asset_id',
+      recordId: generated.id,
+      kind: 'image',
+      status: 'stored',
+    })
+    let assetLookups = 0
+    const result = await processCanvasExecutionTask(task(canvasInput({
+      nodeRuns: {
+        node_1: { status: 'generating', generationId: generated.id, cacheHit: false, startedAt: NOW },
+      },
+    })), {
+      repository: {
+        createGeneration: async () => createdGeneration(generated),
+        getGenerationRecord: async () => generated,
+        listArtifactsForRecord: async () => [artifact],
+      },
+      assetRepository: {
+        getUserAsset: async () => {
+          assetLookups += 1
+          return undefined
+        },
+      },
+      logger: createRecordingLogger(),
+    })
+
+    expect(result).toMatchObject({
+      status: 'retry',
+      error: { code: 'CANVAS_ASSET_WAITING' },
+    })
+    expect(assetLookups).toBe(0)
   })
 
   it('persists a failed node cursor when its generation fails', async () => {

@@ -1771,6 +1771,9 @@ describe('generation repository', () => {
     })
     expect(asset?.originalUrl).toBeNull()
     expect(asset?.storageUrl).toBeNull()
+
+    const [listedArtifact] = await repository.listArtifactsForRecord(created.record.id)
+    expect(listedArtifact?.assetId).toBe(asset?.id)
   })
 
   it('keeps the generation asset projection idempotent when artifact persistence retries', async () => {

@@ -498,6 +498,8 @@ export const GenerationArtifactSchema = z.object({
   recordId: z.string(),
   userId: z.string(),
   kind: z.enum(['image', 'video', 'audio', 'text', 'archive']),
+  /** owner 视角下已投影 user asset 的权威 ID；旧 API 响应可能没有。 */
+  assetId: z.string().optional(),
   sourceUrl: z.string().optional(),
   text: z.string().optional(),
   mimeType: z.string().optional(),

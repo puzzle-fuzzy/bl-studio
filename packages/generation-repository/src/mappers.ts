@@ -109,12 +109,13 @@ export function toGenerationShare(row: GenerationShareRow): GenerationShare {
 }
 
 /** DB 行 → 领域 GenerationArtifact；Date 字段统一 toISOString()。 */
-export function toGenerationArtifact(row: GenerationArtifactRow): GenerationArtifact {
+export function toGenerationArtifact(row: GenerationArtifactRow, assetId?: string): GenerationArtifact {
   return {
     id: row.id,
     recordId: row.recordId,
     userId: row.userId,
     kind: row.kind as GenerationArtifact['kind'],
+    ...(assetId !== undefined ? { assetId } : {}),
     sourceUrl: row.sourceUrl ?? undefined,
     text: row.text ?? undefined,
     mimeType: row.mimeType ?? undefined,

@@ -348,7 +348,15 @@ async function inspectGeneratingNode(
     )
   }
 
-  const assetIds = artifacts.map(artifact => `asset_generation_${artifact.id}`)
+  const assetIds = artifacts.flatMap(artifact => artifact.assetId === undefined ? [] : [artifact.assetId])
+  if (assetIds.length !== artifacts.length) {
+    return {
+      kind: 'waiting',
+      nodeId: planNode.nodeId,
+      code: 'CANVAS_ASSET_WAITING',
+      details: { nodeId: planNode.nodeId, generationId: generation.id },
+    }
+  }
   try {
     const assets = await Promise.all(
       assetIds.map(assetId =>
