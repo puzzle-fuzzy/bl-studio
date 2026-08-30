@@ -9,6 +9,8 @@ const MAX_POLL_MS = 5 * 60_000
 interface GenerateOptions {
   modelId: string
   prompt: string
+  /** 已按当前模型 manifest 映射的参数；不在 hook 内猜测 provider 字段名。 */
+  params?: Record<string, unknown>
   /** 按模型 manifest 参数名绑定的真实资产 ID。 */
   assetRefs?: Record<string, string | string[]>
 }
@@ -187,7 +189,7 @@ export function useCanvasGeneration(
       const idempotencyKey = `canvas:${nodeId}:${Date.now()}`
       const response = await apiClient.createGeneration({
         modelId: options.modelId,
-        params: { prompt: options.prompt },
+        params: { prompt: options.prompt, ...(options.params ?? {}) },
         ...(options.assetRefs !== undefined && Object.keys(options.assetRefs).length > 0
           ? { assetRefs: options.assetRefs }
           : {}),

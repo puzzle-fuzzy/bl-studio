@@ -151,16 +151,19 @@ flowchart LR
   直到 worker 收口为终态，避免 UI 将“已发出取消请求”误报为“已停止执行”。
   两条入口共享资产 ID 协议，但 UI 互斥：整图执行期间不能提交单节点，单节点生成期间不能启动整图执行，
   从而避免两条生命周期竞争写回同一节点结果。
+- Canvas 节点的 `aspectRatio` 只保存画布语义值；前端与纯编译器通过 `canvas-contracts` 的同一映射函数，
+  按当前模型 manifest 的 `aspectRatio`、`ratio` 或 `size` 选项生成真实参数。模型未声明可映射的比例时，
+  不提交未知 provider 参数，界面不显示不可用选项。
 - API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、
   缺失/越权素材和不支持的媒体输入；任务提交以 `(user, canvas, idempotencyKey)` 的确定性任务 ID
   提供幂等边界。
 - Worker 按拓扑顺序推进节点；同一依赖层的就绪节点会并行创建 generation，默认并发上限为 4，
   可由 Worker 组合根调整。每个 Canvas 媒体节点都通过现有 `GenerationRepository` 创建普通
   generation，因此继续复用额度预留、provider 审计、artifact 持久化和资产投影；上游节点只向下游
-  传递稳定的 `asset_generation_*` ID。
+  传递稳定的 `user_assets` ID。
 - Canvas worker 会等待 artifact persist 完成并确认 user asset 投影 ready 后才推进下游；不会把
   provider 临时 URL 写入任务或画布快照。每个节点仍以可恢复的 `nodeRuns` 状态推进，并默认每个
-  上游节点向下游提供第一个输出资产。
+  上游节点向下游提供第一个稳定 `user_assets` 资产。
 - 用户可以取消仍处于 queued/running 的整张 Canvas 任务；任务状态会原子地变为 cancelled、释放租约，
   并尽力向已创建的子 generation 发出取消请求。Provider 是否已经停止执行由现有 generation/provider
   生命周期决定，因此取消接口不承诺已发出的外部请求能够瞬时中断。

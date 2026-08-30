@@ -1,4 +1,10 @@
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
+import {
+  CANVAS_ASPECT_RATIOS,
+  resolveCanvasAspectRatioParameter,
+  supportedCanvasAspectRatios,
+  type CanvasAspectRatio,
+} from '@bailian-studio/canvas-contracts'
 import { cn } from '@bailian-studio/lib-client'
 import { Button, Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
 import { Handle, type NodeProps, Position } from '@xyflow/react'
@@ -43,7 +49,7 @@ export interface MediaNodeData extends Record<string, unknown> {
   referenceAssetIds?: string[]
   /** 静态资产 ID 对应的媒体类型；用于模型切换和版本恢复时保持参数分配稳定。 */
   referenceAssetKinds?: Record<string, MediaKind>
-  aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4'
+  aspectRatio: CanvasAspectRatio
 }
 
 interface ConnectedReference {
@@ -61,8 +67,6 @@ const ASPECT_CLASS: Record<string, string> = {
   '4:3': 'aspect-[4/3]',
   '3:4': 'aspect-[3/4]',
 }
-
-const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4'] as const
 
 export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const nodeData = data as MediaNodeData
@@ -113,6 +117,14 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     [modelId, models],
   )
   const mediaParameters = useMemo(() => canvasMediaParameters(selectedModel), [selectedModel])
+  const supportedAspectRatios = useMemo(
+    () => supportedCanvasAspectRatios(selectedModel?.parameters ?? []),
+    [selectedModel],
+  )
+  const aspectRatioParameter = useMemo(
+    () => resolveCanvasAspectRatioParameter(selectedModel?.parameters ?? [], aspectRatio),
+    [aspectRatio, selectedModel],
+  )
   const selectableReferenceKinds = useMemo<MediaKind[]>(
     () => [...new Set(mediaParameters.map(parameter => parameter.mediaKind))],
     [mediaParameters],
@@ -200,9 +212,12 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     void generate({
       modelId,
       prompt: prompt.trim(),
+      ...(aspectRatioParameter === undefined
+        ? {}
+        : { params: { [aspectRatioParameter.name]: aspectRatioParameter.value } }),
       ...(Object.keys(assetRefs).length > 0 ? { assetRefs } : {}),
     })
-  }, [assetRefs, generate, modelId, prompt, referenceError])
+  }, [aspectRatioParameter, assetRefs, generate, modelId, prompt, referenceError])
 
   const handleCancelGeneration = useCallback(async () => {
     const generationId = nodeData.generationId
@@ -385,23 +400,29 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
             </Button>
           </div>
 
-          <div className="flex items-center gap-1.5">
-            {ASPECT_RATIOS.map(ratio => (
-              <button
-                key={ratio}
-                type="button"
-                className={cn(
-                  'rounded-md border px-1.5 py-0.5 text-[10px] transition-colors',
-                  aspectRatio === ratio
-                    ? 'border-primary bg-primary/10 text-primary'
-                    : 'text-muted-foreground hover:bg-accent',
-                )}
-                onClick={() => updateNodeData(id, { aspectRatio: ratio })}
-              >
-                {ratio}
-              </button>
-            ))}
-          </div>
+          {supportedAspectRatios.length > 0 ? (
+            <div className="flex items-center gap-1.5">
+              {CANVAS_ASPECT_RATIOS.filter(ratio => supportedAspectRatios.includes(ratio)).map(ratio => (
+                <button
+                  key={ratio}
+                  type="button"
+                  className={cn(
+                    'rounded-md border px-1.5 py-0.5 text-[10px] transition-colors',
+                    aspectRatio === ratio
+                      ? 'border-primary bg-primary/10 text-primary'
+                      : 'text-muted-foreground hover:bg-accent',
+                  )}
+                  onClick={() => updateNodeData(id, { aspectRatio: ratio })}
+                >
+                  {ratio}
+                </button>
+              ))}
+            </div>
+          ) : (
+            <p className="text-[10px] leading-4 text-muted-foreground">
+              当前模型未声明可选画面比例
+            </p>
+          )}
         </div>
       )}
 

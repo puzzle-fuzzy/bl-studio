@@ -16,9 +16,8 @@ API 在用户
 
 Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错；它直接创建普通 generation，不进入
 `canvas.execute` 的 `nodeRuns` 和运行记录。单节点 generation ID 作为可恢复指针随节点快照保存，页面刷新后恢复轮询；
-生成完成后优先按确定性 `asset_generation_<artifactId>` 单条读取资产，列表查询只作为旧部署兼容回退，避免分页导致结果
-无法成为下游稳定输入。Owner generation artifact 读模型现在直接返回关联的权威 `assetId`，Canvas/Worker 以此为正常路径；
-缺少该字段时才保留旧部署的确定性 ID 兼容回退；
+生成完成后优先使用 Owner generation artifact 读模型返回的权威 `assetId`，避免分页导致结果无法成为下游稳定输入；
+只有旧 API 缺少该字段时才保留确定性 `asset_generation_<artifactId>` 单条读取及列表查询兼容回退；
 历史快照没有该 ID 时降级为可编辑状态。两条入口共享资产 ID、模型校验和结果持久化，但页面保证互斥：
 整图任务执行期间禁用单节点提交，单节点生成期间禁用“运行画布”，避免两个生命周期竞争写回同一个节点结果。
 单节点生成支持取消：queued 记录可立即进入 cancelled，processing 记录只提交取消请求，客户端继续轮询直到 worker
@@ -28,6 +27,10 @@ Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错�
 执行计划包含：拓扑排序后的媒体节点、模型 ID、已通过 manifest 校验的非媒体参数、静态资产 ID、
 以及“媒体参数 → 上游节点”的依赖绑定。编译器是纯包 `@bailian-studio/canvas-execution`，
 不读取数据库、环境变量或 URL。
+
+节点保存的 `aspectRatio` 是 Canvas 语义值，不直接等同于某个 provider 字段。前端和编译器通过
+`canvas-contracts` 的纯函数按当前模型 manifest 映射到 `aspectRatio`、`ratio` 或 `size`；
+模型没有对应能力时不提交未知参数，前端也不展示不可用的比例选项。
 
 Worker 把每一个计划节点转换为普通 generation。同一依赖层中满足输入条件的节点会在并发上限内
 并行创建；默认单个 Canvas 任务最多同时运行 4 个节点。节点生成完成后，Worker 等待 artifact persist

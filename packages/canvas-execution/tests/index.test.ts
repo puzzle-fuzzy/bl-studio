@@ -111,6 +111,32 @@ describe('compileCanvasGraph', () => {
     })
   })
 
+  it('maps the authored Canvas ratio to the model manifest parameter', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot([
+        mediaNode('portrait', { aspectRatio: '9:16' }),
+      ]),
+    })
+
+    expect(result.nodes[0]?.params).toMatchObject({ size: '928*1664' })
+  })
+
+  it('keeps an unsupported authored ratio out of the provider params', () => {
+    const result = compileCanvasGraph({
+      snapshot: snapshot([
+        mediaNode('unsupported', {
+          modelId: 'wanx-2.7-image',
+          aspectRatio: '3:4',
+          referenceAssetIds: ['asset-image'],
+        }),
+      ]),
+      assetKinds: new Map([['asset-image', 'image']]),
+    })
+
+    expect(result.nodes[0]?.params).not.toHaveProperty('aspectRatio')
+    expect(result.nodes[0]?.params).not.toHaveProperty('ratio')
+  })
+
   it('rejects cycles before creating an execution plan', () => {
     expect(() =>
       compileCanvasGraph({

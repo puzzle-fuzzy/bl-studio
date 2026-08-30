@@ -20,6 +20,7 @@ import type {
   CanvasNode,
   CanvasSnapshot,
 } from '@bailian-studio/canvas-contracts'
+import { resolveCanvasAspectRatioParameter } from '@bailian-studio/canvas-contracts'
 
 export type CanvasExecutionAssetKind = 'image' | 'video' | 'audio' | 'text' | 'archive'
 
@@ -307,6 +308,13 @@ function compileNode(
   const assetRefs: Record<string, string[]> = {}
   const dependencyBindings: Record<string, string[]> = {}
   const validationParams: Record<string, unknown> = { prompt }
+  const authoredAspectRatio = readString(node.data, 'aspectRatio')
+  if (authoredAspectRatio !== undefined) {
+    const mappedAspectRatio = resolveCanvasAspectRatioParameter(model.parameters, authoredAspectRatio)
+    if (mappedAspectRatio !== undefined) {
+      validationParams[mappedAspectRatio.name] = mappedAspectRatio.value
+    }
+  }
 
   for (const parameter of mediaParameters) {
     const mediaKind = parameter.mediaKind

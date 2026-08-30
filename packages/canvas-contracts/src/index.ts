@@ -1,5 +1,15 @@
 import { z } from 'zod'
 
+export {
+  CANVAS_ASPECT_RATIOS,
+  resolveCanvasAspectRatioParameter,
+  supportedCanvasAspectRatios,
+  type CanvasAspectRatio,
+  type CanvasAspectRatioParameter,
+  type CanvasAspectRatioParameterOption,
+  type ResolvedCanvasAspectRatioParameter,
+} from './aspect-ratio'
+
 const finiteNumber = z.number().finite()
 
 /** React Flow 节点的持久化子集；运行时字段（例如 signed URL）不属于协议。 */
