@@ -149,6 +149,28 @@ export function useCanvasGeneration(
     startPolling(recordId, runId)
   }, [onStatusChange, startPolling, stopPolling])
 
+  const cancel = useCallback(async (recordId: string): Promise<'cancelled' | 'pending'> => {
+    // 取消请求本身会让当前轮询失效；如果服务端只记录了 processing 状态的
+    // cancelRequestedAt，则重新接管轮询，等待 worker 把 generation 收口为终态。
+    stopPolling()
+
+    try {
+      const response = await apiClient.cancelGeneration(recordId)
+      if (response.record.status === 'cancelled') {
+        onStatusChange('error', undefined, '生成已取消')
+        return 'cancelled'
+      }
+
+      resume(recordId)
+      return 'pending'
+    }
+    catch (error) {
+      // 网络失败不能让节点停在“无轮询”的假状态；恢复跟踪并把错误交给 UI 展示。
+      resume(recordId)
+      throw error
+    }
+  }, [onStatusChange, resume, stopPolling])
+
   const generate = useCallback(async (options: GenerateOptions) => {
     stopPolling()
     const runId = runIdRef.current
@@ -178,5 +200,5 @@ export function useCanvasGeneration(
     }
   }, [nodeId, onStatusChange, startPolling, stopPolling])
 
-  return { generate, resume, stopPolling }
+  return { cancel, generate, resume, stopPolling }
 }

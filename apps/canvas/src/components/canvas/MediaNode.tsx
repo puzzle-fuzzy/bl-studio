@@ -68,6 +68,8 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const nodeData = data as MediaNodeData
   const [isEditing, setIsEditing] = useState(false)
   const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false)
+  const [isCancelling, setIsCancelling] = useState(false)
+  const [cancelError, setCancelError] = useState<string | undefined>()
   const { data: models } = useModelCatalog()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
@@ -173,7 +175,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     })
   }, [id, updateNodeData])
 
-  const { generate, resume } = useCanvasGeneration(id, onStatusChange)
+  const { cancel, generate, resume } = useCanvasGeneration(id, onStatusChange)
 
   // 旧快照如果仍处于 generating 且带有 generationId，重新建立当前页轮询。
   useEffect(() => {
@@ -201,6 +203,23 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
       ...(Object.keys(assetRefs).length > 0 ? { assetRefs } : {}),
     })
   }, [assetRefs, generate, modelId, prompt, referenceError])
+
+  const handleCancelGeneration = useCallback(async () => {
+    const generationId = nodeData.generationId
+    if (generationId === undefined || isCancelling) return
+
+    setCancelError(undefined)
+    setIsCancelling(true)
+    try {
+      await cancel(generationId)
+    }
+    catch (error) {
+      setCancelError(error instanceof Error ? error.message : '取消请求失败，请稍后重试')
+    }
+    finally {
+      setIsCancelling(false)
+    }
+  }, [cancel, isCancelling, nodeData.generationId])
 
   const removeReference = useCallback((edgeId: string) => {
     onEdgesChange([{ type: 'remove', id: edgeId }])
@@ -236,11 +255,27 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
             <img src={nodeData.resultUrl} alt="生成结果" className="h-full w-full object-cover" />
           )
         ) : nodeData.status === 'generating' ? (
-          <div className="flex h-full w-full items-center justify-center">
+          <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-3">
             <div className="flex flex-col items-center gap-2 text-muted-foreground">
               <Loader2 className="size-8 animate-spin text-primary/60" aria-hidden />
               <span className="text-xs">生成中…</span>
             </div>
+            {nodeData.generationId !== undefined && (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="h-7 px-2 text-[10px]"
+                disabled={isCancelling}
+                onClick={() => void handleCancelGeneration()}
+              >
+                {isCancelling ? <Loader2 className="mr-1 size-3 animate-spin" aria-hidden /> : <X className="mr-1 size-3" aria-hidden />}
+                {isCancelling ? '取消中…' : '取消生成'}
+              </Button>
+            )}
+            {cancelError !== undefined && (
+              <span className="max-w-full text-center text-[10px] leading-4 text-destructive">{cancelError}</span>
+            )}
           </div>
         ) : nodeData.status === 'error' ? (
           <div className="flex h-full w-full flex-col items-center justify-center gap-2 p-4 text-center">
