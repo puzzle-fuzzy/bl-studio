@@ -1166,13 +1166,52 @@ export const AdminTaskInputAssetSchema = z.object({
 })
 
 /** 生成型任务的原始请求快照，供管理员排障；非生成任务返回 null。 */
-export const AdminTaskRequestContextSchema = z.object({
+const AdminGenerationTaskContextSchema = z.object({
+  /** 旧响应不带 kind，保留可选以兼容已经部署的 API。 */
+  kind: z.literal('generation').optional(),
   recordId: z.string(),
   modelId: z.string(),
   category: z.enum(['image', 'video', 'audio', 'text']),
   inputParams: z.record(z.string(), z.unknown()),
   inputAssets: z.array(AdminTaskInputAssetSchema),
 })
+
+/** Canvas 任务的编排快照与每个节点的成本诊断。 */
+export const AdminCanvasTaskContextSchema = z.object({
+  kind: z.literal('canvas'),
+  documentId: z.string(),
+  documentRevision: z.number().int().positive(),
+  cachePolicy: z.enum(['reuse', 'refresh']).optional(),
+  rerun: z.object({
+    sourceExecutionId: z.string(),
+    nodeId: z.string(),
+  }).strict().optional(),
+  nodes: z.array(z.object({
+    nodeId: z.string(),
+    kind: z.enum(['image', 'video']),
+    modelId: z.string(),
+    params: z.record(z.string(), z.unknown()),
+    assetRefs: z.record(z.string(), z.array(z.string())),
+    dependencyBindings: z.record(z.string(), z.array(z.string())),
+    dependsOn: z.array(z.string()),
+    status: z.enum(['queued', 'generating', 'succeeded', 'failed']),
+    generationId: z.string().optional(),
+    assetIds: z.array(z.string()).optional(),
+    cacheHit: z.boolean().optional(),
+    startedAt: z.string().optional(),
+    completedAt: z.string().optional(),
+    durationMs: z.number().int().nonnegative().optional(),
+    errorCode: z.string().optional(),
+    error: z.string().optional(),
+    generationStatus: z.string().optional(),
+    accountedCents: z.number().int().nonnegative(),
+  }).strict()),
+}).strict()
+
+export const AdminTaskRequestContextSchema = z.union([
+  AdminGenerationTaskContextSchema,
+  AdminCanvasTaskContextSchema,
+])
 
 export const AdminTaskRequestContextResponseSchema = z.object({
   context: AdminTaskRequestContextSchema.nullable(),
@@ -1378,6 +1417,8 @@ export type AdminTaskError = z.infer<typeof AdminTaskErrorSchema>
 export type ListAdminTasksResult = z.infer<typeof ListAdminTasksResponseSchema>
 export type AdminTaskInputAsset = z.infer<typeof AdminTaskInputAssetSchema>
 export type AdminTaskRequestContext = z.infer<typeof AdminTaskRequestContextSchema>
+export type AdminCanvasTaskContext = z.infer<typeof AdminCanvasTaskContextSchema>
+export type AdminCanvasTaskNode = AdminCanvasTaskContext['nodes'][number]
 export type AdminGalleryArtifact = z.infer<typeof AdminGalleryArtifactSchema>
 export type AdminGalleryArtifactsResult = z.infer<typeof AdminGalleryArtifactsResponseSchema>
 export type AdminUserDetail = z.infer<typeof AdminUserDetailSchema>

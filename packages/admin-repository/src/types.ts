@@ -1,4 +1,5 @@
 import type { ModelCategory } from '@bailian-studio/model-core'
+import type { CanvasExecutionNodeRun } from '@bailian-studio/canvas-contracts'
 import type { TaskError, TaskRecord } from '@bailian-studio/task-engine'
 
 export type GalleryVisibility = 'private' | 'public'
@@ -101,9 +102,43 @@ export interface AdminTaskRequestContextRecord {
   inputAssets: GenerationInputAsset[]
 }
 
+export interface AdminCanvasTaskNode {
+  nodeId: string
+  kind: 'image' | 'video'
+  modelId: string
+  params: Record<string, unknown>
+  assetRefs: Record<string, string[]>
+  dependencyBindings: Record<string, string[]>
+  dependsOn: string[]
+  status: CanvasExecutionNodeRun['status']
+  generationId?: string
+  assetIds?: string[]
+  cacheHit?: boolean
+  startedAt?: string
+  completedAt?: string
+  durationMs?: number
+  errorCode?: string
+  error?: string
+  generationStatus?: string
+  /** 本次 Canvas 执行实际承担的费用；缓存复用或 provenance 缺失时为 0。 */
+  accountedCents: number
+}
+
+export interface AdminCanvasTaskContext {
+  documentId: string
+  documentRevision: number
+  cachePolicy?: 'reuse' | 'refresh'
+  rerun?: {
+    sourceExecutionId: string
+    nodeId: string
+  }
+  nodes: AdminCanvasTaskNode[]
+}
+
 export interface AdminTaskRequestContext {
   task: TaskRecord
   record?: AdminTaskRequestContextRecord
+  canvas?: AdminCanvasTaskContext
 }
 
 export interface GenerationCallStats {

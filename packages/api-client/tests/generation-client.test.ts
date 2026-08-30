@@ -457,10 +457,52 @@ describe('createApiClient', () => {
 
     const context = await client.adminGetTaskRequestContext('task-1')
 
-    expect(context?.inputParams).toEqual({ prompt: '一只戴墨镜的柴犬' })
-    expect(context?.inputAssets[0]?.asset.url).toContain('signed.example')
+    if (context === null || context.kind === 'canvas') throw new Error('expected generation task context')
+    expect(context.inputParams).toEqual({ prompt: '一只戴墨镜的柴犬' })
+    expect(context.inputAssets[0]?.asset.url).toContain('signed.example')
     expect(calls[0]?.url).toBe('http://api.test/api/admin/tasks/task-1/request-context')
     expect(calls[0]?.credentials).toBe('include')
+  })
+
+  it('parses Canvas node diagnostics from an admin task context', async () => {
+    const { fetch } = queuedFetch([
+      jsonResponse({
+        success: true,
+        data: {
+          context: {
+            kind: 'canvas',
+            documentId: 'canvas-1',
+            documentRevision: 3,
+            cachePolicy: 'reuse',
+            nodes: [{
+              nodeId: 'node-1',
+              kind: 'image',
+              modelId: 'qwen-image',
+              params: { prompt: '一只戴墨镜的柴犬' },
+              assetRefs: {},
+              dependencyBindings: {},
+              dependsOn: [],
+              status: 'succeeded',
+              generationId: 'generation-canvas-1',
+              cacheHit: false,
+              generationStatus: 'succeeded',
+              accountedCents: 120,
+            }],
+          },
+        },
+      }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    const context = await client.adminGetTaskRequestContext('canvas-task-1')
+
+    expect(context?.kind).toBe('canvas')
+    if (context?.kind !== 'canvas') throw new Error('expected Canvas task context')
+    expect(context.nodes[0]).toMatchObject({
+      nodeId: 'node-1',
+      generationId: 'generation-canvas-1',
+      accountedCents: 120,
+    })
   })
 
   it('creates a generation with stable asset references and no client-supplied userId', async () => {

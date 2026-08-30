@@ -227,6 +227,30 @@ const fakeAssetRepository: AssetRepository = {
 
 const fakeAdminTaskRepository: AdminTaskRepository = {
   getAdminTaskRequestContext: async id => {
+    if (id === 'canvas-task-1') {
+      return {
+        task: { id, type: 'canvas.execute', domain: 'canvas' } as never,
+        canvas: {
+          documentId: 'canvas-1',
+          documentRevision: 3,
+          cachePolicy: 'reuse',
+          nodes: [{
+            nodeId: 'node-1',
+            kind: 'image',
+            modelId: 'qwen-image',
+            params: { prompt: '一只戴墨镜的柴犬' },
+            assetRefs: {},
+            dependencyBindings: {},
+            dependsOn: [],
+            status: 'succeeded',
+            generationId: 'generation-canvas-1',
+            cacheHit: false,
+            generationStatus: 'succeeded',
+            accountedCents: 120,
+          }],
+        },
+      }
+    }
     if (id !== 'task-1') return undefined
     return {
       task: { id, recordId: 'generation-1' } as never,
@@ -577,6 +601,29 @@ describe('admin routes', () => {
     expect(body.data.context?.inputAssets[0]?.asset.url).toContain(
       '/signed/inputs/reference-1.png',
     )
+  })
+
+  it('returns Canvas node diagnostics from the admin task context endpoint', async () => {
+    const response = await app.handle(
+      adminRequest('/api/admin/tasks/canvas-task-1/request-context'),
+    )
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      success: true,
+      data: {
+        context: expect.objectContaining({
+          kind: 'canvas',
+          documentId: 'canvas-1',
+          documentRevision: 3,
+          nodes: [expect.objectContaining({
+            nodeId: 'node-1',
+            modelId: 'qwen-image',
+            generationId: 'generation-canvas-1',
+            accountedCents: 120,
+          })],
+        }),
+      },
+    })
   })
 
   it('bans and unbans a user via admin endpoints with audit', async () => {

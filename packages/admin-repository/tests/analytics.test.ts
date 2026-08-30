@@ -1,11 +1,12 @@
 import { createDb, generationRecords, taskRecords, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { createAnalyticsRepository, type AnalyticsRepository } from '../src'
+import { createAdminTaskRepository, createAnalyticsRepository, type AdminTaskRepository, type AnalyticsRepository } from '../src'
 
 let isolated: IsolatedTestDb | undefined
 let db: BailianStudioDb | undefined
 let analytics: AnalyticsRepository
+let adminTasks: AdminTaskRepository
 
 const USER_ID = 'admin-analytics-test'
 const WINDOW_FROM = '2026-08-01T00:00:00.000Z'
@@ -136,6 +137,7 @@ describe('admin analytics repository', () => {
     ])
 
     analytics = createAnalyticsRepository(db)
+    adminTasks = createAdminTaskRepository(db)
   })
 
   afterAll(async () => {
@@ -153,5 +155,28 @@ describe('admin analytics repository', () => {
       accountedCents: 120,
       byModel: [{ modelId: 'qwen-image', calls: 1, accountedCents: 120 }],
     })
+  })
+
+  it('returns a Canvas task context with node-level provenance and cost', async () => {
+    const context = await adminTasks.getAdminTaskRequestContext('canvas-task-1')
+
+    expect(context?.record).toBeUndefined()
+    expect(context?.canvas).toMatchObject({
+      documentId: 'canvas-1',
+      documentRevision: 1,
+      cachePolicy: 'reuse',
+      nodes: [{
+        nodeId: 'node-1',
+        modelId: 'qwen-image',
+        status: 'succeeded',
+        generationId: 'generation-current',
+        cacheHit: false,
+        generationStatus: 'succeeded',
+        accountedCents: 120,
+      }],
+    })
+
+    const cachedContext = await adminTasks.getAdminTaskRequestContext('canvas-task-2')
+    expect(cachedContext?.canvas?.nodes[0]?.accountedCents).toBe(0)
   })
 })

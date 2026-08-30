@@ -13,6 +13,10 @@
 也不依赖 HTTP、Provider 或前端。API 组合根通过 `adminRepository.gallery`、
 `adminRepository.tasks` 和 `adminRepository.analytics` 注入组合根，路由不再依赖三个扁平字段。
 
+Canvas 任务详情继续复用 `AdminTaskRepository` 的请求上下文接缝：`canvas.execute` 以
+`kind="canvas"` 返回节点级只读投影，并用父任务 `traceId` 校验子 generation 的费用归属；不为
+管理详情复制一张 Canvas 运行态表。
+
 这样做的原因是 admin 查询天然跨越 users、generations、assets 和 tasks；将它们留在生成
 生命周期 repository 会持续扩大核心接口，也会让后台权限边界混入普通生成流程。
 

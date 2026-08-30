@@ -12,13 +12,16 @@ import {
 	userAssets,
 	users,
 } from "@bailian-studio/db";
+import { CanvasExecutionTaskInputSchema } from "@bailian-studio/canvas-contracts";
 import type { ModelCategory } from "@bailian-studio/model-core";
-import { and, desc, eq, isNull, type SQL, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNull, type SQL, sql } from "drizzle-orm";
 import { clampLimit, decodeCursor, encodeCursor } from "./cursor";
 import { AdminRepositoryError } from "./errors";
 import { toTaskRecord } from "./mappers";
 import type {
 	AdminTaskItem,
+	AdminCanvasTaskContext,
+	AdminCanvasTaskNode,
 	AdminTaskRequestContext,
 	GenerationInputAsset,
 	ListAdminTasksResult,
@@ -53,6 +56,95 @@ export function createAdminTaskRepository(
 		if (taskRow === undefined) return undefined;
 
 		const task = toTaskRecord(taskRow);
+		if (task.type === "canvas.execute" && task.domain === "canvas") {
+			const parsed = CanvasExecutionTaskInputSchema.safeParse(task.input);
+			if (parsed.success) {
+				const generationIds = Object.values(parsed.data.nodeRuns)
+					.map((run) => run.generationId)
+					.filter((id): id is string => id !== undefined);
+				const generationRows =
+					generationIds.length === 0
+						? []
+						: await db
+								.select({
+									id: generationRecords.id,
+									status: generationRecords.status,
+									traceId: generationRecords.traceId,
+									costEstimate: generationRecords.costEstimate,
+									costFinal: generationRecords.costFinal,
+									deletedAt: generationRecords.deletedAt,
+								})
+								.from(generationRecords)
+								.where(inArray(generationRecords.id, generationIds));
+				const generationById = new Map(
+					generationRows.map((row) => [row.id, row]),
+				);
+				const nodes: AdminCanvasTaskNode[] = parsed.data.plan.nodes.map(
+					(node) => {
+						const run = parsed.data.nodeRuns[node.nodeId];
+						const generationId = run?.generationId;
+						const generation =
+							generationId === undefined
+								? undefined
+								: generationById.get(generationId);
+						const accountedCents =
+							run?.cacheHit === true ||
+								task.traceId === undefined ||
+								generation?.traceId !== task.traceId ||
+								generation?.deletedAt !== null
+									? 0
+									: generation.costFinal ?? generation.costEstimate;
+						const nodeContext: AdminCanvasTaskNode = {
+							nodeId: node.nodeId,
+							kind: node.kind,
+							modelId: node.modelId,
+							params: node.params,
+							assetRefs: node.assetRefs,
+							dependencyBindings: node.dependencyBindings,
+							dependsOn: node.dependsOn,
+							status: run?.status ?? "queued",
+							accountedCents,
+							...(generationId === undefined ? {} : { generationId }),
+							...(run?.assetIds === undefined
+								? {}
+								: { assetIds: run.assetIds }),
+							...(run?.cacheHit === undefined
+								? {}
+								: { cacheHit: run.cacheHit }),
+							...(run?.startedAt === undefined
+								? {}
+								: { startedAt: run.startedAt }),
+							...(run?.completedAt === undefined
+								? {}
+								: { completedAt: run.completedAt }),
+							...(run?.durationMs === undefined
+								? {}
+								: { durationMs: run.durationMs }),
+							...(run?.errorCode === undefined
+								? {}
+								: { errorCode: run.errorCode }),
+							...(run?.error === undefined ? {} : { error: run.error }),
+							...(generation === undefined
+								? {}
+								: { generationStatus: generation.status }),
+						};
+						return nodeContext;
+					},
+				);
+				const canvas: AdminCanvasTaskContext = {
+					documentId: parsed.data.documentId,
+					documentRevision: parsed.data.documentRevision,
+					nodes,
+					...(parsed.data.cachePolicy === undefined
+						? {}
+						: { cachePolicy: parsed.data.cachePolicy }),
+					...(parsed.data.rerun === undefined
+						? {}
+						: { rerun: parsed.data.rerun }),
+				};
+				return { task, canvas };
+			}
+		}
 		if (task.recordId === undefined) return { task };
 
 		const [record] = await db

@@ -167,6 +167,9 @@ flowchart LR
 - Canvas 执行历史通过 `GET /api/canvases/:id/executions` 从 `task_records` 读取，不新增第二份运行态表；
   查询由 `task-repository.listTasks` 提供用户隔离的 keyset 分页，并同时按新任务的 `recordId` 与旧任务输入中的
   `documentId` 保持兼容。前端可点击历史记录，重新读取执行摘要和稳定资产结果来恢复节点预览。
+- Admin 任务详情复用 `/api/admin/tasks/:id/request-context`，对 `canvas.execute` 返回带
+  `kind="canvas"` 的节点级只读投影；节点费用只有在子 generation 的 `traceId` 与父任务一致且未缓存复用时才计入，
+  从而可以在任务中心定位单次执行，同时不把管理排障模型混入 Canvas 运行态写入。
 - 生成仓储对幂等创建显式返回是否 `reused`；Canvas Worker 把该结果写入节点 `nodeRuns.cacheHit`，并通过
   `worker.canvas.node_cache` 暴露 hit/miss 计数。API 历史摘要和 Canvas 运行记录面板只投影这个可恢复字段，
   不把缓存命中误作 generation 已完成，也兼容尚未带该字段的历史任务。

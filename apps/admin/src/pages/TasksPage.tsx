@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, FileArchive, FileText, Film, Image as ImageIcon, Loader2, Music } from 'lucide-react'
-import type { AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
+import type { AdminCanvasTaskContext, AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
@@ -58,6 +58,10 @@ function shortId(id: string | undefined, len = 8): string {
   return id.length <= len ? id : id.slice(0, len)
 }
 
+function centsToYuan(cents: number): string {
+  return (cents / 100).toFixed(2)
+}
+
 function assetKindIcon(kind: string) {
   return kind === 'video' ? Film
     : kind === 'audio' ? Music
@@ -77,6 +81,78 @@ function DetailField({ label, value, mono = false }: { label: string; value: str
   )
 }
 
+function CanvasTaskContextSection({ context }: { context: AdminCanvasTaskContext }) {
+  const cacheHitCount = context.nodes.filter(node => node.cacheHit === true).length
+  const accountedCents = context.nodes.reduce((total, node) => total + node.accountedCents, 0)
+
+  return (
+    <section className="mt-8 flex flex-col gap-4">
+      <div>
+        <h3 className="text-sm font-medium">Canvas 执行详情</h3>
+        <p className="mt-1 text-sm text-muted-foreground">编排版本、节点状态和本次执行实际核算费用。</p>
+      </div>
+
+      <dl className="flex flex-col gap-4">
+        <DetailField label="画布" value={context.documentId} mono />
+        <DetailField label="文档版本" value={String(context.documentRevision)} />
+        <DetailField label="缓存策略" value={context.cachePolicy ?? '—'} />
+        <DetailField label="节点统计" value={`${context.nodes.length} 个节点 · ${cacheHitCount} 次缓存复用`} />
+        <DetailField label="本次费用" value={`${centsToYuan(accountedCents)} 元`} />
+      </dl>
+
+      <div className="overflow-x-auto rounded-lg border">
+        <Table className="min-w-[820px]">
+          <TableHeader>
+            <TableRow>
+              <TableHead>节点</TableHead>
+              <TableHead>模型</TableHead>
+              <TableHead>状态</TableHead>
+              <TableHead>generation</TableHead>
+              <TableHead>耗时</TableHead>
+              <TableHead className="text-right">费用</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {context.nodes.map(node => (
+              <TableRow key={node.nodeId}>
+                <TableCell className="font-mono text-xs">{node.nodeId}</TableCell>
+                <TableCell>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-sm">{node.modelId}</span>
+                    <span className="text-xs text-muted-foreground">{node.kind}</span>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-wrap items-center gap-1">
+                    <Badge variant={statusVariant(node.status)}>{STATUS_LABELS[node.status] ?? node.status}</Badge>
+                    {node.cacheHit === true && <Badge variant="outline">缓存</Badge>}
+                  </div>
+                </TableCell>
+                <TableCell className="font-mono text-xs">{shortId(node.generationId, 12)}</TableCell>
+                <TableCell>{node.durationMs !== undefined ? `${(node.durationMs / 1000).toFixed(1)} 秒` : '—'}</TableCell>
+                <TableCell className="text-right">
+                  {node.cacheHit === true ? '0.00 元' : `${centsToYuan(node.accountedCents)} 元`}
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+
+      {context.nodes.some(node => node.error !== undefined) && (
+        <div className="flex flex-col gap-2 rounded-lg bg-destructive/5 p-3">
+          <h4 className="text-sm font-medium text-destructive">节点错误</h4>
+          {context.nodes.filter(node => node.error !== undefined).map(node => (
+            <p key={node.nodeId} className="break-words text-sm text-muted-foreground">
+              {node.nodeId}：{node.errorCode !== undefined ? `${node.errorCode} · ` : ''}{node.error}
+            </p>
+          ))}
+        </div>
+      )}
+    </section>
+  )
+}
+
 function TaskRequestContextSection({
   context,
   loading,
@@ -87,6 +163,8 @@ function TaskRequestContextSection({
   error: string | null
 }) {
   const [previewIndex, setPreviewIndex] = useState<number | null>(null)
+  if (context?.kind === 'canvas') return <CanvasTaskContextSection context={context} />
+
   const inputEntries = context === null ? [] : Object.entries(context.inputParams)
   const promptEntries = inputEntries.filter(([key, value]) => (
     typeof value === 'string' && /prompt|text|description/i.test(key)

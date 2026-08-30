@@ -599,6 +599,18 @@ export function createAdminRoutes(deps: ApiDependencies) {
             )
           }
 
+          if (requestContext.canvas !== undefined) {
+            return {
+              success: true,
+              data: {
+                context: {
+                  kind: 'canvas' as const,
+                  ...requestContext.canvas,
+                },
+              },
+            }
+          }
+
           const record = requestContext.record
           if (record === undefined) {
             return { success: true, data: { context: null } }

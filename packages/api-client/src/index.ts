@@ -168,6 +168,8 @@ export type {
   ListAdminTasksResult,
   AdminTaskInputAsset,
   AdminTaskRequestContext,
+  AdminCanvasTaskContext,
+  AdminCanvasTaskNode,
   AdminGalleryArtifact,
   AdminGalleryArtifactsResult,
   GalleryItem,

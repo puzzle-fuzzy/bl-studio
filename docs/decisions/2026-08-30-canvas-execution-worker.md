@@ -64,3 +64,6 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - Canvas 父任务与实际创建的子 generation 共用任务 `traceId`，管理侧成本分析据此关联 `task_records` 与 `generation_records`；
   `nodeRuns.cacheHit` 只统计缓存复用次数，不再次计入 generation 成本。该分析先复用现有表结构，不新增成本明细表，后续
   若需要按节点或单次执行钻取，再在此关联契约上扩展读模型。
+- 管理任务详情沿用 `/api/admin/tasks/:id/request-context`，对合法的 `canvas.execute` 返回带
+  `kind="canvas"` 的节点级诊断与费用投影；只有子 generation 的 `traceId` 与父任务一致、且节点未命中缓存时才核算费用。
+  这样 admin 可以定位单次执行而不读取用户侧权限接口，也不新增 Canvas 专用运行态表。
