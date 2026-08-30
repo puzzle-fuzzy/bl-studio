@@ -49,3 +49,11 @@ provider request 数据，但不拥有任何状态迁移或任务生命周期写
 Worker 的陈旧 generation 清扫同样移入独立的 `GenerationRecoveryRepository`。该 port 只负责
 读取跨 generation/task 的恢复候选；Worker 仍通过核心 `GenerationRepository` 执行最终的
 `failGeneration` 收口，避免把恢复扫描与生成状态写入重新混回同一个接口。
+
+## 后台任务读模型的后续边界
+
+`AdminTaskRepository` 暂不迁入 `@bailian-studio/task-repository`。它虽然以
+`task_records` 为入口，却同时投影 `users`、`generation_records`、
+`generation_input_assets` 和 `user_assets`，并为运营排障组装 generation 请求上下文；这不是
+任务生命周期能力。若继续物理拆包，应建立独立的 `@bailian-studio/admin-repository` 只读包，
+由 API 组合根注入，而不是让 task-repository 反向依赖业务域表。

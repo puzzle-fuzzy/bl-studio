@@ -66,7 +66,9 @@
 - admin gallery 治理由 `src/admin-gallery.ts` 的 `AdminGalleryRepository` 拥有；它允许
   后台预览隐藏作品，但不改变面向用户的 SocialRepository 可见性策略。
 - admin 任务中心和成本/留存读模型分别由 `src/admin-tasks.ts` 的 `AdminTaskRepository`
-  与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；内容域不再通过中央聚合转发。
+  与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；内容域不再通过中央聚合转发。AdminTask
+  是跨 users/generation/assets 的只读运营投影，后续物理拆包进入独立 admin repository，
+  不迁入只负责任务生命周期的 task-repository。
 - `GenerationRepository` 核心接口不再重复声明 gallery、通知、提示词库、反馈、举报、
   admin 与分析方法；URL 工厂/隔离测试句柄分别暴露核心 repository 与各域窄 port，仓储
   测试按窄 port 组合 harness。

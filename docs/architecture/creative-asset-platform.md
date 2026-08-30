@@ -95,7 +95,8 @@ flowchart LR
 - admin gallery 的治理/预览依赖 `AdminGalleryRepository`，SQL 位于
   `generation-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
 - admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
-  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`。
+  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；admin 任务是跨 users/generation/assets 的
+  只读运营投影，后续物理拆包时进入独立 admin repository，不迁入任务生命周期包。
 - 内容域方法已从 `GenerationRepository` 核心接口移除；URL 工厂/隔离测试句柄分别暴露
   核心 repository 与各域窄 port，仓储测试按窄 port 组合 harness。
 - 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；
@@ -370,4 +371,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是评估业务 repository 的事务 store 是否需要进一步统一；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。下一步是为跨域 admin 读模型定义独立 admin repository 的契约；request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
