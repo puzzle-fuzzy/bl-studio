@@ -15,9 +15,9 @@ export function AdminShell() {
   }
 
   return (
-    <div className="flex min-h-screen flex-col bg-muted/20">
-      <header className="sticky top-0 z-10 border-b bg-background">
-        <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
+    <div className="flex min-h-svh min-w-0 flex-col overflow-x-hidden bg-muted/20">
+      <header className="sticky top-0 z-10 overflow-x-auto border-b bg-background">
+        <div className="mx-auto flex h-14 min-w-max max-w-6xl items-center justify-between px-4">
           <div className="flex items-center gap-6">
             <span className="text-sm font-semibold">Bailian Studio Admin</span>
             <nav className="flex items-center gap-1">
@@ -74,7 +74,7 @@ export function AdminShell() {
           </div>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl flex-1 p-4">
+      <main className="mx-auto min-h-0 w-full max-w-6xl flex-1 p-4">
         <Outlet />
       </main>
     </div>

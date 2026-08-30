@@ -9,7 +9,7 @@ import { ReactFlowProvider } from '@xyflow/react'
 export function CanvasShell() {
   return (
     <ReactFlowProvider>
-      <div className="flex h-screen flex-col bg-background text-foreground">
+      <div className="flex h-svh min-h-0 min-w-0 flex-col overflow-hidden bg-background text-foreground">
         <header className="flex h-12 shrink-0 items-center gap-3 border-b bg-surface px-4">
           <Link to="/canvas" className="flex items-center gap-2 text-sm font-semibold tracking-tight">
             <Palette className="size-4 text-primary" aria-hidden />

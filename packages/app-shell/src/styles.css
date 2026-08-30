@@ -185,6 +185,13 @@
   overflow-y: auto;
 }
 
+.studio-shell__content {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: var(--rb-content-max-width);
+  margin-inline: auto;
+}
+
 .login-page {
   position: relative;
   min-height: 100svh;

@@ -13,9 +13,9 @@ export function WriterShell() {
     { to: '/director', label: '导演台', icon: Film },
   ]
   return (
-    <div className="min-h-screen bg-background text-foreground">
-      <header className="sticky top-0 z-20 border-b bg-surface/80 backdrop-blur">
-        <div className="mx-auto flex h-12 max-w-[1660px] items-center gap-1 px-4">
+    <div className="min-h-svh min-w-0 overflow-x-hidden bg-background text-foreground">
+      <header className="sticky top-0 z-20 overflow-x-auto border-b bg-surface/80 backdrop-blur">
+        <div className="mx-auto flex h-12 min-w-max max-w-[1660px] items-center gap-1 px-4">
           <Link to="/writing" className="mr-4 text-sm font-semibold tracking-tight">编剧台</Link>
           {nav.map(({ to, label, icon: Icon }) => (
             <Link
@@ -34,7 +34,9 @@ export function WriterShell() {
           <a href="/" className="text-sm text-muted-foreground transition-colors hover:text-foreground">返回创作工作区</a>
         </div>
       </header>
-      <Outlet />
+      <div className="min-w-0">
+        <Outlet />
+      </div>
     </div>
   )
 }
