@@ -14,4 +14,5 @@ export type {
 export { providerError } from './types'
 
 export { DashScopeProviderRunner, type CreateDashScopeRunnerOptions } from './dashscope-runner'
+export { isDashScopeArtifactHost } from '@bailian-studio/provider-dashscope'
 export { ProviderRegistry, createProviderRegistry, type CreateProviderRegistryOptions } from './registry'

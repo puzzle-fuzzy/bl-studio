@@ -30,6 +30,7 @@ export {
 export type { DashScopeHttpTarget, DashScopeTransportOptions } from './transport'
 export { classifyDashScopeError } from './errors'
 export type { ProviderErrorCategory, ProviderErrorInfo } from './errors'
+export { isDashScopeArtifactHost } from './artifact-host'
 export { buildDashScopeRequest } from './request-builder'
 export type { DashScopeRequest } from './request-builder'
 export { buildChatRequest } from './chat-builder'

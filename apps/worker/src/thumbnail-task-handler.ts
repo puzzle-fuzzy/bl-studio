@@ -184,6 +184,7 @@ async function readThumbnailSource(
     url: source.originalUrl,
     kind: source.kind,
     allowedHosts: deps.artifactFetch?.allowedHosts,
+    isAllowedHost: deps.artifactFetch?.isAllowedHost,
     maxBytes,
     timeoutMs: deps.artifactFetch?.timeoutMs ?? DEFAULT_ARTIFACT_FETCH_TIMEOUT_MS,
     ...(deps.artifactFetch?.maxRedirects === undefined

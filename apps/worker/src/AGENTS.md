@@ -10,5 +10,6 @@ These instructions apply to Worker source. Read `../../../docs/bailian/PACKAGE_B
 - `provider-error-mapping.ts` may convert stable provider errors into task errors; it must not maintain an independent provider error-code catalog.
 - Never import the external SDK, use package subpaths, deep-import package sources, or bypass the provider with literal DashScope HTTP calls.
 - Keep generation, media, and artifact handlers single-purpose and preserve structured bilingual diagnostics across boundaries.
+- Artifact host predicates are provider-owned and injected by the composition root; generic `artifact-fetch` must not hardcode provider domains.
 
 Worker changes require Worker tests, boundary checks, root typecheck, and DB-backed root verify.

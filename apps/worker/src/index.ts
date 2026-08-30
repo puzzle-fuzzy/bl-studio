@@ -11,7 +11,7 @@ import { createStorageFromEnv } from '@bailian-studio/storage'
 import { readGenerationLimits } from '@bailian-studio/shared'
 import { WorkerLoop, type WorkerLoopConfig } from './worker-loop'
 import { createFfmpegMediaProcessor } from './media-processor'
-import { createProviderRegistry } from './providers'
+import { createProviderRegistry, isDashScopeArtifactHost } from './providers'
 import { verifyBailianRuntime } from './bailian-runtime'
 import { readWorkerEnv } from './config'
 
@@ -130,27 +130,21 @@ async function main(): Promise<void> {
     ...(env.artifactPersistTimeoutMs === undefined
       ? {}
       : { artifactPersistTimeoutMs: env.artifactPersistTimeoutMs }),
-    ...(env.artifactFetchMaxBytes === undefined &&
-    env.artifactFetchTimeoutMs === undefined &&
-    env.artifactFetchMaxRedirects === undefined &&
-    env.artifactFetchAllowedHosts === undefined
-      ? {}
-      : {
-          artifactFetch: {
-            ...(env.artifactFetchMaxBytes === undefined
-              ? {}
-              : { maxBytes: env.artifactFetchMaxBytes }),
-            ...(env.artifactFetchTimeoutMs === undefined
-              ? {}
-              : { timeoutMs: env.artifactFetchTimeoutMs }),
-            ...(env.artifactFetchMaxRedirects === undefined
-              ? {}
-              : { maxRedirects: env.artifactFetchMaxRedirects }),
-            ...(env.artifactFetchAllowedHosts === undefined
-              ? {}
-              : { allowedHosts: env.artifactFetchAllowedHosts }),
-          },
-        }),
+    artifactFetch: {
+      isAllowedHost: isDashScopeArtifactHost,
+      ...(env.artifactFetchMaxBytes === undefined
+        ? {}
+        : { maxBytes: env.artifactFetchMaxBytes }),
+      ...(env.artifactFetchTimeoutMs === undefined
+        ? {}
+        : { timeoutMs: env.artifactFetchTimeoutMs }),
+      ...(env.artifactFetchMaxRedirects === undefined
+        ? {}
+        : { maxRedirects: env.artifactFetchMaxRedirects }),
+      ...(env.artifactFetchAllowedHosts === undefined
+        ? {}
+        : { allowedHosts: env.artifactFetchAllowedHosts }),
+    },
     ...(env.workerLockHeartbeatMs === undefined
       ? {}
       : { lockHeartbeatMs: env.workerLockHeartbeatMs }),

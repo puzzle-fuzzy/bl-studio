@@ -20,6 +20,8 @@ export interface FetchProviderArtifactInput {
   url: string | URL
   kind: ProviderArtifactKind
   allowedHosts?: readonly string[]
+  /** Provider-owned predicate for artifact hosts that cannot be listed statically. */
+  isAllowedHost?: (hostname: string) => boolean
   maxBytes: number
   timeoutMs?: number
   maxRedirects?: number
@@ -91,25 +93,6 @@ function isBlockedLocalName(hostname: string): boolean {
   return BLOCKED_LOCAL_NAMES.some(name => hostname === name || hostname.endsWith(`.${name}`))
 }
 
-function isDashScopeResultHost(hostname: string): boolean {
-  const labels = hostname.split('.')
-  if (labels.length !== 4 || labels[2] !== 'aliyuncs' || labels[3] !== 'com') return false
-  const resultLabel = labels[0]
-  const ossLabel = labels[1]
-  if (resultLabel === undefined || ossLabel === undefined) return false
-  // DashScope 目前会同时返回 legacy 的 `dashscope-result-*` 与直接的
-  // `dashscope-*` OSS 加速结果域名。保留 provider 专属前缀与 DNS 结构校验，
-  // 绝不接受任意的 aliyuncs.com 域名。
-  const resultPrefix = resultLabel.startsWith('dashscope-result-')
-    ? 'dashscope-result-'
-    : resultLabel.startsWith('dashscope-')
-      ? 'dashscope-'
-      : undefined
-  if (resultPrefix === undefined || !DNS_LABEL.test(resultLabel)) return false
-  if (!ossLabel.startsWith('oss-') || !DNS_LABEL.test(ossLabel)) return false
-  return DNS_LABEL.test(resultLabel.slice(resultPrefix.length))
-}
-
 function configuredHosts(values: readonly string[] | undefined): ReadonlySet<string> {
   const hosts = new Set<string>()
   for (const value of values ?? []) {
@@ -121,9 +104,13 @@ function configuredHosts(values: readonly string[] | undefined): ReadonlySet<str
 
 /**
  * SSRF 防护：校验协议、凭据、端口与主机名，只允许显式白名单域名或
- * DashScope 专属结果域名，拒绝 IP 字面量与本地/内网主机名。
+ * 由 provider 注入的专属结果域名，拒绝 IP 字面量与本地/内网主机名。
  */
-function validateUrl(value: string | URL, allowedHosts: ReadonlySet<string>): URL {
+function validateUrl(
+  value: string | URL,
+  allowedHosts: ReadonlySet<string>,
+  isAllowedHost: ((hostname: string) => boolean) | undefined,
+): URL {
   let url: URL
   try {
     url = new URL(value)
@@ -139,7 +126,7 @@ function validateUrl(value: string | URL, allowedHosts: ReadonlySet<string>): UR
   if (isIpLiteral(hostname) || isBlockedLocalName(hostname) || !isValidDnsHostname(hostname)) {
     throw new ArtifactFetchError('HOST_REJECTED')
   }
-  if (!allowedHosts.has(hostname) && !isDashScopeResultHost(hostname)) {
+  if (!allowedHosts.has(hostname) && !(isAllowedHost?.(hostname) ?? false)) {
     throw new ArtifactFetchError('HOST_REJECTED')
   }
 
@@ -348,7 +335,7 @@ export async function fetchProviderArtifact(input: FetchProviderArtifactInput): 
   }
 
   const allowedHosts = configuredHosts(input.allowedHosts)
-  let current = validateUrl(input.url, allowedHosts)
+  let current = validateUrl(input.url, allowedHosts, input.isAllowedHost)
   const lifecycle = createFetchLifecycle(timeoutMs, input.signal)
   const fetchImpl = input.fetch ?? globalThis.fetch
   let redirects = 0
@@ -358,8 +345,7 @@ export async function fetchProviderArtifact(input: FetchProviderArtifactInput): 
       // P2-04（已知限制，标注）：validateUrl 的主机名校验与这里的 fetch 各做一次
       // DNS 解析，存在 TOCTOU 窗口——恶意主机可在校验时返回白名单解析结果、连接时
       // 再解析到内网 IP。白名单 + 拒绝 IP 字面量已大幅缩小面，但未做「解析后 IP
-      // 固定」级别的防护（node:dns lookup 后以解析到的 IP 直连并校验该 IP）。产物
-      // URL 来自受信的 DashScope 结果域，暂不在 SSRF 威胁面内，升级时再收口。
+      // 固定」级别的防护（node:dns lookup 后以解析到的 IP 直连并校验该 IP）。
       const response = await fetchImpl(current, {
         method: 'GET',
         headers: { accept: MIME_ALLOWLIST[input.kind].join(', ') },
@@ -375,7 +361,7 @@ export async function fetchProviderArtifact(input: FetchProviderArtifactInput): 
         const location = response.headers.get('location')
         if (location === null || redirects >= maxRedirects) throw new ArtifactFetchError('REDIRECT_REJECTED')
         try {
-          current = validateUrl(new URL(location, current), allowedHosts)
+          current = validateUrl(new URL(location, current), allowedHosts, input.isAllowedHost)
         } catch {
           throw new ArtifactFetchError('REDIRECT_REJECTED')
         }

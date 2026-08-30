@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { isDashScopeArtifactHost } from '@bailian-studio/provider-dashscope'
 import { ArtifactFetchError, fetchProviderArtifact, type ArtifactFetch } from '../src/artifact-fetch'
 
 function imageResponse(body: BodyInit, headers: Record<string, string> = { 'content-type': 'image/png' }) {
@@ -53,10 +54,30 @@ describe('fetchProviderArtifact', () => {
       url: 'https://dashscope-7c2c.oss-accelerate.aliyuncs.com/result.png',
       kind: 'image',
       maxBytes: 10,
+      isAllowedHost: isDashScopeArtifactHost,
       fetch: async () => imageResponse(new Uint8Array([1, 2, 3])),
     })
 
     await expect(result.consume()).resolves.toEqual(new Uint8Array([1, 2, 3]))
+  })
+
+  it('uses an injected provider host policy for dynamic artifact domains', async () => {
+    const result = await fetchProviderArtifact({
+      url: 'https://provider-result.example.test/result.png',
+      kind: 'image',
+      maxBytes: 10,
+      isAllowedHost: hostname => hostname === 'provider-result.example.test',
+      fetch: async () => imageResponse(new Uint8Array([4, 5, 6])),
+    })
+
+    await expect(result.consume()).resolves.toEqual(new Uint8Array([4, 5, 6]))
+    await expect(fetchProviderArtifact({
+      url: 'https://other-result.example.test/result.png',
+      kind: 'image',
+      maxBytes: 10,
+      isAllowedHost: hostname => hostname === 'provider-result.example.test',
+      fetch: async () => imageResponse(new Uint8Array([7])),
+    })).rejects.toMatchObject({ code: 'HOST_REJECTED' })
   })
 
   it('revalidates every redirect against the allowed host policy', async () => {

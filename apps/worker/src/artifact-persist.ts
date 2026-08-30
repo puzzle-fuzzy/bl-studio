@@ -22,8 +22,10 @@ export interface PersistArtifactsForRecordInput {
 }
 
 export interface ArtifactFetchPolicy {
-  /** 除 DashScope 结果域名外，额外允许访问的 provider 域名。 */
+  /** Explicit extra hosts allowed for provider artifacts. */
   allowedHosts?: readonly string[]
+  /** Provider-owned predicate for dynamic artifact hosts. */
+  isAllowedHost?: (hostname: string) => boolean
   /** 单个 provider artifact 允许的最大字节数，默认 100 MiB。 */
   maxBytes?: number
   /** 获取并消费单个 provider artifact 的最大耗时。 */
@@ -109,6 +111,7 @@ async function readArtifactPayload(
     url: artifact.sourceUrl,
     kind: artifact.kind,
     allowedHosts: policy?.allowedHosts,
+    isAllowedHost: policy?.isAllowedHost,
     maxBytes: policy?.maxBytes ?? DEFAULT_ARTIFACT_FETCH_MAX_BYTES,
     timeoutMs: policy?.timeoutMs ?? DEFAULT_ARTIFACT_FETCH_TIMEOUT_MS,
     ...(policy?.maxRedirects === undefined ? {} : { maxRedirects: policy.maxRedirects }),
