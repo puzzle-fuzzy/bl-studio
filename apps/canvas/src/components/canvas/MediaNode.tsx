@@ -34,6 +34,8 @@ export interface MediaNodeData extends Record<string, unknown> {
   resultUrl?: string
   resultKind?: MediaKind
   resultAssetId?: string
+  /** 单节点快捷 generation 在页面刷新后的恢复 ID。 */
+  generationId?: string
   errorMessage?: string
   /** 仅保留旧版本画布数据的兼容展示；新连接使用上游资产 ID。 */
   referenceUrls: string[]
@@ -156,20 +158,28 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
 
   const onStatusChange = useCallback((
     status: 'generating' | 'ready' | 'error',
-    result?: { url: string; kind: MediaKind; assetId?: string },
+    result?: { generationId?: string; url?: string; kind?: MediaKind; assetId?: string },
     error?: string,
   ) => {
     updateNodeData(id, {
       status,
-      ...(result !== undefined
-        ? { resultUrl: result.url, resultKind: result.kind, resultAssetId: result.assetId }
-        : {}),
-      ...(status === 'generating' ? { errorMessage: undefined } : {}),
+      ...(status === 'generating'
+        ? { generationId: result?.generationId, errorMessage: undefined }
+        : { generationId: undefined }),
+      ...(result?.url !== undefined ? { resultUrl: result.url } : {}),
+      ...(result?.kind !== undefined ? { resultKind: result.kind } : {}),
+      ...(status === 'ready' && result !== undefined ? { resultAssetId: result.assetId } : {}),
       ...(error !== undefined ? { errorMessage: error } : {}),
     })
   }, [id, updateNodeData])
 
-  const { generate } = useCanvasGeneration(id, onStatusChange)
+  const { generate, resume } = useCanvasGeneration(id, onStatusChange)
+
+  // 旧快照如果仍处于 generating 且带有 generationId，重新建立当前页轮询。
+  useEffect(() => {
+    if (nodeData.status !== 'generating' || nodeData.generationId === undefined) return
+    resume(nodeData.generationId)
+  }, [nodeData.generationId, nodeData.status, resume])
 
   // 新节点按类型自动选择第一个可用模型，避免用户面对空的模型选择器。
   useEffect(() => {
