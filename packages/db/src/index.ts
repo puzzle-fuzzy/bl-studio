@@ -11,6 +11,9 @@ export { createDb, type CreateDbOptions, type BailianStudioDb, type BailianStudi
 export { DEV_DATABASE_URL, TEST_DATABASE_URL } from './defaults'
 export {
   assetDerivatives,
+  canvasDocumentVersions,
+  canvasDocuments,
+  auditEventOutbox,
   auditLogs,
   authActionTokens,
   creditAccounts,
@@ -19,6 +22,8 @@ export {
   creativeAssets,
   creativeAssetVersions,
   creativeAssetReferences,
+  creativeAssetCollectionBatches,
+  creativeAssetCollectionBatchItems,
   creativeProjects,
   creativeProjectAssets,
   creativeGenerationContexts,
@@ -33,6 +38,7 @@ export {
   directorScriptMessages,
   directorScriptVersions,
   directorShots,
+	directorEntityCandidates,
   generationArtifacts,
   generationEvents,
   generationFavorites,
@@ -61,3 +67,9 @@ export {
 // 测试专用工具（resetBailianStudioTestDb / createIsolatedTestDb / requireDatabaseUrl /
 // IsolatedTestDb）不放在生产 barrel 里——通过子路径 `@bailian-studio/db/test` 显式引用，
 // 避免生产消费者把「重置测试库」能力拉进运行时模块图。
+
+// ── task_records 序列化（P1-C 唯一实现，取代三份分叉副本） ──
+export { taskInsertValues, type TaskRecordInput } from './task-serialize'
+
+// ── 审计动作枚举（P1-J 唯一事实源） ──
+export { AUDIT_ACTIONS, type AuditAction } from './audit-actions'

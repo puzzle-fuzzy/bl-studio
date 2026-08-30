@@ -1,6 +1,6 @@
 import { Link, Outlet, useNavigate } from 'react-router'
 import { BarChart3, ChartPie, Flag, Images, ListChecks, LogOut, MessageSquare, Users } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { Button } from '@bailian-studio/ui'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 
 /** 管理后台外壳：顶部栏（品牌 + 当前管理员 + 登出）+ 内容区。 */

@@ -92,7 +92,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
 
       // GitHub 在用户取消授权时带 error 参数返回（无 code），先行处理。
       if (typeof query.error === 'string' && query.error.length > 0) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { step: 'access_denied' },
@@ -104,7 +104,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
       try {
         input = validateInput(CallbackQuerySchema, query)
       } catch {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { step: 'invalid_query' },
@@ -114,7 +114,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
 
       const expectedState = readCookie(request.headers.get('cookie'), GITHUB_OAUTH_STATE_COOKIE)
       if (expectedState === undefined || expectedState !== input.state) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { step: 'state_mismatch' },
@@ -124,7 +124,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
 
       const accessToken = await exchangeCodeForToken(config, input.code)
       if (accessToken === undefined) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { step: 'token_exchange' },
@@ -134,7 +134,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
 
       const profile = await fetchGithubProfile(accessToken)
       if (profile === undefined) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { step: 'profile_fetch' },
@@ -148,7 +148,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
           email: profile.email,
           displayName: profile.displayName,
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: result.user.id,
           action: 'auth.github',
           outcome: 'succeeded',
@@ -163,7 +163,7 @@ export function createGithubOAuthHandlers(deps: ApiDependencies) {
         headers.append('Set-Cookie', clearedStateCookieHeader(deps.cookieSecure))
         return new Response(null, { status: 302, headers })
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { errorCode: error instanceof Error && 'code' in error ? String((error as { code: unknown }).code) : 'unknown' },

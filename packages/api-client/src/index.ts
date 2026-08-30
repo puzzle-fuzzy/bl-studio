@@ -1,7 +1,7 @@
 /**
  * api-client 包的对外出口集合（barrel）。
  *
- * 本包是 apps/web 使用的【类型化 API 契约层】：它把后端
+ * 本包是 studio/writer/canvas/admin 使用的【类型化 API 契约层】：它把后端
  * `/api/*` 的 HTTP 路由封装成带类型的方法，并用 zod schema 在传输层两端
  * （请求返回时 / SSE 信令上线时）做严格校验，让前端代码永远不需要写 `as`
  * 强转。任何对 API wire 形状的改动都应在这里或 schemas.ts 体现，从而成为
@@ -29,10 +29,22 @@ export {
   type BailianStudioApiClient,
   type UploadAssetInput,
 } from './generation-client'
+export type {
+  CanvasDocument,
+  CanvasDocumentSummary,
+  CanvasEdge,
+  CanvasNode,
+  CanvasSnapshot,
+  CanvasVersion,
+  CreateCanvasInput,
+  ListCanvasesResult,
+  RestoreCanvasInput,
+  SaveCanvasInput,
+} from '@bailian-studio/canvas-contracts'
 export * from './creative-asset-client'
 export { avatarUrlFor } from './avatar-url'
 export { ApiClientError } from './http'
-export { DirectorAnalysisResultSchema, DirectorAssemblyPreflightResponseSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationDraftSchema, DirectorLocationsResultSchema, DirectorMusicEstimateResponseSchema, DirectorPromptRebuildResultSchema, DirectorScriptChatInputSchema, DirectorScriptMessageSchema, DirectorScriptMessagesResponseSchema, DirectorScriptVersionResponseSchema, DirectorScriptVersionsResponseSchema, DirectorShotDraftSchema, DirectorShotResponseSchema, DirectorShotSchema, DirectorStoryboardResultSchema, DirectorVideoEstimateResponseSchema, UpdateDirectorShotSchema } from './schemas'
+export { DirectorAnalysisResultSchema, DirectorAssemblyPreflightResponseSchema, DirectorCharacterDraftSchema, DirectorCharactersResultSchema, DirectorContinuityResultSchema, DirectorDialogueResultSchema, DirectorLocationDraftSchema, DirectorLocationsResultSchema, DirectorMusicEstimateResponseSchema, DirectorPromptRebuildResultSchema, DirectorScriptChatInputSchema, DirectorScriptMessageSchema, DirectorScriptMessagesResponseSchema, DirectorScriptVersionResponseSchema, DirectorScriptVersionsResponseSchema, DirectorShotDraftSchema, DirectorShotResponseSchema, DirectorShotSchema, DirectorStoryboardResultSchema, DirectorVideoEstimateResponseSchema, UpdateDirectorShotSchema, DirectorEntityCandidateSchema, DirectorEntityCandidateKindSchema, DirectorEntityCandidateStatusSchema, DirectorEntityMentionSchema, ListDirectorEntityCandidatesSchema, ReviewDirectorEntityCandidateSchema, DirectorEntityCandidatesResponseSchema, DirectorEntityCandidateResponseSchema, DirectorEntityCandidateDeleteResponseSchema } from './schemas'
 export {
   DIRECTOR_PHASE_LABELS,
   DIRECTOR_PHASES,
@@ -151,4 +163,10 @@ export type {
   AdjustPointsInput,
   PointsMutationResult,
   UpdateDirectorProjectInput,
+  DirectorEntityCandidate,
+  DirectorEntityCandidateKind,
+  DirectorEntityCandidateStatus,
+  DirectorEntityMention,
+  ListDirectorEntityCandidatesInput,
+  ReviewDirectorEntityCandidateInput,
 } from './schemas'

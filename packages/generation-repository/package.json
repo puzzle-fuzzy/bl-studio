@@ -17,11 +17,13 @@
     "@bailian-studio/db": "workspace:*",
     "@bailian-studio/event-bus": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
+    "@bailian-studio/task-repository": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",
     "drizzle-orm": "catalog:",
     "postgres": "catalog:"
   },
   "devDependencies": {
+    "@bailian-studio/admin-repository": "workspace:*",
     "typescript": "catalog:"
   },
   "author": {

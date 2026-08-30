@@ -45,6 +45,8 @@ flowchart LR
   Persistence --> Credit["credit-ledger"]
   Persistence --> AssetRepo["creative-asset-repository"]
   Persistence --> GenerationRepo["generation-repository"]
+  Persistence --> AdminRepo["admin-repository"]
+  Persistence --> CanvasRepo["canvas-repository"]
   Persistence --> TaskRepo["task-repository"]
   Persistence --> DirectorRepo["director-repository"]
   Persistence --> MediaRepo["media-repository"]
@@ -72,6 +74,8 @@ flowchart LR
 - `apps/worker` 可以依赖 generation repository、task-repository、storage、model-core 和 provider runner，但不能依赖 API 或直接访问 `db`。
 - `creative-asset-domain` 和 `creative-asset-compiler` 不读取环境变量、不访问数据库、不发 HTTP、不启动 listener。
 - `creative-asset-repository` 只负责资产域持久化、事务和数据库不变量；不负责 HTTP、Provider、UI 和 prompt 编排。
+- `admin-repository` 只负责后台治理读模型和运营分析 port；不再由 generation repository 对外转发。
+- `canvas-repository` 负责用户画布文档、当前快照、不可变版本和 revision 并发控制；Canvas 节点引用资产 ID，临时 read URL 不入库。
 - `provider-dashscope` 不依赖资产 repository、generation repository、Worker 或 API；资产输入必须已经被编译成 provider-neutral 的生成输入。
 - `apps/studio`、`apps/writer`、`apps/canvas`、`apps/admin` 只通过 `packages/api-client` 访问 API，不 deep-import repository、db 或 app 源码。
 
@@ -92,11 +96,11 @@ flowchart LR
   SQL 位于 `generation-repository/src/notifications.ts`。
 - 提示词库、用户反馈和内容举报分别依赖 `PromptLibraryRepository`、`FeedbackRepository`、
   `ContentReportRepository`；SQL 已归档到对应模块，API 组合根负责实例化和注入。
-- admin gallery 的治理/预览依赖 `AdminGalleryRepository`，SQL 位于
-  `generation-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
+- admin gallery 的治理/预览依赖 `AdminGalleryRepository`，SQL 已物理迁移到
+  `packages/admin-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
 - admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
-  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；admin 任务是跨 users/generation/assets 的
-  只读运营投影，后续物理拆包时进入独立 admin repository，不迁入任务生命周期包。
+  SQL 已物理迁移到 `packages/admin-repository/src/admin-tasks.ts` 与 `analytics.ts`；
+  admin 任务是跨 users/generation/assets 的只读运营投影，不迁入任务生命周期包。
 - 内容域方法已从 `GenerationRepository` 核心接口移除；URL 工厂/隔离测试句柄分别暴露
   核心 repository 与各域窄 port，仓储测试按窄 port 组合 harness。
 - 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；

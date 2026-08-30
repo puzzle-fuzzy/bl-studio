@@ -81,4 +81,17 @@ export const qwenImage: ModelManifest = {
     },
   },
   availability: { enabled: true, stage: 'stable' },
+  examples: {
+    valid: [
+      { prompt: '一只橘猫在窗台上晒太阳' },
+      { prompt: '赛博朋克城市夜景', negativePrompt: '人物', size: '928*1664', seed: 42 },
+    ],
+    invalid: [
+      { params: {}, expectedCode: 'REQUIRED_PARAMETER', expectedField: 'prompt' },
+      { params: { prompt: 'a'.repeat(801) }, expectedCode: 'OUT_OF_RANGE', expectedField: 'prompt' },
+      { params: { prompt: 'cat', size: '999*999' }, expectedCode: 'INVALID_VALUE', expectedField: 'size' },
+      { params: { prompt: 'cat', seed: 99999999999 }, expectedCode: 'OUT_OF_RANGE', expectedField: 'seed' },
+      { params: { prompt: 'cat', unknownParam: 'x' }, expectedCode: 'UNKNOWN_PARAMETER', expectedField: 'unknownParam' },
+    ],
+  },
 }

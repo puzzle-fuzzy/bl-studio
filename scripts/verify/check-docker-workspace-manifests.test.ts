@@ -32,8 +32,8 @@ function listDockerfileManifests(): string[] {
 describe('Docker workspace dependency cache', () => {
   it('copies every workspace manifest before installing dependencies', () => {
     expect(listDockerfileManifests()).toEqual(listWorkspaceManifests())
-    expect(dockerfile.indexOf('pnpm install --frozen-lockfile')).toBeLessThan(dockerfile.indexOf('COPY apps ./apps'))
-    expect(dockerfile.indexOf('pnpm install --frozen-lockfile')).toBeLessThan(dockerfile.indexOf('COPY packages ./packages'))
+    expect(dockerfile.indexOf('bun install --frozen-lockfile')).toBeLessThan(dockerfile.indexOf('COPY apps ./apps'))
+    expect(dockerfile.indexOf('bun install --frozen-lockfile')).toBeLessThan(dockerfile.indexOf('COPY packages ./packages'))
   })
 
   it('does not duplicate the workspace through a recursive runtime chown', () => {

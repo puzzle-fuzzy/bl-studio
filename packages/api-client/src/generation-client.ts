@@ -10,6 +10,17 @@
  */
 import { z } from 'zod'
 import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-contracts'
+import {
+  CanvasDocumentResponseSchema,
+  CanvasVersionsResponseSchema,
+  ListCanvasesResponseSchema,
+  type CanvasDocument,
+  type CanvasVersion,
+  type CreateCanvasInput,
+  type ListCanvasesResult,
+  type RestoreCanvasInput,
+  type SaveCanvasInput,
+} from '@bailian-studio/canvas-contracts'
 import { createCreativeAssetClient, type CreativeAssetApiClient } from './creative-asset-client'
 import { ApiClientError, requestNoContent, unwrapData } from './http'
 import {
@@ -29,6 +40,9 @@ import {
   CreateGenerationResponseSchema,
   DirectorProjectListResponseSchema,
   DirectorProjectResponseSchema,
+  DirectorEntityCandidatesResponseSchema,
+  DirectorEntityCandidateResponseSchema,
+  DirectorEntityCandidateDeleteResponseSchema,
   DirectorScriptMessagesResponseSchema,
   DirectorScriptVersionResponseSchema,
   DirectorScriptVersionsResponseSchema,
@@ -163,6 +177,10 @@ import type {
   UsageSummary,
   UpdateDirectorProjectInput,
   UpdateDirectorShotInput,
+  DirectorEntityCandidate,
+  DirectorEntityCandidateKind,
+  DirectorEntityCandidateStatus,
+  ReviewDirectorEntityCandidateInput,
 } from './schemas'
 
 /** 带 JSON content-type 的请求头常量，供带 body 的 POST 复用。 */
@@ -332,6 +350,12 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   createDirectorProject(input: CreateDirectorProjectInput): Promise<DirectorProjectDetail>
   /** `GET /api/director/projects/:id` — 获取项目及阶段状态。 */
   getDirectorProject(id: string): Promise<DirectorProjectDetail>
+  /** `GET /api/director/projects/:id/entity-candidates` — 获取剧本实体候选。 */
+  listDirectorEntityCandidates(id: string, params?: { status?: DirectorEntityCandidateStatus; kind?: DirectorEntityCandidateKind }): Promise<DirectorEntityCandidate[]>
+  /** `PATCH /api/director/entity-candidates/:id` — 接受或拒绝一个实体候选。 */
+  reviewDirectorEntityCandidate(id: string, input: ReviewDirectorEntityCandidateInput): Promise<DirectorEntityCandidate>
+  /** `DELETE /api/director/entity-candidates/:id` — 移除一个实体候选。 */
+  deleteDirectorEntityCandidate(id: string): Promise<void>
   listDirectorScriptMessages(id: string): Promise<DirectorScriptMessage[]>
   listDirectorScriptVersions(id: string): Promise<DirectorScriptVersionSummary[]>
   getDirectorScriptVersion(id: string, versionId: string): Promise<DirectorScriptVersion>
@@ -433,6 +457,18 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   listAssets(params?: ListAssetsParams): Promise<ListAssetsResult>
   getAssetCapabilities(): Promise<AssetCapabilities>
   getAsset(id: string): Promise<AssetItem>
+  /** `GET /api/canvases` —— 当前用户的画布文档列表。 */
+  listCanvases(params?: { limit?: number }): Promise<ListCanvasesResult>
+  /** `POST /api/canvases` —— 创建一个画布文档。 */
+  createCanvas(input?: CreateCanvasInput): Promise<CanvasDocument>
+  /** `GET /api/canvases/:id` —— 获取画布当前快照。 */
+  getCanvas(id: string): Promise<CanvasDocument>
+  /** `PATCH /api/canvases/:id` —— 以 expectedRevision 保存画布。 */
+  saveCanvas(id: string, input: SaveCanvasInput): Promise<CanvasDocument>
+  /** `GET /api/canvases/:id/versions` —— 获取不可变版本历史。 */
+  listCanvasVersions(id: string, params?: { limit?: number }): Promise<CanvasVersion[]>
+  /** `POST /api/canvases/:id/restore` —— 从历史版本创建新的当前版本。 */
+  restoreCanvas(id: string, input: RestoreCanvasInput): Promise<CanvasDocument>
   deleteAsset(id: string): Promise<void>
 
   /** `POST /api/auth/logout` —— 注销，服务端软删 session 让 cookie 失效。 */
@@ -694,6 +730,37 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         DirectorProjectResponseSchema,
       )
       return data.project
+    },
+
+    async listDirectorEntityCandidates(id, params = {}) {
+      const search = new URLSearchParams()
+      if (params.status !== undefined) search.set('status', params.status)
+      if (params.kind !== undefined) search.set('kind', params.kind)
+      const query = search.toString()
+      return unwrapData(
+        `${base}/api/director/projects/${encodeURIComponent(id)}/entity-candidates${query.length > 0 ? `?${query}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        DirectorEntityCandidatesResponseSchema,
+      )
+    },
+
+    async reviewDirectorEntityCandidate(id, input) {
+      return unwrapData(
+        `${base}/api/director/entity-candidates/${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        DirectorEntityCandidateResponseSchema,
+      )
+    },
+
+    async deleteDirectorEntityCandidate(id) {
+      await unwrapData(
+        `${base}/api/director/entity-candidates/${encodeURIComponent(id)}`,
+        { method: 'DELETE', credentials: 'include' },
+        fetchImpl,
+        DirectorEntityCandidateDeleteResponseSchema,
+      )
     },
 
     async listDirectorScriptMessages(id) {
@@ -1136,6 +1203,71 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         AssetResponseSchema,
       )
       return data.asset
+    },
+
+    async listCanvases(params = {}) {
+      const query = new URLSearchParams()
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      return unwrapData(
+        `${base}/api/canvases${qs.length > 0 ? `?${qs}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListCanvasesResponseSchema,
+      )
+    },
+
+    async createCanvas(input = {}) {
+      const data = await unwrapData(
+        `${base}/api/canvases`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        CanvasDocumentResponseSchema,
+      )
+      return data.document
+    },
+
+    async getCanvas(id) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        CanvasDocumentResponseSchema,
+      )
+      return data.document
+    },
+
+    async saveCanvas(id, input) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}`,
+        { method: 'PATCH', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        CanvasDocumentResponseSchema,
+      )
+      return data.document
+    },
+
+    async listCanvasVersions(id, params = {}) {
+      const query = new URLSearchParams()
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      const qs = query.toString()
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/versions${qs.length > 0 ? `?${qs}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        CanvasVersionsResponseSchema,
+      )
+      return data.versions
+    },
+
+    async restoreCanvas(id, input) {
+      const data = await unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/restore`,
+        { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(input), credentials: 'include' },
+        fetchImpl,
+        CanvasDocumentResponseSchema,
+      )
+      return data.document
     },
 
     async deleteAsset(id) {

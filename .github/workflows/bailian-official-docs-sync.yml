@@ -22,25 +22,24 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Set up pnpm
-        uses: pnpm/action-setup@v4
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          version: 10.9.0
+          bun-version: 1.4.0
 
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
           node-version: 24.12.0
-          cache: pnpm
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+        run: bun install --frozen-lockfile
 
       - name: Sync official Bailian document snapshot
-        run: pnpm run docs:bailian:sync
+        run: bun run docs:bailian:sync
 
       - name: Validate official Bailian snapshot
-        run: pnpm run docs:bailian:snapshot:check
+        run: bun run docs:bailian:snapshot:check
 
       - name: Validate generated files
         run: |

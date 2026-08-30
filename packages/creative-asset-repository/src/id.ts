@@ -19,3 +19,15 @@ export function nextCreativeAssetVersionId(): string {
 export function nextCreativeAssetReferenceId(): string {
   return `creative-asset-reference_${randomUUID()}`
 }
+
+export function nextCreativeAssetCollectionBatchId(): string {
+  return `creative-asset-collection-batch_${randomUUID()}`
+}
+
+export function nextCreativeAssetCollectionBatchItemId(): string {
+  return `creative-asset-collection-batch-item_${randomUUID()}`
+}
+
+export function nextAuditEventOutboxId(): string {
+  return `audit-event-outbox_${randomUUID()}`
+}

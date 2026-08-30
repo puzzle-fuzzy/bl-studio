@@ -33,9 +33,6 @@ export type GenerationRepositoryTestDb = GenerationRepositoryHandle
 export interface IsolatedGenerationRepository {
   /** 核心 generation/worker 能力；其他上下文通过独立 port 暴露。 */
   repository: GenerationRepository
-  adminGalleryRepository: GenerationRepositoryHandle['adminGalleryRepository']
-  adminTaskRepository: GenerationRepositoryHandle['adminTaskRepository']
-  analyticsRepository: GenerationRepositoryHandle['analyticsRepository']
   assetRepository: GenerationRepositoryHandle['assetRepository']
   auditRepository: GenerationRepositoryHandle['auditRepository']
   generationDiagnosticsRepository: GenerationRepositoryHandle['generationDiagnosticsRepository']
@@ -64,9 +61,6 @@ export async function createIsolatedGenerationRepository(
   const handle = createGenerationRepositoryFromUrl(testDb.url, options)
   return {
     repository: handle.repository,
-    adminGalleryRepository: handle.adminGalleryRepository,
-    adminTaskRepository: handle.adminTaskRepository,
-    analyticsRepository: handle.analyticsRepository,
     assetRepository: handle.assetRepository,
     auditRepository: handle.auditRepository,
     generationDiagnosticsRepository: handle.generationDiagnosticsRepository,

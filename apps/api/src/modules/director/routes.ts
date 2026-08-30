@@ -1,4 +1,5 @@
 import { Elysia } from 'elysia'
+import { makeDirectorEvent } from '@bailian-studio/event-bus'
 import {
   AttachDirectorAssetSchema,
   CreateDirectorPhaseRunSchema,
@@ -8,11 +9,11 @@ import {
   ListDirectorProjectsSchema,
   UpdateDirectorProjectSchema,
   UpdateDirectorShotSchema,
-  ValidationError,
   createLogger,
   validateInput,
+  ListDirectorEntityCandidatesSchema,
+  ReviewDirectorEntityCandidateSchema,
 } from '@bailian-studio/shared'
-import { estimatePriceCents, getBailianOperationCapability, getModelById, validateModelParams, type FrozenModelManifest } from '@bailian-studio/model-core'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
@@ -22,6 +23,7 @@ const directorLogger = createLogger('director-api')
 
 export function createDirectorRoutes(deps: ApiDependencies) {
   const repository = deps.directorRepository
+  const directorService = deps.directorApplicationService
 
   return new Elysia({ prefix: '/api/director' })
     .get('/projects', async ({ request, query }) => {
@@ -96,12 +98,11 @@ export function createDirectorRoutes(deps: ApiDependencies) {
         messageLength: input.message.length,
       })
       try {
-        const run = await repository.requestPhaseRun({
+        const run = await directorService.requestScriptChat({
           userId: user.id,
           projectId: params.id,
-          phase: 'analyze',
           traceId: requestId,
-          ...input,
+          input,
         })
         directorLogger.info('script_chat.queued', {
           requestId,
@@ -155,84 +156,37 @@ export function createDirectorRoutes(deps: ApiDependencies) {
     .post('/projects/:id/shots/:shotId/video-runs/estimate', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const model = requireDirectorVideoModel(input.modelId)
-      const project = await repository.getProject({ userId: user.id, projectId: params.id })
-      if (project === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
-      const shot = project.shots.find(candidate => candidate.id === params.shotId)
-      if (shot === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_SHOT_NOT_FOUND', `Director shot not found: ${params.shotId}`)
-      }
-      if (shot.status !== 'locked' && shot.status !== 'failed') {
-        throw new DirectorRepositoryError(
-          shot.status === 'generating' ? 'DIRECTOR_SHOT_GENERATING' : 'DIRECTOR_PHASE_INPUT_NOT_READY',
-          'Only a locked or failed storyboard shot can be retried individually',
-        )
-      }
-      validateDirectorVideoShots(model, [shot])
+      const estimate = await directorService.estimateShotVideo({
+        userId: user.id,
+        projectId: params.id,
+        shotId: params.shotId,
+        modelId: input.modelId,
+      })
       return {
         success: true,
-        data: {
-          estimate: {
-            modelId: model.id,
-            estimatedCents: estimateDirectorShotCents(model, shot.durationSeconds, shot.referenceAssetIds.length),
-            shotCount: 1,
-            currency: 'CNY' as const,
-          },
-        },
+        data: { estimate },
       }
     })
     .post('/projects/:id/shots/:shotId/video-runs', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const model = requireDirectorVideoModel(input.modelId)
-      const project = await repository.getProject({ userId: user.id, projectId: params.id })
-      if (project === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
-      const shot = project.shots.find(candidate => candidate.id === params.shotId)
-      if (shot === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_SHOT_NOT_FOUND', `Director shot not found: ${params.shotId}`)
-      }
-      if (shot.status !== 'locked' && shot.status !== 'failed') {
-        throw new DirectorRepositoryError(
-          shot.status === 'generating' ? 'DIRECTOR_SHOT_GENERATING' : 'DIRECTOR_PHASE_INPUT_NOT_READY',
-          'Only a locked or failed storyboard shot can be retried individually',
-        )
-      }
-      validateDirectorVideoShots(model, [shot])
-      const run = await repository.requestPhaseRun({
+      const run = await directorService.createShotVideoRun({
         userId: user.id,
         projectId: params.id,
-        phase: 'videos',
         shotId: params.shotId,
-        ...input,
+        traceId: getRequestTrace(request)?.requestId,
+        input,
       })
       return { success: true, data: { run } }
     })
     .post('/projects/:id/phases/assemble/runs', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const preflight = await repository.getAssemblyPreflight({
+      const run = await directorService.createAssemblyRun({
         userId: user.id,
         projectId: params.id,
-        ...(input.assembly === undefined ? {} : { settings: input.assembly }),
-      })
-      if (preflight === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
-      if (!preflight.ready) {
-        throw new DirectorRepositoryError(
-          'DIRECTOR_PHASE_INPUT_NOT_READY',
-          preflight.issues[0]?.message ?? 'Assembly inputs are not ready',
-        )
-      }
-      const run = await repository.requestPhaseRun({
-        userId: user.id,
-        projectId: params.id,
-        phase: 'assemble',
-        ...input,
+        traceId: getRequestTrace(request)?.requestId,
+        input,
       })
       return { success: true, data: { run } }
     })
@@ -240,98 +194,49 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const phase = validateInput(DirectorPhaseSchema, params.phase)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      if (phase === 'videos') {
-        const model = requireDirectorVideoModel(input.modelId)
-        const project = await repository.getProject({ userId: user.id, projectId: params.id })
-        if (project === undefined) {
-          throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-        }
-        validateDirectorVideoShots(model, project.shots.filter(shot => shot.status === 'locked' || shot.status === 'failed'))
-      }
-      if (phase === 'bgm') {
-        const model = requireDirectorMusicModel(input.modelId)
-        const validation = validateModelParams(model, directorMusicParams(input))
-        if (!validation.valid) {
-          throw new ValidationError(validation.errors[0]?.message ?? 'Invalid music generation parameters')
-        }
-      }
-      const run = await repository.requestPhaseRun({
+      const run = await directorService.createPhaseRun({
         userId: user.id,
         projectId: params.id,
         phase,
-        ...input,
+        traceId: getRequestTrace(request)?.requestId,
+        input,
       })
       return { success: true, data: { run } }
     })
     .post('/projects/:id/phases/videos/estimate', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const model = requireDirectorVideoModel(input.modelId)
-      const project = await repository.getProject({ userId: user.id, projectId: params.id })
-      if (project === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
-      const pendingShots = project.shots.filter(shot => shot.status === 'locked' || shot.status === 'failed')
-      if (
-        project.shots.length === 0
-        || project.shots.some(shot => !['locked', 'failed', 'generating', 'succeeded'].includes(shot.status))
-        || project.shots.some(shot => shot.status === 'generating' && shot.videoGenerationId === null)
-      ) {
-        throw new DirectorRepositoryError(
-          'DIRECTOR_PHASE_INPUT_NOT_READY',
-          'Every current storyboard shot must be locked, resumable, or already generated before estimating video generation',
-        )
-      }
-      validateDirectorVideoShots(model, pendingShots)
-      const estimatedCents = pendingShots.reduce((total, shot) => total + estimateDirectorShotCents(model, shot.durationSeconds, shot.referenceAssetIds.length), 0)
+      const estimate = await directorService.estimateVideos({
+        userId: user.id,
+        projectId: params.id,
+        modelId: input.modelId,
+      })
       return {
         success: true,
-        data: {
-          estimate: {
-            modelId: model.id,
-            estimatedCents,
-            shotCount: pendingShots.length,
-            currency: 'CNY' as const,
-          },
-        },
+        data: { estimate },
       }
     })
     .post('/projects/:id/phases/bgm/estimate', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const model = requireDirectorMusicModel(input.modelId)
-      const paramsForModel = directorMusicParams(input)
-      const validation = validateModelParams(model, paramsForModel)
-      if (!validation.valid) {
-        throw new ValidationError(validation.errors[0]?.message ?? 'Invalid music generation parameters')
-      }
-      const project = await repository.getProject({ userId: user.id, projectId: params.id })
-      if (project === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
+      const estimate = await directorService.estimateMusic({
+        userId: user.id,
+        projectId: params.id,
+        input,
+      })
       return {
         success: true,
-        data: {
-          estimate: {
-            modelId: model.id,
-            estimatedCents: estimatePriceCents(model, paramsForModel),
-            durationSeconds: Number(paramsForModel.duration),
-            currency: 'CNY' as const,
-          },
-        },
+        data: { estimate },
       }
     })
     .post('/projects/:id/phases/assemble/preflight', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreateDirectorPhaseRunSchema, body)
-      const preflight = await repository.getAssemblyPreflight({
+      const preflight = await directorService.getAssemblyPreflight({
         userId: user.id,
         projectId: params.id,
         ...(input.assembly === undefined ? {} : { settings: input.assembly }),
       })
-      if (preflight === undefined) {
-        throw new DirectorRepositoryError('DIRECTOR_PROJECT_NOT_FOUND', `Director project not found: ${params.id}`)
-      }
       return { success: true, data: { preflight } }
     })
     .get('/projects/:id/phases/:phase/runs/:runId', async ({ request, params }) => {
@@ -348,101 +253,48 @@ export function createDirectorRoutes(deps: ApiDependencies) {
       }
       return { success: true, data: { run } }
     })
-}
 
-function estimateDirectorShotCents(
-  manifest: FrozenModelManifest,
-  durationSeconds: number | null,
-  referenceCount: number,
-): number {
-  return estimatePriceCents(manifest, directorVideoParams(manifest, durationSeconds, referenceCount))
-}
-
-function requireDirectorMusicModel(modelId: string | undefined): FrozenModelManifest {
-  const model = modelId === undefined ? undefined : getModelById(modelId)
-  if (model === undefined || model.availability.enabled === false || getBailianOperationCapability(model.id) !== 'music.generate') {
-    throw new ValidationError('音乐阶段需要使用已启用的音乐生成模型')
-  }
-  return model
-}
-
-function directorMusicParams(input: {
-  prompt?: string
-  lyrics?: string
-  isInstrumental?: boolean
-  enableAigcWatermark?: boolean
-  gender?: 'female' | 'male'
-  format?: 'mp3' | 'wav'
-  duration?: number
-}): Record<string, unknown> {
-  return {
-    ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
-    ...(input.lyrics === undefined ? {} : { lyrics: input.lyrics }),
-    isInstrumental: input.isInstrumental ?? false,
-    enableAigcWatermark: input.enableAigcWatermark ?? false,
-    gender: input.gender ?? 'female',
-    format: input.format ?? 'mp3',
-    duration: input.duration ?? 60,
-  }
-}
-
-function validateDirectorVideoShots(
-  manifest: FrozenModelManifest,
-  shots: ReadonlyArray<{ durationSeconds: number | null; referenceAssetIds: string[] }>,
-): void {
-  for (const shot of shots) {
-    const params = directorVideoParams(manifest, shot.durationSeconds, shot.referenceAssetIds.length)
-    const promptParameter = manifest.parameters.find(parameter => parameter.name === 'prompt' && parameter.type === 'text')
-    if (promptParameter !== undefined) params[promptParameter.name] = 'director video estimate'
-    const validation = validateModelParams(manifest, params)
-    if (validation.valid) continue
-    const issue = validation.errors[0]
-    throw new ValidationError(
-      issue?.messages['zh-CN'] ?? issue?.message ?? '视频镜头参数不满足模型约束',
-      'shots',
-      { modelId: manifest.id, code: issue?.code ?? 'PARAMETERS_INVALID' },
-    )
-  }
-}
-
-function directorVideoParams(
-  manifest: FrozenModelManifest,
-  durationSeconds: number | null,
-  referenceCount: number,
-): Record<string, unknown> {
-  const durationParameter = manifest.parameters.find(parameter => parameter.name === 'duration' && parameter.type === 'number')
-  const defaultDuration = durationParameter?.defaultValue
-  const requestedDuration = durationSeconds ?? (typeof defaultDuration === 'number' ? defaultDuration : 5)
-  const duration = durationParameter === undefined
-    ? requestedDuration
-    : Math.min(durationParameter.max ?? requestedDuration, Math.max(durationParameter.min ?? requestedDuration, requestedDuration))
-  const params: Record<string, unknown> = { duration }
-  for (const parameter of manifest.parameters) {
-    if (parameter.defaultValue !== undefined && parameter.name !== 'duration') params[parameter.name] = parameter.defaultValue
-  }
-  const referenceParameter = manifest.parameters.find(parameter => (
-    parameter.type === 'media'
-    && parameter.mediaKind === 'image'
-    && manifest.request.bindings[parameter.name]?.target === 'input.media'
-  ))
-  if (referenceParameter !== undefined && referenceCount > 0) params[referenceParameter.name] = Array.from({ length: referenceCount }, () => 'reference')
-  return params
-}
-
-function requireDirectorVideoModel(modelId: string | undefined): FrozenModelManifest {
-  const model = modelId === undefined ? undefined : getModelById(modelId)
-  if (
-    model === undefined
-    || model.availability.enabled === false
-    || model.request.kind !== 'dashscope-video-task'
-    || getBailianOperationCapability(model.id) !== 'video.reference-to-video'
-    || !model.parameters.some(parameter => (
-      parameter.type === 'media'
-      && parameter.mediaKind === 'image'
-      && model.request.bindings[parameter.name]?.target === 'input.media'
-    ))
-  ) {
-    throw new ValidationError('视频阶段需要使用支持参考图像输入的已启用参考生视频模型', 'modelId')
-  }
-  return model
+    // ── 实体候选：剧本 AI 提取 → 人工审核 ──
+    .get('/projects/:id/entity-candidates', async ({ request, params, query }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(ListDirectorEntityCandidatesSchema, {
+        projectId: params.id,
+        ...(query.status !== undefined ? { status: query.status } : {}),
+        ...(query.kind !== undefined ? { kind: query.kind } : {}),
+      })
+      const candidates = await repository.listEntityCandidates({ userId: user.id, ...input })
+      return { success: true, data: candidates }
+    })
+    .patch('/entity-candidates/:candidateId', async ({ request, params, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(ReviewDirectorEntityCandidateSchema, body)
+      const candidate = await repository.reviewEntityCandidate({
+        userId: user.id,
+        candidateId: params.candidateId,
+        status: input.status,
+      })
+      if (candidate === undefined) {
+        throw new DirectorRepositoryError('DIRECTOR_ENTITY_CANDIDATE_NOT_FOUND', `Candidate not found: ${params.candidateId}`)
+      }
+      deps.generationSseHub.publish(makeDirectorEvent('director.entities.changed', {
+        userId: user.id,
+        projectId: candidate.projectId,
+        candidateId: candidate.id,
+        reason: 'candidate_reviewed',
+      }))
+      return { success: true, data: candidate }
+    })
+    .delete('/entity-candidates/:candidateId', async ({ request, params }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const deleted = await repository.deleteEntityCandidate({ userId: user.id, candidateId: params.candidateId })
+      if (!deleted) {
+        throw new DirectorRepositoryError('DIRECTOR_ENTITY_CANDIDATE_NOT_FOUND', `Candidate not found: ${params.candidateId}`)
+      }
+      deps.generationSseHub.publish(makeDirectorEvent('director.entities.changed', {
+        userId: user.id,
+        candidateId: params.candidateId,
+        reason: 'candidate_deleted',
+      }))
+      return { success: true, data: { deleted: true } }
+    })
 }

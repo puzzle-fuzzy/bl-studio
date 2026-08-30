@@ -11,7 +11,6 @@
  */
 import type { InferSelectModel } from 'drizzle-orm'
 import type { auditLogs, generationArtifacts, generationEvents, generationRecords, generationShares, providerRequestAudits, taskRecords, workerHeartbeats } from '@bailian-studio/db'
-import type { TaskRecord, TaskError } from '@bailian-studio/task-engine'
 import type { AuditLog, AuditEventMetadata } from './audit-types'
 import type { ProviderRequestAudit } from './provider-request-types'
 import type { GenerationArtifact, GenerationAssetRefs, GenerationEvent, GenerationRecord, GenerationShare, WorkerHeartbeat } from './types'
@@ -25,18 +24,9 @@ export type ProviderRequestAuditRow = InferSelectModel<typeof providerRequestAud
 export type WorkerHeartbeatRow = InferSelectModel<typeof workerHeartbeats>
 export type AuditLogRow = InferSelectModel<typeof auditLogs>
 
-/**
- * 类型守卫：判断 value 是否是一个结构合法的 TaskError。
- * 用于在把 errorJson 还原回领域类型前做安全校验，避免任意 JSON 被当成 TaskError。
- */
-function isTaskError(value: unknown): value is TaskError {
-  return value !== null &&
-         typeof value === 'object' &&
-         !Array.isArray(value) &&
-         'category' in value &&
-         'message' in value &&
-         'retriable' in value
-}
+// 任务行映射由 task-repository 统一拥有；这里保留 re-export 让旧的
+// 保留这些映射在共享模块，避免跨 repository 包重复定义。
+export { toTaskRecord } from '@bailian-studio/task-repository'
 
 /** DB 行 → 领域 GenerationRecord；Date 字段统一 toISOString()。 */
 export function toGenerationRecord(
@@ -134,36 +124,6 @@ export function toGenerationArtifact(row: GenerationArtifactRow): GenerationArti
     byteSize: row.byteSize ?? undefined,
     status: row.status as GenerationArtifact['status'],
     errorJson: row.errorJson ?? undefined,
-    createdAt: row.createdAt.toISOString(),
-    updatedAt: row.updatedAt.toISOString(),
-  }
-}
-
-/**
- * DB 行 → 领域 TaskRecord；Date 字段统一 toISOString()。
- * errorJson 仅在结构上通过 isTaskError 守卫后才赋值，否则置 undefined，
- * 避免把脏数据或历史遗留格式当成 TaskError 暴露给上层。
- */
-export function toTaskRecord(row: TaskRecordRow): TaskRecord {
-  return {
-    id: row.id,
-    type: row.type as TaskRecord['type'],
-    domain: row.domain as TaskRecord['domain'],
-    status: row.status as TaskRecord['status'],
-    priority: row.priority,
-    input: row.inputJson,
-    output: row.outputJson ?? undefined,
-    lockedBy: row.lockedBy ?? undefined,
-    lockedUntil: row.lockedUntil?.toISOString(),
-    startedAt: row.startedAt?.toISOString(),
-    completedAt: row.completedAt?.toISOString(),
-    attempts: row.attempts,
-    maxAttempts: row.maxAttempts,
-    nextRunAt: row.nextRunAt.toISOString(),
-    errorJson: row.errorJson === null || !isTaskError(row.errorJson) ? undefined : row.errorJson,
-    recordId: row.recordId ?? undefined,
-    userId: row.userId ?? undefined,
-    traceId: row.traceId ?? undefined,
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }

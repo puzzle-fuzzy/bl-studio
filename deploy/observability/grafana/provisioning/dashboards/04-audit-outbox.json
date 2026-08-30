@@ -1,0 +1,144 @@
+{
+  "annotations": { "list": [] },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 1,
+  "links": [],
+  "panels": [
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 0 },
+      "id": 1,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (container) (sum_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} |= \"audit_outbox.drained\" | json | unwrap failed | __error__=\"\" [$__auto]))",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "审计 outbox 终态失败量",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "short"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 0 },
+      "id": 2,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "sum by (container) (count_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} |= \"audit_outbox.drain_failed\" [$__auto]))",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "审计 outbox 消费异常次数",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "fieldConfig": {
+        "defaults": {
+          "custom": { "drawStyle": "line", "fillOpacity": 15, "lineWidth": 2, "showPoints": "never", "spanNulls": true },
+          "unit": "ms"
+        },
+        "overrides": []
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 8 },
+      "id": 3,
+      "options": {
+        "legend": { "calcs": ["last", "max"], "displayMode": "list", "placement": "bottom" },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "max by (container) (last_over_time({compose_project=\"bailian-studio-prod\",container=~\"$container\"} |= \"worker.metrics_snapshot\" | regexp `\"worker\\.audit_outbox\\.drain_ms\\|status=completed\":\\{\"count\":\\d+,\"sumMs\":\\d+(?:\\.\\d+)?,\"minMs\":\\d+(?:\\.\\d+)?,\"maxMs\":(?P<max_ms>\\d+(?:\\.\\d+)?)\\}` | unwrap max_ms | __error__=\"\" [$__auto]))",
+          "legendFormat": "{{container}}",
+          "refId": "A"
+        }
+      ],
+      "title": "审计 outbox 消费耗时 max",
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "loki", "uid": "lokiuid" },
+      "gridPos": { "h": 12, "w": 12, "x": 12, "y": 8 },
+      "id": 4,
+      "options": {
+        "dedupStrategy": "none",
+        "enableLogDetails": true,
+        "preferVisualisationType": "logs",
+        "showCommonLabels": false,
+        "showTime": true,
+        "sortOrder": "Descending",
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "datasource": { "type": "loki", "uid": "lokiuid" },
+          "editorMode": "code",
+          "expr": "{compose_project=\"bailian-studio-prod\",container=~\"$container\"} |= \"audit_outbox.drain_failed\" or ({compose_project=\"bailian-studio-prod\",container=~\"$container\"} |= \"audit_outbox.drained\" | json | failed=~\"[1-9][0-9]*\")",
+          "refId": "A"
+        }
+      ],
+      "title": "失败与终态失败明细",
+      "type": "logs"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["bailian-studio", "audit-outbox"],
+  "templating": {
+    "list": [
+      {
+        "allValue": ".*",
+        "current": { "selected": true, "text": "All", "value": "$__all" },
+        "datasource": { "type": "loki", "uid": "lokiuid" },
+        "definition": "label_values(container)",
+        "hide": 0,
+        "includeAll": true,
+        "label": "Worker",
+        "multi": true,
+        "name": "container",
+        "options": [],
+        "query": { "query": "label_values(container)", "refId": "container-var" },
+        "refresh": 2,
+        "skipUrlSync": false,
+        "sort": 1,
+        "type": "query"
+      }
+    ]
+  },
+  "time": { "from": "now-6h", "to": "now" },
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "审计 Outbox 运营",
+  "uid": "bailian-audit-outbox",
+  "version": 1
+}

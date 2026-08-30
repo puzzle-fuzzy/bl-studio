@@ -1,4 +1,6 @@
 import type {
+  DirectorEntityCandidate,
+  DirectorEntityCandidateKind,
   CreateDirectorPhaseRunInput,
   CreateDirectorProjectInput,
   AttachDirectorAssetInput,
@@ -209,4 +211,36 @@ export interface DirectorRepository {
   setPhaseRunProgress(input: DirectorPhaseRunProgressInput): Promise<DirectorPhaseRun | undefined>
   completePhaseRun(input: DirectorPhaseRunCompletionInput): Promise<DirectorPhaseRun | undefined>
   failPhaseRun(input: DirectorPhaseRunFailureInput): Promise<DirectorPhaseRun | undefined>
+  listEntityCandidates(input: ListEntityCandidatesInput): Promise<DirectorEntityCandidate[]>
+  createEntityCandidates(input: CreateEntityCandidatesInput): Promise<DirectorEntityCandidate[]>
+  reviewEntityCandidate(input: ReviewEntityCandidateInput): Promise<DirectorEntityCandidate | undefined>
+  deleteEntityCandidate(input: { userId: string; candidateId: string }): Promise<boolean>
+}
+
+export interface ListEntityCandidatesInput {
+  userId: string
+  projectId: string
+  status?: DirectorEntityCandidate['status']
+  kind?: DirectorEntityCandidateKind
+}
+
+export interface CreateEntityCandidateData {
+  kind: DirectorEntityCandidateKind
+  name: string
+  description: string
+  traits: string[]
+  mentions: Array<{ text: string; start: number; end: number }>
+}
+
+export interface CreateEntityCandidatesInput {
+  userId: string
+  projectId: string
+  sourceRunId?: string
+  candidates: CreateEntityCandidateData[]
+}
+
+export interface ReviewEntityCandidateInput {
+  userId: string
+  candidateId: string
+  status: 'accepted' | 'rejected'
 }

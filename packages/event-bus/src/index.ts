@@ -10,13 +10,16 @@
  * 该包被 apps/api 的 SSE hub 与 event-listener 复用；
  * 它本身是 leaf 包，仅依赖类型，不引入 DB / provider / React / Elysia。
  */
-export { generationChannel, generationEventNameForStatus, makeGenerationEvent } from './events'
+export { generationChannel, generationEventNameForStatus, makeDirectorEvent, makeGenerationEvent } from './events'
 export { encodeSSE, type SseMessage } from './sse'
 export type {
   GenerationEventData,
   GenerationEventName,
   GenerationEventPayload,
   GenerationStatus,
+  DirectorEntitiesChangedPayload,
+  DirectorEventData,
+  DirectorEventName,
   NotificationPayload,
   PresencePayload,
   BailianStudioSSEEvent,

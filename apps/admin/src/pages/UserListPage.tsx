@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, Loader2, Search, UserPlus } from 'lucide-react'
 import type { AdminUser } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 import { UserAvatar } from '@/components/layout/user-avatar'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@bailian-studio/ui'
+import { Input } from '@bailian-studio/ui'
+import { Label } from '@bailian-studio/ui'
+import { Badge } from '@bailian-studio/ui'
+import { Card, CardContent } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Checkbox } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@bailian-studio/ui'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@bailian-studio/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
 
 const PAGE_SIZE = 20
 
@@ -27,12 +28,10 @@ function formatDate(iso: string): string {
 export function UserListPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const q = searchParams.get('q') ?? ''
-  const [items, setItems] = useState<AdminUser[]>([])
-  const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
   const [searchInput, setSearchInput] = useState(q)
+  // 批量/单行操作的服务端反馈（成功计数、部分失败等）；与查询错误分离。
+  const [notice, setNotice] = useState<string | null>(null)
 
   const currentAdminId = useAdminAuthStore(state => state.user?.id)
 
@@ -54,31 +53,28 @@ export function UserListPage() {
   const [grantBusy, setGrantBusy] = useState(false)
   const [grantError, setGrantError] = useState<string | null>(null)
 
-  /** 请求序号：搜索词/翻页快速切换时，旧响应晚到不得覆盖新结果（P1-08）。 */
-  const requestSeq = useRef(0)
+  // Batch 0c：useQuery 的缓存键含 (q, page)，翻页/切词自动重取；keepPreviousData
+  // 让翻页时旧列表不闪空。旧的 requestSeq 手写守卫（P1-08）由此作废。
+  const queryClient = useQueryClient()
+  const { data, isPending, error: queryError } = useQuery({
+    queryKey: ['admin', 'users', q, page],
+    queryFn: () => apiClient.listAdminUsers({ q: q || undefined, page, pageSize: PAGE_SIZE }),
+    placeholderData: keepPreviousData,
+  })
+  const items = data?.items ?? []
+  const total = data?.total ?? 0
+  const loading = isPending && data === undefined
+  const error = notice ?? (queryError !== null ? userErrorMessage(queryError) : null)
 
-  const load = useCallback(async (pageNo: number) => {
-    const seq = ++requestSeq.current
-    setLoading(true)
-    setError(null)
-    setSelected(new Set())
-    try {
-      const result = await apiClient.listAdminUsers({ q: q || undefined, page: pageNo, pageSize: PAGE_SIZE })
-      if (seq !== requestSeq.current) return
-      setItems(result.items)
-      setTotal(result.total ?? 0)
-      setPage(pageNo)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoading(false)
-    }
-  }, [q])
+  const invalidateUsers = () => queryClient.invalidateQueries({ queryKey: ['admin', 'users'] })
 
-  // q 变化（搜索/清空）时回到第一页。
+  // q 变化（搜索/清空）时回到第一页；换页/换词清空勾选。
   useEffect(() => {
-    void load(1)
-  }, [load])
+    setPage(1)
+  }, [q])
+  useEffect(() => {
+    setSelected(new Set())
+  }, [q, page])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
@@ -129,7 +125,8 @@ export function UserListPage() {
       })
       setCreateOpen(false)
       setCreateForm({ email: '', password: '', displayName: '', role: 'user' })
-      void load(1)
+      setPage(1)
+      void invalidateUsers()
     } catch (err) {
       setCreateError(userErrorMessage(err))
     } finally {
@@ -143,9 +140,9 @@ export function UserListPage() {
     try {
       await apiClient.adminDeleteUser(deleting.id)
       setDeleting(null)
-      void load(page)
+      void invalidateUsers()
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
       setDeleting(null)
     } finally {
       setDeletingBusy(false)
@@ -155,16 +152,16 @@ export function UserListPage() {
   const runBatch = async (op: () => Promise<unknown>, okMessage: string) => {
     if (selectedCount === 0) return
     setBatchBusy(true)
-    setError(null)
+    setNotice(null)
     try {
       const result = await op()
       const affected = typeof result === 'object' && result !== null && 'affected' in result
         ? String((result as { affected: number }).affected)
         : String(selectedCount)
-      setError(`${okMessage}：${affected} 位用户`)
-      void load(page)
+      setNotice(`${okMessage}：${affected} 位用户`)
+      void invalidateUsers()
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setBatchBusy(false)
     }
@@ -214,12 +211,12 @@ export function UserListPage() {
       })
       setGrantOpen(false)
       setGrantForm({ amountCents: '', reason: '' })
-      setError(
+      setNotice(
         result.failed.length === 0
           ? `已赠送 ${result.granted} 位用户各 ${amountCents} 积分`
           : `已赠送 ${result.granted} 位用户，${result.failed.length} 位失败`,
       )
-      void load(page)
+      void invalidateUsers()
     } catch (err) {
       setGrantError(userErrorMessage(err))
     } finally {
@@ -231,9 +228,9 @@ export function UserListPage() {
     setBatchBusy(true)
     try {
       await apiClient.adminBanUser(user.id)
-      void load(page)
+      void invalidateUsers()
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setBatchBusy(false)
     }
@@ -243,9 +240,9 @@ export function UserListPage() {
     setBatchBusy(true)
     try {
       await apiClient.adminUnbanUser(user.id)
-      void load(page)
+      void invalidateUsers()
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setBatchBusy(false)
     }
@@ -388,7 +385,7 @@ export function UserListPage() {
       </Card>
 
       {totalPages > 1 && (
-        <PaginationBar page={page} totalPages={totalPages} loading={loading} onPageChange={pageNo => void load(pageNo)} />
+        <PaginationBar page={page} totalPages={totalPages} loading={loading} onPageChange={setPage} />
       )}
 
       <Dialog open={createOpen} onOpenChange={setCreateOpen}>

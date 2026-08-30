@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client'
 import { RouterProvider } from 'react-router'
 import { router } from './routes'
 import { installChunkRecovery } from '@/lib/chunk-recovery'
+import { AppQueryProvider } from '@bailian-studio/lib-client'
 import './styles.css'
 
 // 部署后旧 chunk 被删、客户端仍引用时，动态 import 会 404。index.html 已是
@@ -16,6 +17,8 @@ if (rootElement === null) {
 
 createRoot(rootElement).render(
   <StrictMode>
-    <RouterProvider router={router} />
+    <AppQueryProvider>
+      <RouterProvider router={router} />
+    </AppQueryProvider>
   </StrictMode>,
 )

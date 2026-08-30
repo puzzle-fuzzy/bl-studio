@@ -3,7 +3,7 @@
  *
  * 现在 AUDIT_ACTIONS（@bailian-studio/generation-repository）是唯一运行时事实源，
  * 类型由它派生。本测试把三处「手工投影」逐一与它比对，防止新增 audit action 时漏改一处：
- *   1. packages/db/src/schema.ts 的 audit_logs_action_check CHECK 内联列表；
+ *   1. packages/db/src/schema/identity.ts 的 audit_logs_action_check CHECK 内联列表；
  *   2. packages/db/drizzle/*.sql 里所有内嵌该 CHECK 的迁移（断言单调增长，最新一份 == AUDIT_ACTIONS）；
  *   3. ensure-audit-action-constraint.ts 已改为直接 import AUDIT_ACTIONS（编译期即锁定），
  *      这里顺带断言它不再内联手抄、且重建走 NOT VALID + VALIDATE。
@@ -15,7 +15,8 @@ import { fileURLToPath } from 'node:url'
 import { AUDIT_ACTIONS } from '@bailian-studio/generation-repository'
 
 const root = fileURLToPath(new URL('../..', import.meta.url))
-const schemaSource = readFileSync(`${root}/packages/db/src/schema.ts`, 'utf8')
+// schema 按域拆分后，audit_logs 的 CHECK 定义位于 identity 域文件。
+const schemaSource = readFileSync(`${root}/packages/db/src/schema/identity.ts`, 'utf8')
 const ensureSource = readFileSync(`${root}/scripts/db/ensure-audit-action-constraint.ts`, 'utf8')
 
 /** 从 `in ('a', 'b')` 段落里提取 action 集合。 */

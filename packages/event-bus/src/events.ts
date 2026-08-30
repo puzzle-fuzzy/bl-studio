@@ -74,6 +74,15 @@ export interface NotificationPayload {
   userId?: string
 }
 
+/** 导演实体发生变化时的实时失效提示。实体本身仍以 API 查询结果为准。 */
+export interface DirectorEntitiesChangedPayload {
+  userId: string
+  /** 删除候选时服务端可能无法从删除结果中携带项目 id，前端应回退失效整个 director 查询根。 */
+  projectId?: string
+  candidateId: string
+  reason: 'candidate_reviewed' | 'candidate_deleted'
+}
+
 /**
  * 全平台 SSE 事件目录：事件名 → 载荷形状的映射。
  *
@@ -90,6 +99,7 @@ export interface BailianStudioSSEEventMap {
   'presence.snapshot': PresencePayload
   'presence.changed': PresencePayload
   notification: NotificationPayload
+  'director.entities.changed': DirectorEntitiesChangedPayload
 }
 
 /**
@@ -104,6 +114,19 @@ export type BailianStudioSSEEvent = {
 export type GenerationEventName = Extract<keyof BailianStudioSSEEventMap, `generation.${string}`>
 /** 按事件名查表得到的载荷类型。 */
 export type GenerationEventData<TEvent extends GenerationEventName> = BailianStudioSSEEventMap[TEvent]
+
+/** 所有 director.* 事件名的提取联合。 */
+export type DirectorEventName = Extract<keyof BailianStudioSSEEventMap, `director.${string}`>
+/** 按事件名查表得到的导演事件载荷类型。 */
+export type DirectorEventData<TEvent extends DirectorEventName> = BailianStudioSSEEventMap[TEvent]
+
+/** 类型安全的导演事件构造器。导演事件不进入 generation_events outbox，只作实时失效提示。 */
+export function makeDirectorEvent<TEvent extends DirectorEventName>(
+  event: TEvent,
+  data: DirectorEventData<TEvent>,
+): { event: TEvent; data: DirectorEventData<TEvent> } {
+  return { event, data }
+}
 
 /**
  * 构造某个用户专属的 generation 频道名。

@@ -145,7 +145,7 @@ describe('creative asset routes', () => {
     expect(body.error.code).toBe('CREATIVE_PROJECT_NOT_FOUND')
   })
 
-  it('collects a stored generation artifact into a draft creative asset version', async () => {
+  it('atomically collects a stored generation artifact and safely retries by idempotency key', async () => {
     await grantTestCredits(isolated.db, currentUserId, 100_000)
     const created = await isolated.repository.createGeneration({
       userId: currentUserId,
@@ -167,27 +167,34 @@ describe('creative asset routes', () => {
       mimeType: 'image/png',
     })
 
-    const assetResponse = await app.handle(authed('http://localhost/api/creative/assets', {
+    const requestBody = {
+      type: 'character',
+      name: '林默',
+      description: '男主角',
+      sourceGenerationId: created.record.id,
+      semanticSpec: { identity: { name: '林默' } },
+      generationRecipe: { source: 'generation' },
+      references: [{ artifactId: artifact.id, role: 'front', position: 0, metadata: { source: 'generated' } }],
+    }
+    const invalidResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ type: 'character', name: '林默' }),
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-invalid' },
+      body: JSON.stringify({ ...requestBody, name: '不应创建', references: [{ ...requestBody.references[0], artifactId: 'missing-artifact' }] }),
     }))
-    const assetBody = await assetResponse.json() as { data: { asset: { id: string } } }
-    const assetId = assetBody.data.asset.id
+    expect(invalidResponse.status).toBe(400)
+    const afterInvalidResponse = await app.handle(authed('http://localhost/api/creative/assets'))
+    const afterInvalidBody = await afterInvalidResponse.json() as { data: { items: Array<{ id: string }> } }
+    expect(afterInvalidBody.data.items).toHaveLength(0)
 
-    const collectResponse = await app.handle(authed(`http://localhost/api/creative/assets/${assetId}/versions/from-generation`, {
+    const collectResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation', {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        sourceGenerationId: created.record.id,
-        semanticSpec: { identity: { name: '林默' } },
-        generationRecipe: { source: 'generation' },
-        references: [{ artifactId: artifact.id, role: 'front', position: 0, metadata: { source: 'generated' } }],
-      }),
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-generation-1' },
+      body: JSON.stringify(requestBody),
     }))
     const collectBody = await collectResponse.json() as {
       data: {
         asset: {
+          id: string
           preview?: { url?: string }
           versions: Array<{ status: string; sourceGenerationId?: string; references: Array<{ userAssetId: string }> }>
         }
@@ -195,11 +202,65 @@ describe('creative asset routes', () => {
     }
 
     expect(collectResponse.status).toBe(200)
+    const firstAssetId = collectBody.data.asset.id
     expect(collectBody.data.asset.preview?.url).toContain(`/signed/generations/${created.record.id}/`)
     expect(collectBody.data.asset.versions[0]).toMatchObject({
       status: 'draft',
       sourceGenerationId: created.record.id,
       references: [{ userAssetId: `asset_generation_${artifact.id}` }],
     })
+
+    const retryResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-generation-1' },
+      body: JSON.stringify(requestBody),
+    }))
+    const retryBody = await retryResponse.json() as { data: { asset: { id: string; versions: unknown[] } } }
+    expect(retryResponse.status).toBe(200)
+    expect(retryBody.data.asset.id).toBe(firstAssetId)
+    expect(retryBody.data.asset.versions).toHaveLength(1)
+
+    const conflictResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-generation-1' },
+      body: JSON.stringify({ ...requestBody, name: '林默（修改请求）' }),
+    }))
+    const conflictBody = await conflictResponse.json() as { error: { code: string } }
+    expect(conflictResponse.status).toBe(409)
+    expect(conflictBody.error.code).toBe('CREATIVE_IDEMPOTENCY_CONFLICT')
+
+    const batchBody = { items: [
+      { ...requestBody, name: '林默批次' },
+      { ...requestBody, name: '医院走廊批次', type: 'environment', references: [{ ...requestBody.references[0], role: 'wide' } ] },
+    ] }
+    const invalidBatchResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-batch-invalid' },
+      body: JSON.stringify({ ...batchBody, items: [...batchBody.items, { ...requestBody, name: '无效项', references: [{ ...requestBody.references[0], artifactId: 'missing-artifact' }] }] }),
+    }))
+    expect(invalidBatchResponse.status).toBe(400)
+    const afterInvalidBatchResponse = await app.handle(authed('http://localhost/api/creative/assets'))
+    const afterInvalidBatchBody = await afterInvalidBatchResponse.json() as { data: { items: Array<{ id: string }> } }
+    expect(afterInvalidBatchBody.data.items).toHaveLength(1)
+
+    const batchResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-batch-1' },
+      body: JSON.stringify(batchBody),
+    }))
+    const batchResponseBody = await batchResponse.json() as { data: { batch: { id: string; assets: Array<{ id: string; versions: unknown[] }> } } }
+    expect(batchResponse.status).toBe(200)
+    expect(batchResponseBody.data.batch.assets).toHaveLength(2)
+    expect(batchResponseBody.data.batch.assets.every(asset => asset.versions.length === 1)).toBe(true)
+
+    const batchRetryResponse = await app.handle(authed('http://localhost/api/creative/assets/collect-from-generation/batch', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'Idempotency-Key': 'collect-batch-1' },
+      body: JSON.stringify(batchBody),
+    }))
+    const batchRetryBody = await batchRetryResponse.json() as { data: { batch: { id: string; assets: Array<{ id: string }> } } }
+    expect(batchRetryResponse.status).toBe(200)
+    expect(batchRetryBody.data.batch.id).toBe(batchResponseBody.data.batch.id)
+    expect(batchRetryBody.data.batch.assets.map(asset => asset.id)).toEqual(batchResponseBody.data.batch.assets.map(asset => asset.id))
   })
 })

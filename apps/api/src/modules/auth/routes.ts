@@ -90,13 +90,13 @@ export function createAuthRoutes(deps: ApiDependencies) {
     .post('/register', async ({ request, body }) => {
       try {
         const registration = await deps.authService.register(validateInput(RegisterSchema, body))
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.register',
           outcome: 'succeeded',
         })
         return { success: true, data: { registration } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.register',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -112,7 +112,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
           value: result.token,
           ...sessionCookieAttributes(maxAgeFor(result.expiresAt), deps.cookieSecure),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: result.user.id,
           action: 'auth.verify-email',
           outcome: 'succeeded',
@@ -121,7 +121,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: result.user } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.verify-email',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -134,7 +134,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         const input = validateInput(EmailSchema, body)
         const result = await deps.authService.resendVerification(input.email)
         set.status = 202
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.resend-verification',
           outcome: 'succeeded',
         })
@@ -142,7 +142,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
       } catch (error) {
         if (error instanceof AuthError && error.code === 'AUTH_EMAIL_RATE_LIMITED') {
           set.status = 202
-          await recordApiAuditEvent(deps.generationRepository, request, {
+          await recordApiAuditEvent(deps.auditRepository, request, {
             action: 'auth.resend-verification',
             outcome: 'succeeded',
             metadata: { rateLimited: true },
@@ -156,7 +156,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
             },
           }
         }
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.resend-verification',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -171,7 +171,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
           value: result.token,
           ...sessionCookieAttributes(maxAgeFor(result.expiresAt), deps.cookieSecure),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: result.user.id,
           action: 'auth.login',
           outcome: 'succeeded',
@@ -180,7 +180,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: result.user } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.login',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -193,7 +193,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         const input = validateInput(EmailSchema, body)
         const result = await deps.authService.forgotPassword(input.email)
         set.status = 202
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.forgot-password',
           outcome: 'succeeded',
         })
@@ -202,14 +202,14 @@ export function createAuthRoutes(deps: ApiDependencies) {
         // 冷却命中时同样返回 202（accepted），避免通过状态码区分账号是否存在。
         if (error instanceof AuthError && error.code === 'AUTH_EMAIL_RATE_LIMITED') {
           set.status = 202
-          await recordApiAuditEvent(deps.generationRepository, request, {
+          await recordApiAuditEvent(deps.auditRepository, request, {
             action: 'auth.forgot-password',
             outcome: 'succeeded',
             metadata: { rateLimited: true },
           })
           return { success: true, data: { accepted: true as const } }
         }
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.forgot-password',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -221,13 +221,13 @@ export function createAuthRoutes(deps: ApiDependencies) {
       try {
         const input = validateInput(ResetPasswordSchema, body)
         await deps.authService.resetPassword(input.token, input.newPassword)
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.reset-password',
           outcome: 'succeeded',
         })
         return new Response(null, { status: 204 })
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.reset-password',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -244,7 +244,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
           value: result.token,
           ...sessionCookieAttributes(maxAgeFor(result.expiresAt), deps.cookieSecure),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: result.user.id,
           action: 'auth.change-password',
           outcome: 'succeeded',
@@ -253,7 +253,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: result.user } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.change-password',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -265,7 +265,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
       try {
         const user = await requireAuthUser(request, deps.authService)
         const updated = await deps.authService.unlinkGithub(user.id)
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'auth.github',
           outcome: 'succeeded',
@@ -275,7 +275,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: updated } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.github',
           outcome: 'failed',
           metadata: { operation: 'unlink', errorCode: auditErrorCode(error) },
@@ -288,14 +288,14 @@ export function createAuthRoutes(deps: ApiDependencies) {
       try {
         if (token !== undefined) await deps.authService.revokeSessionByToken(token)
         setSessionCookie(set, clearedCookieAttributes(deps.cookieSecure))
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.logout',
           outcome: 'succeeded',
           metadata: { hadSessionCookie: token !== undefined },
         })
         return new Response(null, { status: 204 })
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.logout',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error), hadSessionCookie: token !== undefined },
@@ -309,7 +309,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         const user = await requireAuthUser(request, deps.authService)
         await deps.authService.revokeAllSessionsByToken(token)
         setSessionCookie(set, clearedCookieAttributes(deps.cookieSecure))
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'auth.logout-all',
           outcome: 'succeeded',
@@ -318,7 +318,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return new Response(null, { status: 204 })
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.logout-all',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -333,7 +333,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
           user.id,
           validateInput(ProfileUpdateSchema, body),
         )
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'auth.profile.update',
           outcome: 'succeeded',
@@ -342,7 +342,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: updated } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.profile.update',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -394,7 +394,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
           await deleteStorageKeyBestEffort(deps.storage, previousKey)
         }
 
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'auth.avatar.update',
           outcome: 'succeeded',
@@ -404,7 +404,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: updated } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.avatar.update',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },
@@ -420,7 +420,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         if (previousKey !== undefined && previousKey !== null) {
           await deleteStorageKeyBestEffort(deps.storage, previousKey)
         }
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'auth.avatar.remove',
           outcome: 'succeeded',
@@ -429,7 +429,7 @@ export function createAuthRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { user: updated } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           action: 'auth.avatar.remove',
           outcome: 'failed',
           metadata: { errorCode: auditErrorCode(error) },

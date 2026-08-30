@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
-import { createDb, userAssets, users } from '@bailian-studio/db'
+import {
+  auditEventOutbox,
+  createDb,
+  generationArtifacts,
+  generationRecords,
+  userAssets,
+  users,
+} from '@bailian-studio/db'
 import { createIsolatedTestDb, resetBailianStudioTestDb } from '@bailian-studio/db/test'
+import { eq } from 'drizzle-orm'
 import { CreativeAssetRepositoryError } from '../src/errors'
 import { createCreativeAssetRepository } from '../src/repository'
 
@@ -36,6 +44,51 @@ async function createReferenceSource(id: string, userId = ownerId): Promise<void
     createdAt: now,
     updatedAt: now,
   })
+}
+
+async function createStoredGenerationArtifact(): Promise<{ generationId: string; artifactId: string }> {
+  const generationId = 'creative-generation-source'
+  const artifactId = 'creative-generation-artifact'
+  await db.insert(generationRecords).values({
+    id: generationId,
+    userId: ownerId,
+    modelId: 'qwen-image',
+    provider: 'dashscope',
+    providerModel: 'qwen-image-v1',
+    category: 'image',
+    inputParamsJson: { prompt: 'portrait' },
+    status: 'succeeded',
+    costEstimate: 10,
+    providerCancelStatus: 'not_requested',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.insert(generationArtifacts).values({
+    id: artifactId,
+    recordId: generationId,
+    userId: ownerId,
+    kind: 'image',
+    sourceUrl: 'https://provider.test/portrait.png',
+    storageProvider: 'oss',
+    storageKey: `generations/${generationId}/${artifactId}.png`,
+    status: 'stored',
+    createdAt: now,
+    updatedAt: now,
+  })
+  await db.insert(userAssets).values({
+    id: `asset_generation_${artifactId}`,
+    userId: ownerId,
+    kind: 'image',
+    source: 'generation',
+    generationArtifactId: artifactId,
+    recordId: generationId,
+    storageProvider: 'oss',
+    storageKey: `generations/${generationId}/${artifactId}.png`,
+    status: 'ready',
+    createdAt: now,
+    updatedAt: now,
+  })
+  return { generationId, artifactId }
 }
 
 beforeAll(async () => {
@@ -163,6 +216,50 @@ describe('creative asset repository', () => {
       assetVersionId: versionId,
       referenceId,
     })).rejects.toMatchObject({ code: 'CREATIVE_ASSET_VERSION_STATE_INVALID' })
+  })
+
+  it('writes one transactional audit outbox event for a new collection and not for its retry', async () => {
+    const source = await createStoredGenerationArtifact()
+    const input = {
+      userId: ownerId,
+      idempotencyKey: 'collect-audit-1',
+      type: 'character' as const,
+      name: '林默',
+      sourceGenerationId: source.generationId,
+      semanticSpec: { identity: { name: '林默' } },
+      generationRecipe: { source: 'generation' },
+      references: [{ artifactId: source.artifactId, role: 'front' as const, position: 0, metadata: {} }],
+      now: now.toISOString(),
+    }
+
+    const first = await repository.collectAssetFromGeneration(input)
+    const retry = await repository.collectAssetFromGeneration(input)
+    const outboxRows = await db
+      .select()
+      .from(auditEventOutbox)
+      .where(eq(auditEventOutbox.userId, ownerId))
+
+    expect(retry.id).toBe(first.id)
+    expect(outboxRows).toHaveLength(1)
+    expect(outboxRows[0]).toMatchObject({
+      action: 'asset.import',
+      outcome: 'succeeded',
+      status: 'pending',
+      targetType: 'creative_asset',
+      targetId: first.id,
+      metadataJson: { source: 'generation', assetCount: 1 },
+    })
+
+    await expect(repository.collectAssetFromGeneration({
+      ...input,
+      idempotencyKey: 'collect-audit-invalid',
+      references: [{ artifactId: 'missing-artifact', role: 'front', position: 0, metadata: {} }],
+    })).rejects.toMatchObject({ code: 'CREATIVE_ASSET_REFERENCE_INVALID' })
+    const afterFailure = await db
+      .select()
+      .from(auditEventOutbox)
+      .where(eq(auditEventOutbox.userId, ownerId))
+    expect(afterFailure).toHaveLength(1)
   })
 
   it('reuses an asset across projects without allowing cross-user access', async () => {

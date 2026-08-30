@@ -7,13 +7,18 @@
  */
 
 import type { AuditOutboxRepository } from '@bailian-studio/audit-repository'
+import type {
+  AdminGalleryRepository,
+  AdminRepository,
+  AdminTaskRepository,
+  AnalyticsRepository,
+} from '@bailian-studio/admin-repository'
 import type { AuthService } from '@bailian-studio/auth'
+import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { DirectorRepository } from '@bailian-studio/director-repository'
 import type {
-  AdminTaskRepository,
-  AnalyticsRepository,
   AuditRepository,
   GenerationDiagnosticsRepository,
   GenerationRepository,
@@ -48,7 +53,12 @@ function missing<T>(name: string): T {
   ) as T
 }
 
-export type TestAppOverrides = Partial<ApiDependencies>
+export type TestAppOverrides = Partial<ApiDependencies> & {
+  /** 兼容既有路由测试的扁平 mock 写法；生产依赖只有 adminRepository。 */
+  adminGalleryRepository?: AdminGalleryRepository
+  adminTaskRepository?: AdminTaskRepository
+  analyticsRepository?: AnalyticsRepository
+}
 
 export interface TestAppContext {
   readonly app: App
@@ -90,15 +100,19 @@ export function createTestApp(
   const contentReportRepository =
     overrides.contentReportRepository ??
     missing<ApiDependencies['contentReportRepository']>('contentReportRepository')
-  const adminGalleryRepository =
-    overrides.adminGalleryRepository ??
-    missing<ApiDependencies['adminGalleryRepository']>('adminGalleryRepository')
-  const adminTaskRepository =
-    overrides.adminTaskRepository ??
-    missing<AdminTaskRepository>('adminTaskRepository')
-  const analyticsRepository =
-    overrides.analyticsRepository ??
-    missing<AnalyticsRepository>('analyticsRepository')
+  const adminRepository =
+    overrides.adminRepository ??
+    ({
+      gallery:
+        overrides.adminGalleryRepository ??
+        missing<AdminGalleryRepository>('adminRepository.gallery'),
+      tasks:
+        overrides.adminTaskRepository ??
+        missing<AdminTaskRepository>('adminRepository.tasks'),
+      analytics:
+        overrides.analyticsRepository ??
+        missing<AnalyticsRepository>('adminRepository.analytics'),
+    } satisfies AdminRepository)
   const usageRepository =
     overrides.usageRepository ??
     missing<UsageRepository>('usageRepository')
@@ -149,9 +163,9 @@ export function createTestApp(
     promptLibraryRepository,
     feedbackRepository,
     contentReportRepository,
-    adminGalleryRepository,
-    adminTaskRepository,
-    analyticsRepository,
+    adminRepository,
+    canvasRepository:
+      overrides.canvasRepository ?? missing<CanvasRepository>('canvasRepository'),
     usageRepository,
     generationApplicationService,
     directorRepository,

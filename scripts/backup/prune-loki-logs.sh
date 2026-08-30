@@ -3,7 +3,7 @@
 #
 # 通过 Loki delete API 队列化删除早于 CUTOFF_HOURS 的日志；Loki 默认保留 24h
 # 取消窗口，之后由 compactor 在下一次压缩周期真正应用。
-# 用法（在服务器上执行）：pnpm run logs:prune  或  CUTOFF_HOURS=48 pnpm run logs:prune
+# 用法（在服务器上执行）：bun run logs:prune  或  CUTOFF_HOURS=48 bun run logs:prune
 set -euo pipefail
 
 LOKI_URL="${LOKI_URL:-http://127.0.0.1:3100}"

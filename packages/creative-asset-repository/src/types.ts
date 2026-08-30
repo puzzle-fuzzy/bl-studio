@@ -183,6 +183,39 @@ export interface CreateCreativeAssetVersionFromGenerationRepositoryInput {
   now?: string
 }
 
+export interface CollectCreativeAssetFromGenerationRepositoryInput {
+  userId: string
+  idempotencyKey: string
+  type: CreateCreativeAssetInput['type']
+  name: CreateCreativeAssetInput['name']
+  description?: CreateCreativeAssetInput['description']
+  metadata?: CreateCreativeAssetInput['metadata']
+  projectId?: string
+  sourceGenerationId: CreateCreativeAssetVersionFromGenerationInput['sourceGenerationId']
+  semanticSpec: CreateCreativeAssetVersionFromGenerationInput['semanticSpec']
+  generationRecipe: CreateCreativeAssetVersionFromGenerationInput['generationRecipe']
+  notes?: CreateCreativeAssetVersionFromGenerationInput['notes']
+  references: CreateCreativeAssetVersionFromGenerationInput['references']
+  now?: string
+}
+
+export type CollectCreativeAssetFromGenerationRepositoryItem = Omit<
+  CollectCreativeAssetFromGenerationRepositoryInput,
+  'userId' | 'idempotencyKey' | 'now'
+>
+
+export interface CollectCreativeAssetFromGenerationBatchRepositoryInput {
+  userId: string
+  idempotencyKey: string
+  items: CollectCreativeAssetFromGenerationRepositoryItem[]
+  now?: string
+}
+
+export interface CreativeAssetCollectionBatch {
+  id: string
+  assets: CreativeAssetDetail[]
+}
+
 export interface AddCreativeAssetReferenceRepositoryInput extends CreateCreativeAssetReferenceInput {
   userId: string
   now?: string
@@ -259,6 +292,8 @@ export interface CreativeAssetRepository {
   detachAsset(input: DetachCreativeAssetRepositoryInput): Promise<CreativeProjectDetail>
   createVersion(input: CreateCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   createVersionFromGeneration(input: CreateCreativeAssetVersionFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
+  collectAssetFromGeneration(input: CollectCreativeAssetFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
+  collectAssetFromGenerationBatch(input: CollectCreativeAssetFromGenerationBatchRepositoryInput): Promise<CreativeAssetCollectionBatch>
   addReference(input: AddCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   removeReference(input: RemoveCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   transitionVersion(input: TransitionCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>

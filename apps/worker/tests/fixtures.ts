@@ -9,7 +9,6 @@ import type {
   CompleteGenerationInput,
   CompleteGenerationResult,
   CompleteAssetThumbnailInput,
-  CostMarginRow,
   ContentReport,
   CreateGenerationInput,
   CreateGenerationResult,
@@ -20,7 +19,6 @@ import type {
   FinishProviderRequestInput,
   GalleryDetail,
   GenerationArtifact,
-  GenerationCallStats,
   GenerationEvent,
   GenerationInputAsset,
   GenerationRecord,
@@ -28,8 +26,6 @@ import type {
   GenerationShare,
   GetOwnedStorageObjectInput,
   GetGenerationShareForRecordInput,
-  ListAdminGalleryResult,
-  ListAdminTasksResult,
   ListFeedbackResult,
   ListContentReportsResult,
   ListGalleryResult,
@@ -43,9 +39,7 @@ import type {
   ListUnifiedAssetsResult,
   MarkArtifactFailedInput,
   MarkArtifactStoredInput,
-  ModelCost,
   PromptLibraryItem,
-  RetentionAnalytics,
   UserFeedback,
   MarkAssetThumbnailProcessingInput,
   MarkGenerationProcessingInput,
@@ -156,10 +150,6 @@ export class FakeRepository implements GenerationRepository {
 
   listStuckGenerationRecords(_input?: ListStuckGenerationRecordsInput): Promise<GenerationRecord[]> {
     return Promise.resolve([])
-  }
-
-  countGenerationCallsBetween(_since: string, _until: string): Promise<GenerationCallStats> {
-    return Promise.resolve({ total: 0, byModel: [], byHour: [] })
   }
 
   startProviderRequest(input: StartProviderRequestInput): Promise<ProviderRequestAudit> {
@@ -526,18 +516,6 @@ export class FakeRepository implements GenerationRepository {
   deletePromptLibraryItem(): Promise<void> {
     return Promise.resolve()
   }
-  listModelCosts(): Promise<ModelCost[]> {
-    return Promise.resolve([])
-  }
-  upsertModelCosts(): Promise<void> {
-    return Promise.resolve()
-  }
-  getCostMarginAnalytics(): Promise<CostMarginRow[]> {
-    return Promise.resolve([])
-  }
-  getRetentionAnalytics(): Promise<RetentionAnalytics> {
-    return Promise.resolve({ firstGeneration: 0, firstSuccess: 0, activeTwoDays: 0 })
-  }
   submitFeedback(): Promise<UserFeedback> {
     throw new Error('FakeRepository.submitFeedback is not used')
   }
@@ -558,33 +536,6 @@ export class FakeRepository implements GenerationRepository {
   }
   updateContentReport(): Promise<ContentReport> {
     throw new Error('FakeRepository.updateContentReport is not used')
-  }
-  // ---- 社区治理（admin）+ 社交通知方法：worker 不使用，按需返回占位值以满足接口。 ----
-  listAdminGalleryGenerations(): Promise<ListAdminGalleryResult> {
-    return Promise.resolve({ items: [] })
-  }
-  getAdminGalleryArtifact(): Promise<GenerationArtifact | undefined> {
-    return Promise.resolve(undefined)
-  }
-  listAdminGalleryRecordArtifacts(input: { recordId: string }): Promise<GenerationArtifact[]> {
-    return Promise.resolve(
-      [...this.artifacts.values()].filter(artifact => artifact.recordId === input.recordId),
-    )
-  }
-  setGalleryRecordHidden(): Promise<void> {
-    return Promise.resolve()
-  }
-  setGalleryRecordsHidden(): Promise<string[]> {
-    return Promise.resolve([])
-  }
-  softDeleteGalleryRecords(): Promise<string[]> {
-    return Promise.resolve([])
-  }
-  hideUserPublicWorks(): Promise<number> {
-    return Promise.resolve(0)
-  }
-  listAdminTasks(): Promise<ListAdminTasksResult> {
-    return Promise.resolve({ items: [] })
   }
   getGenerationOwner(): Promise<string | undefined> {
     return Promise.resolve(undefined)

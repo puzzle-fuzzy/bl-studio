@@ -27,7 +27,7 @@ export type BailianStudioDbTransaction = Parameters<Parameters<BailianStudioDb['
 export interface CreateDbOptions {
   /** Postgres 连接串，形如 `postgres://user:pass@host:port/db`。 */
   url: string
-  /** 连接池上限，默认 5。worker/API 各自按并发量调整。 */
+  /** 连接池上限，默认 5；一个进程应在组合根创建一次并由所有 repository 复用。 */
   max?: number
 }
 
@@ -39,7 +39,7 @@ export interface CreateDbOptions {
  * 连接池，而不必再持有原始 client 引用。
  *
  * @param options.url  Postgres 连接串
- * @param options.max  连接池上限（默认 5）
+ * @param options.max  连接池上限（默认 5）；通常由进程组合根统一设置
  */
 export function createDb(options: CreateDbOptions) {
   const client = postgres(options.url, { max: options.max ?? 5 })

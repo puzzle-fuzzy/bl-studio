@@ -73,6 +73,7 @@ export const qwenOmniScreenplayFlash: ModelManifest = {
     promptParam: 'prompt',
     stream: true,
     bindings: {
+      mode: { target: 'ui.only' },
       videoUrl: { target: 'ui.only' },
       language: { target: 'ui.only' },
       detailLevel: { target: 'ui.only' },

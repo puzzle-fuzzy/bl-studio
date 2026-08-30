@@ -9,6 +9,7 @@ import {
   type BailianStudioDb,
   type BailianStudioDbTransaction,
 } from '@bailian-studio/db'
+import { decodeCursor as kitDecodeCursor, encodeCursor as kitEncodeCursor } from '@bailian-studio/shared'
 import { MAX_CREDIT_AMOUNT_CENTS, type AdjustCreditsInput, type CreditAccount, type CreditBalance, type CreditLedgerEntry, type CreditLedgerKind, type CreditMutationResult, type CreditReconciliationReport, type GrantCreditsInput, type GrantCreditsResult, type ListCreditLedgerInput, type CreditLedgerPage, type ReleaseStaleReservationsInput, type ReleaseStaleReservationsResult } from './types'
 import { CreditLedgerError } from './errors'
 
@@ -102,19 +103,18 @@ function normalizeLimit(limit: number | undefined): number {
 }
 
 function encodeCursor(input: { createdAt: Date; id: string }): string {
-  return Buffer.from(JSON.stringify({ createdAt: input.createdAt.toISOString(), id: input.id }), 'utf8').toString('base64url')
+  return kitEncodeCursor({ createdAt: input.createdAt.toISOString(), id: input.id })
 }
 
 function decodeCursor(cursor: string): { createdAt: Date; id: string } {
-  try {
-    const decoded = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { createdAt?: unknown; id?: unknown }
-    if (typeof decoded.createdAt !== 'string' || typeof decoded.id !== 'string' || !Number.isFinite(Date.parse(decoded.createdAt))) {
-      throw new Error('invalid cursor')
-    }
-    return { createdAt: new Date(decoded.createdAt), id: decoded.id }
-  } catch {
+  const decoded = kitDecodeCursor<{ createdAt?: string; id?: string }>(cursor)
+  if (decoded === undefined
+    || typeof decoded.createdAt !== 'string'
+    || typeof decoded.id !== 'string'
+    || !Number.isFinite(Date.parse(decoded.createdAt))) {
     throw new CreditLedgerError('POINTS_INVALID_CURSOR', 'Invalid credit ledger cursor')
   }
+  return { createdAt: new Date(decoded.createdAt), id: decoded.id }
 }
 
 async function findLockedAccount(tx: BailianStudioDbTransaction, userId: string): Promise<CreditAccountRow> {

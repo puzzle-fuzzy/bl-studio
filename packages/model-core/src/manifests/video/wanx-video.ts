@@ -96,4 +96,19 @@ export const wanxTextToVideo: ModelManifest = {
     },
   },
   availability: { enabled: true, stage: 'beta' },
+  sourceRefs: {
+    paths: ['视频生成/万相/2865250-万相2.7-文生视频.md'],
+    reviewedAtVersion: 62,
+  },
+  examples: {
+    valid: [
+      { prompt: '海边日落延时摄影' },
+      { prompt: '城市街道夜景', negativePrompt: '模糊', size: '720*1280' },
+    ],
+    invalid: [
+      { params: {}, expectedCode: 'REQUIRED_PARAMETER', expectedField: 'prompt' },
+      { params: { prompt: 'x'.repeat(801) }, expectedCode: 'OUT_OF_RANGE', expectedField: 'prompt' },
+      { params: { prompt: 'test', size: '999*999' }, expectedCode: 'INVALID_VALUE', expectedField: 'size' },
+    ],
+  },
 }

@@ -7,7 +7,10 @@ definitions, the `createDb` connection factory, and generic PostgreSQL
 - Schema-only/data-access foundation; it does not own generation workflows or
   application use cases.
 - Runtime apps must reach persistence through a repository/service boundary;
-  they must not import this package directly.
+  they must not import this package directly. API and Worker process roots use
+  `@bailian-studio/persistence-runtime` to create one shared handle and inject
+  it into repositories/services; the dedicated event-listener connection is
+  intentionally outside that transaction handle.
 - Generation event trigger DDL belongs to `@bailian-studio/generation-repository`.
 - Test reset helpers are exposed through `@bailian-studio/db/test`, not the
   production barrel.

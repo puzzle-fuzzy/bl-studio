@@ -440,6 +440,41 @@ export interface ModelManifest {
      */
     notActivated?: string
   }
+  /**
+   * 可选参数校验样例（Batch 4 门禁）。check:manifests 对每个样例真跑
+   * validateModelParams：valid 必须全部通过，invalid 必须产出声明的
+   * expectedCode + expectedField。把"规则说 max 15"变成可执行的证明。
+   */
+  examples?: ModelManifestExamples
+  /**
+   * 可选来源文档引用（Batch 4 漂移门禁）。指向 docs/bailian/official/raw/
+   * 下的文件路径 + 编写时的 officialVersion。check:manifests 对比
+   * sync-state.json 的当前版本——文档已更新而 manifest 版本落后时
+   * 输出漂移警告，提示需要复核参数定义是否仍然准确。
+   */
+  sourceRefs?: ModelManifestSourceRefs
+}
+
+/** manifest 的参数校验样例集。 */
+export interface ModelManifestExamples {
+  /** 必须全部通过 validateModelParams（零 issue）。 */
+  readonly valid: ReadonlyArray<Record<string, unknown>>
+  /** 每条必须产出至少一个匹配 expectedCode 的 issue。 */
+  readonly invalid: ReadonlyArray<{
+    readonly params: Record<string, unknown>
+    /** 期望的 ParameterIssueCode（如 OUT_OF_RANGE、REQUIRED_PARAMETER）。 */
+    readonly expectedCode: ParameterIssueCode
+    /** 可选：进一步断言 issue 的 field 精确匹配。 */
+    readonly expectedField?: string
+  }>
+}
+
+/** manifest 的来源文档引用。 */
+export interface ModelManifestSourceRefs {
+  /** docs/bailian/official/raw/ 下的相对路径列表。 */
+  readonly paths: ReadonlyArray<string>
+  /** manifest 编写/最后复核时依据的文档版本号（sync-state.json 的 officialVersion）。 */
+  readonly reviewedAtVersion: number
 }
 
 export interface LocalizedModelMessage {

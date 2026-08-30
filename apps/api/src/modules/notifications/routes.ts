@@ -24,7 +24,7 @@ export function createNotificationsRoutes(deps: ApiDependencies) {
     .get('/api/notifications', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(ListNotificationsQuerySchema, query)
-      const page = await deps.generationRepository.listNotifications({
+      const page = await deps.notificationRepository.listNotifications({
         userId: user.id,
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
@@ -33,13 +33,13 @@ export function createNotificationsRoutes(deps: ApiDependencies) {
     })
     .get('/api/notifications/unread-count', async ({ request }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const count = await deps.generationRepository.countUnreadNotifications(user.id)
+      const count = await deps.notificationRepository.countUnreadNotifications(user.id)
       return { success: true, data: { count } }
     })
     .post('/api/notifications/:id/read', async ({ request, params, set }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { id } = validateInput(NotificationIdParamsSchema, params)
-      const marked = await deps.generationRepository.markNotificationRead({ userId: user.id, notificationId: id })
+      const marked = await deps.notificationRepository.markNotificationRead({ userId: user.id, notificationId: id })
       if (!marked) {
         set.status = 404
         return requestErrorResponseBody(request, 'NOTIFICATION_NOT_FOUND', 'Notification not found', set)
@@ -48,7 +48,7 @@ export function createNotificationsRoutes(deps: ApiDependencies) {
     })
     .post('/api/notifications/read-all', async ({ request }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const marked = await deps.generationRepository.markAllNotificationsRead(user.id)
+      const marked = await deps.notificationRepository.markAllNotificationsRead(user.id)
       return { success: true, data: { marked } }
     })
 }

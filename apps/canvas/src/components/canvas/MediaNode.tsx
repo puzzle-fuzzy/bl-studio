@@ -8,6 +8,7 @@ import { useCanvasGeneration } from '@/hooks/use-canvas-generation'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
 import { buildCanvasAssetRefs, canvasMediaParameters } from '@/lib/generation-refs'
 import { useCanvasStore } from '@/stores/canvas-store'
+import { AssetPicker } from './AssetPicker'
 
 /**
  * 画布生成节点（Krea 式）。
@@ -31,6 +32,8 @@ export interface MediaNodeData extends Record<string, unknown> {
   errorMessage?: string
   /** 仅保留旧版本画布数据的兼容展示；新连接使用上游资产 ID。 */
   referenceUrls: string[]
+  /** 用户从资产库选择的稳定资产 ID；生成时按模型参数映射到 assetRefs。 */
+  referenceAssetIds?: string[]
   aspectRatio: '1:1' | '16:9' | '9:16' | '4:3' | '3:4'
 }
 
@@ -55,6 +58,7 @@ const ASPECT_RATIOS = ['1:1', '16:9', '9:16', '4:3', '3:4'] as const
 export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const nodeData = data as MediaNodeData
   const [isEditing, setIsEditing] = useState(false)
+  const [isAssetPickerOpen, setIsAssetPickerOpen] = useState(false)
   const { data: models } = useModelCatalog()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
@@ -83,6 +87,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const prompt = nodeData.prompt ?? ''
   const modelId = nodeData.modelId ?? ''
   const referenceUrls = nodeData.referenceUrls ?? []
+  const referenceAssetIds = nodeData.referenceAssetIds ?? []
   const aspectRatio = nodeData.aspectRatio ?? '1:1'
   const availableModels = useMemo(
     () => (models ?? []).filter((model: ModelCatalogItem) => (
@@ -96,10 +101,12 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   )
   const mediaParameters = useMemo(() => canvasMediaParameters(selectedModel), [selectedModel])
   const referenceAssets = useMemo(
-    () => connectedReferences
+    () => [...connectedReferences
       .filter((reference): reference is ConnectedReference & { assetId: string } => reference.assetId !== undefined)
       .map(reference => ({ assetId: reference.assetId, kind: reference.kind })),
-    [connectedReferences],
+      ...referenceAssetIds.map(assetId => ({ assetId, kind: nodeKind })),
+    ].filter((reference, index, all) => all.findIndex(item => item.assetId === reference.assetId) === index),
+    [connectedReferences, nodeKind, referenceAssetIds],
   )
   const assetRefs = useMemo(
     () => buildCanvasAssetRefs(mediaParameters, referenceAssets),
@@ -111,7 +118,8 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   )
   const hasUnusableReference = connectedReferences.some(reference => (
     reference.assetId === undefined || !boundAssetIds.has(reference.assetId)
-  )) || (connectedReferences.length === 0 && referenceUrls.length > 0)
+  )) || referenceAssetIds.some(assetId => !boundAssetIds.has(assetId))
+    || (connectedReferences.length === 0 && referenceAssetIds.length === 0 && referenceUrls.length > 0)
   const missingRequiredReference = mediaParameters.some(parameter => (
     parameter.required === true && assetRefs[parameter.name] === undefined
   ))
@@ -243,6 +251,23 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
               旧版本参考素材需要重新连接上游节点
             </div>
           ) : null}
+
+          <button
+            type="button"
+            className="flex w-full items-center justify-center rounded-md border border-dashed px-2 py-1.5 text-[10px] text-muted-foreground transition-colors hover:border-primary hover:text-primary"
+            onClick={() => setIsAssetPickerOpen(open => !open)}
+          >
+            <ImagePlus className="mr-1 size-3" aria-hidden />
+            {referenceAssetIds.length > 0 ? `管理已选素材（${referenceAssetIds.length}）` : '从资产库选择参考素材'}
+          </button>
+          {isAssetPickerOpen && (
+            <AssetPicker
+              kind={nodeKind}
+              selectedIds={referenceAssetIds}
+              onChange={ids => updateNodeData(id, { referenceAssetIds: ids })}
+              onClose={() => setIsAssetPickerOpen(false)}
+            />
+          )}
 
           {referenceError !== undefined && (
             <p className="text-[10px] leading-4 text-destructive">{referenceError}</p>

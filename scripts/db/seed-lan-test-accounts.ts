@@ -6,7 +6,7 @@
  * 这样失败的本地 SMTP 实验可以被修复，而不会留下不可用的账号。
  *
  * 运行方式：
- *   pnpm run seed:lan-test-accounts --confirm
+ *   bun run seed:lan-test-accounts --confirm
  */
 import { randomBytes } from 'node:crypto'
 import postgres from 'postgres'

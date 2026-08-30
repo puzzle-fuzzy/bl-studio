@@ -1,4 +1,6 @@
 import {
+  creativeAssetCollectionBatches,
+  creativeAssetCollectionBatchItems,
   creativeAssetReferences,
   creativeAssetVersions,
   creativeAssets,
@@ -22,19 +24,25 @@ import { and, asc, desc, eq, exists, gt, ilike, inArray, isNull, ne, notExists, 
 import { alias } from 'drizzle-orm/pg-core'
 import { CreativeAssetRepositoryError } from './errors'
 import {
+  nextCreativeAssetCollectionBatchId,
+  nextCreativeAssetCollectionBatchItemId,
   nextCreativeAssetId,
   nextCreativeAssetReferenceId,
   nextCreativeAssetVersionId,
   nextCreativeProjectAssetId,
   nextCreativeProjectId,
 } from './id'
+import { enqueueCreativeAssetCollectionAudit } from './audit-outbox'
 import type {
   CreativeAssetDetail,
+  CreativeAssetCollectionBatch,
   CreativeAssetPreviewSource,
   CreativeAssetReference,
   CreativeAssetRepository,
   CreativeAssetSummary,
   CreativeAssetVersion,
+  CollectCreativeAssetFromGenerationRepositoryItem,
+  CreateCreativeAssetRepositoryInput,
   CreateCreativeAssetVersionFromGenerationRepositoryInput,
   RemoveCreativeAssetReferenceRepositoryInput,
   CreativeProject,
@@ -45,6 +53,7 @@ import type {
   ResolveCreativeGenerationBindingsRepositoryInput,
   ResolvedCreativeGenerationBinding,
 } from './types'
+import { creativeAssetCollectionBatchFingerprint, creativeAssetCollectionFingerprint } from './idempotency'
 
 interface Cursor {
   createdAt: string
@@ -603,6 +612,52 @@ async function attachAssetInTransaction(
   })
 }
 
+async function createAssetInTransaction(
+  tx: BailianStudioDbTransaction,
+  input: {
+    userId: string
+    assetId: string
+    type: CreateCreativeAssetRepositoryInput['type']
+    name: CreateCreativeAssetRepositoryInput['name']
+    description?: CreateCreativeAssetRepositoryInput['description']
+    metadata?: CreateCreativeAssetRepositoryInput['metadata']
+    projectId?: string
+    now: Date
+    collectionIdempotencyKey?: string
+    collectionIdempotencyFingerprint?: string
+  },
+): Promise<void> {
+  if (input.projectId !== undefined) await ownedProject(tx, input.userId, input.projectId)
+  await tx.insert(creativeAssets).values({
+    id: input.assetId,
+    userId: input.userId,
+    type: input.type,
+    name: input.name,
+    description: input.description ?? '',
+    status: 'draft',
+    metadataJson: input.metadata ?? {},
+    ...(input.collectionIdempotencyKey === undefined
+      ? {}
+      : {
+          collectionIdempotencyKey: input.collectionIdempotencyKey,
+          collectionIdempotencyFingerprint: input.collectionIdempotencyFingerprint ?? '',
+        }),
+    createdBy: input.userId,
+    updatedBy: input.userId,
+    createdAt: input.now,
+    updatedAt: input.now,
+  })
+  if (input.projectId !== undefined) {
+    await attachAssetInTransaction(tx, {
+      userId: input.userId,
+      projectId: input.projectId,
+      assetId: input.assetId,
+      sortOrder: 0,
+      now: input.now,
+    })
+  }
+}
+
 function assertVersionTransition(from: CreativeAssetVersionStatus, to: CreativeAssetVersionStatus): void {
   const allowed: Record<CreativeAssetVersionStatus, readonly CreativeAssetVersionStatus[]> = {
     draft: ['generating', 'candidate', 'archived'],
@@ -619,118 +674,243 @@ function assertVersionTransition(from: CreativeAssetVersionStatus, to: CreativeA
   )
 }
 
+async function findCollectedAsset(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  userId: string,
+  idempotencyKey: string,
+): Promise<{ id: string; fingerprint: string | null } | undefined> {
+  const [asset] = await db
+    .select({ id: creativeAssets.id, fingerprint: creativeAssets.collectionIdempotencyFingerprint })
+    .from(creativeAssets)
+    .where(and(
+      eq(creativeAssets.userId, userId),
+      eq(creativeAssets.collectionIdempotencyKey, idempotencyKey),
+      isNull(creativeAssets.deletedAt),
+    ))
+    .limit(1)
+  return asset
+}
+
+async function findCollectionBatch(
+  db: BailianStudioDb | BailianStudioDbTransaction,
+  userId: string,
+  idempotencyKey: string,
+): Promise<{ id: string; fingerprint: string } | undefined> {
+  const [batch] = await db
+    .select({ id: creativeAssetCollectionBatches.id, fingerprint: creativeAssetCollectionBatches.requestFingerprint })
+    .from(creativeAssetCollectionBatches)
+    .where(and(
+      eq(creativeAssetCollectionBatches.userId, userId),
+      eq(creativeAssetCollectionBatches.idempotencyKey, idempotencyKey),
+    ))
+    .limit(1)
+  return batch
+}
+
+async function collectionBatchDetail(
+  db: BailianStudioDb,
+  userId: string,
+  batchId: string,
+): Promise<CreativeAssetCollectionBatch> {
+  const batch = await findCollectionBatchById(db, userId, batchId)
+  const rows = await db
+    .select({ assetId: creativeAssetCollectionBatchItems.assetId })
+    .from(creativeAssetCollectionBatchItems)
+    .where(eq(creativeAssetCollectionBatchItems.batchId, batch.id))
+    .orderBy(asc(creativeAssetCollectionBatchItems.itemIndex))
+  return {
+    id: batch.id,
+    assets: await Promise.all(rows.map(row => assetDetail(db, userId, row.assetId))),
+  }
+}
+
+async function findCollectionBatchById(
+  db: BailianStudioDb,
+  userId: string,
+  batchId: string,
+): Promise<typeof creativeAssetCollectionBatches.$inferSelect> {
+  const [batch] = await db
+    .select()
+    .from(creativeAssetCollectionBatches)
+    .where(and(
+      eq(creativeAssetCollectionBatches.id, batchId),
+      eq(creativeAssetCollectionBatches.userId, userId),
+    ))
+    .limit(1)
+  if (batch === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', `Creative asset collection batch not found: ${batchId}`)
+  return batch
+}
+
+function assertCollectionIdempotency(existingFingerprint: string | null, fingerprint: string, idempotencyKey: string): void {
+  if (existingFingerprint !== fingerprint) {
+    throw new CreativeAssetRepositoryError(
+      'CREATIVE_IDEMPOTENCY_CONFLICT',
+      `Idempotency key was already used with a different collection request: ${idempotencyKey}`,
+      { idempotencyKey },
+    )
+  }
+}
+
+function isUniqueViolation(error: unknown): boolean {
+  return typeof error === 'object'
+    && error !== null
+    && 'code' in error
+    && (error as { code?: unknown }).code === '23505'
+}
+
+async function createVersionFromGenerationInTransaction(
+  tx: BailianStudioDbTransaction,
+  input: CreateCreativeAssetVersionFromGenerationRepositoryInput,
+): Promise<void> {
+  const now = nowDate(input.now)
+  const [asset] = await tx
+    .select()
+    .from(creativeAssets)
+    .where(and(
+      eq(creativeAssets.id, input.assetId),
+      eq(creativeAssets.userId, input.userId),
+      isNull(creativeAssets.deletedAt),
+    ))
+    .limit(1)
+    .for('update')
+  if (asset === undefined) {
+    throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${input.assetId}`)
+  }
+  if (asset.status === 'archived') {
+    throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', `Creative asset is archived: ${input.assetId}`)
+  }
+
+  const [generation] = await tx
+    .select({ id: generationRecords.id, status: generationRecords.status })
+    .from(generationRecords)
+    .where(and(
+      eq(generationRecords.id, input.sourceGenerationId),
+      eq(generationRecords.userId, input.userId),
+      isNull(generationRecords.deletedAt),
+    ))
+    .limit(1)
+  if (generation === undefined) {
+    throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', `Source generation not found: ${input.sourceGenerationId}`)
+  }
+  if (generation.status !== 'succeeded') {
+    throw new CreativeAssetRepositoryError(
+      'CREATIVE_ASSET_VERSION_STATE_INVALID',
+      `Only succeeded generations can be collected: ${input.sourceGenerationId}`,
+    )
+  }
+
+  const artifactRows = await tx
+    .select({ artifact: generationArtifacts, userAsset: userAssets })
+    .from(generationArtifacts)
+    .innerJoin(userAssets, eq(userAssets.generationArtifactId, generationArtifacts.id))
+    .where(and(
+      inArray(generationArtifacts.id, input.references.map(reference => reference.artifactId)),
+      eq(generationArtifacts.recordId, input.sourceGenerationId),
+      eq(generationArtifacts.userId, input.userId),
+      eq(generationArtifacts.status, 'stored'),
+      isNull(generationArtifacts.deletedAt),
+      eq(userAssets.userId, input.userId),
+      eq(userAssets.status, 'ready'),
+      isNull(userAssets.deletedAt),
+    ))
+  const artifactsById = new Map(artifactRows.map(row => [row.artifact.id, row] as const))
+  const resolvedReferences = input.references.map((reference, index) => {
+    const row = artifactsById.get(reference.artifactId)
+    if (row === undefined || row.artifact.kind !== 'image' || row.userAsset.kind !== 'image') {
+      throw new CreativeAssetRepositoryError(
+        'CREATIVE_ASSET_REFERENCE_INVALID',
+        `Generation artifact is not an available image: ${reference.artifactId}`,
+        { field: `references.${index}.artifactId`, artifactId: reference.artifactId },
+      )
+    }
+    if (!isCreativeAssetReferenceRoleCompatible(asset.type as CreativeAssetType, reference.role)) {
+      throw new CreativeAssetRepositoryError(
+        'CREATIVE_ASSET_REFERENCE_INVALID',
+        `Reference role '${reference.role}' is incompatible with asset type '${asset.type}'`,
+        { field: `references.${index}.role`, assetType: asset.type, role: reference.role },
+      )
+    }
+    return { reference, row }
+  })
+
+  const [latest] = await tx
+    .select({ version: creativeAssetVersions.version })
+    .from(creativeAssetVersions)
+    .where(and(eq(creativeAssetVersions.assetId, asset.id), isNull(creativeAssetVersions.deletedAt)))
+    .orderBy(desc(creativeAssetVersions.version))
+    .limit(1)
+    .for('update')
+  const versionId = nextCreativeAssetVersionId()
+  await tx.insert(creativeAssetVersions).values({
+    id: versionId,
+    assetId: asset.id,
+    sourceGenerationId: input.sourceGenerationId,
+    version: (latest?.version ?? 0) + 1,
+    status: 'draft',
+    semanticSpecJson: input.semanticSpec,
+    generationRecipeJson: input.generationRecipe,
+    notes: input.notes ?? null,
+    createdBy: input.userId,
+    updatedBy: input.userId,
+    createdAt: now,
+    updatedAt: now,
+  })
+  await tx.insert(creativeAssetReferences).values(resolvedReferences.map(({ reference, row }) => ({
+    id: nextCreativeAssetReferenceId(),
+    assetVersionId: versionId,
+    userAssetId: row.userAsset.id,
+    role: reference.role,
+    position: reference.position,
+    metadataJson: reference.metadata,
+    createdBy: input.userId,
+    updatedBy: input.userId,
+    createdAt: now,
+    updatedAt: now,
+  })))
+}
+
 async function createVersionFromGeneration(
   db: BailianStudioDb,
   input: CreateCreativeAssetVersionFromGenerationRepositoryInput,
 ): Promise<CreativeAssetDetail> {
-  const now = nowDate(input.now)
-  await db.transaction(async tx => {
-    const [asset] = await tx
-      .select()
-      .from(creativeAssets)
-      .where(and(
-        eq(creativeAssets.id, input.assetId),
-        eq(creativeAssets.userId, input.userId),
-        isNull(creativeAssets.deletedAt),
-      ))
-      .limit(1)
-      .for('update')
-    if (asset === undefined) {
-      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${input.assetId}`)
-    }
-    if (asset.status === 'archived') {
-      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_STATUS_INVALID', `Creative asset is archived: ${input.assetId}`)
-    }
-
-    const [generation] = await tx
-      .select({ id: generationRecords.id, status: generationRecords.status })
-      .from(generationRecords)
-      .where(and(
-        eq(generationRecords.id, input.sourceGenerationId),
-        eq(generationRecords.userId, input.userId),
-        isNull(generationRecords.deletedAt),
-      ))
-      .limit(1)
-    if (generation === undefined) {
-      throw new CreativeAssetRepositoryError('CREATIVE_ASSET_REFERENCE_INVALID', `Source generation not found: ${input.sourceGenerationId}`)
-    }
-    if (generation.status !== 'succeeded') {
-      throw new CreativeAssetRepositoryError(
-        'CREATIVE_ASSET_VERSION_STATE_INVALID',
-        `Only succeeded generations can be collected: ${input.sourceGenerationId}`,
-      )
-    }
-
-    const artifactRows = await tx
-      .select({ artifact: generationArtifacts, userAsset: userAssets })
-      .from(generationArtifacts)
-      .innerJoin(userAssets, eq(userAssets.generationArtifactId, generationArtifacts.id))
-      .where(and(
-        inArray(generationArtifacts.id, input.references.map(reference => reference.artifactId)),
-        eq(generationArtifacts.recordId, input.sourceGenerationId),
-        eq(generationArtifacts.userId, input.userId),
-        eq(generationArtifacts.status, 'stored'),
-        isNull(generationArtifacts.deletedAt),
-        eq(userAssets.userId, input.userId),
-        eq(userAssets.status, 'ready'),
-        isNull(userAssets.deletedAt),
-      ))
-    const artifactsById = new Map(artifactRows.map(row => [row.artifact.id, row] as const))
-    const resolvedReferences = input.references.map((reference, index) => {
-      const row = artifactsById.get(reference.artifactId)
-      if (row === undefined || row.artifact.kind !== 'image' || row.userAsset.kind !== 'image') {
-        throw new CreativeAssetRepositoryError(
-          'CREATIVE_ASSET_REFERENCE_INVALID',
-          `Generation artifact is not an available image: ${reference.artifactId}`,
-          { field: `references.${index}.artifactId`, artifactId: reference.artifactId },
-        )
-      }
-      if (!isCreativeAssetReferenceRoleCompatible(asset.type as CreativeAssetType, reference.role)) {
-        throw new CreativeAssetRepositoryError(
-          'CREATIVE_ASSET_REFERENCE_INVALID',
-          `Reference role '${reference.role}' is incompatible with asset type '${asset.type}'`,
-          { field: `references.${index}.role`, assetType: asset.type, role: reference.role },
-        )
-      }
-      return { reference, row }
-    })
-
-    const [latest] = await tx
-      .select({ version: creativeAssetVersions.version })
-      .from(creativeAssetVersions)
-      .where(and(eq(creativeAssetVersions.assetId, asset.id), isNull(creativeAssetVersions.deletedAt)))
-      .orderBy(desc(creativeAssetVersions.version))
-      .limit(1)
-      .for('update')
-    const versionId = nextCreativeAssetVersionId()
-    await tx.insert(creativeAssetVersions).values({
-      id: versionId,
-      assetId: asset.id,
-      sourceGenerationId: input.sourceGenerationId,
-      version: (latest?.version ?? 0) + 1,
-      status: 'draft',
-      semanticSpecJson: input.semanticSpec,
-      generationRecipeJson: input.generationRecipe,
-      notes: input.notes ?? null,
-      createdBy: input.userId,
-      updatedBy: input.userId,
-      createdAt: now,
-      updatedAt: now,
-    })
-    await tx.insert(creativeAssetReferences).values(resolvedReferences.map(({ reference, row }) => ({
-      id: nextCreativeAssetReferenceId(),
-      assetVersionId: versionId,
-      userAssetId: row.userAsset.id,
-      role: reference.role,
-      position: reference.position,
-      metadataJson: reference.metadata,
-      createdBy: input.userId,
-      updatedBy: input.userId,
-      createdAt: now,
-      updatedAt: now,
-    })))
-  })
+  await db.transaction(async tx => createVersionFromGenerationInTransaction(tx, input))
   return assetDetail(db, input.userId, input.assetId)
+}
+
+async function createCollectedAssetInTransaction(
+  tx: BailianStudioDbTransaction,
+  userId: string,
+  input: CollectCreativeAssetFromGenerationRepositoryItem,
+  assetId: string,
+  now: Date,
+  idempotency?: { key: string; fingerprint: string },
+): Promise<void> {
+  await createAssetInTransaction(tx, {
+    userId,
+    assetId,
+    type: input.type,
+    name: input.name,
+    ...(input.description !== undefined ? { description: input.description } : {}),
+    ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+    ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+    now,
+    ...(idempotency === undefined
+      ? {}
+      : {
+          collectionIdempotencyKey: idempotency.key,
+          collectionIdempotencyFingerprint: idempotency.fingerprint,
+        }),
+  })
+  await createVersionFromGenerationInTransaction(tx, {
+    userId,
+    assetId,
+    sourceGenerationId: input.sourceGenerationId,
+    semanticSpec: input.semanticSpec,
+    generationRecipe: input.generationRecipe,
+    ...(input.notes !== undefined ? { notes: input.notes } : {}),
+    references: input.references,
+    now: now.toISOString(),
+  })
 }
 
 export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): CreativeAssetRepository {
@@ -817,31 +997,7 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
     async createAsset(input) {
       const now = nowDate(input.now)
       const assetId = nextCreativeAssetId()
-      await db.transaction(async tx => {
-        if (input.projectId !== undefined) await ownedProject(tx, input.userId, input.projectId)
-        await tx.insert(creativeAssets).values({
-          id: assetId,
-          userId: input.userId,
-          type: input.type,
-          name: input.name,
-          description: input.description ?? '',
-          status: 'draft',
-          metadataJson: input.metadata ?? {},
-          createdBy: input.userId,
-          updatedBy: input.userId,
-          createdAt: now,
-          updatedAt: now,
-        })
-        if (input.projectId !== undefined) {
-          await attachAssetInTransaction(tx, {
-            userId: input.userId,
-            projectId: input.projectId,
-            assetId,
-            sortOrder: 0,
-            now,
-          })
-        }
-      })
+      await db.transaction(async tx => createAssetInTransaction(tx, { ...input, assetId, now }))
       return assetDetail(db, input.userId, assetId)
     },
 
@@ -1030,6 +1186,133 @@ export function createCreativeAssetRepository({ db }: { db: BailianStudioDb }): 
 
     async createVersionFromGeneration(input) {
       return createVersionFromGeneration(db, input)
+    },
+
+    async collectAssetFromGeneration(input) {
+      const idempotencyKey = input.idempotencyKey.trim()
+      if (idempotencyKey.length === 0 || idempotencyKey.length > 256) {
+        throw new CreativeAssetRepositoryError('CREATIVE_IDEMPOTENCY_KEY_INVALID', 'Idempotency key must be between 1 and 256 characters')
+      }
+      const fingerprint = await creativeAssetCollectionFingerprint({
+        type: input.type,
+        name: input.name,
+        ...(input.description !== undefined ? { description: input.description } : {}),
+        ...(input.metadata !== undefined ? { metadata: input.metadata } : {}),
+        ...(input.projectId !== undefined ? { projectId: input.projectId } : {}),
+        sourceGenerationId: input.sourceGenerationId,
+        semanticSpec: input.semanticSpec,
+        generationRecipe: input.generationRecipe,
+        ...(input.notes !== undefined ? { notes: input.notes } : {}),
+        references: input.references,
+      })
+      const now = nowDate(input.now)
+      let assetId: string | undefined
+      try {
+        await db.transaction(async tx => {
+          const [existing] = await tx
+            .select({ id: creativeAssets.id, fingerprint: creativeAssets.collectionIdempotencyFingerprint })
+            .from(creativeAssets)
+            .where(and(
+              eq(creativeAssets.userId, input.userId),
+              eq(creativeAssets.collectionIdempotencyKey, idempotencyKey),
+              isNull(creativeAssets.deletedAt),
+            ))
+            .limit(1)
+            .for('update')
+          if (existing !== undefined) {
+            assertCollectionIdempotency(existing.fingerprint, fingerprint, idempotencyKey)
+            assetId = existing.id
+            return
+          }
+
+          assetId = nextCreativeAssetId()
+          await createCollectedAssetInTransaction(tx, input.userId, input, assetId, now, {
+            key: idempotencyKey,
+            fingerprint,
+          })
+          await enqueueCreativeAssetCollectionAudit(tx, {
+            userId: input.userId,
+            targetType: 'creative_asset',
+            targetId: assetId,
+            assetCount: 1,
+            occurredAt: now,
+          })
+        })
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+        const existing = await findCollectedAsset(db, input.userId, idempotencyKey)
+        if (existing === undefined) throw error
+        assertCollectionIdempotency(existing.fingerprint, fingerprint, idempotencyKey)
+        assetId = existing.id
+      }
+      if (assetId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Collected asset could not be reloaded')
+      return assetDetail(db, input.userId, assetId)
+    },
+
+    async collectAssetFromGenerationBatch(input) {
+      const idempotencyKey = input.idempotencyKey.trim()
+      if (idempotencyKey.length === 0 || idempotencyKey.length > 256) {
+        throw new CreativeAssetRepositoryError('CREATIVE_IDEMPOTENCY_KEY_INVALID', 'Idempotency key must be between 1 and 256 characters')
+      }
+      const fingerprint = await creativeAssetCollectionBatchFingerprint({ items: input.items })
+      const now = nowDate(input.now)
+      let batchId: string | undefined
+      try {
+        await db.transaction(async tx => {
+          const [existing] = await tx
+            .select({ id: creativeAssetCollectionBatches.id, fingerprint: creativeAssetCollectionBatches.requestFingerprint })
+            .from(creativeAssetCollectionBatches)
+            .where(and(
+              eq(creativeAssetCollectionBatches.userId, input.userId),
+              eq(creativeAssetCollectionBatches.idempotencyKey, idempotencyKey),
+            ))
+            .limit(1)
+            .for('update')
+          if (existing !== undefined) {
+            assertCollectionIdempotency(existing.fingerprint, fingerprint, idempotencyKey)
+            batchId = existing.id
+            return
+          }
+
+          batchId = nextCreativeAssetCollectionBatchId()
+          await tx.insert(creativeAssetCollectionBatches).values({
+            id: batchId,
+            userId: input.userId,
+            idempotencyKey,
+            requestFingerprint: fingerprint,
+            createdBy: input.userId,
+            updatedBy: input.userId,
+            createdAt: now,
+            updatedAt: now,
+          })
+          for (const [itemIndex, item] of input.items.entries()) {
+            const assetId = nextCreativeAssetId()
+            await createCollectedAssetInTransaction(tx, input.userId, item, assetId, now)
+            await tx.insert(creativeAssetCollectionBatchItems).values({
+              id: nextCreativeAssetCollectionBatchItemId(),
+              batchId,
+              itemIndex,
+              assetId,
+              createdAt: now,
+            })
+          }
+          await enqueueCreativeAssetCollectionAudit(tx, {
+            userId: input.userId,
+            targetType: 'creative_asset_collection_batch',
+            targetId: batchId,
+            assetCount: input.items.length,
+            occurredAt: now,
+          })
+        })
+      } catch (error) {
+        if (!isUniqueViolation(error)) throw error
+        const existing = await findCollectionBatch(db, input.userId, idempotencyKey)
+        if (existing === undefined) throw error
+        assertCollectionIdempotency(existing.fingerprint, fingerprint, idempotencyKey)
+        batchId = existing.id
+      }
+      if (batchId === undefined) throw new CreativeAssetRepositoryError('CREATIVE_DATABASE_ERROR', 'Collected asset batch could not be reloaded')
+      return collectionBatchDetail(db, input.userId, batchId)
     },
 
     async addReference(input) {

@@ -400,6 +400,48 @@
       "when": 1787636185934,
       "tag": "0056_first_charles_xavier",
       "breakpoints": true
+    },
+    {
+      "idx": 57,
+      "version": "7",
+      "when": 1787993565707,
+      "tag": "0057_aspiring_blackheart",
+      "breakpoints": true
+    },
+    {
+      "idx": 58,
+      "version": "7",
+      "when": 1788037688476,
+      "tag": "0058_kind_toad_men",
+      "breakpoints": true
+    },
+    {
+      "idx": 59,
+      "version": "7",
+      "when": 1788038416293,
+      "tag": "0059_familiar_golden_guardian",
+      "breakpoints": true
+    },
+    {
+      "idx": 60,
+      "version": "7",
+      "when": 1788039053385,
+      "tag": "0060_numerous_smiling_tiger",
+      "breakpoints": true
+    },
+    {
+      "idx": 61,
+      "version": "7",
+      "when": 1788040644899,
+      "tag": "0061_tough_magik",
+      "breakpoints": true
+    },
+    {
+      "idx": 62,
+      "version": "7",
+      "when": 1788076810001,
+      "tag": "0062_purple_marvel_apes",
+      "breakpoints": true
     }
   ]
 }

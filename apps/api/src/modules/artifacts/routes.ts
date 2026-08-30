@@ -53,7 +53,7 @@ export function createArtifactRoutes(deps: ApiDependencies) {
     const items = await Promise.all(result.items.map(artifact => resolveArtifactReadUrl.execute({ artifact })))
     await Promise.all(items
       .filter(artifact => artifact.readUrl !== undefined)
-      .map(artifact => recordApiAuditEvent(repository, request, {
+      .map(artifact => recordApiAuditEvent(deps.auditRepository, request, {
         userId: user.id,
         action: 'artifact.read',
         outcome: 'succeeded',
@@ -109,7 +109,7 @@ export function createArtifactRoutes(deps: ApiDependencies) {
             }
           : {}),
       })
-      await recordApiAuditEvent(repository, request, {
+      await recordApiAuditEvent(deps.auditRepository, request, {
         userId: user.id,
         action: 'artifact.read',
         outcome: 'succeeded',
@@ -119,7 +119,7 @@ export function createArtifactRoutes(deps: ApiDependencies) {
       })
       return response
     } catch (error) {
-      await recordApiAuditEvent(repository, request, {
+      await recordApiAuditEvent(deps.auditRepository, request, {
         userId: user.id,
         action: 'artifact.read',
         outcome: 'failed',

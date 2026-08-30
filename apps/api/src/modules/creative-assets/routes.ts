@@ -5,6 +5,8 @@ import {
   CreateCreativeAssetSchema,
   CreateCreativeAssetVersionSchema,
   CreateCreativeAssetVersionFromGenerationSchema,
+  CollectCreativeAssetFromGenerationSchema,
+  CollectCreativeAssetFromGenerationBatchSchema,
   CreateCreativeProjectSchema,
   CreativeAssetTypeSchema,
   CreativeAssetVersionStatusSchema,
@@ -25,12 +27,12 @@ import {
 } from '@bailian-studio/storage'
 import type { ApiDependencies } from '../../dependencies'
 import { requireAuthUser } from '../auth/session'
-import { createCreativeAssetUseCases } from './service'
 
 const ProjectIdParamsSchema = z.object({ projectId: z.string().trim().min(1).max(256) }).strict()
 const AssetIdParamsSchema = z.object({ assetId: z.string().trim().min(1).max(256) }).strict()
 const VersionIdParamsSchema = z.object({ versionId: z.string().trim().min(1).max(256) }).strict()
 const ReferenceIdParamsSchema = z.object({ referenceId: z.string().trim().min(1).max(256) }).strict()
+const IdempotencyKeySchema = z.string().trim().min(1).max(256)
 
 const ListProjectsQuerySchema = z.object({
   limit: z.coerce.number().int().min(1).max(100).optional(),
@@ -63,6 +65,7 @@ const ListAssetsQuerySchema = z.object({
 }).strict()
 
 const CreateVersionBodySchema = CreateCreativeAssetVersionSchema.omit({ assetId: true })
+const CollectAssetFromGenerationBodySchema = CollectCreativeAssetFromGenerationSchema
 const AddReferenceBodySchema = CreateCreativeAssetReferenceSchema.omit({ assetVersionId: true })
 const TransitionVersionBodySchema = z.object({
   status: CreativeAssetVersionStatusSchema,
@@ -146,7 +149,7 @@ async function toPublicProject(project: CreativeProjectDetail, storage: StorageA
 }
 
 export function createCreativeAssetRoutes(deps: ApiDependencies) {
-  const creativeAssets = createCreativeAssetUseCases({ repository: deps.creativeAssetRepository })
+  const creativeAssets = deps.creativeAssetApplicationService
   return new Elysia()
     .get('/api/creative/projects', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
@@ -226,6 +229,28 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
       const asset = await creativeAssets.createAsset({ ...input, userId: user.id })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
+    .post('/api/creative/assets/collect-from-generation', async ({ request, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CollectAssetFromGenerationBodySchema, body)
+      const idempotencyKey = validateInput(IdempotencyKeySchema, request.headers.get('Idempotency-Key'))
+      const asset = await creativeAssets.collectAssetFromGeneration({ ...input, userId: user.id, idempotencyKey })
+      return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
+    })
+    .post('/api/creative/assets/collect-from-generation/batch', async ({ request, body }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const input = validateInput(CollectCreativeAssetFromGenerationBatchSchema, body)
+      const idempotencyKey = validateInput(IdempotencyKeySchema, request.headers.get('Idempotency-Key'))
+      const batch = await creativeAssets.collectAssetFromGenerationBatch({ ...input, userId: user.id, idempotencyKey })
+      return {
+        success: true,
+        data: {
+          batch: {
+            id: batch.id,
+            assets: await Promise.all(batch.assets.map(asset => toPublicDetail(asset, deps.storage))),
+          },
+        },
+      }
+    })
     .get('/api/creative/assets/:assetId', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { assetId } = validateInput(AssetIdParamsSchema, params)
@@ -273,11 +298,13 @@ export function createCreativeAssetRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const { versionId } = validateInput(VersionIdParamsSchema, params)
       const input = validateInput(TransitionVersionBodySchema, body)
-      const asset = await creativeAssets.transitionVersion({
-        userId: user.id,
-        assetVersionId: versionId,
-        status: input.status,
-      })
+      const asset = input.status === 'approved'
+        ? await creativeAssets.publishVersion({ userId: user.id, assetVersionId: versionId })
+        : await creativeAssets.transitionVersion({
+            userId: user.id,
+            assetVersionId: versionId,
+            status: input.status,
+          })
       return { success: true, data: { asset: await toPublicDetail(asset, deps.storage) } }
     })
 }

@@ -19,9 +19,16 @@ import {
 
 const STORAGE_KEY = 'bailian-studio:canvas:v1'
 
-interface CanvasState {
+export type CanvasSaveStatus = 'idle' | 'loading' | 'saving' | 'saved' | 'conflict' | 'error'
+
+export interface CanvasState {
   nodes: Node[]
   edges: Edge[]
+  documentId?: string
+  revision?: number
+  title: string
+  hydrated: boolean
+  saveStatus: CanvasSaveStatus
   onNodesChange: (changes: NodeChange[]) => void
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
@@ -29,6 +36,15 @@ interface CanvasState {
   updateNodeData: (id: string, data: Partial<Node['data']>) => void
   removeNode: (id: string) => void
   clear: () => void
+  setDocument: (input: {
+    id: string
+    revision: number
+    title: string
+    nodes: Node[]
+    edges: Edge[]
+  }) => void
+  setRevision: (revision: number) => void
+  setSaveStatus: (status: CanvasSaveStatus) => void
 }
 
 function loadFromStorage(): { nodes: Node[]; edges: Edge[] } | null {
@@ -62,6 +78,9 @@ const initial = loadFromStorage()
 export const useCanvasStore = create<CanvasState>((set, get) => ({
   nodes: initial?.nodes ?? [],
   edges: initial?.edges ?? [],
+  title: '未命名画布',
+  hydrated: false,
+  saveStatus: 'idle',
 
   onNodesChange: (changes) => {
     set(state => ({ nodes: applyNodeChanges(changes, state.nodes) }))
@@ -114,4 +133,13 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
     set({ nodes: [], edges: [] })
     localStorage.removeItem(STORAGE_KEY)
   },
+
+  setDocument: ({ id, revision, title, nodes, edges }) => {
+    set({ documentId: id, revision, title, nodes, edges, hydrated: true })
+    saveToStorage(nodes, edges)
+  },
+
+  setRevision: (revision) => set({ revision }),
+
+  setSaveStatus: (saveStatus) => set({ saveStatus }),
 }))

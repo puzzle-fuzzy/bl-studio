@@ -2,7 +2,7 @@
  * generation 分享的 API 持久化 port。
  *
  * 创建/撤销分享与匿名公开读取分别声明能力；SQL 实现归档在 shares.ts，API
- * 通过组合根注入窄 port。generation-repository 仅为旧调用方保留兼容 facade。
+ * 通过组合根注入窄 port。
  */
 import type {
 	CreateGenerationShareInput,

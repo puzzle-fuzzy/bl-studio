@@ -1,13 +1,11 @@
 import type {
-  AuditAction,
-  AuditEventMetadata,
-  AuditOutcome,
-  GenerationRepository,
+	AuditAction,
+	AuditEventMetadata,
+	AuditOutcome,
+	AuditRepository,
 } from '@bailian-studio/generation-repository'
 import { createLogger } from '@bailian-studio/shared'
 import { getRequestTrace } from './middleware'
-
-type AuditRepository = Pick<GenerationRepository, 'recordAuditEvent'>
 
 export interface RecordApiAuditEventInput {
   userId?: string

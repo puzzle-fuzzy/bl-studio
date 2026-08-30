@@ -6,7 +6,7 @@
  * 未列出的模型默认成本为 0，可在 admin「分析 → 维护模型成本」里补充。
  *
  * 用法：DATABASE_URL=<url> tsx scripts/db/seed-model-costs.ts
- *（或 pnpm run db:seed:model-costs）
+ *（或 bun run db:seed:model-costs）
  */
 import postgres from 'postgres'
 import seedCosts from '../../data/fixtures/model-costs.json'

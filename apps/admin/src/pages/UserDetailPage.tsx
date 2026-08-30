@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useState } from 'react'
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Link, useParams } from 'react-router'
 import { ArrowLeft, Gift, Loader2, Minus } from 'lucide-react'
 import type { AdminUser, AssetItem, CreditBalance } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { UserAvatar } from '@/components/layout/user-avatar'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Button } from '@bailian-studio/ui'
+import { Badge } from '@bailian-studio/ui'
+import { Card, CardContent, CardHeader, CardTitle } from '@bailian-studio/ui'
+import { Input } from '@bailian-studio/ui'
+import { Label } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@bailian-studio/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
 
 function formatDate(iso: string): string {
@@ -32,14 +33,10 @@ function assetToLightboxMedia(asset: AssetItem): LightboxMedia {
 
 export function UserDetailPage() {
   const { userId = '' } = useParams()
-  const [user, setUser] = useState<AdminUser | null>(null)
-  const [balance, setBalance] = useState<CreditBalance | null>(null)
-  const [assets, setAssets] = useState<AssetItem[]>([])
-  const [assetCursor, setAssetCursor] = useState<string | undefined>(undefined)
-  const [assetsLoadingMore, setAssetsLoadingMore] = useState(false)
   const [preview, setPreview] = useState<{ index: number } | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // 变更操作（角色/积分）的错误反馈；查询错误来自 useQuery。
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
 
   const [roleBusy, setRoleBusy] = useState(false)
   const [grantOpen, setGrantOpen] = useState(false)
@@ -53,53 +50,46 @@ export function UserDetailPage() {
   const [deductBusy, setDeductBusy] = useState(false)
   const [deductError, setDeductError] = useState<string | null>(null)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [detail, assetPage] = await Promise.all([
-        apiClient.adminGetUser(userId),
-        apiClient.adminListUserAssets(userId, { limit: 50 }),
-      ])
-      setUser(detail.user)
-      setBalance(detail.balance)
-      setAssets(assetPage.items)
-      setAssetCursor(assetPage.nextCursor)
-    } catch (err) {
-      setError(userErrorMessage(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [userId])
+  // Batch 0c：用户详情与资产（P1-15 的无限翻页保留）分为两个查询。
+  const { data: detail, isPending: loading, error: queryError } = useQuery({
+    queryKey: ['admin', 'user', userId],
+    queryFn: () => apiClient.adminGetUser(userId),
+  })
+  const user = detail?.user ?? null
+  const balance = detail?.balance ?? null
 
-  // P1-15：大账户资产可继续翻页，不再被首屏 50 条截断无法完整审计。
-  const loadMoreAssets = async () => {
-    if (assetCursor === undefined || assetsLoadingMore) return
-    setAssetsLoadingMore(true)
-    try {
-      const page = await apiClient.adminListUserAssets(userId, { limit: 50, cursor: assetCursor })
-      setAssets(current => [...current, ...page.items])
-      setAssetCursor(page.nextCursor)
-    } catch (err) {
-      setError(userErrorMessage(err))
-    } finally {
-      setAssetsLoadingMore(false)
-    }
+  const {
+    data: assetsData,
+    fetchNextPage: fetchAssetsNextPage,
+    hasNextPage: hasMoreAssets,
+    isFetchingNextPage: assetsLoadingMore,
+  } = useInfiniteQuery({
+    queryKey: ['admin', 'user', userId, 'assets'],
+    queryFn: ({ pageParam }) => apiClient.adminListUserAssets(userId, {
+      limit: 50,
+      ...(pageParam !== undefined ? { cursor: pageParam } : {}),
+    }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+  })
+  const assets = assetsData?.pages.flatMap(page => page.items) ?? []
+  const error = mutationError ?? (queryError !== null ? userErrorMessage(queryError) : null)
+
+  const loadMoreAssets = () => {
+    if (!hasMoreAssets || assetsLoadingMore) return
+    void fetchAssetsNextPage()
   }
-
-  useEffect(() => {
-    void load()
-  }, [load])
 
   const handleRoleChange = async (role: 'user' | 'admin') => {
     if (user === null || role === user.role) return
     setRoleBusy(true)
-    setError(null)
+    setMutationError(null)
     try {
       const updated = await apiClient.adminUpdateUser(user.id, { role })
-      setUser(updated)
+      queryClient.setQueryData(['admin', 'user', userId], (current: { user: AdminUser; balance: CreditBalance } | undefined) =>
+        current === undefined ? current : { ...current, user: updated })
     } catch (err) {
-      setError(userErrorMessage(err))
+      setMutationError(userErrorMessage(err))
     } finally {
       setRoleBusy(false)
     }
@@ -119,7 +109,8 @@ export function UserDetailPage() {
         reason: grantReason.trim() || '管理员赠送',
         idempotencyKey: crypto.randomUUID(),
       })
-      setBalance(result.balance)
+      queryClient.setQueryData(['admin', 'user', userId], (current: { user: AdminUser; balance: CreditBalance } | undefined) =>
+        current === undefined ? current : { ...current, balance: result.balance })
       setGrantOpen(false)
       setGrantCents('')
       setGrantReason('')
@@ -145,7 +136,8 @@ export function UserDetailPage() {
         reason: deductReason.trim() || '管理员扣除',
         idempotencyKey: crypto.randomUUID(),
       })
-      setBalance(result.balance)
+      queryClient.setQueryData(['admin', 'user', userId], (current: { user: AdminUser; balance: CreditBalance } | undefined) =>
+        current === undefined ? current : { ...current, balance: result.balance })
       setDeductOpen(false)
       setDeductCents('')
       setDeductReason('')
@@ -292,7 +284,7 @@ export function UserDetailPage() {
                   </button>
                 ))}
               </div>
-              {assetCursor !== undefined && (
+              {hasMoreAssets && (
                 <div className="flex justify-center pt-3">
                   <Button variant="outline" size="sm" disabled={assetsLoadingMore} onClick={() => void loadMoreAssets()}>
                     {assetsLoadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}

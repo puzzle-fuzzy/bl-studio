@@ -173,6 +173,26 @@ export const CreateCreativeAssetVersionFromGenerationSchema = z.object({
 })
 export type CreateCreativeAssetVersionFromGenerationInput = z.infer<typeof CreateCreativeAssetVersionFromGenerationSchema>
 
+/**
+ * 在一次请求中创建创意资产并收录一个生成版本。
+ *
+ * 这是“收录生成产物”流程的组合协议：资产字段、可选项目关系和
+ * 已落存生成产物引用必须一起通过 API。幂等键不放进业务 body，而由
+ * API client 通过 Idempotency-Key 请求头传递。
+ */
+export const CollectCreativeAssetFromGenerationSchema = CreateCreativeAssetSchema
+  .and(CreateCreativeAssetVersionFromGenerationSchema)
+  .and(z.object({
+    projectId: z.string().trim().min(1).max(256).optional(),
+  }).strict())
+export type CollectCreativeAssetFromGenerationInput = z.infer<typeof CollectCreativeAssetFromGenerationSchema>
+
+/** 批量收录仍复用单项协议；批次级幂等键通过 HTTP header 传递。 */
+export const CollectCreativeAssetFromGenerationBatchSchema = z.object({
+  items: z.array(CollectCreativeAssetFromGenerationSchema).min(1).max(50),
+}).strict()
+export type CollectCreativeAssetFromGenerationBatchInput = z.infer<typeof CollectCreativeAssetFromGenerationBatchSchema>
+
 export const CreateCreativeAssetReferenceSchema = z.object({
   assetVersionId: z.string().trim().min(1).max(256),
   userAssetId: z.string().trim().min(1).max(256),

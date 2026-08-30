@@ -40,6 +40,24 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
     allowedConsumerScopes: ['apps/worker'],
     dependencyProtocol: 'workspace:*',
   },
+  {
+    packageName: '@bailian-studio/persistence-runtime',
+    ownerScope: 'packages/persistence-runtime',
+    allowedConsumerScopes: ['apps/api', 'apps/worker'],
+    dependencyProtocol: 'workspace:*',
+  },
+  {
+    packageName: '@bailian-studio/task-repository',
+    ownerScope: 'packages/task-repository',
+    allowedConsumerScopes: ['packages/generation-repository', 'packages/persistence-runtime', 'packages/media-repository', 'packages/director-repository', 'packages/admin-repository', 'apps/worker'],
+    dependencyProtocol: 'workspace:*',
+  },
+  {
+    packageName: '@bailian-studio/admin-repository',
+    ownerScope: 'packages/admin-repository',
+    allowedConsumerScopes: ['apps/api', 'packages/persistence-runtime', 'packages/generation-repository'],
+    dependencyProtocol: 'workspace:*',
+  },
 ] as const
 
 function isWithinScope(relativePath: string, scope: string): boolean {
@@ -134,7 +152,7 @@ export const rules: Array<{
     ],
   },
   {
-    scope: 'apps/web',
+    scope: 'apps/studio',
     banned: [
       // P1-40：前端运行时禁止直连持久化 / provider 执行 / 后端仓库包
       // （CLAUDE.md「运行时应用禁止直接 import @bailian-studio/db」的可执行化）。
@@ -161,7 +179,7 @@ export const rules: Array<{
       // P1-40：api-client 是纯 zod 传输契约层；创意资产 client 可直接依赖领域
       // contracts，其余 workspace 包仍然禁止——用 importSpecifier
       // 只匹配真实 import，不误伤源内自我引述的注释。
-      importSpecifier(String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b)[a-z-]+`),
+      importSpecifier(String.raw`@bailian-studio\/(?!shared\b|creative-asset-contracts\b|canvas-contracts\b)[a-z-]+`),
       importsApps,
       importsServices,
     ],
@@ -175,6 +193,62 @@ export const rules: Array<{
       importsApps,
       importsServices,
       importsReact,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/lib-client',
+    banned: [
+      // 前端共享客户端工具（API 单例/错误文案/chunk 自愈/通用组件）。
+      // 只允许 ui（展示原语）与 api-client（传输契约）；数据库、仓库、provider、
+      // 后端服务与 app 运行时一律禁入。
+      importSpecifier(String.raw`@bailian-studio\/(?!lib-client\b|ui\b|api-client\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/app-shell',
+    banned: [
+      // 认证层共享包：只许依赖展示原语（ui）、传输契约（api-client）与客户端
+      // 工具（lib-client）；数据库/仓库/provider/app 运行时禁入。
+      importSpecifier(String.raw`@bailian-studio\/(?!app-shell\b|ui\b|lib-client\b|api-client\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/creative-asset-repository',
+    banned: [
+      // 创意资产 repository：只许依赖 db（表定义）和 creative-asset-contracts（协议）；
+      // 禁入 provider、任务引擎、其他 repository、app 运行时与后端服务。
+      importSpecifier(String.raw`@bailian-studio\/(?!creative-asset-repository\b|creative-asset-contracts\b|db\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/director-repository',
+    banned: [
+      // 导演 repository：只许依赖 db 和 shared（域契约）；
+      // 禁入 provider、任务引擎、其他 repository、app 运行时与后端服务。
+      importSpecifier(String.raw`@bailian-studio\/(?!director-repository\b|shared\b|db\b|task-repository\b)[a-z-]+`),
+      importsApps,
+      importsServices,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/ui',
+    banned: [
+      // 共享 UI 原语包：纯展示层，禁入一切 @bailian-studio 兄弟包（含 api-client——
+      // 需要数据的组件留在各 app 侧组合）与后端/应用运行时。
+      importSpecifier(String.raw`@bailian-studio\/(?!ui\b)[a-z-]+`),
+      importsApps,
+      importsServices,
       importsElysia,
     ],
   },
@@ -222,6 +296,16 @@ export const rules: Array<{
     ],
   },
   {
+    scope: 'packages/admin-repository',
+    banned: [
+      /@bailian-studio\/(provider-dashscope|api|worker|storage|event-bus)\b/,
+      importsServices,
+      importsApps,
+      importsReact,
+      importsElysia,
+    ],
+  },
+  {
     scope: 'packages/credit-ledger',
     banned: [
       /@bailian-studio\/(?!db\b|shared\b)[a-z-]+/,
@@ -235,6 +319,17 @@ export const rules: Array<{
     scope: 'packages/media-repository',
     banned: [
       /@bailian-studio\/(provider-dashscope|generation-repository|model-core|event-bus|storage|auth)\b/,
+      importsServices,
+      importsApps,
+      importsReact,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/persistence-runtime',
+    banned: [
+      // 进程级持久化组合包可以依赖 schema 与各 repository/service，但不能反向依赖
+      // HTTP、Worker、Provider、React 或 listener；它只负责资源组装与生命周期。
       importsServices,
       importsApps,
       importsReact,
@@ -265,6 +360,16 @@ export const rules: Array<{
     scope: 'packages/task-engine',
     banned: [
       /@bailian-studio\/(db|storage|provider-dashscope)\b/,
+      importsServices,
+      importsApps,
+      importsReact,
+      importsElysia,
+    ],
+  },
+  {
+    scope: 'packages/task-repository',
+    banned: [
+      /@bailian-studio\/(?!db\b|task-engine\b|task-repository\b)[a-z-]+/,
       importsServices,
       importsApps,
       importsReact,

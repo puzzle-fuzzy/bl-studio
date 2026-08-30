@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { generationChannel, generationEventNameForStatus, makeGenerationEvent } from '../src'
+import { generationChannel, generationEventNameForStatus, makeDirectorEvent, makeGenerationEvent } from '../src'
 
 describe('generation events', () => {
   it('builds generation event payloads with stable channel ids', () => {
@@ -28,5 +28,19 @@ describe('generationEventNameForStatus', () => {
     expect(generationEventNameForStatus('processing')).toBe('generation.status')
     expect(generationEventNameForStatus('provider_processing')).toBe('generation.status')
     expect(generationEventNameForStatus('submitting')).toBe('generation.status')
+  })
+})
+
+describe('director events', () => {
+  it('builds a project-scoped entity invalidation event', () => {
+    const event = makeDirectorEvent('director.entities.changed', {
+      userId: 'user_1',
+      projectId: 'project_1',
+      candidateId: 'candidate_1',
+      reason: 'candidate_reviewed',
+    })
+
+    expect(event.event).toBe('director.entities.changed')
+    expect(event.data.projectId).toBe('project_1')
   })
 })

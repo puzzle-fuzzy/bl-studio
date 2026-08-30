@@ -240,7 +240,6 @@ beforeAll(async () => {
     feedbackRepository: generationHandle.feedbackRepository,
     notificationRepository: generationHandle.notificationRepository,
     promptLibraryRepository: generationHandle.promptLibraryRepository,
-    providerRequestAuditRepository: generationHandle.providerRequestAuditRepository,
     shareRepository: generationHandle.shareRepository,
     publicShareRepository: generationHandle.publicShareRepository,
     socialRepository: generationHandle.socialRepository,

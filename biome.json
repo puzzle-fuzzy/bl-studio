@@ -7,7 +7,8 @@
       "!**/dist",
       "!**/coverage",
       "!**/.turbo",
-      "!var/ffmpeg"
+      "!var/ffmpeg",
+      "!reference-materials"
     ]
   },
   "linter": {
@@ -40,6 +41,16 @@
         "rules": {
           "suspicious": {
             "noUndeclaredEnvVars": "off"
+          }
+        }
+      }
+    },
+    {
+      "includes": ["apps/canvas/**"],
+      "linter": {
+        "rules": {
+          "a11y": {
+            "useMediaCaption": "off"
           }
         }
       }

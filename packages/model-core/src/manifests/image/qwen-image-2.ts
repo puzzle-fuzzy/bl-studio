@@ -216,6 +216,7 @@ export const qwenImageMax: ModelManifest = {
       prompt: { target: 'input.prompt' },
       negativePrompt: { target: 'parameters.field', field: 'negative_prompt' },
       size: { target: 'parameters.field' },
+      n: { target: 'parameters.field' },
       promptExtend: { target: 'parameters.field', field: 'prompt_extend' },
       watermark: { target: 'parameters.field' },
       seed: { target: 'parameters.field' },

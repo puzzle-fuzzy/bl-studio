@@ -32,13 +32,13 @@ export function createContentReportRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(SubmitContentReportSchema, body)
       try {
-        const report = await deps.generationRepository.submitContentReport({
+        const report = await deps.contentReportRepository.submitContentReport({
           reporterId: user.id,
           generationId: input.generationId,
           reason: input.reason,
           ...(input.details !== undefined && input.details.length > 0 ? { details: input.details } : {}),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'content.report.submit',
           outcome: 'succeeded',
@@ -48,7 +48,7 @@ export function createContentReportRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { report } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'content.report.submit',
           outcome: 'failed',
@@ -62,7 +62,7 @@ export function createContentReportRoutes(deps: ApiDependencies) {
     .get('/api/admin/reports', async ({ request, query }) => {
       await requireAdminUser(request, deps.authService)
       const input = validateInput(ListContentReportsQuerySchema, query)
-      const page = await deps.generationRepository.listContentReports({
+      const page = await deps.contentReportRepository.listContentReports({
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
@@ -74,7 +74,7 @@ export function createContentReportRoutes(deps: ApiDependencies) {
       const { id } = validateInput(ContentReportIdParamsSchema, params)
       const input = validateInput(UpdateContentReportSchema, body)
       try {
-        const report = await deps.generationRepository.updateContentReport({
+        const report = await deps.contentReportRepository.updateContentReport({
           reportId: id,
           status: input.status,
           resolvedBy: actor.id,
@@ -83,13 +83,13 @@ export function createContentReportRoutes(deps: ApiDependencies) {
             : {}),
         })
         if (input.hideTarget === true) {
-          await deps.generationRepository.setGalleryRecordHidden({
+          await deps.adminRepository.gallery.setGalleryRecordHidden({
             recordId: report.generationId,
             hidden: true,
             actorId: actor.id,
           })
         }
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'admin.content-report.update',
           outcome: 'succeeded',
@@ -99,7 +99,7 @@ export function createContentReportRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { report } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'admin.content-report.update',
           outcome: 'failed',

@@ -5,10 +5,9 @@ import { createAuthService, type AuthService, type AuthServiceOptions } from './
 /**
  * AuthService 的 URL 工厂。
  *
- * 与 generation repository 包 的 createGenerationRepositoryFromUrl 保持
- * 一致的模式：services（api/worker）受边界规则限制，【不能】直接 import
- * @bailian-studio/db 来建库连接，必须经由本包暴露的工厂封装——这样 @bailian-studio/db 的
- * import 只发生在本包内部，services 只拿到一个组装好的 AuthService 与配套句柄。
+ * URL 工厂适合独立运行或测试场景：services（api/worker）受边界规则限制，不能直接
+ * import @bailian-studio/db 来建库连接。多模块进程的组合根应创建一个共享数据库句柄，
+ * 然后直接调用 createAuthService({ db, ... })，避免每个 service 各自拥有连接池。
  */
 
 export type CreateAuthServiceFromUrlOptions = Omit<AuthServiceOptions, 'db'> & {
@@ -24,9 +23,9 @@ export interface AuthServiceHandle {
 }
 
 /**
- * 用一个数据库 URL 构造完整的 AuthService（内部建库连接 + 组装 service）。
- * 返回的 handle.close() 用于关闭连接池。services 调用本函数即可在不触碰
- * @bailian-studio/db 的前提下完成持久化接线。
+ * 用一个数据库 URL 构造独立的 AuthService（内部建库连接 + 组装 service）。
+ * 返回的 handle.close() 用于关闭连接池；如果进程还需要其它持久化模块，优先在
+ * 组合根复用已有 db 并调用 createAuthService，避免把本句柄当成共享池的 owner。
  */
 export function createAuthServiceFromUrl(
   url: string,

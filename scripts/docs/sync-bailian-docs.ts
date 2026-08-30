@@ -2,7 +2,7 @@
  * 官网漂移检查（按需执行，不 gate）。
  *
  * AI 维护工作流：官网变更 → 抓文档 → AI 读原文更新对应 manifest（transport/rules/
- * pricing/parameters）→ `pnpm run verify` → 部署。git 即版本。
+ * pricing/parameters）→ `bun run verify` → 部署。git 即版本。
  *
  * 本脚本只做「漂移检测」：抓百炼 OpenAI 兼容面 `GET /compatible-mode/v1/models`
  * （机器可读清单，覆盖 chat / embedding / 第三方模型），与 model-core 的 manifest

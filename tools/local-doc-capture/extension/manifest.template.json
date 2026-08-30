@@ -1,0 +1,16 @@
+{
+  "manifest_version": 3,
+  "name": "Bailian Studio 本地文档采集",
+  "description": "仅在本机、用户明确点击后采集百炼公开文档正文。",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "采集当前页面",
+    "default_popup": "popup.html"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "permissions": ["scripting", "storage"],
+  "host_permissions": ["https://help.aliyun.com/*"]
+}

@@ -4,10 +4,10 @@
 
 | 项 | 决策 | 理由 |
 |---|---|---|
-| 包管理 | **pnpm 10 + turbo 2** | 用户要求；整体都使用 pnpm |
+| 包管理 | **Bun 1.4 + turbo 2** | 当前仓库事实；workspace 与根脚本统一使用 `bun` / `bunx` |
 | Node 运行时 | **Node ≥ 24** | 用户要求；`import.meta.main` 原生可用 |
 | API 运行时 | **Bun（唯一例外）** | 用户要求；Elysia 在 Bun 下走原生 Bun.serve，Node 下会退回不支持 listen 的 WebStandard adapter |
-| Worker 运行时 | Node + **tsx** | 整体使用 pnpm 的体现 |
+| Worker 运行时 | Node + **tsx** | Worker 需要 Node 24；API 仍由 Bun 启动 |
 | 测试 | **Vitest 4（全仓统一，Node 上运行）** | bun:test → vitest，前后端同一工具链；与运行时解耦 |
 | 前端框架 | React 19 + TypeScript strict + Vite 8 | 用户要求 |
 | 前端状态 | **zustand**（客户端/全局状态）+ 纯函数业务逻辑层 | 用户要求；SSE 失效驱动 |
@@ -26,29 +26,28 @@
 
 ```text
 bl-studio/
-├── package.json              # pnpm root + turbo
-├── pnpm-workspace.yaml       # packages + catalog（共享版本）
+├── package.json              # Bun workspace + turbo
+├── bun.lock                 # 唯一锁文件
 ├── turbo.json                # dev/build/typecheck/test 任务
 ├── tsconfig.base.json        # strict 全开
 ├── .npmrc / .gitignore / .dockerignore
-├── README.md                 # pnpm 启动指南
+├── README.md                 # Bun 启动指南
 ├── CLAUDE.md                 # 面向 AI 助手的仓库指南
 ├── docs/                     # 评估报告、设计、迁移说明
 ├── apps/
-│   ├── web/                  # ★ 合并后的 React 前端（从零重写）
-│   ├── api/                  # Elysia（Bun→Node 迁移 + 改进）
-│   └── worker/               # 任务 worker（Bun→Node 迁移 + 改进）
-├── packages/                 # 15 个共享包（迁移 + 改进）
-├── infra/
-│   ├── env/                  # .env.example/.env.test.example/.env.production.example
-│   ├── docker/               # Dockerfile（node+pnpm）、compose
-│   ├── nginx/                # 单前端反代
-│   └── scripts/              # 运维脚本（Bun→Node/tsx）
+│   ├── studio/               # ★ 创作工作区前端（原 web）
+│   ├── writer/               # 编剧台（写作 + 导演管线）
+│   ├── canvas/               # 画布（Krea 式生成画布）
+│   ├── admin/                # 管理后台
+│   ├── api/                  # Elysia API（唯一后端）
+│   └── worker/               # 任务 worker
+├── packages/                 # 共享包（model-core/api-client/ui/lib-client/app-shell 等）
+├── deploy/                   # nginx、compose、Dockerfile、运维脚本
 ├── tests/                    # 根级契约/脚本测试
-└── e2e/                      # Playwright（单前端）
+└── playwright.config.ts      # Playwright（根目录）
 ```
 
-## 三、前端架构（apps/web）
+## 三、前端架构（apps/studio、apps/writer、apps/canvas、apps/admin）
 
 ### 状态分层
 ```text
@@ -75,7 +74,7 @@ bl-studio/
 └────────────────────────────────────────────────┘
 ```
 
-- **SSE 只做失效**：事件携带 recordId → 触发 `refreshRecord(id)` 拉详情 + 相关缓存失效，不写数据（继承两版最佳实践）。
+- **SSE 只做失效**：生成事件携带 recordId → 触发 `refreshRecord(id)` 拉详情；导演实体审核发 `director.entities.changed` → 失效对应 director 查询。两类事件都不把 SSE payload 当作事实来源；生成事件可从 outbox 重放，导演实体事件是实时提示，断线后由查询刷新兜底。视频阶段的当前有效 `shot_video` 通过已有用户资产下载 URL 逐镜导出，不把历史版本或成片合成混入该入口。
 - **登出清理**：`registerPrivateReset` 注册表 + `resetPrivateData()`（继承 Vue 版模式）。
 - **防竞态**：`requestVersion`/`refreshVersion` 序号丢弃过期响应（继承 Vue 版模式）。
 - **幂等提交**：canonicalize payload → 稳定 idempotencyKey（继承 Vue 版，并修复原版"只存最近一次"的缺陷：payload 指纹缓存）。
@@ -121,9 +120,11 @@ bl-studio/
 5. **费用预估**：350ms 防抖 + 序列号丢弃过期（继承两版）。
 6. **主题**：`next-themes` + Tailwind v4 oklch 变量（React 版 CSS 已就绪，接线切换器）。
 
+### 4.2 结构性改进（有意义的架构调整）
+
 ## 四、后端改造
 
-### 4.1 运行时迁移（Bun → Node，真实工作）
+### 4.1 历史运行时迁移（已完成，以当前实现为准）
 | 原 Bun API | 迁移目标 |
 |---|---|
 | `Bun.password.hash/verify`（argon2id） | `@node-rs/argon2`（argon2id） |
@@ -132,7 +133,7 @@ bl-studio/
 | `Bun.env` | `process.env` |
 | `bun:test`（101 文件） | `vitest`（机械替换 + 逐文件修正） |
 | `bun --env-file=...`（dev 脚本） | `dotenv-cli`（或 Node `--env-file`） |
-| `bun run` / `bun x`（scripts） | `pnpm` / `pnpm exec` |
+| `bun run` / `bun x`（scripts） | 保持为 `bun` / `bunx`；Worker 与脚本通过 Node 24/tsx 执行 |
 
 ### 4.2 结构性改进（有意义的架构调整）
 1. **错误体系（按现状如实描述，收敛推后）**：共享主干只有 `BailianStudioError`（`code`/`retryable`/`metadata`，实际仅 `ValidationError` 继承）。各业务层各自定义错误类并 `extends Error`：`GenerationRepositoryError`/`AuthError`/`CreditLedgerError`/`MediaRepositoryError`/`ModelCoreError`/`ApiClientError`/`DashScopeHttpError`；`ProviderErrorInfo` 是 **interface**。层间一致性靠**集中映射**而非统一继承：`apps/api/src/lib/http-errors.ts` 用 `instanceof` 逐一映射到 HTTP 状态与响应体，各层 `code` 是带完整 union 的稳定字符串（`Record<Code, number>` 覆盖完整联合，新增 code 未映射即编译报错），未分类错误走兜底 `INTERNAL_ERROR`——**绝不透传 `message`/`cause` 原文给客户端**（R2-P0-03，原文只进服务端日志经值级脱敏）。跨层统一继承留待后续（届时把各层子类迁到继承 `BailianStudioError` 并补回 `shared/errors.ts` 子类）。
@@ -140,6 +141,7 @@ bl-studio/
 3. **类型收敛**：`api-client` 的本地类型声明改为从单一契约模块导出（不破坏包边界：契约类型留在 api-client，model-core 通过 `catalog.ts` 投影在结构上满足）。
 4. **SSE 类型精化**：为 `generation.status` 载荷的 status 保留字符串联合，但前端解析分支固定（`recordMatchesGenerationViews` 迁移为纯函数）。
 5. **限流/SSE 单实例**：文档标注为"个人部署假设"，不在本次扩展（标注"建议人工复核"）。
+6. **进程级持久化组装（已实现）**：API 与 Worker 各自只创建一个共享 PostgreSQL/Drizzle 句柄，由 `@bailian-studio/persistence-runtime` 注入各模块；退出时由该组合根统一释放，事件监听继续使用独立连接。
 
 ### 4.3 保留不变
 - 包边界门禁、manifest 注册表、outbox+SSE 管线、keyset 游标、账务模型、安全姿态（IDOR/CSRF/body guard）。
@@ -147,8 +149,8 @@ bl-studio/
 
 ## 五、基础设施
 
-- **Docker**：`oven/bun:1.3.14-debian` 基座 + 官方二进制 **Node 24**（apt 的 v20 缺 `import.meta.main`，会让 worker 静默退出）+ pnpm + tsx 直跑源码 + ffmpeg；web 单独构建到 nginx:1.27-alpine。**不使用 Caddy**——HTTPS 由宿主机 nginx + certbot 终止。
-- **Nginx**：单 `apps/web/dist`，/api 反代 + SSE 反代配置不变（去掉 5004 相关）。
+- **Docker**：`oven/bun:1.3.14-debian` 基座 + 官方二进制 **Node 24**（apt 的 v20 缺 `import.meta.main`，会让 worker 静默退出）+ Bun/tsx 直跑源码 + ffmpeg；nginx 镜像同时承载 `apps/studio`、`apps/writer`、`apps/canvas` 和 `apps/admin` 四个静态构建。
+- **Nginx**：主站 `/` 服务 `apps/studio/dist`，`/writer/`、`/canvas/`、`/admin/` 分别服务对应前端构建，`/api/` 反代 API 并保持 SSE 长连接。
 - **env 模板**：`AUTH_PUBLIC_WEB_ORIGIN` 默认改为 `http://localhost:5002`；CORS 默认仅 `localhost:5002`。
 - **Compose**：dev/test 双 Postgres（:55431/:55432）+ Mailpit，保留原端口。
 
@@ -164,9 +166,7 @@ bl-studio/
 
 ## 七、验收清单
 
-- [ ] `pnpm install` 成功，无 bun 残留依赖
-- [ ] `pnpm typecheck` 全仓通过
-- [ ] `pnpm test` 全仓通过（vitest）
-- [ ] `pnpm check:boundaries` / `check:manifests` 通过
-- [ ] 前端 `pnpm dev`（web:5002 + api:5003 + worker）可跑通创作→生成→SSE→资产闭环
-- [ ] 无任何 `bun:test` / `Bun.*` / `apps/web-vue` 残留
+- [x] `bun install` 与唯一 `bun.lock` 工作区链路已建立
+- [x] `bun run typecheck`、`bun run test`、`bun run check:boundaries` 已接入根脚本
+- [x] 前端开发入口已拆为 studio:5002、writer:5006、canvas:5007、admin:5004；API:5003、Worker 独立运行
+- [ ] 创作→生成→SSE→资产闭环的真实 Provider smoke（需要有效 `DASHSCOPE_API_KEY`）

@@ -1,12 +1,13 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Area, AreaChart, CartesianGrid, XAxis } from 'recharts'
 import type { AdminStatsOverview } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@/components/ui/chart'
+import { Card, CardContent, CardHeader, CardTitle } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, ChartLegend, ChartLegendContent, type ChartConfig } from '@bailian-studio/ui'
 
 const OTHER_KEY = '__other__'
 const CHART_COLORS = [
@@ -23,35 +24,20 @@ interface CallRow {
 }
 
 export function StatsPage() {
-  const [overview, setOverview] = useState<AdminStatsOverview | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // Batch 0c 参考模式：useQuery 替代 useState/useEffect/cancelled 样板。
+  // 缓存键 ['admin','stats','overview'] 供批量操作后的 invalidateQueries 复用。
+  const { data: overview, isPending, error } = useQuery({
+    queryKey: ['admin', 'stats', 'overview'],
+    queryFn: () => apiClient.adminGetStatsOverview(),
+  })
 
-  useEffect(() => {
-    let cancelled = false
-    apiClient
-      .adminGetStatsOverview()
-      .then(data => {
-        if (!cancelled) setOverview(data)
-      })
-      .catch(err => {
-        if (!cancelled) setError(userErrorMessage(err))
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [])
-
-  const callsView = useMemo(() => (overview === null ? null : buildCallsView(overview)), [overview])
+  const callsView = useMemo(() => (overview === null || overview === undefined ? null : buildCallsView(overview)), [overview])
   const registrations = useMemo(
-    () => (overview === null ? [] : buildRegistrationsData(overview.registrationsByDay)),
+    () => (overview === null || overview === undefined ? [] : buildRegistrationsData(overview.registrationsByDay)),
     [overview],
   )
 
-  if (loading) {
+  if (isPending) {
     return (
       <div className="space-y-4">
         <div className="grid grid-cols-3 gap-4">
@@ -65,14 +51,14 @@ export function StatsPage() {
     )
   }
 
-  if (overview === null) {
-    return <p className="text-sm text-destructive">{error ?? '统计加载失败'}</p>
+  if (overview === null || overview === undefined) {
+    return <p className="text-sm text-destructive">{error !== null ? userErrorMessage(error) : '统计加载失败'}</p>
   }
 
   return (
     <div className="space-y-4">
       <h1 className="text-lg font-semibold">调用统计</h1>
-      {error !== null && <p className="text-sm text-destructive">{error}</p>}
+      {error !== null && <p className="text-sm text-destructive">{userErrorMessage(error)}</p>}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         <StatCard label="今日调用" value={overview.todayCalls} />

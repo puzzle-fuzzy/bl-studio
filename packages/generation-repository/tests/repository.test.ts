@@ -22,6 +22,8 @@ import {
   createAdminGalleryRepository,
   createAdminTaskRepository,
   createAnalyticsRepository,
+} from '@bailian-studio/admin-repository'
+import {
   createAssetRepository,
   createAuditRepository,
   createContentReportRepository,

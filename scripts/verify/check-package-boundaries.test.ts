@@ -93,13 +93,37 @@ describe('package boundary rules', () => {
         allowedConsumerScopes: ['apps/worker'],
         dependencyProtocol: 'workspace:*',
       },
+      {
+        packageName: '@bailian-studio/persistence-runtime',
+        ownerScope: 'packages/persistence-runtime',
+        allowedConsumerScopes: ['apps/api', 'apps/worker'],
+        dependencyProtocol: 'workspace:*',
+      },
+      {
+        packageName: '@bailian-studio/task-repository',
+        ownerScope: 'packages/task-repository',
+        allowedConsumerScopes: ['packages/generation-repository', 'packages/persistence-runtime', 'packages/media-repository', 'packages/director-repository', 'packages/admin-repository', 'apps/worker'],
+        dependencyProtocol: 'workspace:*',
+      },
+      {
+        packageName: '@bailian-studio/admin-repository',
+        ownerScope: 'packages/admin-repository',
+        allowedConsumerScopes: ['apps/api', 'packages/persistence-runtime', 'packages/generation-repository'],
+        dependencyProtocol: 'workspace:*',
+      },
     ])
 
     const providerBoundary = bailianPackageBoundaries[0]
     expect(providerBoundary).toBeDefined()
     expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/worker/src/index.ts')).toBe(true)
     expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/api/src/index.ts')).toBe(false)
-    expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/web/src/App.tsx')).toBe(false)
+    expect(isBailianPackageConsumerAllowed(providerBoundary!, 'apps/studio/src/App.tsx')).toBe(false)
+
+    const persistenceBoundary = bailianPackageBoundaries[1]
+    expect(persistenceBoundary).toBeDefined()
+    expect(isBailianPackageConsumerAllowed(persistenceBoundary!, 'apps/api/src/index.ts')).toBe(true)
+    expect(isBailianPackageConsumerAllowed(persistenceBoundary!, 'apps/worker/src/index.ts')).toBe(true)
+    expect(isBailianPackageConsumerAllowed(persistenceBoundary!, 'apps/studio/src/App.tsx')).toBe(false)
   })
 
   it('rejects unapproved consumers, package subpaths, and source deep imports', () => {
@@ -126,7 +150,7 @@ describe('package boundary rules', () => {
       dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
     }, '@bailian-studio/provider-dashscope')).toBe(true)
 
-    expect(checkBailianPackageManifestBoundary('apps/web/package.json', {
+    expect(checkBailianPackageManifestBoundary('apps/studio/package.json', {
       dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
     })).toHaveLength(1)
     expect(checkBailianPackageManifestBoundary('apps/worker/package.json', {
@@ -164,6 +188,20 @@ describe('package boundary rules', () => {
     expect(matchesRule('packages/db', "import postgres from 'postgres'")).toBe(false)
   })
 
+  it('keeps the persistence runtime free of application and transport dependencies', () => {
+    expect(matchesRule('packages/persistence-runtime', "import { app } from '../../apps/api'")).toBe(true)
+    expect(matchesRule('packages/persistence-runtime', "import { WorkerLoop } from '../../apps/worker'")).toBe(true)
+    expect(matchesRule('packages/persistence-runtime', "import { Elysia } from 'elysia'")).toBe(true)
+    expect(matchesRule('packages/persistence-runtime', "import { createDb } from '@bailian-studio/db'")).toBe(false)
+  })
+
+  it('keeps task-repository limited to database and task-engine dependencies', () => {
+    expect(matchesRule('packages/task-repository', "import { createDb } from '@bailian-studio/db'")).toBe(false)
+    expect(matchesRule('packages/task-repository', "import { transitionTask } from '@bailian-studio/task-engine'")).toBe(false)
+    expect(matchesRule('packages/task-repository', "import { createLogger } from '@bailian-studio/shared'")).toBe(true)
+    expect(matchesRule('packages/task-repository', "import { app } from '../../apps/api'")).toBe(true)
+  })
+
   it('defines the generation repository boundary', () => {
     expect(matchesRule('packages/generation-repository', "import { app } from '../../apps/api'")).toBe(true)
     expect(matchesRule('packages/generation-repository', "import { runWorkerOnce } from '../../apps/worker'")).toBe(true)
@@ -184,7 +222,7 @@ describe('package boundary rules', () => {
   it('keeps web and admin frontends isolated from persistence and provider execution (P1-40)', () => {
     // CLAUDE.md「运行时应用禁止直接 import @bailian-studio/db」此前无规则可执行，
     // web/admin 完全裸奔。现在 web/admin 禁入持久化 / 执行 / 后端仓库包。
-    for (const scope of ['apps/web', 'apps/admin']) {
+    for (const scope of ['apps/studio', 'apps/admin']) {
       expect(matchesRule(scope, "import { createDb } from '@bailian-studio/db'")).toBe(true)
       expect(matchesRule(scope, "import { buildDashScopeRequest } from '@bailian-studio/provider-dashscope'")).toBe(true)
       expect(matchesRule(scope, "import { createGenerationRepository } from '@bailian-studio/generation-repository'")).toBe(true)
@@ -200,6 +238,7 @@ describe('package boundary rules', () => {
     expect(matchesRule('packages/api-client', "import { z } from 'zod'")).toBe(false)
     expect(matchesRule('packages/api-client', "import { createLogger } from '@bailian-studio/shared'")).toBe(false)
     expect(matchesRule('packages/api-client', "import { CreativeAssetTypeSchema } from '@bailian-studio/creative-asset-contracts'")).toBe(false)
+    expect(matchesRule('packages/api-client', "import { CanvasSnapshotSchema } from '@bailian-studio/canvas-contracts'")).toBe(false)
     expect(matchesRule('packages/api-client', "import { listModels } from '@bailian-studio/model-core'")).toBe(true)
 
     // storage 只允许叶子 shared。

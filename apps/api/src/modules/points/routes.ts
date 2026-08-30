@@ -63,7 +63,7 @@ export function createPointsRoutes(deps: ApiDependencies) {
           actorUserId: actor.id,
           ...(requestId !== undefined ? { requestId } : {}),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'points.grant',
           outcome: 'succeeded',
@@ -73,7 +73,7 @@ export function createPointsRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { balance: result.balance, entry: result.entry } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'points.grant',
           outcome: 'failed',
@@ -97,7 +97,7 @@ export function createPointsRoutes(deps: ApiDependencies) {
         actorUserId: actor.id,
         ...(requestId !== undefined ? { requestId } : {}),
       })
-      await recordApiAuditEvent(deps.generationRepository, request, {
+      await recordApiAuditEvent(deps.auditRepository, request, {
         userId: actor.id,
         action: 'points.adjustment',
         outcome: 'succeeded',

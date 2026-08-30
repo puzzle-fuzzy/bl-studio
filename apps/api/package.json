@@ -13,6 +13,9 @@
     "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@bailian-studio/admin-repository": "workspace:*",
+    "@bailian-studio/canvas-contracts": "workspace:*",
+    "@bailian-studio/canvas-repository": "workspace:*",
     "@elysia/cors": "^1.4.2",
     "@bailian-studio/auth": "workspace:*",
     "@bailian-studio/audit-repository": "workspace:*",

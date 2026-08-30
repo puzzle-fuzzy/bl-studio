@@ -15,19 +15,6 @@
 
 // 监听器 transport 仍来自 db；generation trigger DDL 由本包自己拥有。
 export type { NotificationListener } from "@bailian-studio/db";
-export {
-	type AdminGalleryRepository,
-	createAdminGalleryRepository,
-} from "./admin-gallery";
-export {
-	type AdminTaskRepository,
-	createAdminTaskRepository,
-} from "./admin-tasks";
-export {
-	type AnalyticsRepository,
-	createAnalyticsRepository,
-	type GenerationCallStats,
-} from "./analytics";
 export type { AssetRepository } from "./asset-port";
 export {
 	createAssetRepository,
@@ -130,8 +117,6 @@ export {
 	resetGenerationRepositoryTestDb,
 } from "./test-utils";
 export type {
-	AdminGalleryItem,
-	AdminTaskItem,
 	ArtifactKind,
 	ArtifactStatus,
 	ArtifactStorageProvider,
@@ -141,7 +126,6 @@ export type {
 	ContentReport,
 	ContentReportReason,
 	ContentReportStatus,
-	CostMarginRow,
 	CreateGenerationInput,
 	CreateGenerationResult,
 	CreateGenerationShareInput,
@@ -165,8 +149,6 @@ export type {
 	GenerationShare,
 	GetGenerationShareForRecordInput,
 	GetOwnedStorageObjectInput,
-	ListAdminGalleryResult,
-	ListAdminTasksResult,
 	ListContentReportsResult,
 	ListFeedbackResult,
 	ListGalleryResult,
@@ -178,7 +160,6 @@ export type {
 	MarkArtifactFailedInput,
 	MarkArtifactStoredInput,
 	MarkGenerationProcessingInput,
-	ModelCost,
 	NormalizedGenerationOutput,
 	NotificationItem,
 	NotificationKind,
@@ -190,7 +171,6 @@ export type {
 	RegisterWorkerHeartbeatInput,
 	RepositoryGenerationStatus,
 	RequestGenerationCancelInput,
-	RetentionAnalytics,
 	RetryGenerationInput,
 	RevokeGenerationShareInput,
 	ScheduleGenerationPollInput,

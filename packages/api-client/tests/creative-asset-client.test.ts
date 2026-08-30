@@ -9,13 +9,14 @@ function jsonResponse(body: unknown, status = 200): Response {
 }
 
 function queuedFetch(responses: Response[]) {
-  const calls: Array<{ method: string; url: string; body?: string; credentials?: RequestCredentials }> = []
+  const calls: Array<{ method: string; url: string; body?: string; credentials?: RequestCredentials; headers?: HeadersInit }> = []
   const core = async (input: Parameters<typeof fetch>[0], init?: RequestInit): Promise<Response> => {
     calls.push({
       method: init?.method ?? 'GET',
       url: String(input),
       ...(typeof init?.body === 'string' ? { body: init.body } : {}),
       ...(init?.credentials === undefined ? {} : { credentials: init.credentials }),
+      ...(init?.headers === undefined ? {} : { headers: init.headers }),
     })
     const response = responses.shift()
     if (response === undefined) throw new Error('No queued response')
@@ -154,22 +155,50 @@ describe('creative asset api client', () => {
     const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { asset: detail } })])
     const client = createApiClient({ baseUrl: 'http://api.test/', fetch })
 
-    await expect(client.createCreativeAssetVersionFromGeneration('asset/1', {
+    await expect(client.collectCreativeAssetFromGeneration({
+      type: 'character',
+      name: '林默',
       sourceGenerationId: 'generation-1',
       semanticSpec: { identity: { name: '林默' } },
-      generationRecipe: { source: 'generation' },
+      generationRecipe: { source: 'generation', generationId: 'generation-1' },
       references: [{ artifactId: 'artifact-1', role: 'front', position: 0, metadata: { source: 'generated' } }],
-    })).resolves.toEqual(detail)
+    }, { idempotencyKey: 'collect-generation-1' })).resolves.toEqual(detail)
 
     expect(calls).toHaveLength(1)
     expect(calls[0]).toMatchObject({
       method: 'POST',
-      url: 'http://api.test/api/creative/assets/asset%2F1/versions/from-generation',
+      url: 'http://api.test/api/creative/assets/collect-from-generation',
       credentials: 'include',
     })
+    expect(new Headers(calls[0]?.headers).get('Idempotency-Key')).toBe('collect-generation-1')
     expect(JSON.parse(calls[0]?.body ?? '{}')).toMatchObject({
+      type: 'character',
+      name: '林默',
       sourceGenerationId: 'generation-1',
       references: [{ artifactId: 'artifact-1', role: 'front', position: 0 }],
     })
+  })
+
+  it('collects multiple generation artifacts through the batch endpoint', async () => {
+    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { batch: { id: 'batch-1', assets: [detail] } } })])
+    const client = createApiClient({ baseUrl: 'http://api.test/', fetch })
+
+    await expect(client.collectCreativeAssetFromGenerationBatch({
+      items: [{
+        type: 'character',
+        name: '林默',
+        sourceGenerationId: 'generation-1',
+        semanticSpec: {},
+        generationRecipe: { source: 'generation' },
+        references: [{ artifactId: 'artifact-1', role: 'front', position: 0, metadata: {} }],
+      }],
+    }, { idempotencyKey: 'batch-1' })).resolves.toEqual({ id: 'batch-1', assets: [detail] })
+
+    expect(calls[0]).toMatchObject({
+      method: 'POST',
+      url: 'http://api.test/api/creative/assets/collect-from-generation/batch',
+      credentials: 'include',
+    })
+    expect(new Headers(calls[0]?.headers).get('Idempotency-Key')).toBe('batch-1')
   })
 })

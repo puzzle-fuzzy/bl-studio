@@ -27,7 +27,7 @@ services:
     image: *runtime-image
     environment:
       DATABASE_URL: postgres://bailian-studio:bailian-studio@postgres:5432/bailian-studio_rehearsal
-    command: ["pnpm", "exec", "drizzle-kit", "migrate", "--config", "packages/db/drizzle.config.ts"]
+    command: ["bun", "x", "drizzle-kit", "migrate", "--config", "packages/db/drizzle.config.ts"]
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +111,7 @@ services:
       FFMPEG_PATH: /usr/local/bin/ffmpeg
       FFPROBE_PATH: /usr/local/bin/ffprobe
       ARTIFACT_LOCAL_ROOT: /app/var/artifacts
-    command: ["pnpm", "exec", "tsx", "apps/worker/src/index.ts"]
+    command: ["node", "--import", "tsx", "apps/worker/src/index.ts"]
     volumes:
       - rehearsal_artifacts:/app/var/artifacts
       - ../../var/ffmpeg/ffmpeg:/usr/local/bin/ffmpeg:ro
@@ -128,14 +128,14 @@ services:
     image: *runtime-image
     environment:
       DATABASE_URL: postgres://bailian-studio:bailian-studio@postgres:5432/bailian-studio_rehearsal
-    command: ["pnpm", "exec", "tsx", "scripts/deploy/queue-ops.ts", "health"]
+    command: ["node", "--import", "tsx", "scripts/deploy/queue-ops.ts", "health"]
     depends_on:
       migrate:
         condition: service_completed_successfully
     restart: "no"
 
   web:
-    # Exercise the same apps/web + Nginx image used by production.
+    # Exercise the same apps/studio + Nginx image used by production.
     image: "bailian-studio-rehearsal-web:${BAILIAN_STUDIO_RELEASE_TAG:-local}"
     build:
       context: ../..

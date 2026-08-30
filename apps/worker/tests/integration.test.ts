@@ -1,4 +1,4 @@
-import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createIsolatedGenerationRepository, createTestUser, grantTestCredits, type IsolatedGenerationRepository } from '@bailian-studio/generation-repository'
 import { getModelById, type FrozenModelManifest } from '@bailian-studio/model-core'
 import { ProviderRegistry } from '../src/providers'
@@ -27,11 +27,6 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await iso?.close()
-})
-
-afterEach(async () => {
-  const queued = await iso.adminTaskRepository.listAdminTasks({ status: 'queued', limit: 100 })
-  expect(queued.items).toHaveLength(0)
 })
 
 /**

@@ -18,6 +18,7 @@ export type DirectorRepositoryErrorCode =
   | 'DIRECTOR_SHOT_GENERATING'
   | 'DIRECTOR_SHOT_REFERENCE_INVALID'
   | 'DIRECTOR_INVALID_CURSOR'
+  | 'DIRECTOR_ENTITY_CANDIDATE_NOT_FOUND'
   | 'DIRECTOR_DATABASE_ERROR'
 
 export class DirectorRepositoryError extends Error {

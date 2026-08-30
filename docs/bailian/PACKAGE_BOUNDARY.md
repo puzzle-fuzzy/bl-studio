@@ -10,7 +10,8 @@
 |---|---|---|---|
 | `@bailian-studio/provider-dashscope` | `packages/provider-dashscope` | `apps/worker` | `workspace:*` |
 | `@bailian-studio/persistence-runtime` | `packages/persistence-runtime` | `apps/api` / `apps/worker` | `workspace:*` |
-| `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `apps/worker` | `workspace:*` |
+| `@bailian-studio/task-repository` | `packages/task-repository` | `packages/generation-repository` / `packages/persistence-runtime` / `packages/media-repository` / `packages/director-repository` / `packages/admin-repository` / `apps/worker` | `workspace:*` |
+| `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
@@ -18,7 +19,10 @@
 
 ## 2. 各包 import 禁令（check-package-boundaries.ts 的 rules 表）
 
-`packages/api-client` 是传输契约层，允许依赖 `@bailian-studio/shared` 与 `zod`；它不得依赖执行层、数据库、应用层或其他运行时包。共享契约只保留一份，避免 API、Worker 与前端各自维护不同的 wire schema。
+`packages/api-client` 是传输契约层，允许依赖 `@bailian-studio/shared`、
+`@bailian-studio/creative-asset-contracts`、`@bailian-studio/canvas-contracts` 与 `zod`；
+它不得依赖执行层、数据库、应用层或其他运行时包。共享契约只保留一份，避免 API、
+Worker 与前端各自维护不同的 wire schema。
 
 | 包 | 禁止 import |
 |---|---|
@@ -26,6 +30,7 @@
 | `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope)`、apps、services |
 | `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|event-bus)`、apps、services、elysia、react |
 | `packages/generation-repository` | `@bailian-studio/provider-dashscope`、services、apps、react、elysia |
+| `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|event-bus)`、services、apps、react、elysia |
 | `packages/director-repository` | 除 `@bailian-studio/(db\|shared\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/credit-ledger` | 除 `@bailian-studio/(db\|shared)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/media-repository` | `@bailian-studio/(provider-dashscope\|generation-repository\|model-core\|event-bus\|storage\|auth)`、services、apps、react、elysia |
@@ -67,8 +72,8 @@
   后台预览隐藏作品，但不改变面向用户的 SocialRepository 可见性策略。
 - admin 任务中心和成本/留存读模型分别由 `src/admin-tasks.ts` 的 `AdminTaskRepository`
   与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；内容域不再通过中央聚合转发。AdminTask
-  是跨 users/generation/assets 的只读运营投影，后续物理拆包进入独立 admin repository，
-  不迁入只负责任务生命周期的 task-repository。
+  是跨 users/generation/assets 的只读运营投影，已物理拆包进入独立
+  `@bailian-studio/admin-repository`；它不迁入只负责任务生命周期的 task-repository。
 - `GenerationRepository` 核心接口不再重复声明 gallery、通知、提示词库、反馈、举报、
   admin 与分析方法；URL 工厂/隔离测试句柄分别暴露核心 repository 与各域窄 port，仓储
   测试按窄 port 组合 harness。

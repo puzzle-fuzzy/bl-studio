@@ -6,9 +6,9 @@
  * 只有传入 `--apply` 才会真正删除任何行。
  *
  * 示例：
- *   DATABASE_URL=... pnpm exec tsx scripts/deploy/queue-ops.ts health
- *   DATABASE_URL=... pnpm exec tsx scripts/deploy/queue-ops.ts retention
- *   DATABASE_URL=... pnpm exec tsx scripts/deploy/queue-ops.ts retention --apply
+ *   DATABASE_URL=... bun x tsx scripts/deploy/queue-ops.ts health
+ *   DATABASE_URL=... bun x tsx scripts/deploy/queue-ops.ts retention
+ *   DATABASE_URL=... bun x tsx scripts/deploy/queue-ops.ts retention --apply
  */
 import postgres from 'postgres'
 

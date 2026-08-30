@@ -52,7 +52,7 @@ try {
   Copy-Item (Join-Path $releaseDirectory.FullName 'ffprobe') (Join-Path $destinationPath 'ffprobe') -Force
 
   Write-Host "Prepared Linux ffmpeg/ffprobe: $destinationPath"
-  Write-Host 'Next: pnpm run deploy:rehearsal:up'
+  Write-Host 'Next: bun run deploy:rehearsal:up'
 }
 finally {
   if (Test-Path $tempRoot) {

@@ -29,21 +29,25 @@ jobs:
       DATABASE_URL: postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          version: 10.9.0
+          bun-version: 1.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24.12.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
+      - name: Cache bun install
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+      - run: bun install --frozen-lockfile
       # 用 migrate（而非 push）准备 test DB：生产只走 migrate，CI 必须覆盖同一条路径；
       # schema↔迁移链一致性由 verify 里的 check:db-migrations（drizzle-kit generate 离线对账）把关。
-      - run: pnpm run db:migrate:test
-      - run: pnpm run verify
+      - run: bun run db:migrate:test
+      - run: bun run verify
 
   # e2e 资产闭环（独立 job，各自的服务容器互不干扰）。与 verify 走同一条 migrate 路径，
-  # 再直接跑 Playwright——刻意不用 `pnpm run e2e`（其内部 db:push 会掩盖迁移漂移，CI 只允许 migrate）。
+  # 再直接跑 Playwright——刻意不用 `bun run e2e`（其内部 db:push 会掩盖迁移漂移，CI 只允许 migrate）。
   # API 由 playwright.config.ts 的 webServer 用 bun 启动；asset-loop.spec.ts 是纯 API 驱动（request fixture，
   # 不需要浏览器二进制），install chromium 仅为未来浏览器 spec 兜底。
   e2e:
@@ -67,20 +71,16 @@ jobs:
       DATABASE_URL: postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.9.0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24.12.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run db:migrate:test
-      - run: node infra/scripts/playwright-cli.cjs install --with-deps chromium
-      - run: node infra/scripts/playwright-cli.cjs test --config=e2e/playwright.config.ts
+      - run: bun install --frozen-lockfile
+      - run: bun run db:migrate:test
+      - run: node scripts/verify/playwright-cli.cjs install --with-deps chromium
+      - run: node scripts/verify/playwright-cli.cjs test --config=playwright.config.ts
 
   # Windows portability gate. It intentionally avoids a database service: the
   # goal is to catch install, path, process-spawn, typecheck, and package-boundary
@@ -89,20 +89,17 @@ jobs:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
-        with:
-          version: 10.9.0
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: 1.4.0
       - uses: actions/setup-node@v4
         with:
           node-version: 24.12.0
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
-      - run: pnpm run check:boundaries
-      - run: pnpm run check:manifests
-      - run: pnpm run typecheck:root
-      - run: pnpm run typecheck
-      - run: pnpm exec vitest run packages/storage/tests/paths.test.ts
+      - run: bun install --frozen-lockfile
+      - run: bun run lint
+      - run: bun run check:boundaries
+      - run: bun run check:manifests
+      - run: bun run typecheck:root
+      - run: bun run typecheck
+      - run: bun run build
+      - run: bun x vitest run packages/storage/tests/paths.test.ts

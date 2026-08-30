@@ -1,0 +1,3 @@
+ALTER TABLE "creative_assets" ADD COLUMN "collection_idempotency_key" text;--> statement-breakpoint
+ALTER TABLE "creative_assets" ADD COLUMN "collection_idempotency_fingerprint" text;--> statement-breakpoint
+CREATE UNIQUE INDEX "creative_assets_user_collection_idempotency_idx" ON "creative_assets" USING btree ("user_id","collection_idempotency_key") WHERE "creative_assets"."collection_idempotency_key" is not null;

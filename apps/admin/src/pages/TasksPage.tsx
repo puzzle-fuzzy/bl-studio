@@ -1,22 +1,23 @@
-import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, FileArchive, FileText, Film, Image as ImageIcon, Loader2, Music } from 'lucide-react'
 import type { AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@bailian-studio/ui'
+import { Button } from '@bailian-studio/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@bailian-studio/ui'
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from '@/components/ui/dialog'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+} from '@bailian-studio/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
 
 type TaskStatusFilter = 'all' | 'queued' | 'running' | 'succeeded' | 'failed' | 'cancelled'
 
@@ -299,70 +300,63 @@ function TaskDetailDialog({
 /** 管理后台任务中心：状态筛选、游标分页和只读任务详情。 */
 export function TasksPage() {
   const [status, setStatus] = useState<TaskStatusFilter>('all')
-  const [items, setItems] = useState<AdminTaskItem[]>([])
   const [pageIndex, setPageIndex] = useState(0)
   const [pageCursors, setPageCursors] = useState<Array<string | undefined>>([undefined])
-  const [hasNextPage, setHasNextPage] = useState(false)
   const [selectedTask, setSelectedTask] = useState<AdminTaskItem | null>(null)
   const [taskRequestContext, setTaskRequestContext] = useState<AdminTaskRequestContext | null>(null)
   const [taskRequestLoading, setTaskRequestLoading] = useState(false)
   const [taskRequestError, setTaskRequestError] = useState<string | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
 
-  const requestSeq = useRef(0)
   const taskRequestSeq = useRef(0)
 
-  const loadPage = useCallback(async (targetPage: number, cursor?: string) => {
-    const seq = ++requestSeq.current
-    setLoading(true)
-    setError(null)
-    setItems([])
+  // Batch 0c：游标栈保留为导航状态，取数交给 useQuery（键含 状态+页码+游标），
+  // requestSeq 手写守卫作废。
+  const cursor = pageCursors[pageIndex]
+  const { data, isPending, error: queryError } = useQuery({
+    queryKey: ['admin', 'tasks', status, pageIndex, cursor],
+    queryFn: () => apiClient.adminListTasks({
+      limit: PAGE_SIZE,
+      ...(cursor !== undefined ? { cursor } : {}),
+      ...(status !== 'all' ? { status } : {}),
+    }),
+  })
+  const items = data?.items ?? []
+  const hasNextPage = data?.nextCursor !== undefined
+  const loading = isPending
+  const error = queryError !== null ? userErrorMessage(queryError) : null
 
-    try {
-      const page = await apiClient.adminListTasks({
-        limit: PAGE_SIZE,
-        ...(cursor !== undefined ? { cursor } : {}),
-        ...(status !== 'all' ? { status } : {}),
-      })
-      if (seq !== requestSeq.current) return
-
-      setItems(page.items)
-      setPageIndex(targetPage)
-      setHasNextPage(page.nextCursor !== undefined)
-      setPageCursors(current => {
-        const next = current.slice(0, targetPage + 1)
-        if (page.nextCursor !== undefined) next[targetPage + 1] = page.nextCursor
-        return next
-      })
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoading(false)
-    }
-  }, [status])
+  // 把本页的 nextCursor 记录进游标栈，供"下一页"使用。
+  useEffect(() => {
+    const nextCursor = data?.nextCursor
+    if (nextCursor === undefined) return
+    setPageCursors(current => {
+      const next = current.slice(0, pageIndex + 1)
+      next[pageIndex + 1] = nextCursor
+      return next
+    })
+  }, [data, pageIndex])
 
   useEffect(() => {
     setPageIndex(0)
     setPageCursors([undefined])
-    setHasNextPage(false)
     taskRequestSeq.current += 1
     setSelectedTask(null)
     setTaskRequestContext(null)
     setTaskRequestLoading(false)
     setTaskRequestError(null)
-    void loadPage(0)
-  }, [loadPage])
+    setPageIndex(0)
+    setPageCursors([undefined])
+  }, [status])
 
   const handleNextPage = () => {
     const nextCursor = pageCursors[pageIndex + 1]
     if (!hasNextPage || nextCursor === undefined || loading) return
-    void loadPage(pageIndex + 1, nextCursor)
+    setPageIndex(pageIndex + 1)
   }
 
   const handlePreviousPage = () => {
     if (pageIndex === 0 || loading) return
-    void loadPage(pageIndex - 1, pageCursors[pageIndex - 1])
+    setPageIndex(pageIndex - 1)
   }
 
   const openTask = (task: AdminTaskItem) => {

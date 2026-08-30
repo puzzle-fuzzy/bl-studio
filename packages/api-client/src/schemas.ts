@@ -43,6 +43,12 @@ import {
   DirectorScriptMessagesResponseSchema,
   DirectorScriptVersionResponseSchema,
   DirectorScriptVersionsResponseSchema,
+  DirectorEntityCandidateSchema,
+  DirectorEntityCandidateKindSchema,
+  DirectorEntityCandidateStatusSchema,
+  DirectorEntityMentionSchema,
+  ListDirectorEntityCandidatesSchema,
+  ReviewDirectorEntityCandidateSchema,
   UpdateDirectorProjectSchema,
   type CreateDirectorProjectInput,
   type CreateDirectorPhaseRunInput,
@@ -75,6 +81,12 @@ import {
   type DirectorScriptMessage,
   type DirectorScriptChatInput,
   type UpdateDirectorProjectInput,
+  type DirectorEntityCandidate,
+  type DirectorEntityCandidateKind,
+  type DirectorEntityCandidateStatus,
+  type DirectorEntityMention,
+  type ListDirectorEntityCandidatesInput,
+  type ReviewDirectorEntityCandidateInput,
 } from '@bailian-studio/shared'
 
 export {
@@ -108,6 +120,12 @@ export {
   DirectorScriptMessagesResponseSchema,
   DirectorScriptVersionResponseSchema,
   DirectorScriptVersionsResponseSchema,
+  DirectorEntityCandidateSchema,
+  DirectorEntityCandidateKindSchema,
+  DirectorEntityCandidateStatusSchema,
+  DirectorEntityMentionSchema,
+  ListDirectorEntityCandidatesSchema,
+  ReviewDirectorEntityCandidateSchema,
   DirectorPhaseRunResponseSchema,
   DirectorPhaseRunSchema,
   UpdateDirectorProjectSchema,
@@ -144,7 +162,19 @@ export type {
   DirectorPhaseRun,
   DirectorPhaseRunStatus,
   UpdateDirectorProjectInput,
+  DirectorEntityCandidate,
+  DirectorEntityCandidateKind,
+  DirectorEntityCandidateStatus,
+  DirectorEntityMention,
+  ListDirectorEntityCandidatesInput,
+  ReviewDirectorEntityCandidateInput,
 }
+
+export const DirectorEntityCandidatesResponseSchema = z.array(DirectorEntityCandidateSchema)
+export const DirectorEntityCandidateResponseSchema = DirectorEntityCandidateSchema
+export const DirectorEntityCandidateDeleteResponseSchema = z.object({
+  deleted: z.literal(true),
+})
 
 export const ModelOperationSchema = z.enum([
   'text.chat',

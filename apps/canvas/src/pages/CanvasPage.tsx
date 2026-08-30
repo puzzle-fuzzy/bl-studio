@@ -12,10 +12,11 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { ImagePlus, Video } from 'lucide-react'
+import { History, ImagePlus, Loader2, Video } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
 import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
 import { useCanvasStore } from '../stores/canvas-store'
+import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
 
 const nodeTypes: NodeTypes = { mediaNode: MediaNode }
 
@@ -31,6 +32,7 @@ interface CanvasMenu {
 
 /** 画布页面：全屏 React Flow 画布 + 工具栏。 */
 export function CanvasPage() {
+  const { saveStatus, versions, refreshVersions, restoreVersion } = useCanvasPersistence()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
@@ -38,6 +40,22 @@ export function CanvasPage() {
   const onConnect = useCanvasStore(state => state.onConnect)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
+  const [showVersions, setShowVersions] = useState(false)
+  const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
+
+  useEffect(() => {
+    if (showVersions) void refreshVersions()
+  }, [refreshVersions, showVersions])
+
+  const saveLabel = saveStatus === 'loading'
+    ? '加载中…'
+    : saveStatus === 'saving'
+      ? '保存中…'
+      : saveStatus === 'conflict'
+        ? '版本冲突'
+        : saveStatus === 'error'
+          ? '离线保存'
+          : '已保存'
 
   // 点击菜单外部或按 Esc 关闭右键菜单。
   useEffect(() => {
@@ -70,6 +88,7 @@ export function CanvasPage() {
         prompt: '',
         modelId: '',
         referenceUrls: [],
+        referenceAssetIds: [],
         aspectRatio: '1:1',
       },
     }
@@ -90,6 +109,7 @@ export function CanvasPage() {
         prompt: '',
         modelId: '',
         referenceUrls: [],
+        referenceAssetIds: [],
         aspectRatio: '1:1',
       },
     }
@@ -140,6 +160,55 @@ export function CanvasPage() {
           视频
         </Button>
       </div>
+      <div className="absolute top-3 right-3 z-10 flex items-center gap-2 rounded-xl border bg-surface/95 p-1 shadow-sm backdrop-blur">
+        <span className={`px-2 text-[10px] ${saveStatus === 'conflict' ? 'text-destructive' : 'text-muted-foreground'}`}>
+          {saveStatus === 'saving' || saveStatus === 'loading' ? <Loader2 className="mr-1 inline size-3 animate-spin" aria-hidden /> : null}
+          {saveLabel}
+        </span>
+        <Button
+          size="sm"
+          variant="ghost"
+          onClick={() => setShowVersions(open => !open)}
+          aria-expanded={showVersions}
+        >
+          <History className="mr-1 size-3.5" aria-hidden />
+          版本
+        </Button>
+      </div>
+
+      {showVersions && (
+        <div className="absolute top-14 right-3 z-20 w-64 rounded-xl border bg-surface/95 p-2 shadow-lg backdrop-blur">
+          <div className="mb-1 flex items-center justify-between px-1">
+            <span className="text-xs font-medium">版本历史</span>
+            <span className="text-[10px] text-muted-foreground">恢复会创建新版本</span>
+          </div>
+          <div className="max-h-64 space-y-1 overflow-y-auto">
+            {versions.length === 0 ? (
+              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无版本</p>
+            ) : versions.map(version => (
+              <div key={version.id} className="flex items-center justify-between rounded-lg px-2 py-1.5 hover:bg-accent">
+                <div>
+                  <div className="text-xs">版本 {version.version}</div>
+                  <div className="text-[10px] text-muted-foreground">{new Date(version.createdAt).toLocaleString()}</div>
+                </div>
+                <Button
+                  size="xs"
+                  variant="outline"
+                  disabled={restoringVersion !== undefined}
+                  onClick={() => {
+                    setRestoringVersion(version.id)
+                    void restoreVersion(version.id)
+                      .catch(() => undefined)
+                      .finally(() => setRestoringVersion(undefined))
+                  }}
+                >
+                  {restoringVersion === version.id ? '恢复中' : '恢复'}
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       <ReactFlow
         nodes={nodes}

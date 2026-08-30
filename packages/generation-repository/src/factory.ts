@@ -6,9 +6,6 @@
  * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository。
  */
 import { createDb, type BailianStudioDb } from '@bailian-studio/db'
-import { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
-import { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
-import { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
 import { createAssetRepository } from './assets'
 import type { AssetRepository } from './asset-port'
 import { createAuditRepository } from './audit-events'
@@ -36,9 +33,6 @@ export interface GenerationRepositoryHandle {
   db: BailianStudioDb
   /** 核心 generation/worker 能力；其他上下文通过下面的窄 port 暴露。 */
   repository: GenerationRepository
-  adminGalleryRepository: AdminGalleryRepository
-  adminTaskRepository: AdminTaskRepository
-  analyticsRepository: AnalyticsRepository
   assetRepository: AssetRepository
   auditRepository: AuditRepository
   generationDiagnosticsRepository: GenerationDiagnosticsRepository
@@ -65,9 +59,6 @@ export function createGenerationRepositoryFromUrl(
   return {
     db,
     repository: createGenerationRepository({ db, taskQueueTransactionStore }),
-    adminGalleryRepository: createAdminGalleryRepository(db),
-    adminTaskRepository: createAdminTaskRepository(db),
-    analyticsRepository: createAnalyticsRepository(db),
     assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
     auditRepository: createAuditRepository(db),
     generationDiagnosticsRepository: createGenerationDiagnosticsRepository(db),

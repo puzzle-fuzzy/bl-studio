@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest'
 import {
   assetDerivatives,
   authActionTokens,
+  auditEventOutbox,
+  auditLogs,
   createDb,
   creditAccounts,
   creditLedgerEntries,
@@ -46,6 +48,9 @@ describe('db schema exports', () => {
     expect(creditAccounts.reservedCents).toBeDefined()
     expect(creditLedgerEntries.kind).toBeDefined()
     expect(creditLedgerEntries.idempotencyKey).toBeDefined()
+    expect(auditEventOutbox.status).toBeDefined()
+    expect(auditEventOutbox.availableAt).toBeDefined()
+    expect(auditLogs.outboxEventId).toBeDefined()
   })
 
   it('exports generation and task tables', () => {

@@ -3,7 +3,7 @@ import type {
   DirectorRepository,
 } from '@bailian-studio/director-repository'
 import { DirectorRepositoryError } from '@bailian-studio/director-repository'
-import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorScriptVersion, type DirectorShot } from '@bailian-studio/shared'
+import { buildDirectorAssemblyPreflight, DIRECTOR_PHASES, type DirectorAsset, type DirectorEntityCandidate, type DirectorPhaseRun, type DirectorPhaseState, type DirectorProjectDetail, type DirectorProjectListResult, type DirectorScriptVersion, type DirectorShot } from '@bailian-studio/shared'
 import { createTestApp } from '../src/test-app'
 import { createFakeAuthService } from './fake-auth-service'
 
@@ -11,6 +11,7 @@ let currentUserId = 'user-1'
 let nextProjectId = 1
 let projects: Array<{ userId: string; project: DirectorProjectDetail }> = []
 let runs: Array<{ userId: string; run: DirectorPhaseRun }> = []
+let candidates: Array<{ userId: string; candidate: DirectorEntityCandidate }> = []
 
 const fakeAuthService = createFakeAuthService(() => ({
   id: currentUserId,
@@ -265,12 +266,55 @@ const fakeDirectorRepository: DirectorRepository = {
   async failPhaseRun() {
     return undefined
   },
+  async listEntityCandidates() {
+    return candidates
+      .filter(item => item.userId === currentUserId)
+      .map(item => item.candidate)
+  },
+  async createEntityCandidates(input) {
+    const created = input.candidates.map((candidate, index) => ({
+      id: `${input.projectId}-candidate-${index + 1}`,
+      projectId: input.projectId,
+      kind: candidate.kind,
+      name: candidate.name,
+      description: candidate.description,
+      traits: candidate.traits,
+      status: 'provisional' as const,
+      mentions: candidate.mentions,
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: '2026-08-10T00:00:00.000Z',
+      updatedAt: '2026-08-10T00:00:00.000Z',
+    }))
+    candidates.push(...created.map(candidate => ({ userId: input.userId, candidate })))
+    return created
+  },
+  async reviewEntityCandidate(input) {
+    const record = candidates.find(item => item.userId === input.userId && item.candidate.id === input.candidateId)
+    if (record === undefined) return undefined
+    record.candidate = {
+      ...record.candidate,
+      status: input.status,
+      reviewedBy: input.userId,
+      reviewedAt: '2026-08-10T00:01:00.000Z',
+      updatedAt: '2026-08-10T00:01:00.000Z',
+    }
+    return record.candidate
+  },
+  async deleteEntityCandidate(input) {
+    const index = candidates.findIndex(item => item.userId === input.userId && item.candidate.id === input.candidateId)
+    if (index === -1) return false
+    candidates.splice(index, 1)
+    return true
+  },
 }
 
-const app = createTestApp({
+const testApp = createTestApp({
   authService: fakeAuthService,
   directorRepository: fakeDirectorRepository,
-}).app
+})
+const app = testApp.app
+const generationSseHub = testApp.generationSseHub
 
 function authed(path: string, init: RequestInit = {}): Request {
   return new Request(`http://localhost${path}`, {
@@ -288,6 +332,8 @@ describe('director routes', () => {
     nextProjectId = 1
     projects = []
     runs = []
+    candidates = []
+    generationSseHub.clear()
   })
 
   it('requires authentication', async () => {
@@ -344,6 +390,60 @@ describe('director routes', () => {
     expect(listResponse.status).toBe(200)
     expect(list.data.items).toHaveLength(0)
     expect(detailResponse.status).toBe(404)
+  })
+
+  it('scopes entity candidates to the project owner and supports review lifecycle', async () => {
+    const project = createProject({ title: '实体审核', storyText: '林默走进旧车站。' })
+    projects = [{ userId: 'user-1', project }]
+    const candidate: DirectorEntityCandidate = {
+      id: 'candidate-1',
+      projectId: project.id,
+      kind: 'character',
+      name: '林默',
+      description: '沉默的等待者',
+      traits: ['克制'],
+      status: 'provisional',
+      mentions: [{ text: '林默', start: 0, end: 2 }],
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: '2026-08-10T00:00:00.000Z',
+      updatedAt: '2026-08-10T00:00:00.000Z',
+    }
+    candidates = [{ userId: 'user-1', candidate }]
+
+    currentUserId = 'user-2'
+    const hiddenResponse = await app.handle(authed(`/api/director/projects/${project.id}/entity-candidates`))
+    const hidden = await hiddenResponse.json() as { data: DirectorEntityCandidate[] }
+    const forbiddenReviewResponse = await app.handle(authed(`/api/director/entity-candidates/${candidate.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'accepted' }),
+    }))
+
+    expect(hiddenResponse.status).toBe(200)
+    expect(hidden.data).toEqual([])
+    expect(forbiddenReviewResponse.status).toBe(404)
+
+    currentUserId = 'user-1'
+    const reviewResponse = await app.handle(authed(`/api/director/entity-candidates/${candidate.id}`, {
+      method: 'PATCH',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ status: 'accepted' }),
+    }))
+    const reviewed = await reviewResponse.json() as { data: DirectorEntityCandidate }
+    expect(reviewResponse.status).toBe(200)
+    expect(reviewed.data.status).toBe('accepted')
+    expect(generationSseHub.drain('user-1')).toEqual([
+      `event: director.entities.changed\ndata: {"userId":"user-1","projectId":"${project.id}","candidateId":"${candidate.id}","reason":"candidate_reviewed"}\n\n`,
+    ])
+
+    const deleteResponse = await app.handle(authed(`/api/director/entity-candidates/${candidate.id}`, { method: 'DELETE' }))
+    const deleted = await deleteResponse.json() as { data: { deleted: boolean } }
+    expect(deleteResponse.status).toBe(200)
+    expect(deleted.data.deleted).toBe(true)
+    expect(generationSseHub.drain('user-1')).toEqual([
+      `event: director.entities.changed\ndata: {"userId":"user-1","candidateId":"${candidate.id}","reason":"candidate_deleted"}\n\n`,
+    ])
   })
 
   it('queues and reads a manual phase run', async () => {

@@ -1,20 +1,19 @@
 # bl-studio 生产镜像。
 #
 # 运行时约定：
-# - 包管理/任务编排：pnpm + turbo（整体都使用 pnpm）；
-# - 唯一例外：Elysia API 进程用 Bun 运行时启动（bun apps/api/src/index.ts）；
-# - Worker 用 Node/tsx 启动（pnpm exec tsx apps/worker/src/index.ts）。
+# - 包管理/任务编排：bun + turbo（整体都使用 bun）；
+# - Elysia API 进程用 Bun 运行时启动（bun apps/api/src/index.ts）；
+# - Worker 用 Node/tsx 启动（node --import tsx apps/worker/src/index.ts）。
 #
 # 镜像分层要点：
-# - `base`：oven/bun + Node 24 + pnpm（无 node_modules）；
+# - `base`：oven/bun + Node 24（无 node_modules）；
 # - `workspace`：**全量依赖**（含 typescript/vite 等构建/测试期工具），仅供 web-build；
-# - `runtime`：**只装 api/worker/root 的生产依赖**（pnpm filtered install），供 api/worker/migrate。
-#   全量 devDeps 永远不进入 runtime 层链，runtime 镜像才真正变小
-#   （node_modules 全量 ~497M → 生产 ~288M，docker save 传输 ~440MB → ~350MB）。
+# - `runtime`：**只装 api/worker/root 的生产依赖**（bun filtered install），供 api/worker/migrate。
+#   全量 devDeps 永远不进入 runtime 层链，runtime 镜像才真正变小。
 
 FROM oven/bun:1.3.14-debian AS base
 
-# 依赖安装用 pnpm（需要 node/npm）；Worker 运行时也用 node/tsx。
+# Node 24 供 Worker（node --import tsx）与 CLI 脚本使用。
 # 注意：项目要求 Node ≥24（`import.meta.main` 原生，Node 20 无此特性会让 worker
 # 静默退出），apt 默认 nodejs 是 v20 —— 必须从官方二进制安装 Node LTS。
 # TARGETARCH 是 BuildKit 自动注入的构建参数（amd64/arm64），保证在 x64 与
@@ -33,7 +32,6 @@ RUN apt-get update \
        -o /tmp/node.tar.xz \
   && tar -xJf /tmp/node.tar.xz -C /usr/local --strip-components=1 \
   && rm /tmp/node.tar.xz \
-  && npm install -g pnpm@10.9.0 \
   && node --version
 
 WORKDIR /app
@@ -41,12 +39,14 @@ WORKDIR /app
 # ── workspace：全量依赖（含构建/测试期工具），供 web-build 使用 ──────────────
 FROM base AS workspace
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
-COPY apps/web/package.json ./apps/web/
+COPY apps/studio/package.json ./apps/studio/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/admin-repository/package.json ./packages/admin-repository/
+COPY packages/audit-repository/package.json ./packages/audit-repository/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
@@ -58,13 +58,22 @@ COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
+COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/
+COPY packages/canvas-contracts/package.json ./packages/canvas-contracts/
+COPY packages/canvas-repository/package.json ./packages/canvas-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/task-engine/package.json ./packages/task-engine/
+COPY packages/task-repository/package.json ./packages/task-repository/
+COPY apps/writer/package.json ./apps/writer/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/lib-client/package.json ./packages/lib-client/
+COPY packages/app-shell/package.json ./packages/app-shell/
+COPY apps/canvas/package.json ./apps/canvas/
 
-RUN pnpm install --frozen-lockfile
+RUN bun install --frozen-lockfile
 
 COPY turbo.json tsconfig.base.json tsconfig.json ./
 COPY apps ./apps
@@ -75,12 +84,14 @@ COPY data/fixtures ./data/fixtures
 # ── runtime：只装生产依赖（不含 devDeps），供 api/worker/migrate ─────────────
 FROM base AS runtime
 
-COPY package.json pnpm-workspace.yaml pnpm-lock.yaml .npmrc ./
+COPY package.json bun.lock ./
 COPY apps/api/package.json ./apps/api/
-COPY apps/web/package.json ./apps/web/
+COPY apps/studio/package.json ./apps/studio/
 COPY apps/admin/package.json ./apps/admin/
 COPY apps/worker/package.json ./apps/worker/
 COPY packages/api-client/package.json ./packages/api-client/
+COPY packages/audit-repository/package.json ./packages/audit-repository/
+COPY packages/admin-repository/package.json ./packages/admin-repository/
 COPY packages/auth/package.json ./packages/auth/
 COPY packages/credit-ledger/package.json ./packages/credit-ledger/
 COPY packages/creative-asset-contracts/package.json ./packages/creative-asset-contracts/
@@ -92,16 +103,25 @@ COPY packages/director-repository/package.json ./packages/director-repository/
 COPY packages/event-bus/package.json ./packages/event-bus/
 COPY packages/generation-repository/package.json ./packages/generation-repository/
 COPY packages/media-repository/package.json ./packages/media-repository/
+COPY packages/persistence-runtime/package.json ./packages/persistence-runtime/
+COPY packages/canvas-contracts/package.json ./packages/canvas-contracts/
+COPY packages/canvas-repository/package.json ./packages/canvas-repository/
 COPY packages/model-core/package.json ./packages/model-core/
 COPY packages/provider-dashscope/package.json ./packages/provider-dashscope/
 COPY packages/shared/package.json ./packages/shared/
 COPY packages/storage/package.json ./packages/storage/
 COPY packages/task-engine/package.json ./packages/task-engine/
+COPY packages/task-repository/package.json ./packages/task-repository/
+COPY apps/writer/package.json ./apps/writer/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/lib-client/package.json ./packages/lib-client/
+COPY packages/app-shell/package.json ./packages/app-shell/
+COPY apps/canvas/package.json ./apps/canvas/
 
 # 生产依赖：tsx/drizzle-kit/postgres 在根 dependencies；api/worker 的 workspace
 # 闭包由 filter 自动带入。web/admin 仅在 web-build 阶段需要，避免把 react/recharts
 # 等前端运行时依赖复制进 api/worker 镜像。
-RUN pnpm install --prod --frozen-lockfile \
+RUN bun install --production --frozen-lockfile \
   --filter . \
   --filter @bailian-studio/api... \
   --filter @bailian-studio/worker...
@@ -147,14 +167,16 @@ ENV VITE_LEGAL_ENTITY=${VITE_LEGAL_ENTITY}
 ENV VITE_LEGAL_CONTACT_EMAIL=${VITE_LEGAL_CONTACT_EMAIL}
 ENV VITE_LEGAL_EFFECTIVE_DATE=${VITE_LEGAL_EFFECTIVE_DATE}
 
-# 同源两个前端：主站 apps/web + 管理后台 apps/admin（nginx 以 /admin 前缀服务）。
-RUN pnpm --filter @bailian-studio/web build && pnpm --filter @bailian-studio/admin build
+# 同源四个前端：主站 apps/studio + 编剧台 apps/writer + 画布 apps/canvas（nginx 以 /writer 前缀服务）+ 管理后台 apps/admin（/admin 前缀）。
+RUN bun run --filter @bailian-studio/studio build && bun run --filter @bailian-studio/writer build && bun run --filter @bailian-studio/canvas build && bun run --filter @bailian-studio/admin build
 
 FROM nginx:1.27-alpine AS web
 
 COPY deploy/nginx/bailian-studio.conf /etc/nginx/conf.d/default.conf
-COPY --from=web-build /app/apps/web/dist /usr/share/nginx/html
+COPY --from=web-build /app/apps/studio/dist /usr/share/nginx/html
 COPY --from=web-build /app/apps/admin/dist /usr/share/nginx/html-admin
+COPY --from=web-build /app/apps/writer/dist /usr/share/nginx/html-writer
+COPY --from=web-build /app/apps/canvas/dist /usr/share/nginx/html-canvas
 
 EXPOSE 5002
 

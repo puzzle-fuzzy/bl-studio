@@ -72,6 +72,8 @@ export type {
   ModelCapability,
   ModelCategory,
   ModelManifest,
+  ModelManifestExamples,
+  ModelManifestSourceRefs,
   ModelParameter,
   ModelParameterType,
   ModelProvider,

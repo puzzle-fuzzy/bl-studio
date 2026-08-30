@@ -6,6 +6,8 @@
  */
 
 import { GenerationRepositoryError, type GenerationRepositoryErrorCode } from '@bailian-studio/generation-repository'
+import { AdminRepositoryError, type AdminRepositoryErrorCode } from '@bailian-studio/admin-repository'
+import { CanvasRepositoryError, type CanvasRepositoryErrorCode } from '@bailian-studio/canvas-repository'
 import { CreativeAssetCompilerError, type CreativeAssetCompilerErrorCode } from '@bailian-studio/creative-asset-compiler'
 import { DirectorRepositoryError, type DirectorRepositoryErrorCode } from '@bailian-studio/director-repository'
 import { CreativeAssetRepositoryError, type CreativeAssetRepositoryErrorCode } from '@bailian-studio/creative-asset-repository'
@@ -50,6 +52,19 @@ const REPOSITORY_STATUS: Record<GenerationRepositoryErrorCode, number> = {
   POINTS_SETTLEMENT_ANOMALY: 500,
 }
 
+const ADMIN_REPOSITORY_STATUS: Record<AdminRepositoryErrorCode, number> = {
+  ADMIN_INVALID_CURSOR: 400,
+  ADMIN_GENERATION_NOT_FOUND: 404,
+  ADMIN_DATABASE_ERROR: 500,
+}
+
+const CANVAS_REPOSITORY_STATUS: Record<CanvasRepositoryErrorCode, number> = {
+  CANVAS_NOT_FOUND: 404,
+  CANVAS_REVISION_CONFLICT: 409,
+  CANVAS_VERSION_NOT_FOUND: 404,
+  CANVAS_DATABASE_ERROR: 500,
+}
+
 const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, number> = {
   CREATIVE_COMPILER_MODEL_UNAVAILABLE: 409,
   CREATIVE_COMPILER_PROMPT_UNSUPPORTED: 400,
@@ -84,6 +99,7 @@ const DIRECTOR_REPOSITORY_STATUS: Record<DirectorRepositoryErrorCode, number> = 
   DIRECTOR_PHASE_ALREADY_RUNNING: 409,
   DIRECTOR_PROJECT_ACTIVE_RUN: 409,
   DIRECTOR_INVALID_CURSOR: 400,
+    DIRECTOR_ENTITY_CANDIDATE_NOT_FOUND: 404,
   DIRECTOR_DATABASE_ERROR: 500,
 }
 
@@ -98,6 +114,8 @@ const CREATIVE_ASSET_REPOSITORY_STATUS: Record<CreativeAssetRepositoryErrorCode,
   CREATIVE_ASSET_VERSION_STATE_INVALID: 409,
   CREATIVE_ASSET_REFERENCE_NOT_FOUND: 404,
   CREATIVE_ASSET_REFERENCE_INVALID: 400,
+  CREATIVE_IDEMPOTENCY_KEY_INVALID: 400,
+  CREATIVE_IDEMPOTENCY_CONFLICT: 409,
   CREATIVE_INVALID_CURSOR: 400,
   CREATIVE_DATABASE_ERROR: 500,
 }
@@ -139,6 +157,8 @@ const STORAGE_STATUS = {
 } as const
 
 export function httpStatusForError(error: unknown): number {
+  if (error instanceof AdminRepositoryError) return ADMIN_REPOSITORY_STATUS[error.code]
+  if (error instanceof CanvasRepositoryError) return CANVAS_REPOSITORY_STATUS[error.code]
   if (requestBodyTooLargeError(error) !== undefined) {
     return 413
   }
@@ -212,6 +232,28 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
         code: bodyTooLarge.code,
         message: bodyTooLarge.message,
         details: { bytesRead: bodyTooLarge.bytesRead, limit: bodyTooLarge.limit },
+      },
+    }
+  }
+
+  if (error instanceof AdminRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
+  if (error instanceof CanvasRepositoryError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
       },
     }
   }

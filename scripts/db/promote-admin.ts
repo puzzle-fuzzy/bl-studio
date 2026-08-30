@@ -5,8 +5,8 @@
  * 避免拼错的选择器悄悄改变权限。操作是幂等的：再次提升已是管理员的账号也会成功。
  *
  * 示例：
- *   DATABASE_URL=... pnpm exec tsx scripts/db/promote-admin.ts --email=owner@example.com --confirm
- *   DATABASE_URL=... pnpm exec tsx scripts/db/promote-admin.ts --user-id=user_123 --confirm
+ *   DATABASE_URL=... bun x tsx scripts/db/promote-admin.ts --email=owner@example.com --confirm
+ *   DATABASE_URL=... bun x tsx scripts/db/promote-admin.ts --user-id=user_123 --confirm
  */
 import postgres from 'postgres'
 

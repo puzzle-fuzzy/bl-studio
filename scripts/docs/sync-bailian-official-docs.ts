@@ -342,8 +342,10 @@ export async function verifyOfficialSnapshot(
   if (JSON.stringify(registeredPaths) !== JSON.stringify(actualPaths)) {
     throw new Error('Official Bailian raw document set does not match registry.json')
   }
+  // reset 快照用 importedAt；本地同步产物用 officialLastModifiedAt——取可用字段
   const sourceImportedAt = state.sourceDocuments
-    .map(document => document.officialLastModifiedAt)
+    .map(document => document.officialLastModifiedAt ?? document.importedAt)
+    .filter((value): value is string => typeof value === 'string')
     .sort((left, right) => right.localeCompare(left, 'en'))[0]
   if (sourceImportedAt === undefined || sourceImportedAt !== state.syncedAt) {
     throw new Error('Official Bailian sync-state.json syncedAt is not the latest official update')

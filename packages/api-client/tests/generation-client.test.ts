@@ -274,6 +274,43 @@ describe('createApiClient', () => {
     expect(calls[0]?.credentials).toBe('include')
   })
 
+  it('lists, reviews, and removes director entity candidates through the typed client', async () => {
+    const candidate = {
+      id: 'entity-candidate-1',
+      projectId: 'project-1',
+      kind: 'character',
+      name: '林默',
+      description: '沉默寡言的调查记者',
+      traits: ['克制', '敏锐'],
+      status: 'provisional',
+      mentions: [{ text: '林默', start: 0, end: 2 }],
+      reviewedBy: null,
+      reviewedAt: null,
+      createdAt: '2026-08-30T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:00.000Z',
+    }
+    const accepted = { ...candidate, status: 'accepted', reviewedBy: 'user-1', reviewedAt: '2026-08-30T00:01:00.000Z' }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: [candidate] }),
+      jsonResponse({ success: true, data: accepted }),
+      jsonResponse({ success: true, data: { deleted: true } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    const candidates = await client.listDirectorEntityCandidates('project/1', { status: 'provisional', kind: 'character' })
+    const reviewed = await client.reviewDirectorEntityCandidate('entity/candidate-1', { status: 'accepted' })
+    await client.deleteDirectorEntityCandidate('entity/candidate-1')
+
+    expect(candidates[0]?.mentions[0]?.text).toBe('林默')
+    expect(reviewed.status).toBe('accepted')
+    expect(calls.map(call => [call.method, call.url, call.body])).toEqual([
+      ['GET', 'http://api.test/api/director/projects/project%2F1/entity-candidates?status=provisional&kind=character', undefined],
+      ['PATCH', 'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1', JSON.stringify({ status: 'accepted' })],
+      ['DELETE', 'http://api.test/api/director/entity-candidates/entity%2Fcandidate-1', undefined],
+    ])
+    expect(calls.every(call => call.credentials === 'include')).toBe(true)
+  })
+
   it('reads request parameters and signed input assets for an admin task', async () => {
     const { fetch, calls } = queuedFetch([
       jsonResponse({

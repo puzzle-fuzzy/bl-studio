@@ -1,9 +1,9 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
+import { Button } from '@bailian-studio/ui'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@bailian-studio/ui'
+import { Input } from '@bailian-studio/ui'
+import { Label } from '@bailian-studio/ui'
 import { useAdminAuthStore } from '@/stores/admin-auth-store'
 import { userErrorMessage } from '@/lib/user-error'
 

@@ -1,345 +1,801 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 1,
   "source": "https://help.aliyun.com/zh/model-studio",
-  "status": "partial",
-  "expectedDocumentCount": 238,
-  "syncedAt": "2026-08-07T09:29:58.000Z",
-  "documentCount": 101,
+  "status": "complete",
+  "expectedDocumentCount": 254,
+  "syncedAt": "2026-08-27T01:18:48.744Z",
+  "documentCount": 254,
   "sourceDocuments": [
     {
       "path": "3D模型生成/3030679-Tripo-3D模型生成.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/tripo-3d-generation-api-reference",
       "nodeId": 3030679,
       "title": "Tripo-3D模型生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/tripo-3d-generation-api-reference",
-      "officialVersion": 12,
-      "officialLastModifiedAt": "2026-07-22T09:31:37.000Z",
-      "contentHash": "sha256:5fa15b9c58a4db2484ba208358c4dee7fa70909d0a326e2b3e207c981261fedf",
-      "importedAt": "2026-07-22T09:31:37.000Z",
-      "bytes": 16763
+      "contentHash": "sha256:e4ae88313f59259fef9aece29c6a89dd879c2b254c4b9714d406406ac0985f56",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23261
     },
     {
-      "path": "错误码.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/error-code",
-      "nodeId": 2712216,
-      "title": "错误码",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/error-code",
-      "officialVersion": 173,
-      "officialLastModifiedAt": "2026-08-07T06:07:31.000Z",
-      "contentHash": "sha256:d499a8db0922d0151de189c18397d31ab8cae789e98659ca83157b74561e038d",
-      "importedAt": "2026-08-07T06:07:31.000Z",
-      "bytes": 115151
+      "path": "爱诗/3025608-爱诗-文生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-text-to-video-api-reference",
+      "nodeId": 3025608,
+      "title": "爱诗-文生视频",
+      "contentHash": "sha256:c1a8bffc9a2fd0e28dd3544d6ed2d373acc9ea5de3cbf64632822507b56f5275",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 41957
+    },
+    {
+      "path": "爱诗/3025609-爱诗-图生视频-基于首帧.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-image-to-video-api-reference",
+      "nodeId": 3025609,
+      "title": "爱诗-图生视频-基于首帧",
+      "contentHash": "sha256:f17a215f2bc8b5eb46f44c1cd33052be40bfe027c5756e59a1dac8f2c6e84ba8",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 24212
+    },
+    {
+      "path": "爱诗/3025611-爱诗-图生视频-基于首尾帧.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-keyframe-to-video-api-reference",
+      "nodeId": 3025611,
+      "title": "爱诗-图生视频-基于首尾帧",
+      "contentHash": "sha256:b9e201308531a1074ced7b887ed15989209df4025b7e760e98d28759e2540f3e",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 21003
+    },
+    {
+      "path": "爱诗/3025612-爱诗-参考生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-reference-to-video-api-reference",
+      "nodeId": 3025612,
+      "title": "爱诗-参考生视频",
+      "contentHash": "sha256:d5605d7aaeeefe2c0cc416f3be0fa1893f919d7e6f72debde1f955c79118d51c",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 34394
+    },
+    {
+      "path": "爱诗/3046321-爱诗-视频对口型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-lipsync-api-reference",
+      "nodeId": 3046321,
+      "title": "爱诗-视频对口型",
+      "contentHash": "sha256:73a8a44a81c3f319e12d43928da091f533c59252790f8b6ab56cfabfb90b1851",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 18037
+    },
+    {
+      "path": "爱诗/3046322-爱诗-视频动作模仿.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-motioncontrol-api-reference",
+      "nodeId": 3046322,
+      "title": "爱诗-视频动作模仿",
+      "contentHash": "sha256:4039910dcd943dbfd6c194b6278c1b4218db568701291f2b351335dd035b73e0",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 14913
+    },
+    {
+      "path": "爱诗/3046323-爱诗-视频超清.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-upscale-api-reference",
+      "nodeId": 3046323,
+      "title": "爱诗-视频超清",
+      "contentHash": "sha256:d322dd4cf699fcb25bca2f14c87eae93d255fa6da00364801a2ee034c412da75",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 14328
+    },
+    {
+      "path": "产品动态/2987781-模型上下架与更新.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/newly-released-models",
+      "nodeId": 2987781,
+      "title": "模型上下架与更新",
+      "contentHash": "sha256:d57b0ec904418ff2f25ce490d9c9dd6e0d6271d02a524a56b5b6ca10b55b01b5",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 310291
+    },
+    {
+      "path": "产品计费/2987148-模型调用计费.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "nodeId": 2987148,
+      "title": "模型调用计费",
+      "contentHash": "sha256:8e5a1926bcb3269db3f9d0a44d18351735ed118a3cc694f6c2672b8246b74bb9",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 242863
+    },
+    {
+      "path": "创意工具/2712453-人物写真FaceChain.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-portrait-generation",
+      "nodeId": 2712453,
+      "title": "人物写真FaceChain",
+      "contentHash": "sha256:2ea727e79b47f9adf467ef29c6eee4e3d94009d9160179bef9e52f23a25d4b31",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 903
+    },
+    {
+      "path": "创意工具/2712493-人像风格重绘.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/portrait-style-redraw-api-reference",
+      "nodeId": 2712493,
+      "title": "人像风格重绘",
+      "contentHash": "sha256:cc1780afc95cbf3c588ba7e24940d88ace2f815497aba86abe1c9da303f8485c",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 21031
+    },
+    {
+      "path": "创意工具/2712497-图像背景生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-background-generation-api-reference",
+      "nodeId": 2712497,
+      "title": "图像背景生成",
+      "contentHash": "sha256:6c4c59ada3ac8a32403a35f33d6968704ae86d6bf0b7d5d2dd9b8b1e5def5caf",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 29505
+    },
+    {
+      "path": "创意工具/2712508-创意文字WordArt锦书API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wordart-quick-start",
+      "nodeId": 2712508,
+      "title": "创意文字WordArt锦书API",
+      "contentHash": "sha256:d98dc7c020508f9368bc661b9b0472cec4a15166783e280717a11de67202d5ff",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 7676
+    },
+    {
+      "path": "创意工具/2796624-AI试衣OutfitAnyone.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/outfitanyone",
+      "nodeId": 2796624,
+      "title": "AI试衣OutfitAnyone",
+      "contentHash": "sha256:d8610281707129babf84115f83d2bf3a433672f4744ffb8304c9b832e01bace6",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 4980
+    },
+    {
+      "path": "创意工具/2796845-图像画面扩展.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-scaling-api",
+      "nodeId": 2796845,
+      "title": "图像画面扩展",
+      "contentHash": "sha256:535c5bf1decfb756966e3a223643fb3916346d77a57401f996ffcdc66cffa5e6",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 29380
+    },
+    {
+      "path": "创意工具/2796985-虚拟模特.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/virtual-model-api-details",
+      "nodeId": 2796985,
+      "title": "虚拟模特",
+      "contentHash": "sha256:6b127885dd03e6e7c3aad81338c1aeea51c293c20427059e058f1a4f29a3156a",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23306
+    },
+    {
+      "path": "创意工具/2804662-鞋靴模特.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/shoe-model-api",
+      "nodeId": 2804662,
+      "title": "鞋靴模特",
+      "contentHash": "sha256:5258cf43c051313054206e018fba0c96597d335f3190bba0228286b290c1ad04",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 15436
+    },
+    {
+      "path": "创意工具/2807172-创意海报生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/creative-poster-generation-api",
+      "nodeId": 2807172,
+      "title": "创意海报生成",
+      "contentHash": "sha256:30cb65f99d074948d048aec77b1ff37d3a82f1ad8289990bac600b2e15d26fc5",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23709
+    },
+    {
+      "path": "创意工具/2840906-人物实例分割.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-instance-segmentation-api-reference",
+      "nodeId": 2840906,
+      "title": "人物实例分割",
+      "contentHash": "sha256:9276e1a836c80b784a8edbc3bec575cfab0f3ce84e6cffafe8645673a4531d97",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 15834
+    },
+    {
+      "path": "创意工具/2840907-图像擦除补全.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-erase-completion-api-reference",
+      "nodeId": 2840907,
+      "title": "图像擦除补全",
+      "contentHash": "sha256:ab2580316b73762fe58c8198e5b9019b802144b85e6605e85035f0239c2e95f5",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 16628
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712509-计量计费.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wordart-billing",
+      "nodeId": 2712509,
+      "title": "计量计费",
+      "contentHash": "sha256:7b4920f1d97ca1dae83a104d36860ee012472505dd52a48ed47619706ae29a2b",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 1925
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712510-文字纹理生成API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fill-texture-effect-api",
+      "nodeId": 2712510,
+      "title": "文字纹理生成API详情",
+      "contentHash": "sha256:62a2a8890745c20db947b0e0ed860d4652e12c7de9cb2cc76b98e0e3c7b32162",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 25450
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712513-文字变形API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/word-transformer",
+      "nodeId": 2712513,
+      "title": "文字变形API详情",
+      "contentHash": "sha256:5c756bdc4ace2e8ed9240e7329f6cc3252328067cb0a66c481ba37e447b87160",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 11270
+    },
+    {
+      "path": "定制热词/3024761-HTTP API参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vocabulary-http-api",
+      "nodeId": 3024761,
+      "title": "HTTP API参考",
+      "contentHash": "sha256:682180c5205b3c1c599b696398415ff65aeaddcfb7d8525855090e826cd2fee6",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 20818
+    },
+    {
+      "path": "定制热词/3024762-Java SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vocabulary-java-sdk",
+      "nodeId": 3024762,
+      "title": "Java SDK参考",
+      "contentHash": "sha256:66fa2745b084204b3a8915b930a300be6c39c824c7d8569b18a721bfff425e7a",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 17564
+    },
+    {
+      "path": "定制热词/3024763-Python SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vocabulary-python-sdk",
+      "nodeId": 3024763,
+      "title": "Python SDK参考",
+      "contentHash": "sha256:2cb42ad37bf90accd895f7884e1a3f37ef1d840b84f3a34ab5a1ccbb4b72e2a9",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 12307
+    },
+    {
+      "path": "多模态向量/2712517-多模态向量.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/multimodal-embedding-api-reference",
+      "nodeId": 2712517,
+      "title": "多模态向量",
+      "contentHash": "sha256:64d9ea49d3c91eec98f5aab417daa11ff525f1fbfd7fac001ab5b79d44482146",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 43242
+    },
+    {
+      "path": "非实时语音合成（MiniMax）/3021951-同步语音合成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/minimax-synchronous-speech-synthesis-api",
+      "nodeId": 3021951,
+      "title": "同步语音合成",
+      "contentHash": "sha256:c0651a4e93eb7cd7222a4a2ccb47d5b35ae49b0636e594cba59b0ad70037d266",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23207
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029755-Java SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-java-sdk",
+      "nodeId": 3029755,
+      "title": "Java SDK参考",
+      "contentHash": "sha256:0a2dcdb8dfe6fdb26840e4055bc866eafb966f7cc3f442942c019e5f6fb7370a",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 30262
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029756-Python SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-python-sdk",
+      "nodeId": 3029756,
+      "title": "Python SDK参考",
+      "contentHash": "sha256:10f708375818aed4fd702238695aa53afa896483f398220bd561f87d1e137a7c",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 14190
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029782-HTTP API参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-http-api",
+      "nodeId": 3029782,
+      "title": "HTTP API参考",
+      "contentHash": "sha256:ca79912899204ef5bda03c763c1cff3c16cfb366681e962b7f607a3e3fd2c292",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 17481
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2712537-最佳实践.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-best-practices",
+      "nodeId": 2712537,
+      "title": "最佳实践",
+      "contentHash": "sha256:64c019c7921bb8e2ae7a4c3c869cb1fb1240d166c141f57f5aa5ac86c790abf0",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 985
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869367-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-java-sdk",
+      "nodeId": 2869367,
+      "title": "Java SDK",
+      "contentHash": "sha256:b82f4de8d77ad8fea117bf00147d67475083f87841aeb6c6a2e4a93a11f4ee3e",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 32809
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869498-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-python-sdk",
+      "nodeId": 2869498,
+      "title": "Python SDK",
+      "contentHash": "sha256:f8c05d6b8f9c88ef32d19fb1238ef1247cb74f92bd28c3062c6f9755fa2fa7b6",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 33729
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869541-HTTP API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-restful-api",
+      "nodeId": 2869541,
+      "title": "HTTP API",
+      "contentHash": "sha256:9998d949fce7cd37eaec56a583ddfe75f4e415ffac3aa80bb532ea436f0b240b",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 28434
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2987223-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-android-sdk",
+      "nodeId": 2987223,
+      "title": "Android SDK",
+      "contentHash": "sha256:e8472974b0668e7191571970163a7fda02044f6090599c4367f355013f2dd18b",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23142
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2987329-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-ios-sdk",
+      "nodeId": 2987329,
+      "title": "iOS SDK",
+      "contentHash": "sha256:02e878d3e7e0e516c5aff34ae02732ee59e45ee8ee2c8c116589a7800673eab3",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 22725
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978299-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-java-sdk",
+      "nodeId": 2978299,
+      "title": "Java SDK",
+      "contentHash": "sha256:e21046b5a86287c63b6c1f86e45e6942755fa19442791c3d85e0ed6816dcf8a5",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 34219
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978300-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk",
+      "nodeId": 2978300,
+      "title": "Python SDK",
+      "contentHash": "sha256:faa0ba896baa665aad9e8ffbd7c08b7361afc7a4781c345091ab8ccf449e94f6",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 32399
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978302-HTTP API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api",
+      "nodeId": 2978302,
+      "title": "HTTP API",
+      "contentHash": "sha256:873d05136bd705ea080a92512addceec8ee43ff7fda72c1f29482a7e1b896d35",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 28076
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2995958-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-android-sdk",
+      "nodeId": 2995958,
+      "title": "Android SDK",
+      "contentHash": "sha256:1b2fa59fa580330d5a6dad823e0eaa0d66349d4ef8f5f1012e372e859fedf45e",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 20311
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2995965-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-ios-sdk",
+      "nodeId": 2995965,
+      "title": "iOS SDK",
+      "contentHash": "sha256:746a6e29559027c7f3581985d72d825ed716f0c368e3fc069261002aea521069",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 19863
     },
     {
       "path": "更多/2746874-子业务空间的模型调用.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-calling-in-sub-workspace",
       "nodeId": 2746874,
       "title": "子业务空间的模型调用",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/model-calling-in-sub-workspace",
-      "officialVersion": 19,
-      "officialLastModifiedAt": "2026-06-04T09:44:37.000Z",
-      "contentHash": "sha256:bc48fbd612a56bc413cf046ae8bd46305b998c2a63585951b508b0c038c9ea82",
-      "importedAt": "2026-06-04T09:44:37.000Z",
-      "bytes": 23604
+      "contentHash": "sha256:bb94039c32acd73d4f591e782e7c98eefe62b02c1261c3ba02135ac4b4501ce7",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 23178
     },
     {
       "path": "更多/2858866-管理异步任务.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks",
       "nodeId": 2858866,
       "title": "管理异步任务",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks",
-      "officialVersion": 6,
-      "officialLastModifiedAt": "2026-02-11T07:32:11.000Z",
-      "contentHash": "sha256:ce44e45d1165cd2370c2405983e4b9c5f0a067888a8934315644b9c40603b0fa",
-      "importedAt": "2026-02-11T07:32:11.000Z",
-      "bytes": 18413
+      "contentHash": "sha256:a8e153e323a55a0f09223c4707806a23eb326e940846887d00a0436bd5104190",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 15681
     },
     {
       "path": "更多/2869454-上传文件获取临时URL.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-temporary-file-url",
       "nodeId": 2869454,
       "title": "上传文件获取临时URL",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/get-temporary-file-url",
-      "officialVersion": 21,
-      "officialLastModifiedAt": "2026-07-06T07:26:57.000Z",
-      "contentHash": "sha256:e7945e9ac42f709846cc90808e588dcdc1996b912eb3ad6049d1d2ae6e88a060",
-      "importedAt": "2026-07-06T07:26:57.000Z",
-      "bytes": 34913
+      "contentHash": "sha256:0795b758e7c534cc0b4ca90759f948a804d1bfcec1c82ff31f50e4e4424de10b",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 35554
     },
     {
       "path": "更多/2874010-DashScope SDK连接复用配置.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/connection-multiplexing-configuration",
       "nodeId": 2874010,
       "title": "DashScope SDK连接复用配置",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/connection-multiplexing-configuration",
-      "officialVersion": 8,
-      "officialLastModifiedAt": "2026-06-04T09:26:12.000Z",
-      "contentHash": "sha256:4ef1ac714903bc4c6f8810bbd44649b24ece829389dd6e6a70b1f0d90a64cd9b",
-      "importedAt": "2026-06-04T09:26:12.000Z",
-      "bytes": 11823
+      "contentHash": "sha256:fdce0d657fc3186f19cc4f509f6845e63fedf1fa247e80b287151a9c85c6f46c",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 11246
     },
     {
       "path": "更多/2879834-生成临时API Key.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/generate-temporary-api-key",
       "nodeId": 2879834,
       "title": "生成临时API Key",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/generate-temporary-api-key",
-      "officialVersion": 15,
-      "officialLastModifiedAt": "2026-06-04T09:23:58.000Z",
-      "contentHash": "sha256:c3837c997180f1879e7b2a5be7ecf28340305c635fb0b77cb34b01cd27833909",
-      "importedAt": "2026-06-04T09:23:58.000Z",
-      "bytes": 2451
+      "contentHash": "sha256:70fb07dc5870a79905ca712a69a070c195fa9cb36c924fac9c5bd80c06abd022",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 2655
     },
     {
       "path": "更多/2880071-配置异步任务回调.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/async-task-api",
       "nodeId": 2880071,
       "title": "配置异步任务回调",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/async-task-api",
-      "officialVersion": 10,
-      "officialLastModifiedAt": "2026-07-30T07:07:20.000Z",
-      "contentHash": "sha256:f8dac238eb601089875a5314d2f8641f3923e201a2e1b6861c8b4c5e3e6f7f04",
-      "importedAt": "2026-07-30T07:07:20.000Z",
-      "bytes": 29373
+      "contentHash": "sha256:b118993cc9de8c6c06980c89a688b74f3609a9c5bb971ac2c1d3385607b3748f",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 30660
     },
     {
       "path": "更多/3042878-查询模型列表.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-models",
       "nodeId": 3042878,
       "title": "查询模型列表",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/list-models",
-      "officialVersion": 1,
-      "officialLastModifiedAt": "2026-08-05T21:19:20.000Z",
-      "contentHash": "sha256:99b11ebaa4c8ba969989321ccc83ede41bfa4bd0989109bd518e81df51e352cc",
-      "importedAt": "2026-08-05T21:19:20.000Z",
-      "bytes": 10321
+      "contentHash": "sha256:f0152e74e4b09b2eaea8febed7767930ca772c0f6f0f4f91337ed81f8c702a6b",
+      "importedAt": "2026-08-26T07:56:40.226Z",
+      "bytes": 11889
     },
     {
-      "path": "更多/3042879-查询模型限额.md",
+      "path": "更多/3042879-查询模型限流.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-quotas",
       "nodeId": 3042879,
-      "title": "查询模型限额",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/list-quotas",
-      "officialVersion": 1,
-      "officialLastModifiedAt": "2026-08-05T21:20:24.000Z",
-      "contentHash": "sha256:0bcf1620c5b63a9bac80e3bef8533d0ee5035635e2b902b4b6fdc4d660869059",
-      "importedAt": "2026-08-05T21:20:24.000Z",
-      "bytes": 6110
+      "title": "查询模型限流",
+      "contentHash": "sha256:0db7234448ad75b809c661b60345863f0edfbcc68d4f6cc542a01b6057627e7f",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 6032
+    },
+    {
+      "path": "更多/3050809-查询模型授权.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-model-permissions",
+      "nodeId": 3050809,
+      "title": "查询模型授权",
+      "contentHash": "sha256:26209417289e7fd03f81d9fb79716639481aca8c072a46f9c6c33f6a0f9375ec",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 4689
+    },
+    {
+      "path": "更多/3050811-更新模型授权.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/update-model-permissions",
+      "nodeId": 3050811,
+      "title": "更新模型授权",
+      "contentHash": "sha256:344278abbad8da4103645b2a98a3c362578eea47a65c86765f24bb9d75848df3",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 4014
+    },
+    {
+      "path": "更多/3050812-更新模型限流.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/update-model-rate-limits",
+      "nodeId": 3050812,
+      "title": "更新模型限流",
+      "contentHash": "sha256:0a5934b9a5f9ead62621c3ffb3012e804b3d0cf91dae7ca740e85d9148de6ebf",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 4663
     },
     {
       "path": "更多模型/2778998-通义法睿.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/tongyi-farui-api",
       "nodeId": 2778998,
       "title": "通义法睿",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/tongyi-farui-api",
-      "officialVersion": 18,
-      "officialLastModifiedAt": "2026-06-25T13:24:39.000Z",
-      "contentHash": "sha256:6c3388cae63c14534471de0d0123686d5ddff472858e7d0207be2a9ee008a411",
-      "importedAt": "2026-06-25T13:24:39.000Z",
-      "bytes": 46538
+      "contentHash": "sha256:4841b77f8049367039fe1b443aac3044179ce4e67b07fa254ecbeba01682f31a",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 40851
     },
     {
       "path": "更多模型/2861138-意图理解.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/intent-detect-capability",
       "nodeId": 2861138,
       "title": "意图理解",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/intent-detect-capability",
-      "officialVersion": 17,
-      "officialLastModifiedAt": "2026-06-25T13:24:44.000Z",
-      "contentHash": "sha256:787a2819155f8df7d973bd065060154b7e218cb34dc970b57994e1d7750d255b",
-      "importedAt": "2026-06-25T13:24:44.000Z",
-      "bytes": 29963
+      "contentHash": "sha256:46ea7e75911abafbf7ff8f19bfea1a01c0f7b00ce90723d1ad3b5b846d5086a8",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 29793
     },
     {
-      "path": "更多模型/2995807-Qwen-MT 翻译模型.md",
+      "path": "更多模型/2995807-Qwen-MT API参考.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-mt-api",
       "nodeId": 2995807,
-      "title": "Qwen-MT 翻译模型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/qwen-mt-api",
-      "officialVersion": 16,
-      "officialLastModifiedAt": "2026-06-25T13:24:55.000Z",
-      "contentHash": "sha256:277a0dda729f5b1c03135260d29555c2f8b4445181b82195d19d85549b50672f",
-      "importedAt": "2026-06-25T13:24:55.000Z",
-      "bytes": 503477
+      "title": "Qwen-MT API参考",
+      "contentHash": "sha256:00fd5cfda0fb89fd010ee77a6eeb7e39f760673bf57fa91e0bd9fe7152ef2ff5",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 86579
     },
     {
       "path": "更多模型/2995976-Qwen-Deep-Research 深入研究模型.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-deep-research-api",
       "nodeId": 2995976,
       "title": "Qwen-Deep-Research 深入研究模型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/qwen-deep-research-api",
-      "officialVersion": 4,
-      "officialLastModifiedAt": "2026-06-25T13:25:07.000Z",
-      "contentHash": "sha256:9043da4ac8c8446dcb7c1718d3cbc91deffb9b44a0813ba8bf1c68a36adbac73",
-      "importedAt": "2026-06-25T13:25:07.000Z",
-      "bytes": 11945
+      "contentHash": "sha256:c6969a8ce705575e632c29a2078ffd29902d88ac86790ca3f39e89d4239c813d",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 17004
     },
     {
       "path": "更多模型/2996283-Qwen-OCR 文字提取模型.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-vl-ocr-api-reference",
       "nodeId": 2996283,
       "title": "Qwen-OCR 文字提取模型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/qwen-vl-ocr-api-reference",
-      "officialVersion": 9,
-      "officialLastModifiedAt": "2026-06-25T13:25:19.000Z",
-      "contentHash": "sha256:0dbf683e6427bcd4710d5a637da67651c0aad4f07577eeb233fe4799a0aa93cc",
-      "importedAt": "2026-06-25T13:25:19.000Z",
-      "bytes": 106372
+      "contentHash": "sha256:42d0031a4ebcc749a9ac96eed60f055ed1ecb959d51e40394e4ff18b06d4910e",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 128927
     },
     {
       "path": "更多模型/2997660-GUI-Plus 界面交互专用模型.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/gui-plus-interface-interaction-model",
       "nodeId": 2997660,
       "title": "GUI-Plus 界面交互专用模型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/gui-plus-interface-interaction-model",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-06-25T13:25:32.000Z",
-      "contentHash": "sha256:a58d52f85ee95f7d723d515f76691d017cae9356c1d1a0f3d1d5310a884d51cb",
-      "importedAt": "2026-06-25T13:25:32.000Z",
-      "bytes": 100693
+      "contentHash": "sha256:a952f3b9e36d46ec66a1f465ffd0093d08e141ca86902331bd54581d56625fcc",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 117740
     },
     {
-      "path": "工具包／框架/2587654-LangChain.md",
+      "path": "工具包_框架/2587654-LangChain.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/use-bailian-in-langchain",
       "nodeId": 2587654,
       "title": "LangChain",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/use-bailian-in-langchain",
-      "officialVersion": 19,
-      "officialLastModifiedAt": "2026-04-07T07:35:01.000Z",
-      "contentHash": "sha256:8cfba462e232db8ca36267894b080697d52a0a31d2126e65ab7512b08f32e534",
-      "importedAt": "2026-04-07T07:35:01.000Z",
-      "bytes": 21323
+      "contentHash": "sha256:a7ac2c5c415eb1a5cc81cabeb5811f7f477b3509fe1f73880e3fa22c16cc8bbd",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 20147
     },
     {
-      "path": "工具包／框架/2833609-OpenAI兼容-Chat.md",
+      "path": "工具包_框架/2833609-OpenAI兼容-Chat.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
       "nodeId": 2833609,
       "title": "OpenAI兼容-Chat",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
-      "officialVersion": 52,
-      "officialLastModifiedAt": "2026-06-25T05:42:51.000Z",
-      "contentHash": "sha256:cbedf2835a697f36944bb3c946dec6a2ffb35bdbddfeabf2214f136f37be3a2d",
-      "importedAt": "2026-06-25T05:42:51.000Z",
-      "bytes": 34732
+      "contentHash": "sha256:fb536cce009d3b226c12a247927a7018a6e36b4db1e8feb07ab0d0e6adf90a4d",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 38091
     },
     {
-      "path": "工具包／框架/2833610-OpenAI兼容-File.md",
+      "path": "工具包_框架/2833610-OpenAI兼容-File.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/openai-file-interface",
       "nodeId": 2833610,
       "title": "OpenAI兼容-File",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/openai-file-interface",
-      "officialVersion": 34,
-      "officialLastModifiedAt": "2026-07-13T10:28:15.000Z",
-      "contentHash": "sha256:a3cb37bcfe26fd157e36579478ee06bc931c1f9f58cfd675f479415ad2eb33ad",
-      "importedAt": "2026-07-13T10:28:15.000Z",
-      "bytes": 20916
+      "contentHash": "sha256:facb20c75d04a2cea25b03c398868b3186bc5f492b68f9f0747931e190bf1fa8",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 20986
     },
     {
-      "path": "工具包／框架/2842025-OpenAI兼容-Batch（文件输入）.md",
+      "path": "工具包_框架/2842025-OpenAI兼容-Batch（文件输入）.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/batch-interfaces-compatible-with-openai",
       "nodeId": 2842025,
       "title": "OpenAI兼容-Batch（文件输入）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/batch-interfaces-compatible-with-openai/",
-      "officialVersion": 135,
-      "officialLastModifiedAt": "2026-08-06T03:18:38.000Z",
-      "contentHash": "sha256:ff213c74d935c6665500284d807a713fb1282b0f42c505d0ab0462cfbdc3509b",
-      "importedAt": "2026-08-06T03:18:38.000Z",
-      "bytes": 102796
+      "contentHash": "sha256:b64ca94a4581fbe30a9faadc45e722f09afaa90d6ca50f9034224d2f2b7dddba",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 106199
     },
     {
-      "path": "工具包／框架/2845564-OpenAI兼容-Vision.md",
+      "path": "工具包_框架/2845564-OpenAI兼容-Vision.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-vl-compatible-with-openai",
       "nodeId": 2845564,
       "title": "OpenAI兼容-Vision",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/qwen-vl-compatible-with-openai",
-      "officialVersion": 31,
-      "officialLastModifiedAt": "2026-06-25T05:43:55.000Z",
-      "contentHash": "sha256:2fe130523cc360ac6d3551e53eb15f8f5f60402d7acefe24fffdfc2d0cda9f70",
-      "importedAt": "2026-06-25T05:43:55.000Z",
-      "bytes": 25731
+      "contentHash": "sha256:f15470d55ab98f75e662d0ebecd53b46d1a4f0ade47f95a8aa720c88e304c491",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 25303
     },
     {
-      "path": "工具包／框架/2846066-OpenAI兼容-Embedding.md",
+      "path": "工具包_框架/2846066-OpenAI兼容-Embedding.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/embedding-interfaces-compatible-with-openai",
       "nodeId": 2846066,
       "title": "OpenAI兼容-Embedding",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/embedding-interfaces-compatible-with-openai",
-      "officialVersion": 24,
-      "officialLastModifiedAt": "2026-06-25T05:45:39.000Z",
-      "contentHash": "sha256:ec793721a825a97c360198cd061ffe2f0545edd9358dff6431bbd2ea36d3f3b3",
-      "importedAt": "2026-06-25T05:45:39.000Z",
-      "bytes": 5246
+      "contentHash": "sha256:3a4b8a921b868de6c7875cd3fe71ea3f9c49dd3010f7b1e526c20ec1ed458fa0",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 5767
     },
     {
-      "path": "工具包／框架/2869921-OpenAI兼容-Completions.md",
+      "path": "工具包_框架/2869921-OpenAI兼容-Completions.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/completions",
       "nodeId": 2869921,
       "title": "OpenAI兼容-Completions",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/completions",
-      "officialVersion": 11,
-      "officialLastModifiedAt": "2026-07-24T12:18:25.000Z",
-      "contentHash": "sha256:b08fbc636faf8daff40007b771a065c3bdb2bdf75c09f21ab7ac735aeb2ec6a1",
-      "importedAt": "2026-07-24T12:18:25.000Z",
-      "bytes": 9003
+      "contentHash": "sha256:86bbe293a0ae1c028fbadb1683a6d9211b054d2d71cf7577896f81e61cd86d28",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 9287
     },
     {
-      "path": "工具包／框架/2997130-OpenAI兼容-Batch Chat.md",
+      "path": "工具包_框架/2997130-OpenAI兼容-Batch Chat.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/openai-compatible-batch-chat",
       "nodeId": 2997130,
       "title": "OpenAI兼容-Batch Chat",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/openai-compatible-batch-chat",
-      "officialVersion": 27,
-      "officialLastModifiedAt": "2026-08-06T03:18:51.000Z",
-      "contentHash": "sha256:de132aeae397682e57fba9f6ca85abb058a73b0fb40caa56bd4f3caed25cca48",
-      "importedAt": "2026-08-06T03:18:51.000Z",
-      "bytes": 20630
+      "contentHash": "sha256:a9d18408d1cd2ff706228619d459130a02c7e15c50e19812f00aa71534b737d1",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 19749
     },
     {
-      "path": "工具包／框架/3016539-OpenAI兼容-Responses.md",
+      "path": "工具包_框架/3016539-OpenAI兼容-Responses.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/compatibility-with-openai-responses-api",
       "nodeId": 3016539,
       "title": "OpenAI兼容-Responses",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/compatibility-with-openai-responses-api",
-      "officialVersion": 36,
-      "officialLastModifiedAt": "2026-08-06T11:33:00.000Z",
-      "contentHash": "sha256:2387d12ee91ede2e0aee72970c3ce850912f7d0fe7ddf9993a69b034c30a612e",
-      "importedAt": "2026-08-06T11:33:00.000Z",
-      "bytes": 53890
+      "contentHash": "sha256:4c8004e4213ddb897441aa092511dcda49643b81c84427877360c347f0a00563",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 58078
     },
     {
-      "path": "工具包／框架/3023274-OpenAI兼容-Conversations.md",
+      "path": "工具包_框架/3023274-OpenAI兼容-Conversations.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/openai-compatible-conversations",
       "nodeId": 3023274,
       "title": "OpenAI兼容-Conversations",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/openai-compatible-conversations",
-      "officialVersion": 10,
-      "officialLastModifiedAt": "2026-08-04T07:45:27.000Z",
-      "contentHash": "sha256:ca18fb2b1fbc0b93ba3d585f4554fde5c022bf924ab778dc58b431e21688a3e7",
-      "importedAt": "2026-08-04T07:45:27.000Z",
-      "bytes": 22925
+      "contentHash": "sha256:80f69035844dd03706587f1511f989292ca681a871a652e9865f51f025a71b5b",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 38137
     },
     {
-      "path": "模型调用价格.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-pricing",
-      "nodeId": 2987148,
-      "title": "模型调用计费",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/model-pricing",
-      "officialVersion": 261,
-      "officialLastModifiedAt": "2026-08-07T03:02:35.000Z",
-      "contentHash": "sha256:d13f391ef108a906b8bc4242e674cf9a54469a586770e36b95c0ccb83e649be9",
-      "importedAt": "2026-08-07T03:02:35.000Z",
-      "bytes": 231157
+      "path": "功能参考/3046066-连接状态管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-connection-management",
+      "nodeId": 3046066,
+      "title": "连接状态管理",
+      "contentHash": "sha256:ffd13aec2ce709d34c83c389639b0927b3391a67bc4b7a7b79e6e52c65a3207f",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 3580
+    },
+    {
+      "path": "功能参考/3046067-媒体流发送管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-media-stream-control",
+      "nodeId": 3046067,
+      "title": "媒体流发送管理",
+      "contentHash": "sha256:f4dcbdca334604ced2f6752f52cc38e0d243a65c27871851cea3ce8a8462dfdc",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 2652
+    },
+    {
+      "path": "功能参考/3046068-视频常用功能介绍.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-video-features",
+      "nodeId": 3046068,
+      "title": "视频常用功能介绍",
+      "contentHash": "sha256:7b050aedfa31d4e832b0cee1ac1904b8c1fbe01ee9b4540579266b12995d10cd",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 16934
+    },
+    {
+      "path": "功能参考/3046069-音频常用功能介绍.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-audio-features",
+      "nodeId": 3046069,
+      "title": "音频常用功能介绍",
+      "contentHash": "sha256:4657f215e7183e130d18f5ff68313dbddbcdb041ea282e733023ff6a96238098",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 17423
+    },
+    {
+      "path": "功能参考/3046070-自定义视频输入.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-custom-video-input",
+      "nodeId": 3046070,
+      "title": "自定义视频输入",
+      "contentHash": "sha256:2ec949c57791a41a6f52fc230face2c97024eab08f7e41c7f4577351214aae93",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 13353
+    },
+    {
+      "path": "功能参考/3046071-自定义音频播放.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-playback",
+      "nodeId": 3046071,
+      "title": "自定义音频播放",
+      "contentHash": "sha256:9f17ccd1496e9f320f959d344f8bc7feaa4ab854377cff978d80a2ff49c6ffee",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 6258
+    },
+    {
+      "path": "功能参考/3046072-自定义音频采集.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-capture",
+      "nodeId": 3046072,
+      "title": "自定义音频采集",
+      "contentHash": "sha256:3d0c03495887182a974b09c5bb5a8ab832a2e534ac5ea4b0f120ff103331c6bd",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 7574
+    },
+    {
+      "path": "开始使用/2840914-选择模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/models",
+      "nodeId": 2840914,
+      "title": "选择模型",
+      "contentHash": "sha256:518038aec479954c464e97a2242f26c918ba410ffa9229676f59b417cff7ce0f",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 15633
+    },
+    {
+      "path": "可灵-视频生成/3026702-可灵-主体ID列表.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/kling-object-ids",
+      "nodeId": 3026702,
+      "title": "可灵-主体ID列表",
+      "contentHash": "sha256:a988b541efcbc4bf64e4276aceb336eab839453badc54d3f6373dff5da03f059",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 5197
+    },
+    {
+      "path": "可灵/3026701-可灵-视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference",
+      "nodeId": 3026701,
+      "title": "可灵-视频生成",
+      "contentHash": "sha256:3dae19dc6794f3a32032c4d58dfcafb8bd9a32b3ea7c345ce895e259a221224a",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 34559
+    },
+    {
+      "path": "可灵/3026706-可灵-图像生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/kling-image-generation-api-reference",
+      "nodeId": 3026706,
+      "title": "可灵-图像生成",
+      "contentHash": "sha256:142b5932b096e04aeae420e1428d25c618f352853502a15a77a0ff87833acd8f",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 20738
+    },
+    {
+      "path": "快速开始/3046059-SDK下载.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/realtime-sdk-download",
+      "nodeId": 3046059,
+      "title": "SDK下载",
+      "contentHash": "sha256:6687644d89328ec119d2d8f84283c590212f8ada47cbca11e104c40f55f01144",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 5201
+    },
+    {
+      "path": "快速开始/3046060-Token鉴权.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/realtime-token-authentication",
+      "nodeId": 3046060,
+      "title": "Token鉴权",
+      "contentHash": "sha256:80f06886a73e2a1488fce073aa2ca8b2dacfc26ec22c59ae59b9901cc0e91f24",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 9922
+    },
+    {
+      "path": "快速开始/3046061-接入模型与应用.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/realtime-connect-model",
+      "nodeId": 3046061,
+      "title": "接入模型与应用",
+      "contentHash": "sha256:827cdc6e0d3e41a0b1e31a06825d2d673aaa6d73b95ea9f2fcf5af75f02d0898",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 10754
+    },
+    {
+      "path": "模型部署/3039666-部署模型管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-deployment-api",
+      "nodeId": 3039666,
+      "title": "部署模型管理",
+      "contentHash": "sha256:bcde41c95aabb6fe59cb6c48b4e465eed691f078efa85bbea7e56f85e342bfb4",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 21205
+    },
+    {
+      "path": "模型调优/3039652-调优任务管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-fine-tuning-job-api",
+      "nodeId": 3039652,
+      "title": "调优任务管理",
+      "contentHash": "sha256:3ce5c60a46001d7a2ccfda04125f2a023a0808adddbb50ff0e3d21ff69e05f6e",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 22060
+    },
+    {
+      "path": "模型调优/3039672-Checkpoint 管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-checkpoints-api",
+      "nodeId": 3039672,
+      "title": "Checkpoint 管理",
+      "contentHash": "sha256:02018ac8af52f756800ad8932fe662007413c9258234bd61a8acee9096265abf",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 16853
     },
     {
       "path": "模型生产/3039647-模型调优.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/fine-tuning-jobs-api",
       "nodeId": 3039647,
       "title": "模型调优",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/fine-tuning-jobs-api/",
-      "officialVersion": 23,
-      "officialLastModifiedAt": "2026-07-27T06:17:30.000Z",
       "contentHash": "sha256:29a8b7c52480c15c312b6a8f26585abca62dea41df213a1e4de187949248f4ba",
-      "importedAt": "2026-07-27T06:17:30.000Z",
+      "importedAt": "2026-08-26T08:04:35.103Z",
       "bytes": 40
     },
     {
@@ -347,876 +803,1494 @@
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/deployments-api",
       "nodeId": 3039649,
       "title": "模型部署",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/deployments-api/",
-      "officialVersion": 21,
-      "officialLastModifiedAt": "2026-07-27T06:18:03.000Z",
       "contentHash": "sha256:83ecc7052283ab71cec08e36147cc2440232af972f93266243ad07f8fb734871",
-      "importedAt": "2026-07-27T06:18:03.000Z",
+      "importedAt": "2026-08-26T08:04:35.103Z",
       "bytes": 58
     },
     {
-      "path": "模型生产/模型部署/3039664-列举可部署模型.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-deployable-models-api",
-      "nodeId": 3039664,
-      "title": "列举可部署模型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/list-deployable-models-api",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-08-07T04:50:39.000Z",
-      "contentHash": "sha256:13ab4d2c16e73ca644e93e78608fb49c96366e25d297e0e5ea315f486fcbbd06",
-      "importedAt": "2026-08-07T04:50:39.000Z",
-      "bytes": 6804
+      "path": "模型生产/3048861-TPM 预留 DashScope OpenAPI 接口文档.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/tpm-reserved-openapi",
+      "nodeId": 3048861,
+      "title": "TPM 预留 DashScope OpenAPI 接口文档",
+      "contentHash": "sha256:bbc6e3d1b20350f82817048723392903977df5c9cc5e4df5059d8a3ca0643197",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 14692
     },
     {
-      "path": "模型生产/模型部署/3039665-创建部署.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/create-deployment-api",
-      "nodeId": 3039665,
-      "title": "创建部署",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/create-deployment-api",
-      "officialVersion": 42,
-      "officialLastModifiedAt": "2026-08-07T07:56:12.000Z",
-      "contentHash": "sha256:88ef013fe96d8bf25c43e69472049bc3a30a604b4f2d1681a92dacec4f76f71d",
-      "importedAt": "2026-08-07T07:56:12.000Z",
-      "bytes": 38741
+      "path": "排序模型（Rerank）/2780056-排序模型（Rerank）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-rerank-api",
+      "nodeId": 2780056,
+      "title": "排序模型（Rerank）",
+      "contentHash": "sha256:a8267a495b1f5d21708dcb58a1bbe60039782e62cc78c7b34f8573ee3faf4cb2",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 21815
     },
     {
-      "path": "模型生产/模型部署/3039666-查询和管理部署.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-deployment-api",
-      "nodeId": 3039666,
-      "title": "查询和管理部署",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/get-deployment-api",
-      "officialVersion": 24,
-      "officialLastModifiedAt": "2026-07-30T04:07:31.000Z",
-      "contentHash": "sha256:60b166fc3e37227aa48aee43cb405e0763d87c898e38b7e64b0f3c25d4252464",
-      "importedAt": "2026-07-30T04:07:31.000Z",
-      "bytes": 10970
+      "path": "千问-早期图像模型/2975126-千问-文生图.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-image-api",
+      "nodeId": 2975126,
+      "title": "千问-文生图",
+      "contentHash": "sha256:55d5d65d6e90a4434bfdec9e370ede1f520e261f984f0642e91684d750b391c9",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 78703
     },
     {
-      "path": "模型生产/模型调优/3039648-模型导入.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/custom-models-api",
-      "nodeId": 3039648,
-      "title": "模型导入",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/custom-models-api",
-      "officialVersion": 38,
-      "officialLastModifiedAt": "2026-07-27T06:17:13.000Z",
-      "contentHash": "sha256:98f74a960bb22ffa7208ad09e770235ce126c4c4bb921a4f11511218fbe12e78",
-      "importedAt": "2026-07-27T06:17:13.000Z",
-      "bytes": 12995
+      "path": "千问-早期图像模型/2976416-千问-图像编辑.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-image-edit-api",
+      "nodeId": 2976416,
+      "title": "千问-图像编辑",
+      "contentHash": "sha256:f7834cb793b99e8869fb3efa14318960d18ce63e599d79ed1e402b1a3f99ecbf",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 42020
     },
     {
-      "path": "模型生产/模型调优/3039651-创建调优任务.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/create-fine-tuning-job-api",
-      "nodeId": 3039651,
-      "title": "创建调优任务",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/create-fine-tuning-job-api",
-      "officialVersion": 14,
-      "officialLastModifiedAt": "2026-08-04T05:53:16.000Z",
-      "contentHash": "sha256:85ae8b360a0fa9c5329a128382b7a82a2455d2b8e3d7e0d95e3d64f727b7d23a",
-      "importedAt": "2026-08-04T05:53:16.000Z",
-      "bytes": 30077
+      "path": "千问/2977163-千问-图像翻译.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-mt-image-api",
+      "nodeId": 2977163,
+      "title": "千问-图像翻译",
+      "contentHash": "sha256:a456e011af582585162e2f6ddf6902e02bec8edbe3732a77f60512f84f45716f",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 25902
     },
     {
-      "path": "模型生产/模型调优/3039652-查询和管理调优任务.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-fine-tuning-job-api",
-      "nodeId": 3039652,
-      "title": "查询和管理调优任务",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/get-fine-tuning-job-api",
-      "officialVersion": 31,
-      "officialLastModifiedAt": "2026-07-28T09:49:49.000Z",
-      "contentHash": "sha256:346ce5fc04d3fce6cd0bed078416fb1d6da48605dad57685c0f7cd09df607194",
-      "importedAt": "2026-07-28T09:49:49.000Z",
-      "bytes": 22309
+      "path": "千问/3047054-千问-图像生成与编辑3.0.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference",
+      "nodeId": 3047054,
+      "title": "千问-图像生成与编辑3.0",
+      "contentHash": "sha256:82f896d0189f11b1d1bab49db0c394c96cbfb68708c419a536cdb710665ff9f1",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 49727
     },
     {
-      "path": "模型生产/模型调优/3039672-Checkpoint 管理.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-checkpoints-api",
-      "nodeId": 3039672,
-      "title": "Checkpoint 管理",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/list-checkpoints-api",
-      "officialVersion": 25,
-      "officialLastModifiedAt": "2026-07-27T06:15:54.000Z",
-      "contentHash": "sha256:1fd5a4d62ae10fac4c4d66ce464ae8a6db947173868f648f541f130538060cab",
-      "importedAt": "2026-07-27T06:15:54.000Z",
-      "bytes": 12732
+      "path": "人物写真FaceChain/2712351-计量计费.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-billing",
+      "nodeId": 2712351,
+      "title": "计量计费",
+      "contentHash": "sha256:a2288572a0c57239d1a6d9284738ae5fe3dbe6de98e2b462e0ebf3c9bf64b4f3",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 2526
     },
     {
-      "path": "模型生产/模型调优/3039885-模型压缩.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-compression-api",
-      "nodeId": 3039885,
-      "title": "模型压缩",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/model-compression-api",
-      "officialVersion": 38,
-      "officialLastModifiedAt": "2026-07-28T09:50:45.000Z",
-      "contentHash": "sha256:7de827dfab548c45fe5d55d07ab40e2c794ac2164a58a1a178534bab18d8297a",
-      "importedAt": "2026-07-28T09:50:45.000Z",
-      "bytes": 25109
+      "path": "人物写真FaceChain/2712501-人物写真生成API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-generation",
+      "nodeId": 2712501,
+      "title": "人物写真生成API详情",
+      "contentHash": "sha256:36161c50b692fe9c09534f3efaa001ba9a9b6a9fdced89aa8f4e18f231e52d0a",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 23223
+    },
+    {
+      "path": "人物写真FaceChain/2712505-快速开始.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-quick-start",
+      "nodeId": 2712505,
+      "title": "快速开始",
+      "contentHash": "sha256:9bc6117db59e79999272ec8bdb1ff6b59376542cdf09ab53e16c591b8dcda8e5",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 18473
+    },
+    {
+      "path": "人物写真FaceChain/2712506-人物形象训练API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-finetune-api",
+      "nodeId": 2712506,
+      "title": "人物形象训练API详情",
+      "contentHash": "sha256:30a8c3928a752bb4b9eb100f79969e6b633b86729fb2a7dea0282bbef7fe6a35",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 15728
+    },
+    {
+      "path": "人物写真FaceChain/2712507-人物图像检测API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-face-detection-api",
+      "nodeId": 2712507,
+      "title": "人物图像检测API详情",
+      "contentHash": "sha256:8d205b84b7c0406a9f06f6592de781b0facd7585f73c9880db557729a2b245c2",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 6664
+    },
+    {
+      "path": "人像驱动/2786459-图生舞蹈视频-舞动人像AnimateAnyone.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animateanyone-quick-start",
+      "nodeId": 2786459,
+      "title": "图生舞蹈视频-舞动人像AnimateAnyone",
+      "contentHash": "sha256:4780a62e03f3c4b8d71ab1ce2779272f313a79da4986470bdb6ab158650f484a",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 5232
+    },
+    {
+      "path": "人像驱动/2786462-图生唱演视频-悦动人像EMO.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-quick-start",
+      "nodeId": 2786462,
+      "title": "图生唱演视频-悦动人像EMO",
+      "contentHash": "sha256:240047b749fc62adefe88e8b72950c182a0a1df4c0b953c12cff8651b4249891",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 5023
+    },
+    {
+      "path": "人像驱动/2846319-视频风格重绘.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/video-style-transform-api-reference",
+      "nodeId": 2846319,
+      "title": "视频风格重绘",
+      "contentHash": "sha256:f095dbe96dbb5bf646feaf788c371506884050bf67a9e968154940ff38de2728",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 21237
+    },
+    {
+      "path": "人像驱动/2856726-图生播报视频-灵动人像LivePortrait.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-quick-start",
+      "nodeId": 2856726,
+      "title": "图生播报视频-灵动人像LivePortrait",
+      "contentHash": "sha256:8f873b35afe94a6237c5faeb2bb30837cd3da42de97b0d929f77271efff99bdf",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 2845
+    },
+    {
+      "path": "人像驱动/2860464-视频口型替换-声动人像VideoRetalk.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/videoretalk",
+      "nodeId": 2860464,
+      "title": "视频口型替换-声动人像VideoRetalk",
+      "contentHash": "sha256:30a0487b35781536f2e1cca57267b3bc2155e0dd163fb79971c189015f5c6805",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 1351
+    },
+    {
+      "path": "人像驱动/2865372-图生表情包视频-表情包Emoji.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emoji-quick-start",
+      "nodeId": 2865372,
+      "title": "图生表情包视频-表情包Emoji",
+      "contentHash": "sha256:456d2569bf62ffb527edb0e549eec5363d0a492e12664dd325473b16a5c9f8b9",
+      "importedAt": "2026-08-26T08:04:35.103Z",
+      "bytes": 1573
+    },
+    {
+      "path": "声音复刻/3027318-HTTP API参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/voice-clone-design-http-api",
+      "nodeId": 3027318,
+      "title": "HTTP API参考",
+      "contentHash": "sha256:b7a9ea477e691732bb1d306456a881e797e414e6a38dd65014a487ce75493bff",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 45321
+    },
+    {
+      "path": "声音复刻/3027319-Java SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/voice-clone-java-sdk",
+      "nodeId": 3027319,
+      "title": "Java SDK参考",
+      "contentHash": "sha256:d2a3d55c26c3991eaa7a6d921c3a9beb248d54ce0d9aa7ca976cf7855bf94cf4",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 14287
+    },
+    {
+      "path": "声音复刻/3027320-Python SDK参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/voice-clone-python-sdk",
+      "nodeId": 3027320,
+      "title": "Python SDK参考",
+      "contentHash": "sha256:c15ef41c480883cb51af35c77b3189b864389af01e146f29dbcc5c8656429fe1",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 10969
     },
     {
       "path": "实时多模态/2922854-客户端事件.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/client-events",
       "nodeId": 2922854,
       "title": "客户端事件",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/client-events",
-      "officialVersion": 22,
-      "officialLastModifiedAt": "2026-07-21T02:12:16.000Z",
-      "contentHash": "sha256:d7d9e692839024537ad36efa34c7358cb6b3d6c36cbf9b80bdbe21ae7c846d6e",
-      "importedAt": "2026-07-21T02:12:16.000Z",
-      "bytes": 24020
+      "contentHash": "sha256:77c08b59926047a22078a35282283f99f43315f28f174b579173d45ddd1307a3",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22606
     },
     {
       "path": "实时多模态/2922855-服务端事件.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/server-events",
       "nodeId": 2922855,
       "title": "服务端事件",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/server-events",
-      "officialVersion": 22,
-      "officialLastModifiedAt": "2026-07-21T02:12:35.000Z",
-      "contentHash": "sha256:0a06f4abd8f6617a1bf29c21a68ca7a1f50cb2f080a7b3a09b1d086de76675d9",
-      "importedAt": "2026-07-21T02:12:35.000Z",
-      "bytes": 37725
+      "contentHash": "sha256:3b2a9b04969eca08cdbcc469ca6c845ad221720f1aa82e30235ac102cf6feb7b",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 57310
     },
     {
       "path": "实时多模态/2949956-Python SDK.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/omni-realtime-python-sdk",
       "nodeId": 2949956,
       "title": "Python SDK",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/omni-realtime-python-sdk",
-      "officialVersion": 22,
-      "officialLastModifiedAt": "2026-07-21T02:12:54.000Z",
-      "contentHash": "sha256:796c1f060f3e76aa42178c662b8b494559c0a1c471b7bc894fb22a183f278ba1",
-      "importedAt": "2026-07-21T02:12:54.000Z",
-      "bytes": 18927
+      "contentHash": "sha256:f3ba254761273db09ef3b41c2bd0dd325b487bbbe0506f5d688e343b6b8fb115",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 23139
     },
     {
       "path": "实时多模态/2950053-Java SDK.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/omni-realtime-java-sdk",
       "nodeId": 2950053,
       "title": "Java SDK",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/omni-realtime-java-sdk",
-      "officialVersion": 20,
-      "officialLastModifiedAt": "2026-07-21T02:13:10.000Z",
-      "contentHash": "sha256:81d0312aa7db06dc907254785fe4a138a4284b9e9b5c70f94d755514398af2b2",
-      "importedAt": "2026-07-21T02:13:10.000Z",
-      "bytes": 20231
+      "contentHash": "sha256:d6acbbe40a8cee7f6f3526d4dc401a9a90a03bb6dc61c39c1e5ce0bb21a9897d",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22499
     },
     {
       "path": "实时多模态/2950095-实时多模态交互流程.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/omni-realtime-interaction-process",
       "nodeId": 2950095,
       "title": "实时多模态交互流程",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/omni-realtime-interaction-process",
-      "officialVersion": 8,
-      "officialLastModifiedAt": "2026-06-16T15:01:28.000Z",
-      "contentHash": "sha256:7a0d0e3a7b252b520f0582384d375fdf0ac20edfdcd9cde53e85586576d58071",
-      "importedAt": "2026-06-16T15:01:28.000Z",
-      "bytes": 3762
+      "contentHash": "sha256:fbd51ff9141f7b546d70a942e815cca7ca471be04a414dc6d939eee3347d8c0f",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 3565
     },
     {
       "path": "实时多模态/3029750-声音复刻.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-omni-voice-cloning",
       "nodeId": 3029750,
       "title": "声音复刻",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/qwen-omni-voice-cloning",
-      "officialVersion": 6,
-      "officialLastModifiedAt": "2026-07-24T12:20:33.000Z",
-      "contentHash": "sha256:e4c7be7d32f03c9abf551c98a47b4c141886207bc80978ebcfe331865ccee43f",
-      "importedAt": "2026-07-24T12:20:33.000Z",
-      "bytes": 64601
+      "contentHash": "sha256:44a3349955809f41d76d6a4e71912569352fdc1ff6539d978166cc4d179ad451",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 68491
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/2983654-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/live-translator-client-events",
+      "nodeId": 2983654,
+      "title": "客户端事件",
+      "contentHash": "sha256:7b3f637a2b8623d9819549ca83bb44d8b616c9c367c8a393a8cd2d172318aacb",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 14648
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/2983655-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/live-translator-server-events",
+      "nodeId": 2983655,
+      "title": "服务端事件",
+      "contentHash": "sha256:10832c669e1461d7ccfda25d47ab01991c9c4fd36ee2c743de50b41258820719",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 44177
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/3000106-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-python-sdk",
+      "nodeId": 3000106,
+      "title": "Python SDK",
+      "contentHash": "sha256:7a1763bc478c60baf69e02c2dc7fde50a0cbb6595f25d11064b26f3c7c2adf65",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 16726
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/3000107-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-java-sdk",
+      "nodeId": 3000107,
+      "title": "Java SDK",
+      "contentHash": "sha256:48a458a604277e39ae155d2441978ffd76c2703a8bda88b10e6a0dae44bc810e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 19935
+    },
+    {
+      "path": "实时语音对话/3041587-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-audiochat-realtime-websocket-api",
+      "nodeId": 3041587,
+      "title": "WebSocket API",
+      "contentHash": "sha256:fc4955de9001274c49103d733222539f0b9be8dbc6a1e12d9cdf7f02540657e0",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 11085
+    },
+    {
+      "path": "实时语音对话/3041588-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-audiochat-client-events",
+      "nodeId": 3041588,
+      "title": "客户端事件",
+      "contentHash": "sha256:884efaa3dfdaad07e9b8191ff517689db1b4ce1fa809c4581af72af0513a89b5",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 19429
+    },
+    {
+      "path": "实时语音对话/3041589-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-audio-realtime-server-events",
+      "nodeId": 3041589,
+      "title": "服务端事件",
+      "contentHash": "sha256:474f5d4491b93fedcb0702a9486f4fe7fbb159716079f7bc286fe9c2011fa2d3",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 49689
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2853143-WebSocket API参考.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-websocket-api",
+      "nodeId": 2853143,
+      "title": "WebSocket API参考",
+      "contentHash": "sha256:edf64fa0c3833911de6789c3b7a8df2d7d9288f2065c1a3461533dffabdb2d95",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4784
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2868658-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-java-sdk",
+      "nodeId": 2868658,
+      "title": "Java SDK",
+      "contentHash": "sha256:977467207a2c478c773544b8e4ae5192df3dd9d249374963a1d9e47d26644e7e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 40214
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2868678-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-python-sdk",
+      "nodeId": 2868678,
+      "title": "Python SDK",
+      "contentHash": "sha256:96b6ec8a35b0a78446d3a112e2fc28ff6185bf701f9d8fe44bac6f7185a36953",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 27547
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2985468-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-android-sdk",
+      "nodeId": 2985468,
+      "title": "Android SDK",
+      "contentHash": "sha256:d0b1f1b1ee53ea136aa98802ea24797565ec3cb8fc6be656bdbd2dbdd8a5c838",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 25420
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2985564-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-ios-sdk",
+      "nodeId": 2985564,
+      "title": "iOS SDK",
+      "contentHash": "sha256:79faa3cd01261aa0a324b41484354926309c9a2e691ad3969d7be386cf350f2b",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 28420
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/3032843-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-client-events",
+      "nodeId": 3032843,
+      "title": "客户端事件",
+      "contentHash": "sha256:8d60ec027169641c573fced299208ea51d85491743834bf91ce2098764b69f70",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 15583
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/3032863-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/cosyvoice-server-events",
+      "nodeId": 3032863,
+      "title": "服务端事件",
+      "contentHash": "sha256:0d63180347648984d2b90b518152d7e3b038bd0650df3301e56963524e1916d4",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 7851
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2938850-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-client-events",
+      "nodeId": 2938850,
+      "title": "客户端事件",
+      "contentHash": "sha256:8940708b3bf6bca6a94cbe77254bbd2523eb2b953ae89595e5c92bf3039bd6af",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 11074
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2938851-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-server-events",
+      "nodeId": 2938851,
+      "title": "服务端事件",
+      "contentHash": "sha256:a138910b3721c40faef7db5c7ccbd0ee2a8f3a16c9763c11b9a019c8630501b5",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22327
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2950054-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-python-sdk",
+      "nodeId": 2950054,
+      "title": "Python SDK",
+      "contentHash": "sha256:1b24501da5c5274fac490c66036a51614b7d5d8beedffc198205ecf50f8421ab",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 18620
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2950055-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-java-sdk",
+      "nodeId": 2950055,
+      "title": "Java SDK",
+      "contentHash": "sha256:74f8316514999c2c2c95da95ef6b3cb61987109c7b7522ebc6c8b0de7b80bb03",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 31878
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2963385-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/interactive-process-of-qwen-tts-realtime-synthesis",
+      "nodeId": 2963385,
+      "title": "WebSocket API",
+      "contentHash": "sha256:5e2a65d127ae08cb502b16b23baa60c24c2e5393b6101dbec8babaedf207f27d",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4118
+    },
+    {
+      "path": "实时语音合成（Sambert）/2857930-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-websocket-api",
+      "nodeId": 2857930,
+      "title": "WebSocket API",
+      "contentHash": "sha256:f00aeb8b293d117f71c518d42046b9a9505a1e317ab4df21be242368ea8f74f1",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 3576
+    },
+    {
+      "path": "实时语音合成（Sambert）/2870013-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-java-sdk",
+      "nodeId": 2870013,
+      "title": "Java SDK",
+      "contentHash": "sha256:43089c595f81021e1e5af550acc2cbbbd1c47af600336d47d1279a5f9079fae2",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 27060
+    },
+    {
+      "path": "实时语音合成（Sambert）/2870050-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-python-sdk",
+      "nodeId": 2870050,
+      "title": "Python SDK",
+      "contentHash": "sha256:ee469df12ac1c9e77daa61da0c756b6a872a6130813ad3bc8fb1d6dd3d9f78bc",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 20891
+    },
+    {
+      "path": "实时语音合成（Sambert）/2985562-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-android-sdk",
+      "nodeId": 2985562,
+      "title": "Android SDK",
+      "contentHash": "sha256:c7087385d815a347eafb41f2a7d12ff186e156cc9068b1703985179942d67c63",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 14663
+    },
+    {
+      "path": "实时语音合成（Sambert）/2986029-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-ios-sdk",
+      "nodeId": 2986029,
+      "title": "iOS SDK",
+      "contentHash": "sha256:747bbe93959d238c5bfb43bf7b9d66eef5b8688d6e0da906aa30a7f1d6bc9c44",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 15256
+    },
+    {
+      "path": "实时语音合成（Sambert）/3032903-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-client-events",
+      "nodeId": 3032903,
+      "title": "客户端事件",
+      "contentHash": "sha256:58ffdeaa5bd64f256349db1ebac72d6eb212c6ed6f23ed09666ac6ceb40c88a2",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4542
+    },
+    {
+      "path": "实时语音合成（Sambert）/3032904-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/sambert-server-events",
+      "nodeId": 3032904,
+      "title": "服务端事件",
+      "contentHash": "sha256:c988dd497859025b0a25956261e26ad8cfa2f068f4c9fdec99e1752cf29ad030",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 6231
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2856047-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/websocket-for-paraformer-real-time-service",
+      "nodeId": 2856047,
+      "title": "WebSocket API",
+      "contentHash": "sha256:841495ed180037cd860353ff583003651c4ac7d02bb5db1f4747f0d68180e6bb",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 3448
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2869146-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-java-sdk",
+      "nodeId": 2869146,
+      "title": "Java SDK",
+      "contentHash": "sha256:895b6f842aaf7f80cd23d74c033a9fd93a72209a7c98642d6b34bba984d0736e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 48659
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2869148-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-python-sdk",
+      "nodeId": 2869148,
+      "title": "Python SDK",
+      "contentHash": "sha256:2217c605e8281bda951a99d6c657cdaab6db9e6f236e151eff00ecae36589d31",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 34842
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2986975-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/android-sdk-for-paraformer-real-time-service",
+      "nodeId": 2986975,
+      "title": "Android SDK",
+      "contentHash": "sha256:f583ad5873d6de51c225c1cff81edbbba709972e1b860bc173dbb75ac0679bec",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22435
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2987141-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-paraformer-real-time-service",
+      "nodeId": 2987141,
+      "title": "iOS SDK",
+      "contentHash": "sha256:da29091c28e5097366effa2c4842e696f358314e512bd40b78c3cdfc2670f3f4",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22643
+    },
+    {
+      "path": "实时语音识别（Paraformer）/3034143-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-client-events",
+      "nodeId": 3034143,
+      "title": "客户端事件",
+      "contentHash": "sha256:d83004381e0561912b5c1affe0a7264ed7be770182e5adf39cb69fadf8e92db6",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 9486
+    },
+    {
+      "path": "实时语音识别（Paraformer）/3034144-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/paraformer-server-events",
+      "nodeId": 3034144,
+      "title": "服务端事件",
+      "contentHash": "sha256:55626dfc90a1dfc7c75d88ae7a71522842949245940c31c2cd401d7127f20e2c",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 9310
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987033-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-client-events",
+      "nodeId": 2987033,
+      "title": "客户端事件",
+      "contentHash": "sha256:18d7ea0e98dfc9aa4de0ac854756635fcf76cf96044e61162d2895d55f88cc15",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 9838
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987059-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-server-events",
+      "nodeId": 2987059,
+      "title": "服务端事件",
+      "contentHash": "sha256:4aac18ebd81d3967bb882e675933b5413666affd3fef1b0e1aec70d35d1f12fd",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 24065
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987072-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-interaction-process",
+      "nodeId": 2987072,
+      "title": "WebSocket API",
+      "contentHash": "sha256:014760dd4699a1aacdccf0ae37dcf049f7640d6d10022720ff518f56f31996f7",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 6645
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2990134-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-python-sdk",
+      "nodeId": 2990134,
+      "title": "Python SDK",
+      "contentHash": "sha256:2d3505e109af22fdf6a40ca6fbf72e1b68d4023d40b739843a3ee9caaf619c0d",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 14038
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2990136-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-java-sdk",
+      "nodeId": 2990136,
+      "title": "Java SDK",
+      "contentHash": "sha256:bbeca924582b28589635cb58f6a737d2011d3734406490b3ba668cfaf73d8a7a",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 12245
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983776-Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-python-sdk",
+      "nodeId": 2983776,
+      "title": "Python SDK",
+      "contentHash": "sha256:3e5b0e6fd6d3fef184c1175bc694d6fc57db1aefa5250d1b9aae691a661c924c",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 31567
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983777-Java SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-java-sdk",
+      "nodeId": 2983777,
+      "title": "Java SDK",
+      "contentHash": "sha256:12fc1197863dff40335897a75db6d6e7a7db6ce95339b0e32160baf164bdf00d",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 50988
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983778-WebSocket API.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-websocket-api",
+      "nodeId": 2983778,
+      "title": "WebSocket API",
+      "contentHash": "sha256:d1f520071fa0cdf1fc634e4437d919a292f476713d0bafd07b576b50030c4c05",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 3818
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2995891-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/android-sdk-for-fun-asr-real-time-service",
+      "nodeId": 2995891,
+      "title": "Android SDK",
+      "contentHash": "sha256:7cd414e0bdadbae77e94cd278bc88cfad0ff2d01f6a4267723bfaf190bb9cd0b",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 30732
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2995957-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-fun-asr-real-time-service",
+      "nodeId": 2995957,
+      "title": "iOS SDK",
+      "contentHash": "sha256:9563c1ab9f21263e5ef8288b31b0f81701ab3090f604280c78f30f7cd93b63b0",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22902
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/3034145-客户端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-client-events",
+      "nodeId": 3034145,
+      "title": "客户端事件",
+      "contentHash": "sha256:9884f8118e71f16f5443a89b2d6a8359f636081439c48c2db169fa01530b6814",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22140
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/3034146-服务端事件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-asr-server-events",
+      "nodeId": 3034146,
+      "title": "服务端事件",
+      "contentHash": "sha256:11b58d716f67559229eacb61b229acc54741f164e2714415d1d836ef40f2101d",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 8938
     },
     {
       "path": "使用 API/2712193-安装SDK.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/install-sdk",
       "nodeId": 2712193,
       "title": "安装SDK",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/install-sdk",
-      "officialVersion": 20,
-      "officialLastModifiedAt": "2026-04-24T06:33:44.000Z",
-      "contentHash": "sha256:2068bc42fe584a2db2ec1366c19af62ecb3a141c296663894dc0ed2bfe1a2925",
-      "importedAt": "2026-04-24T06:33:44.000Z",
-      "bytes": 4441
+      "contentHash": "sha256:586408193699d5c1ccc56f59197bd932391bcc252588b4b92a89ffa403f0397e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 3908
     },
     {
-      "path": "使用 API/2712195-获取API Key.md",
+      "path": "使用 API/2712195-获取与配置 API Key.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-api-key",
       "nodeId": 2712195,
-      "title": "获取API Key",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/get-api-key",
-      "officialVersion": 72,
-      "officialLastModifiedAt": "2026-07-14T04:30:08.000Z",
-      "contentHash": "sha256:b08b58dac2529e306aeb5f16fce87474886ffe8f008dff29c92f17cdce600ec8",
-      "importedAt": "2026-07-14T04:30:08.000Z",
-      "bytes": 21103
+      "title": "获取与配置 API Key",
+      "contentHash": "sha256:66ebe7c89bb709ec3e5f1270738a01996ef14b14c030457cdacd27f2298a517e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 17255
     },
     {
       "path": "使用 API/2712216-错误码.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/error-code",
       "nodeId": 2712216,
       "title": "错误码",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/error-code",
-      "officialVersion": 173,
-      "officialLastModifiedAt": "2026-08-07T06:07:31.000Z",
-      "contentHash": "sha256:d499a8db0922d0151de189c18397d31ab8cae789e98659ca83157b74561e038d",
-      "importedAt": "2026-08-07T06:07:31.000Z",
-      "bytes": 115151
+      "contentHash": "sha256:3db214edf1563a9fc4bebbcafbf82b084977fe49869467072a8dfde634c5a4fd",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 116362
     },
     {
       "path": "使用 API/3041691-使用百炼CLI.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/use-model-studio-cli",
       "nodeId": 3041691,
       "title": "使用百炼CLI",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/use-model-studio-cli",
-      "officialVersion": 4,
-      "officialLastModifiedAt": "2026-07-31T02:43:56.000Z",
-      "contentHash": "sha256:6b9920e6b2343155e46f7a210ccdc4446169add20b693a6cc0273c63983efc0d",
-      "importedAt": "2026-07-31T02:43:56.000Z",
-      "bytes": 25730
+      "contentHash": "sha256:73fd963440ea42b4a83718ed85ca5367ec9c130649dce81c6c3bc72f852df777",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 22872
     },
     {
-      "path": "视频生成/爱诗/3025608-爱诗-文生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-text-to-video-api-reference",
-      "nodeId": 3025608,
-      "title": "爱诗-文生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-text-to-video-api-reference",
-      "officialVersion": 10,
-      "officialLastModifiedAt": "2026-07-23T07:44:21.000Z",
-      "contentHash": "sha256:90b11fd69b7a4002264dcc830d431aa57b2e3945e47587ab53c27d6e2474ba8e",
-      "importedAt": "2026-07-23T07:44:21.000Z",
-      "bytes": 33653
-    },
-    {
-      "path": "视频生成/爱诗/3025609-爱诗-图生视频-基于首帧.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-image-to-video-api-reference",
-      "nodeId": 3025609,
-      "title": "爱诗-图生视频-基于首帧",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-image-to-video-api-reference",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-07-23T07:44:29.000Z",
-      "contentHash": "sha256:9aa174c08839210e399e8c775d58381456ecc1c0c6956f71e275d0ff47914906",
-      "importedAt": "2026-07-23T07:44:29.000Z",
-      "bytes": 17588
-    },
-    {
-      "path": "视频生成/爱诗/3025611-爱诗-图生视频-基于首尾帧.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-keyframe-to-video-api-reference",
-      "nodeId": 3025611,
-      "title": "爱诗-图生视频-基于首尾帧",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-keyframe-to-video-api-reference",
-      "officialVersion": 8,
-      "officialLastModifiedAt": "2026-07-23T07:44:37.000Z",
-      "contentHash": "sha256:866f15987e9c234d22ba9380ca968229d02ad97e3bc7a4de2e0c88fa12ecad8b",
-      "importedAt": "2026-07-23T07:44:37.000Z",
-      "bytes": 15197
-    },
-    {
-      "path": "视频生成/爱诗/3025612-爱诗-参考生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-reference-to-video-api-reference",
-      "nodeId": 3025612,
-      "title": "爱诗-参考生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-reference-to-video-api-reference",
-      "officialVersion": 14,
-      "officialLastModifiedAt": "2026-07-23T07:44:46.000Z",
-      "contentHash": "sha256:a3210df469ac0cac8579d8448fad6cd9a5b11d10e9c284084179dd052ad71e28",
-      "importedAt": "2026-07-23T07:44:46.000Z",
-      "bytes": 20729
-    },
-    {
-      "path": "视频生成/爱诗/3046321-爱诗-视频对口型.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-lipsync-api-reference",
-      "nodeId": 3046321,
-      "title": "爱诗-视频对口型",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-lipsync-api-reference",
-      "officialVersion": 2,
-      "officialLastModifiedAt": "2026-07-23T07:44:55.000Z",
-      "contentHash": "sha256:7ed05cd25488b6b698454545f6c331c85349a3a436688f41fd918dc0b4c3dcdd",
-      "importedAt": "2026-07-23T07:44:55.000Z",
-      "bytes": 12933
-    },
-    {
-      "path": "视频生成/爱诗/3046322-爱诗-视频动作模仿.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-motioncontrol-api-reference",
-      "nodeId": 3046322,
-      "title": "爱诗-视频动作模仿",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-motioncontrol-api-reference",
-      "officialVersion": 2,
-      "officialLastModifiedAt": "2026-07-23T07:45:03.000Z",
-      "contentHash": "sha256:4f17151f7d71574cd5c9b937c6c83eac612e5963be4bf77f4d0a0c216098f0fd",
-      "importedAt": "2026-07-23T07:45:03.000Z",
-      "bytes": 11023
-    },
-    {
-      "path": "视频生成/爱诗/3046323-爱诗-视频超清.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/pixverse-upscale-api-reference",
-      "nodeId": 3046323,
-      "title": "爱诗-视频超清",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/pixverse-upscale-api-reference",
-      "officialVersion": 2,
-      "officialLastModifiedAt": "2026-07-23T07:45:11.000Z",
-      "contentHash": "sha256:ca65a2b09b5fead9065a0c0e1ce73a7882913aec37aba61507ac113c2f6fc62e",
-      "importedAt": "2026-07-23T07:45:11.000Z",
-      "bytes": 10450
-    },
-    {
-      "path": "视频生成/可灵/3026701-可灵-视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference",
-      "nodeId": 3026701,
-      "title": "可灵-视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference/",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-07-23T07:45:18.000Z",
-      "contentHash": "sha256:527ef312822ccb6cf65fbf7b5f4ed813a60641230e58cdac423aa9a572a52059",
-      "importedAt": "2026-07-23T07:45:18.000Z",
-      "bytes": 25310
-    },
-    {
-      "path": "视频生成/可灵/3026702-可灵-主体ID列表.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/kling-object-ids",
-      "nodeId": 3026702,
-      "title": "可灵-主体ID列表",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/kling-object-ids",
-      "officialVersion": 1,
-      "officialLastModifiedAt": "2026-03-27T18:28:59.000Z",
-      "contentHash": "sha256:dd9ae441fba11819b65960c6e158eb1c70ff3a6d80b9ae2c6c482b7f3ab0b7e3",
-      "importedAt": "2026-03-27T18:28:59.000Z",
-      "bytes": 2825
-    },
-    {
-      "path": "视频生成/人像驱动/2786459-图生舞蹈视频-舞动人像AnimateAnyone.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animateanyone-quick-start",
-      "nodeId": 2786459,
-      "title": "图生舞蹈视频-舞动人像AnimateAnyone",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/animateanyone-quick-start/",
-      "officialVersion": 13,
-      "officialLastModifiedAt": "2026-06-22T12:14:12.000Z",
-      "contentHash": "sha256:62b4e4d9d5cf8c203142401103049d6e47b945e6fa684dfba8840b1c58a3530b",
-      "importedAt": "2026-06-22T12:14:12.000Z",
-      "bytes": 5318
-    },
-    {
-      "path": "视频生成/人像驱动/2786461-EMO 视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-api",
-      "nodeId": 2786461,
-      "title": "EMO 视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emo-api",
-      "officialVersion": 27,
-      "officialLastModifiedAt": "2026-06-24T03:49:40.000Z",
-      "contentHash": "sha256:1ffd94df288e2701d0f50e523643c735351674b70d5ff44e703c3b3c298e2c19",
-      "importedAt": "2026-06-24T03:49:40.000Z",
-      "bytes": 20838
-    },
-    {
-      "path": "视频生成/人像驱动/2786462-图生唱演视频-悦动人像EMO.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-quick-start",
-      "nodeId": 2786462,
-      "title": "图生唱演视频-悦动人像EMO",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emo-quick-start/",
-      "officialVersion": 13,
-      "officialLastModifiedAt": "2026-02-11T07:24:28.000Z",
-      "contentHash": "sha256:c9186e93419bb43bcf90fdca4835e0cffe92fac1781093261c999ccf65a1a618",
-      "importedAt": "2026-02-11T07:24:28.000Z",
-      "bytes": 4859
-    },
-    {
-      "path": "视频生成/人像驱动/2786463-EMO 图像检测.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-detect-api",
-      "nodeId": 2786463,
-      "title": "EMO 图像检测",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emo-detect-api",
-      "officialVersion": 17,
-      "officialLastModifiedAt": "2026-06-22T02:08:34.000Z",
-      "contentHash": "sha256:655eaa2799960d47b832ebea7c6f7e183498302a872322af7f41aa65719f62e0",
-      "importedAt": "2026-06-22T02:08:34.000Z",
-      "bytes": 4709
-    },
-    {
-      "path": "视频生成/人像驱动/2786464-AnimateAnyone 视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animateanyone-video-generation-api",
-      "nodeId": 2786464,
-      "title": "AnimateAnyone 视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/animateanyone-video-generation-api",
-      "officialVersion": 19,
-      "officialLastModifiedAt": "2026-06-22T12:19:50.000Z",
-      "contentHash": "sha256:8e0e8831861b44e1abfca18f8143eace5fc150fc8eb4893ee7162562da5f9cb7",
-      "importedAt": "2026-06-22T12:19:50.000Z",
-      "bytes": 10004
-    },
-    {
-      "path": "视频生成/人像驱动/2786465-AnimateAnyone 图像检测.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animate-anyone-detect-api",
-      "nodeId": 2786465,
-      "title": "AnimateAnyone 图像检测",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/animate-anyone-detect-api",
-      "officialVersion": 15,
-      "officialLastModifiedAt": "2026-06-22T12:16:08.000Z",
-      "contentHash": "sha256:d48d989b6553ce4c6c4208472547faf04767defc764e09b4a0e1e8b3a78f438f",
-      "importedAt": "2026-06-22T12:16:08.000Z",
-      "bytes": 4168
-    },
-    {
-      "path": "视频生成/人像驱动/2807955-AnimateAnyone 动作模板生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animate-anyone-template-api",
-      "nodeId": 2807955,
-      "title": "AnimateAnyone 动作模板生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/animate-anyone-template-api",
-      "officialVersion": 14,
-      "officialLastModifiedAt": "2026-06-22T12:18:09.000Z",
-      "contentHash": "sha256:5d29468ce4f08b862cf5cc63adca26362cec8b87f5c8cdf47252f6f46f929eda",
-      "importedAt": "2026-06-22T12:18:09.000Z",
-      "bytes": 8253
-    },
-    {
-      "path": "视频生成/人像驱动/2846319-视频风格重绘.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/video-style-transform-api-reference",
-      "nodeId": 2846319,
-      "title": "视频风格重绘",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/video-style-transform-api-reference",
-      "officialVersion": 19,
-      "officialLastModifiedAt": "2026-06-22T02:09:41.000Z",
-      "contentHash": "sha256:395dbc9b59eb565690bc73d447e053e8c6e8720afa444cb2d8547b5d6a47715a",
-      "importedAt": "2026-06-22T02:09:41.000Z",
-      "bytes": 13870
-    },
-    {
-      "path": "视频生成/人像驱动/2856726-图生播报视频-灵动人像LivePortrait.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-quick-start",
-      "nodeId": 2856726,
-      "title": "图生播报视频-灵动人像LivePortrait",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/liveportrait-quick-start/",
-      "officialVersion": 10,
-      "officialLastModifiedAt": "2026-06-22T12:11:25.000Z",
-      "contentHash": "sha256:6290339ea5ab6821abbdeb42638f5bf04ab70b886a5f4d2763dc800ab2182215",
-      "importedAt": "2026-06-22T12:11:25.000Z",
-      "bytes": 2481
-    },
-    {
-      "path": "视频生成/人像驱动/2856727-LivePortrait 图像检测.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-detect-api",
-      "nodeId": 2856727,
-      "title": "LivePortrait 图像检测",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/liveportrait-detect-api",
-      "officialVersion": 15,
-      "officialLastModifiedAt": "2026-06-24T05:56:13.000Z",
-      "contentHash": "sha256:097da6727666797e077f4e16cb5bfa42a4699887038a39738621d242b44380f4",
-      "importedAt": "2026-06-24T05:56:13.000Z",
-      "bytes": 3863
-    },
-    {
-      "path": "视频生成/人像驱动/2856730-LivePortrait 视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-api",
-      "nodeId": 2856730,
-      "title": "LivePortrait 视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/liveportrait-api",
-      "officialVersion": 20,
-      "officialLastModifiedAt": "2026-06-24T03:52:57.000Z",
-      "contentHash": "sha256:6593218d5b03b877736a2c8037f413c2373719d4b6c0219baff03668de5c30f8",
-      "importedAt": "2026-06-24T03:52:57.000Z",
-      "bytes": 8545
-    },
-    {
-      "path": "视频生成/人像驱动/2860464-视频口型替换-声动人像VideoRetalk.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/videoretalk",
-      "nodeId": 2860464,
-      "title": "视频口型替换-声动人像VideoRetalk",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/videoretalk/",
-      "officialVersion": 14,
-      "officialLastModifiedAt": "2026-06-24T03:37:23.000Z",
-      "contentHash": "sha256:ab1550cdd0602ef94a95b274c636de7e4d41606b5b636fbb172bcab74fd88480",
-      "importedAt": "2026-06-24T03:37:23.000Z",
-      "bytes": 1276
-    },
-    {
-      "path": "视频生成/人像驱动/2860466-VideoRetalk视频生成.md",
+      "path": "视频口型替换-声动人像VideoRetalk/2860466-VideoRetalk视频生成.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/videoretalk-api",
       "nodeId": 2860466,
       "title": "VideoRetalk视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/videoretalk-api",
-      "officialVersion": 16,
-      "officialLastModifiedAt": "2026-07-06T07:15:28.000Z",
-      "contentHash": "sha256:b753359643fa668f18a1999559100fbcd1f7e971af2f5118d736aeebf21bb97a",
-      "importedAt": "2026-07-06T07:15:28.000Z",
-      "bytes": 13192
+      "contentHash": "sha256:5417c3836ecaf30022c2fbb1eeb98cf17025f4bfa3008e4a37c9cb7ca36d5afc",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 14363
     },
     {
-      "path": "视频生成/人像驱动/2865371-Emoji 图像检测.md",
+      "path": "视频生成/3048749-创建调优任务.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/video-generation-create-fine-tuning-job-api",
+      "nodeId": 3048749,
+      "title": "创建调优任务",
+      "contentHash": "sha256:03a88ed1307f7d4659259f6c842b7d047a777b50cf84403d4905f892365d87d8",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 19870
+    },
+    {
+      "path": "视频生成/3048859-部署模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/video-generation-deploy-model-api",
+      "nodeId": 3048859,
+      "title": "部署模型",
+      "contentHash": "sha256:ac1ca1d787d274cbd9c21d142e9640d644a1fbadb47a393243dd861e276b37b5",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 13808
+    },
+    {
+      "path": "通用文本向量/2712515-同步接口API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-embedding-synchronous-api",
+      "nodeId": 2712515,
+      "title": "同步接口API详情",
+      "contentHash": "sha256:5b47d6f629f25ac67adfa0754b4fdee0144c5f3df86e3ce20acb6c92d95e5288",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 48400
+    },
+    {
+      "path": "通用文本向量/2712516-批处理接口API详情.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-embedding-batch-api",
+      "nodeId": 2712516,
+      "title": "批处理接口API详情",
+      "contentHash": "sha256:164a83d6bc6bd22ef5269fa95fb742ef6b300e3902748218108b09a13514801b",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 33942
+    },
+    {
+      "path": "图生表情包视频-表情包Emoji/2865371-Emoji 图像检测.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/emoji-detect-api",
       "nodeId": 2865371,
       "title": "Emoji 图像检测",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emoji-detect-api",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-06-24T03:34:34.000Z",
-      "contentHash": "sha256:b3bfc17827a2dffb969ce1f6c8655cf7ff9f9c93e782d6d66ac0cf547bec9a20",
-      "importedAt": "2026-06-24T03:34:34.000Z",
-      "bytes": 7038
+      "contentHash": "sha256:78e8ef45574b41c662351441eda66be5f7420c36ba9811d40e89a2946542ddb0",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 10424
     },
     {
-      "path": "视频生成/人像驱动/2865372-图生表情包视频-表情包Emoji.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emoji-quick-start",
-      "nodeId": 2865372,
-      "title": "图生表情包视频-表情包Emoji",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emoji-quick-start/",
-      "officialVersion": 11,
-      "officialLastModifiedAt": "2026-06-24T02:13:48.000Z",
-      "contentHash": "sha256:b10da89fff665eba4e330cf5d962830f09cba81eb4a9cddf84ff3937172155cc",
-      "importedAt": "2026-06-24T02:13:48.000Z",
-      "bytes": 1513
-    },
-    {
-      "path": "视频生成/人像驱动/2865374-Emoji 视频生成.md",
+      "path": "图生表情包视频-表情包Emoji/2865374-Emoji 视频生成.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/emoji-api",
       "nodeId": 2865374,
       "title": "Emoji 视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/emoji-api",
-      "officialVersion": 8,
-      "officialLastModifiedAt": "2026-06-24T03:35:21.000Z",
-      "contentHash": "sha256:df26d59176f1668c94e70dbaef80e3ac72eaa87d20601c3f17127e5bf184c4c9",
-      "importedAt": "2026-06-24T03:35:21.000Z",
-      "bytes": 12689
+      "contentHash": "sha256:1cbdaa34cb4b4208dfa65e5ddc5138a068e9b66ba0f43377c87c2d36d5ad3dcc",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 19815
     },
     {
-      "path": "视频生成/万相/2865250-万相2.7-文生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-to-video-api-reference",
-      "nodeId": 2865250,
-      "title": "万相2.7-文生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/text-to-video-api-reference",
-      "officialVersion": 62,
-      "officialLastModifiedAt": "2026-07-22T07:32:37.000Z",
-      "contentHash": "sha256:db7a6446aa1aafea904ec22d9b6aa9549558fc610d726d8abe281f9ac8ba7ce9",
-      "importedAt": "2026-07-22T07:32:37.000Z",
-      "bytes": 42710
+      "path": "图生播报视频-灵动人像LivePortrait/2856727-LivePortrait 图像检测.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-detect-api",
+      "nodeId": 2856727,
+      "title": "LivePortrait 图像检测",
+      "contentHash": "sha256:0fe1a144e0c19cab3f1cc0ca87a31b4dab4d5c6d035bb39ba8a8a1d21ec130f3",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4079
     },
     {
-      "path": "视频生成/万相/2867393-万相-图生视频-基于首帧（2.1-2.6）.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-api-reference",
-      "nodeId": 2867393,
-      "title": "万相-图生视频-基于首帧（2.1-2.6）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-api-reference/",
-      "officialVersion": 76,
-      "officialLastModifiedAt": "2026-07-22T07:33:22.000Z",
-      "contentHash": "sha256:7ca8d17fad5869556cb4c7c5400c363b88ef70ae4b56d5805bf713b8ea376421",
-      "importedAt": "2026-07-22T07:33:22.000Z",
-      "bytes": 57333
+      "path": "图生播报视频-灵动人像LivePortrait/2856730-LivePortrait 视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/liveportrait-api",
+      "nodeId": 2856730,
+      "title": "LivePortrait 视频生成",
+      "contentHash": "sha256:0d34c2a51fa9cf9d5cd52a87c576a0d78d3e555302596eb23b1daef1220483b4",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 9376
     },
     {
-      "path": "视频生成/万相/2880649-万相-图生视频-基于首尾帧（2.2）.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-by-first-and-last-frame-api-reference",
-      "nodeId": 2880649,
-      "title": "万相-图生视频-基于首尾帧（2.2）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-by-first-and-last-frame-api-reference",
-      "officialVersion": 36,
-      "officialLastModifiedAt": "2026-07-22T07:36:18.000Z",
-      "contentHash": "sha256:d20e445b07f99233cb5bfce907598545fea9dabe0d1ca56e729932a5a66f885d",
-      "importedAt": "2026-07-22T07:36:18.000Z",
-      "bytes": 33424
+      "path": "图生唱演视频-悦动人像EMO/2786461-EMO 视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-api",
+      "nodeId": 2786461,
+      "title": "EMO 视频生成",
+      "contentHash": "sha256:29f3cbcd2d5f78c602b4c5961f6c6d805b02ab1aec64a9d9465c2e81a52ae0f0",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 28933
     },
     {
-      "path": "视频生成/万相/2922183-万相-视频编辑（2.1）.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wanx-vace-api-reference",
-      "nodeId": 2922183,
-      "title": "万相-视频编辑（2.1）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/legacy-wanx-vace-api-reference",
-      "officialVersion": 32,
-      "officialLastModifiedAt": "2026-07-22T07:36:39.000Z",
-      "contentHash": "sha256:c3d9ebf16594e5c904059641cd9856d15b5af00e6f2cca6a75ec7f9f28ac5f91",
-      "importedAt": "2026-07-22T07:36:39.000Z",
-      "bytes": 39692
+      "path": "图生唱演视频-悦动人像EMO/2786463-EMO 图像检测.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/emo-detect-api",
+      "nodeId": 2786463,
+      "title": "EMO 图像检测",
+      "contentHash": "sha256:16600b9d54d5d301ee5d0d7672f364432bf4d8b0780427c96253301a6effe5b8",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 5135
     },
     {
-      "path": "视频生成/万相/2930017-万相-图生视频-视频特效列表.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-video-effects",
-      "nodeId": 2930017,
-      "title": "万相-图生视频-视频特效列表",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wanx-video-effects",
-      "officialVersion": 9,
-      "officialLastModifiedAt": "2026-07-22T07:34:30.000Z",
-      "contentHash": "sha256:66a9d20b20691973be9f2e21ffa1db416abe67ae5be3cc3ea41ff70e0b9c2f5b",
-      "importedAt": "2026-07-22T07:34:30.000Z",
-      "bytes": 9446
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2786464-AnimateAnyone 视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animateanyone-video-generation-api",
+      "nodeId": 2786464,
+      "title": "AnimateAnyone 视频生成",
+      "contentHash": "sha256:939af00b322daece3298ce9ab17c60d0081b04b5436fd8f971263883321813be",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 10218
     },
     {
-      "path": "视频生成/万相/2978213-万相-数字人.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-overview",
-      "nodeId": 2978213,
-      "title": "万相-数字人",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-s2v-overview/",
-      "officialVersion": 10,
-      "officialLastModifiedAt": "2026-06-16T15:05:00.000Z",
-      "contentHash": "sha256:947416b676bdff7e988a521b992898e07c67904834dfba8fcdbbc5052673ca71",
-      "importedAt": "2026-06-16T15:05:00.000Z",
-      "bytes": 4629
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2786465-AnimateAnyone 图像检测.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animate-anyone-detect-api",
+      "nodeId": 2786465,
+      "title": "AnimateAnyone 图像检测",
+      "contentHash": "sha256:3e76351713043c8d3cbcc83c762bf4f4a7796ab42ca0ca396bd51091b921f2ed",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 5311
     },
     {
-      "path": "视频生成/万相/2978214-wan2.2-s2v 图像检测.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api",
-      "nodeId": 2978214,
-      "title": "wan2.2-s2v 图像检测",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api",
-      "officialVersion": 15,
-      "officialLastModifiedAt": "2026-07-22T07:38:16.000Z",
-      "contentHash": "sha256:66c081d73c6b4511971228d4462faecd6506d08bb8d3521e227fb517e0b30c40",
-      "importedAt": "2026-07-22T07:38:16.000Z",
-      "bytes": 4582
-    },
-    {
-      "path": "视频生成/万相/2978215-wan2.2-s2v 视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-api",
-      "nodeId": 2978215,
-      "title": "wan2.2-s2v 视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-s2v-api",
-      "officialVersion": 14,
-      "officialLastModifiedAt": "2026-07-22T07:38:37.000Z",
-      "contentHash": "sha256:3bd091787742d06cb260bb848b2171d942a6b4c4c025ae6562dac07ad665af95",
-      "importedAt": "2026-07-22T07:38:37.000Z",
-      "bytes": 11079
-    },
-    {
-      "path": "视频生成/万相/2981852-万相-图生动作.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-animate-move-api",
-      "nodeId": 2981852,
-      "title": "万相-图生动作",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-animate-move-api",
-      "officialVersion": 22,
-      "officialLastModifiedAt": "2026-07-22T07:37:10.000Z",
-      "contentHash": "sha256:8dc2e3c2f13338c17eb8167b203f79d81e2ae0f99459f4de8144524a99d184d5",
-      "importedAt": "2026-07-22T07:37:10.000Z",
-      "bytes": 16039
-    },
-    {
-      "path": "视频生成/万相/2982219-万相-视频换人.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-animate-mix-api",
-      "nodeId": 2982219,
-      "title": "万相-视频换人",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-animate-mix-api",
-      "officialVersion": 20,
-      "officialLastModifiedAt": "2026-07-22T07:37:47.000Z",
-      "contentHash": "sha256:5d0bac7075741b690016a96553a1135868b0f01b805552afbad3be28f665e261",
-      "importedAt": "2026-07-22T07:37:47.000Z",
-      "bytes": 16879
-    },
-    {
-      "path": "视频生成/万相/3001146-万相2.7-参考生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-video-to-video-api-reference",
-      "nodeId": 3001146,
-      "title": "万相2.7-参考生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-video-to-video-api-reference",
-      "officialVersion": 37,
-      "officialLastModifiedAt": "2026-07-02T03:09:58.000Z",
-      "contentHash": "sha256:7a3137d32d611ad794d5f1debf4b1ec14fa1f37c6a6cc72f57436975f4881309",
-      "importedAt": "2026-07-02T03:09:58.000Z",
-      "bytes": 47991
-    },
-    {
-      "path": "视频生成/万相/3021842-万相2.7-视频编辑.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-video-editing-api-reference",
-      "nodeId": 3021842,
-      "title": "万相2.7-视频编辑",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan-video-editing-api-reference",
-      "officialVersion": 15,
-      "officialLastModifiedAt": "2026-07-22T07:32:59.000Z",
-      "contentHash": "sha256:6b8768788f862c874c629f4a31ef9dfa39664a21aae6437126e6f052a6fe272f",
-      "importedAt": "2026-07-22T07:32:59.000Z",
-      "bytes": 42417
-    },
-    {
-      "path": "视频生成/万相/3025059-万相2.7-图生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference",
-      "nodeId": 3025059,
-      "title": "万相2.7-图生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference",
-      "officialVersion": 11,
-      "officialLastModifiedAt": "2026-07-22T07:32:14.000Z",
-      "contentHash": "sha256:e910108f625549d2d1fa324448ccae2d51f0431b17c09fedf16a6f8c3877605c",
-      "importedAt": "2026-07-22T07:32:14.000Z",
-      "bytes": 41685
-    },
-    {
-      "path": "视频生成/万相/3030512-万相-参考生视频（2.6）.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wan-reference-to-video-api-reference",
-      "nodeId": 3030512,
-      "title": "万相-参考生视频（2.6）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/legacy-wan-reference-to-video-api-reference",
-      "officialVersion": 6,
-      "officialLastModifiedAt": "2026-07-22T07:35:55.000Z",
-      "contentHash": "sha256:848b1f17c7c62c9c5a530c13c08a2ec62ff0305995d864266f0f039b60b4b115",
-      "importedAt": "2026-07-22T07:35:55.000Z",
-      "bytes": 37267
-    },
-    {
-      "path": "视频生成/万相/3030514-万相-文生视频（2.1-2.6）.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wan-text-to-video-api-reference",
-      "nodeId": 3030514,
-      "title": "万相-文生视频（2.1-2.6）",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/legacy-wan-text-to-video-api-reference",
-      "officialVersion": 5,
-      "officialLastModifiedAt": "2026-07-22T07:35:32.000Z",
-      "contentHash": "sha256:a6e756ff06e6914e744c964f1b0d1e13eafb1dd9d1798a8b3e8882ed98b33a03",
-      "importedAt": "2026-07-22T07:35:32.000Z",
-      "bytes": 50496
-    },
-    {
-      "path": "视频生成/万相/3049634-万相3.0-视频生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
-      "nodeId": 3049634,
-      "title": "万相3.0-视频生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
-      "officialVersion": 4,
-      "officialLastModifiedAt": "2026-08-07T09:29:58.000Z",
-      "contentHash": "sha256:8e1f616bbf2daaa9486b3a5eea21e550fedda8c0c1892010a29bc9eabadb9d09",
-      "importedAt": "2026-08-07T09:29:58.000Z",
-      "bytes": 23181
-    },
-    {
-      "path": "视频生成/HappyHorse/3029820-HappyHorse-文生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference",
-      "nodeId": 3029820,
-      "title": "HappyHorse-文生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference",
-      "officialVersion": 17,
-      "officialLastModifiedAt": "2026-07-29T15:47:09.000Z",
-      "contentHash": "sha256:1d72c0b1d86c720051a7859a5da7643a54f6a082227215d3857dca842813c3bb",
-      "importedAt": "2026-07-29T15:47:09.000Z",
-      "bytes": 13896
-    },
-    {
-      "path": "视频生成/HappyHorse/3029821-HappyHorse-图生视频-基于首帧.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-image-to-video-api-reference",
-      "nodeId": 3029821,
-      "title": "HappyHorse-图生视频-基于首帧",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/happyhorse-image-to-video-api-reference",
-      "officialVersion": 16,
-      "officialLastModifiedAt": "2026-07-29T15:47:25.000Z",
-      "contentHash": "sha256:818193fdbc5b2ed3ebc0a5faade2d5d1402e1cd99c27ee39bd656c34dbc745c0",
-      "importedAt": "2026-07-29T15:47:25.000Z",
-      "bytes": 15518
-    },
-    {
-      "path": "视频生成/HappyHorse/3030778-HappyHorse-参考生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-reference-to-video-api-reference",
-      "nodeId": 3030778,
-      "title": "HappyHorse-参考生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/happyhorse-reference-to-video-api-reference",
-      "officialVersion": 20,
-      "officialLastModifiedAt": "2026-07-29T15:47:41.000Z",
-      "contentHash": "sha256:589aae403a3551ca6ecc1426b02567ad94f92e28b3bfebe8126ec41865aded44",
-      "importedAt": "2026-07-29T15:47:41.000Z",
-      "bytes": 17073
-    },
-    {
-      "path": "视频生成/HappyHorse/3030779-HappyHorse-视频编辑.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference",
-      "nodeId": 3030779,
-      "title": "HappyHorse-视频编辑",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference",
-      "officialVersion": 13,
-      "officialLastModifiedAt": "2026-07-24T06:34:37.000Z",
-      "contentHash": "sha256:88c9df54db7d4228ae35f38706c0df3b06962241c7bbe8b03eea146e402cec69",
-      "importedAt": "2026-07-24T06:34:37.000Z",
-      "bytes": 16189
-    },
-    {
-      "path": "视频生成/Vidu/3026197-Vidu-文生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-text-to-video-api-reference",
-      "nodeId": 3026197,
-      "title": "Vidu-文生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/vidu-text-to-video-api-reference",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-07-23T07:45:27.000Z",
-      "contentHash": "sha256:9803c46f4901153fef06488787806f95c1dc255bf72e9d4c026268d5e74fe8ab",
-      "importedAt": "2026-07-23T07:45:27.000Z",
-      "bytes": 27063
-    },
-    {
-      "path": "视频生成/Vidu/3026198-Vidu-图生视频-基于首帧.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-image-to-video-api-reference",
-      "nodeId": 3026198,
-      "title": "Vidu-图生视频-基于首帧",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/vidu-image-to-video-api-reference",
-      "officialVersion": 7,
-      "officialLastModifiedAt": "2026-07-23T07:45:42.000Z",
-      "contentHash": "sha256:5499ab6fe026033f7a3d8466a1fde7e69c964b2472a0d4fb2e7fd227deaacfbb",
-      "importedAt": "2026-07-23T07:45:42.000Z",
-      "bytes": 15117
-    },
-    {
-      "path": "视频生成/Vidu/3026199-Vidu-图生视频-基于首尾帧.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-keyframe-to-video-api-reference",
-      "nodeId": 3026199,
-      "title": "Vidu-图生视频-基于首尾帧",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/vidu-keyframe-to-video-api-reference",
-      "officialVersion": 6,
-      "officialLastModifiedAt": "2026-07-23T07:45:50.000Z",
-      "contentHash": "sha256:f275fa221b75c7b226d7adcdfb43eb3b58c77382f956796095a11be24317adfa",
-      "importedAt": "2026-07-23T07:45:50.000Z",
-      "bytes": 15074
-    },
-    {
-      "path": "视频生成/Vidu/3026200-Vidu-参考生视频.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-reference-to-video-api-reference",
-      "nodeId": 3026200,
-      "title": "Vidu-参考生视频",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/vidu-reference-to-video-api-reference",
-      "officialVersion": 11,
-      "officialLastModifiedAt": "2026-08-04T11:44:24.000Z",
-      "contentHash": "sha256:428dab32cd58a080e2b95f0916211cf64743ce3f454ba11ec5fb7c0f5e2b5561",
-      "importedAt": "2026-08-04T11:44:24.000Z",
-      "bytes": 25196
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2807955-AnimateAnyone 动作模板生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/animate-anyone-template-api",
+      "nodeId": 2807955,
+      "title": "AnimateAnyone 动作模板生成",
+      "contentHash": "sha256:ea933ac5d4b5f72fafd903333c40643056cd8e5d213ff22f13a97defe0d1912e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 10725
     },
     {
       "path": "图像生成/2867348-常见问题.md",
       "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-faq",
       "nodeId": 2867348,
       "title": "常见问题",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/image-faq",
-      "officialVersion": 16,
-      "officialLastModifiedAt": "2026-02-27T12:16:29.000Z",
-      "contentHash": "sha256:4b9e35ef3b4073764bbd014f8b3a3540891192978e48ee415d8e7f89245eb803",
-      "importedAt": "2026-02-27T12:16:29.000Z",
-      "bytes": 7954
+      "contentHash": "sha256:930a8bd8be5fa9a058c0d2ff5f4ee8127c35eda798492718586b513f237c622b",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 7754
     },
     {
-      "path": "图像生成/创意工具/2712351-计量计费.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-billing",
-      "nodeId": 2712351,
+      "path": "图像生成/3048763-创建微调任务.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-generation-create-fine-tuning-job-api",
+      "nodeId": 3048763,
+      "title": "创建微调任务",
+      "contentHash": "sha256:8dedb304ed5afb931b4b52b2af97f661d55e8c5e7ca2f121d9bff0477eb95802",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 20684
+    },
+    {
+      "path": "图像生成/3048872-部署模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-generation-deploy-model-api",
+      "nodeId": 3048872,
+      "title": "部署模型",
+      "contentHash": "sha256:29cc32b828e41e0c1e31b24a26156756437838dfe95bf768f94a4e727906d1d5",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 6923
+    },
+    {
+      "path": "万相-数字人/2978214-wan2.2-s2v 图像检测.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api",
+      "nodeId": 2978214,
+      "title": "wan2.2-s2v 图像检测",
+      "contentHash": "sha256:d48bdc0b349d108b773a4bc37474a37feb3b1e69b07d6632a3181ea8d7322f71",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4706
+    },
+    {
+      "path": "万相-数字人/2978215-wan2.2-s2v 视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-api",
+      "nodeId": 2978215,
+      "title": "wan2.2-s2v 视频生成",
+      "contentHash": "sha256:958f7a7b91fb6087e58536c856ea09984d9ce4fcb052c0517740ba042312074f",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 11513
+    },
+    {
+      "path": "万相-图生视频-基于首帧（2.1-2.6）/2930017-万相-图生视频-视频特效列表.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-video-effects",
+      "nodeId": 2930017,
+      "title": "万相-图生视频-视频特效列表",
+      "contentHash": "sha256:791733874767c97b9bc9c7d1f9795ff8e9dd35cc3dd5f1d5666b16579383ce54",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 10544
+    },
+    {
+      "path": "万相-早期视频模型（2.1-2.6）/2867393-万相-图生视频-基于首帧（2.1-2.6）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-api-reference",
+      "nodeId": 2867393,
+      "title": "万相-图生视频-基于首帧（2.1-2.6）",
+      "contentHash": "sha256:8f2873f5abc934544da0dd2eed846edbe3b6c68cca6886e282d89f47335c3c1e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 65865
+    },
+    {
+      "path": "万相-早期视频模型（2.1-2.6）/2880649-万相-图生视频-基于首尾帧（2.2）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-by-first-and-last-frame-api-reference",
+      "nodeId": 2880649,
+      "title": "万相-图生视频-基于首尾帧（2.2）",
+      "contentHash": "sha256:7976c6e23e5869a7b88d6af8f060b0e36cba445de176e8f007be9e59b62c2c33",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 39112
+    },
+    {
+      "path": "万相-早期视频模型（2.1-2.6）/2922183-万相-视频编辑（2.1）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wanx-vace-api-reference",
+      "nodeId": 2922183,
+      "title": "万相-视频编辑（2.1）",
+      "contentHash": "sha256:f5877358276b791221c648f01c20287103da72100eb4a4afbe23a8b44e7d94dd",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 57011
+    },
+    {
+      "path": "万相-早期视频模型（2.1-2.6）/3030512-万相-参考生视频（2.6）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wan-reference-to-video-api-reference",
+      "nodeId": 3030512,
+      "title": "万相-参考生视频（2.6）",
+      "contentHash": "sha256:dc81bb765923a5a421d2716f281c0a4d028c2ba624140abef8ee5c89057140a6",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 44570
+    },
+    {
+      "path": "万相-早期视频模型（2.1-2.6）/3030514-万相-文生视频（2.1-2.6）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/legacy-wan-text-to-video-api-reference",
+      "nodeId": 3030514,
+      "title": "万相-文生视频（2.1-2.6）",
+      "contentHash": "sha256:752d796935993159c21a783d9d596d8f8f072a613dd93b1f2825c2b80e5cf9cb",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 57033
+    },
+    {
+      "path": "万相/2712483-万相-文生图V1.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-to-image-api-reference",
+      "nodeId": 2712483,
+      "title": "万相-文生图V1",
+      "contentHash": "sha256:c440560e1df3c25cf15c981546eee56cc0a79bf72eb9db9b3c94b46c3620f11a",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 51657
+    },
+    {
+      "path": "万相/2712498-万相-涂鸦作画.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-sketch-to-image-api-reference",
+      "nodeId": 2712498,
+      "title": "万相-涂鸦作画",
+      "contentHash": "sha256:e88fdb83333bc88b0cb1ff28c68a0c75efb36b6915795fc5c03a68704a9370c2",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 33581
+    },
+    {
+      "path": "万相/2797051-万相-图像局部重绘.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vary-region-api-reference",
+      "nodeId": 2797051,
+      "title": "万相-图像局部重绘",
+      "contentHash": "sha256:2cab0a798dbf0be4dbb48a2d85e410f19b1ec6947048fdceb60ac0798518134c",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 34010
+    },
+    {
+      "path": "万相/2862677-万相-文生图V2.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-to-image-v2-api-reference",
+      "nodeId": 2862677,
+      "title": "万相-文生图V2",
+      "contentHash": "sha256:634608aa331ae3dca446122fb80e73814e23173ee2eb8025536b1263ddf0df86",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 95610
+    },
+    {
+      "path": "万相/2865250-万相2.7-文生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/text-to-video-api-reference",
+      "nodeId": 2865250,
+      "title": "万相2.7-文生视频",
+      "contentHash": "sha256:f081207e86bc652c0a7061d10417fd5f7add8a01cc6ae831bee93613a62bab8a",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 49087
+    },
+    {
+      "path": "万相/2868981-万相-通用图像编辑2.1.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-image-edit-api-reference",
+      "nodeId": 2868981,
+      "title": "万相-通用图像编辑2.1",
+      "contentHash": "sha256:8691b83784e98af7f0118f4ed2e175e6c419e8d81c3ec1e4cfde54faad46afb8",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 61365
+    },
+    {
+      "path": "万相/2978213-万相-数字人.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-s2v-overview",
+      "nodeId": 2978213,
+      "title": "万相-数字人",
+      "contentHash": "sha256:4ab81b796b1aafda652d123693d9ed343bb84cb98c635b5e8f66f4afa9c7cb31",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 4846
+    },
+    {
+      "path": "万相/2981852-万相-图生动作.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-animate-move-api",
+      "nodeId": 2981852,
+      "title": "万相-图生动作",
+      "contentHash": "sha256:e9cf6b64a98caf9090cc28d1ccb1b6da841020c6056804c974aa0d1307fbaae4",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 20970
+    },
+    {
+      "path": "万相/2982219-万相-视频换人.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-animate-mix-api",
+      "nodeId": 2982219,
+      "title": "万相-视频换人",
+      "contentHash": "sha256:e2209c8b285be6000e1fc3d7b6a1b200e5168958eee6d8efcb74a9d251547f2e",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 21782
+    },
+    {
+      "path": "万相/2982258-万相-通用图像编辑2.5.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan2-5-image-edit-api-reference",
+      "nodeId": 2982258,
+      "title": "万相-通用图像编辑2.5",
+      "contentHash": "sha256:c008fabb3f8662bb67b3492d588cf4631c281beff770e05a2da53801f41ca434",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 48316
+    },
+    {
+      "path": "万相/3001143-万相-图像生成与编辑2.6.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-image-generation-api-reference",
+      "nodeId": 3001143,
+      "title": "万相-图像生成与编辑2.6",
+      "contentHash": "sha256:dd6eed1ed883675d844bd5c53bb13accd39013dc2ad9a712232038ffe0981858",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 94230
+    },
+    {
+      "path": "万相/3001146-万相2.7-参考生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-video-to-video-api-reference",
+      "nodeId": 3001146,
+      "title": "万相2.7-参考生视频",
+      "contentHash": "sha256:fa0ced64ff095e9e06a4c004d3cc22ca4c8da634fd010087b88e5e0693a231f7",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 54615
+    },
+    {
+      "path": "万相/3021842-万相2.7-视频编辑.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-video-editing-api-reference",
+      "nodeId": 3021842,
+      "title": "万相2.7-视频编辑",
+      "contentHash": "sha256:cb6694b3821967d56e2fbe171e4242450757cb9799fb6b7f91add76c2e11583f",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 48821
+    },
+    {
+      "path": "万相/3025059-万相2.7-图生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference",
+      "nodeId": 3025059,
+      "title": "万相2.7-图生视频",
+      "contentHash": "sha256:5db4c6082e765dab590700065afd2754f7d472fddc86bb5e392cf42abc05b702",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 48295
+    },
+    {
+      "path": "万相/3026980-万相-图像生成与编辑2.7.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan-image-generation-and-editing-api-reference",
+      "nodeId": 3026980,
+      "title": "万相-图像生成与编辑2.7",
+      "contentHash": "sha256:4fdcb0d4944074455e699286a4b89820e0bf3524c72dd86ce806886f2b231ad0",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 100241
+    },
+    {
+      "path": "万相/3049634-万相3.0-视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
+      "nodeId": 3049634,
+      "title": "万相3.0-视频生成",
+      "contentHash": "sha256:5909795265b67a0b600ff8b76748dddc27efe97e14eca97ac54994a7f96cf91c",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 34672
+    },
+    {
+      "path": "文本生成/2980295-Anthropic兼容-Messages.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/anthropic-api-messages",
+      "nodeId": 2980295,
+      "title": "Anthropic兼容-Messages",
+      "contentHash": "sha256:0f56d6a18e469cedee11ccfd48aff6db3a84e355e852dbb5134346564dfe5768",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 62028
+    },
+    {
+      "path": "文本生成/3016807-OpenAI兼容-Chat.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions",
+      "nodeId": 3016807,
+      "title": "OpenAI兼容-Chat",
+      "contentHash": "sha256:8a95c9df979387180577e8d50d99013b57e1b328422fd4ccd5d28af093d8d04a",
+      "importedAt": "2026-08-27T01:17:01.607Z",
+      "bytes": 126613
+    },
+    {
+      "path": "文本生成/3016809-DashScope.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-api-via-dashscope",
+      "nodeId": 3016809,
+      "title": "DashScope",
+      "contentHash": "sha256:811c8b3254d2d54d3310e782e9014fa7eafade3580ee6b8fcf9784b4df6abfe4",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 145299
+    },
+    {
+      "path": "文本生成/3039648-模型导入.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/custom-models-api",
+      "nodeId": 3039648,
+      "title": "模型导入",
+      "contentHash": "sha256:a9443529accfd47117a7ec8ca108e1783965d3e5dce905c78fc57ba13b46a234",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 14607
+    },
+    {
+      "path": "文本生成/3039651-创建调优任务.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/create-fine-tuning-job-api",
+      "nodeId": 3039651,
+      "title": "创建调优任务",
+      "contentHash": "sha256:13c2c91c34042d68c6a975e96229585ce12db88d543324f2b8cb54cf2ceb5da0",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 23645
+    },
+    {
+      "path": "文本生成/3039665-部署模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/create-deployment-api",
+      "nodeId": 3039665,
+      "title": "部署模型",
+      "contentHash": "sha256:fbdc73e206a2f8deb6d322600ca4f8b0b51d41cec19391ceb6509354a61d90d9",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 16146
+    },
+    {
+      "path": "文本生成/3039885-模型压缩.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/model-compression-api",
+      "nodeId": 3039885,
+      "title": "模型压缩",
+      "contentHash": "sha256:14f43bf753ab4fcb7dc7f44d199d5eee86b9cde807fea3e8bb05974bb5011a9f",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 27297
+    },
+    {
+      "path": "文件管理/3039636-上传文件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/upload-file-api",
+      "nodeId": 3039636,
+      "title": "上传文件",
+      "contentHash": "sha256:e2baa894a406bd660e9b020505517ba56c9b10f9be1b0d9f36feaeeb9f72f0e2",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 3969
+    },
+    {
+      "path": "文件管理/3039637-查询和管理文件.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/get-file-api",
+      "nodeId": 3039637,
+      "title": "查询和管理文件",
+      "contentHash": "sha256:6c2a24b165b5d1bbb320a297fc9a1d7a1fd9beb4e16412713a8120dcee3fb02d",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 6687
+    },
+    {
+      "path": "音乐生成/3030449-音乐生成（Fun-Music）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/fun-music-api",
+      "nodeId": 3030449,
+      "title": "音乐生成（Fun-Music）",
+      "contentHash": "sha256:98bcd113c15cbd49c0eab85bf85f568c6ee9cc80e1a3476c18fcf9cd6df13c33",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 12280
+    },
+    {
+      "path": "语音翻译/2999751-音视频翻译-通义千问.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen3-livetranslate-flash-api",
+      "nodeId": 2999751,
+      "title": "音视频翻译-通义千问",
+      "contentHash": "sha256:593961c30b43b901597a918662661b7340867f631854b2418a297015586a86e4",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 23523
+    },
+    {
+      "path": "语音合成/2881635-非实时语音合成（Qwen-TTS）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-tts-api",
+      "nodeId": 2881635,
+      "title": "非实时语音合成（Qwen-TTS）",
+      "contentHash": "sha256:adc58a27a4133f39995e78d324451ba4626d7ff3512bf6bf2479adb1e8b98282",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 22521
+    },
+    {
+      "path": "语音合成/3032884-声音设计.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/voice-design-api-references",
+      "nodeId": 3032884,
+      "title": "声音设计",
+      "contentHash": "sha256:54a90f1c8d3894ed5a4434f220ecbfc044ae78645ce73bf2b253c3554f33e5da",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 34167
+    },
+    {
+      "path": "语音合成/3048764-创建调优任务.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/voice-synthesis-create-fine-tuning-job-api",
+      "nodeId": 3048764,
+      "title": "创建调优任务",
+      "contentHash": "sha256:9158458ab62f951a2f0aaffab163ea798fcad647b3b6de042feea43f72c62324",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 17130
+    },
+    {
+      "path": "语音合成/3048888-部署模型.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/tts-deploy-model-api",
+      "nodeId": 3048888,
+      "title": "部署模型",
+      "contentHash": "sha256:15974ae4a5b839ff784ebf619dcce582683bf2e517ca0bb0921bd3182151e33e",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 7949
+    },
+    {
+      "path": "语音识别/2986952-非实时语音识别（Qwen-ASR）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference",
+      "nodeId": 2986952,
+      "title": "非实时语音识别（Qwen-ASR）",
+      "contentHash": "sha256:36b922e9ccca3b1189619a491b86c03715c5810e73a6e92e97bfa14051e5b354",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 81354
+    },
+    {
+      "path": "语音识别/3047297-非实时语音识别（Qwen-Audio-3.0-ASR-Flash_Fun-ASR-Flash）.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/non-real-time-speech-recognition-for-fun-asr-flash",
+      "nodeId": 3047297,
+      "title": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash/Fun-ASR-Flash）",
+      "contentHash": "sha256:b243a1b108c6253ad5542fbcad6f906034df8818e7631b351f0afa49a75f2577",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 27574
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2796626-AI试衣-基础版.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/outfitanyone-api",
+      "nodeId": 2796626,
+      "title": "AI试衣-基础版",
+      "contentHash": "sha256:58cd3c903c8b66df617eefe835d8e6e832135f72e5a5fb2f15b3f3b6bde21bd1",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 28857
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2796629-计量计费.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/billing-for-outfitanyone",
+      "nodeId": 2796629,
       "title": "计量计费",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/facechain-billing",
-      "officialVersion": 12,
-      "officialLastModifiedAt": "2026-06-24T02:13:14.000Z",
-      "contentHash": "sha256:fddc64191cb7089b08d5a56df75d372e88812f0a59f0f87bdd6da539511b8e11",
-      "importedAt": "2026-06-24T02:13:14.000Z",
-      "bytes": 2363
+      "contentHash": "sha256:0e0ef9daa8914cda1ad4a7ef560850cc39d05d9b112bc275ed4a6bdaac0e85e8",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 6024
     },
     {
-      "path": "图像生成/创意工具/2712453-人物写真FaceChain.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/facechain-portrait-generation",
-      "nodeId": 2712453,
-      "title": "人物写真FaceChain",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/facechain-portrait-generation/",
-      "officialVersion": 9,
-      "officialLastModifiedAt": "2026-06-24T02:15:34.000Z",
-      "contentHash": "sha256:a9af41bad8bdb1c21f0ad52fee82d6d098e7fcc278583b4da5af0916737f2da3",
-      "importedAt": "2026-06-24T02:15:34.000Z",
-      "bytes": 1012
+      "path": "AI试衣OutfitAnyone/2796663-AI试衣-图片精修.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/ai-fitting-picture-finishing-api-details",
+      "nodeId": 2796663,
+      "title": "AI试衣-图片精修",
+      "contentHash": "sha256:f2d2b7b5b8a71c03752f2b720d8f585a80d39bced9ec949750653228322b950b",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 14018
     },
     {
-      "path": "图像生成/创意工具/2712493-人像风格重绘.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/portrait-style-redraw-api-reference",
-      "nodeId": 2712493,
-      "title": "人像风格重绘",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/portrait-style-redraw-api-reference",
-      "officialVersion": 37,
-      "officialLastModifiedAt": "2026-07-15T08:06:56.000Z",
-      "contentHash": "sha256:010e1b3ad2ba92a2ae470bb7bdf8d08b608dfd74ff9f9a5c714c08c24369ebe8",
-      "importedAt": "2026-07-15T08:06:56.000Z",
-      "bytes": 15623
+      "path": "AI试衣OutfitAnyone/2865249-AI试衣-图片分割.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aitryon-parsing-api",
+      "nodeId": 2865249,
+      "title": "AI试衣-图片分割",
+      "contentHash": "sha256:e343536795a7f794251c33a739a7505da5312b28de8440765230c76d4616f55e",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 12446
     },
     {
-      "path": "图像生成/创意工具/2712497-图像背景生成.md",
-      "sourceUrl": "https://help.aliyun.com/zh/model-studio/wanx-background-generation-api-reference",
-      "nodeId": 2712497,
-      "title": "图像背景生成",
-      "officialPath": "https://help.aliyun.com/zh/model-studio/wanx-background-generation-api-reference",
-      "officialVersion": 39,
-      "officialLastModifiedAt": "2026-07-16T09:48:53.000Z",
-      "contentHash": "sha256:aed9113ad203874885485d401854b435dace1fd977b2a70838bfb714f68720d1",
-      "importedAt": "2026-07-16T09:48:53.000Z",
-      "bytes": 22462
+      "path": "AI试衣OutfitAnyone/2881846-AI试衣-Plus版.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aitryon-plus-api",
+      "nodeId": 2881846,
+      "title": "AI试衣-Plus版",
+      "contentHash": "sha256:de842203910f8de008293a2b7558daa5615af72f7e4b996d1b55e2d80c50641c",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 29317
+    },
+    {
+      "path": "AOQ客户端SDK/3046056-SDK简介.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/realtime-api-aoq-sdk-desc",
+      "nodeId": 3046056,
+      "title": "SDK简介",
+      "contentHash": "sha256:834aacc7161f578841f10aac2368b1b30283be0d1ddf4c13303f9994ffb3b80f",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 858
+    },
+    {
+      "path": "API参考（模型）/2712576-文本生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-api-reference",
+      "nodeId": 2712576,
+      "title": "文本生成",
+      "contentHash": "sha256:dc0083c3a2fe3275a48eab1c0f11bd839cfa44abc3b7c3a6d8fe205cad42ecf2",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 707
+    },
+    {
+      "path": "API参考（模型）/3039634-文件管理.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/file-management-api",
+      "nodeId": 3039634,
+      "title": "文件管理",
+      "contentHash": "sha256:01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 1
+    },
+    {
+      "path": "HappyHorse/3029820-HappyHorse-文生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference",
+      "nodeId": 3029820,
+      "title": "HappyHorse-文生视频",
+      "contentHash": "sha256:f9a77677b097fca5e193d344537e55c1a36e30129dc8be360c451ff6fee4c4fc",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 18923
+    },
+    {
+      "path": "HappyHorse/3029821-HappyHorse-图生视频-基于首帧.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-image-to-video-api-reference",
+      "nodeId": 3029821,
+      "title": "HappyHorse-图生视频-基于首帧",
+      "contentHash": "sha256:e3a6fd8f30fb7ac4163c3f5a4c3833ea9bfa1c46261f3d8df6b49c60b8607aaa",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 21088
+    },
+    {
+      "path": "HappyHorse/3030778-HappyHorse-参考生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-reference-to-video-api-reference",
+      "nodeId": 3030778,
+      "title": "HappyHorse-参考生视频",
+      "contentHash": "sha256:e6c7ac3083604d5e70f80c6cca94120467f51a13a37d2c7aec09dc76120cbdbe",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 22883
+    },
+    {
+      "path": "HappyHorse/3030779-HappyHorse-视频编辑.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference",
+      "nodeId": 3030779,
+      "title": "HappyHorse-视频编辑",
+      "contentHash": "sha256:61e0fdccd7be49b4256b1b57b08b8506c90b845d5c70fec553bd23ae3d493e36",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 22178
+    },
+    {
+      "path": "MiniMax/3052216-MiniMax-视频生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/minimax-video-generation-api-reference",
+      "nodeId": 3052216,
+      "title": "MiniMax-视频生成",
+      "contentHash": "sha256:5772d0f5a16f3577898e65da148531515b7889d433aaf4b01728147572c29002",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 27546
+    },
+    {
+      "path": "OpenAI兼容-Responses/3016808-创建响应.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses",
+      "nodeId": 3016808,
+      "title": "创建响应",
+      "contentHash": "sha256:d9a99f565d9c26b8d7b6c4dfc02e195a7b0c64fdd4d2f1506d9fa9e3038efa12",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 104273
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033492-获取响应.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/retrieve-a-response",
+      "nodeId": 3033492,
+      "title": "获取响应",
+      "contentHash": "sha256:6ff1dcaddc3cb3fde0db5411abf27f5d3a381912601e850391510377752161d4",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 18978
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033494-删除响应.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/delete-a-response",
+      "nodeId": 3033494,
+      "title": "删除响应",
+      "contentHash": "sha256:f3aa67b5679a429e6a79c9b6835878f52b04a84a88ee499ada0959fa3daadd58",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 3724
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033495-获取输入项列表.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/list-input-items",
+      "nodeId": 3033495,
+      "title": "获取输入项列表",
+      "contentHash": "sha256:cd0c4f7184fbcafe8f21ed1cdcb49a019091ab6ac9d75c2282566c8243ed5073",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 9944
+    },
+    {
+      "path": "Realtime API/3046058-概述.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/realtime-api-overview",
+      "nodeId": 3046058,
+      "title": "概述",
+      "contentHash": "sha256:f8634bb28c9f54ce6ef35d86975bb0d9adec959656bc8a50e737dbcddf618bd9",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 4504
+    },
+    {
+      "path": "SDK简介/3046063-Android SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-android-sdk-reference",
+      "nodeId": 3046063,
+      "title": "Android SDK",
+      "contentHash": "sha256:491f5555b128216987bc7aa570ad8f500b2e12798ac6568c510b8288ea64f43a",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 23146
+    },
+    {
+      "path": "SDK简介/3046064-iOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-ios-sdk-reference",
+      "nodeId": 3046064,
+      "title": "iOS SDK",
+      "contentHash": "sha256:ac70d58a6bca919b478b673f13260e0201d1bcb0b1fbf2a52a6830117591a3b0",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 16669
+    },
+    {
+      "path": "SDK简介/3046065-HarmonyOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-harmony-sdk-reference",
+      "nodeId": 3046065,
+      "title": "HarmonyOS SDK",
+      "contentHash": "sha256:2cb6be8fc88397d208c416683ece3d722352807ab4caea4ce6c8b92a33b03c5d",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 34614
+    },
+    {
+      "path": "SDK简介/3052524-Windows SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-windows-sdk-reference",
+      "nodeId": 3052524,
+      "title": "Windows SDK",
+      "contentHash": "sha256:15441fcadf94bc4525f067d2d102ec5ec0d7b156b612e29fadab754a0010148d",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 61053
+    },
+    {
+      "path": "SDK简介/3052525-macOS SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-macos-sdk-reference",
+      "nodeId": 3052525,
+      "title": "macOS SDK",
+      "contentHash": "sha256:bf229628423547b25be35f3d3bfbfa57f9843715e97c9873b25258ca06e7b12b",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 60747
+    },
+    {
+      "path": "SDK简介/3052526-Electron SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-electron-sdk-reference",
+      "nodeId": 3052526,
+      "title": "Electron SDK",
+      "contentHash": "sha256:1064376baa1bb09129fe9aad9361388cc5772a268c7a117c2eb653f699df5172",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 48640
+    },
+    {
+      "path": "SDK简介/3052527-Linux Python SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-linux-python-sdk-reference",
+      "nodeId": 3052527,
+      "title": "Linux Python SDK",
+      "contentHash": "sha256:846db75798a005bf35b900c578bf54ea0b8ad0bde15be25929181b62021c1457",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 29190
+    },
+    {
+      "path": "SDK简介/3052528-Linux C++ SDK.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/aoq-linux-cpp-sdk-reference",
+      "nodeId": 3052528,
+      "title": "Linux C++ SDK",
+      "contentHash": "sha256:4aa0e26b6ee8c0e54a314f4aefab99136bfe210f2b93b02b4189f7dddcb74127",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 54029
+    },
+    {
+      "path": "Vidu/3026197-Vidu-文生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-text-to-video-api-reference",
+      "nodeId": 3026197,
+      "title": "Vidu-文生视频",
+      "contentHash": "sha256:ac13f054bf457af7bd4cb281aa724ad185c0a6f041d27a51c1a1476ebbd2f7bd",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 32983
+    },
+    {
+      "path": "Vidu/3026198-Vidu-图生视频-基于首帧.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-image-to-video-api-reference",
+      "nodeId": 3026198,
+      "title": "Vidu-图生视频-基于首帧",
+      "contentHash": "sha256:567cb88798cd0fa6c44e6a22d19a70dbe7d7e45916579cbeaa858ae53afdd804",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 20780
+    },
+    {
+      "path": "Vidu/3026199-Vidu-图生视频-基于首尾帧.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-keyframe-to-video-api-reference",
+      "nodeId": 3026199,
+      "title": "Vidu-图生视频-基于首尾帧",
+      "contentHash": "sha256:19ebc7b2175e924482f39687026639603a7fc040219d9ffde32ee91cb1a22016",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 20721
+    },
+    {
+      "path": "Vidu/3026200-Vidu-参考生视频.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-reference-to-video-api-reference",
+      "nodeId": 3026200,
+      "title": "Vidu-参考生视频",
+      "contentHash": "sha256:ba7db541bff2ae51fe52f466e1f65861f36dea9842811df03c529d27043317ba",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 33341
+    },
+    {
+      "path": "Vidu/3045893-Vidu-图像生成.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/vidu-image-generation-api-reference",
+      "nodeId": 3045893,
+      "title": "Vidu-图像生成",
+      "contentHash": "sha256:f373da006b45c0ee983a6d33c5f59e9ed9a1f2e5fe15f7f15aba8b615977e03e",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 20555
+    },
+    {
+      "path": "Z-Image/3002354-文生图Z-Image.md",
+      "sourceUrl": "https://help.aliyun.com/zh/model-studio/z-image-api-reference",
+      "nodeId": 3002354,
+      "title": "文生图Z-Image",
+      "contentHash": "sha256:18ca36343cff42858fece760a31a497245282b448291f8d5f53c4db8aa160650",
+      "importedAt": "2026-08-27T01:18:48.744Z",
+      "bytes": 20851
     }
   ]
 }

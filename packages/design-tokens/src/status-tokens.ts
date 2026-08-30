@@ -8,7 +8,7 @@
  *
  * 与 tokens.css 的对应：tone 命名与 `--rb-success` / `--rb-warning` /
  * `--rb-danger` 等语义色变量一一对齐；apps 消费时既可直接读 CSS 变量，也可
- * 经由 shadcn variant 间接消费（参考 apps/web 的 StatusBadge：先取 tone，
+ * 经由 shadcn variant 间接消费（参考 studio/admin 的 StatusBadge：先取 tone，
  * 再用 TONE_TO_VARIANT 翻译成 Badge variant）。
  *
  * 主题机制：当前仅 light 一套（见 tokens.css 的 :root）；若未来引入 dark

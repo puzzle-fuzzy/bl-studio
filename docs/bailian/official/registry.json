@@ -9,10 +9,13 @@
     "nodeId": "2400256",
     "website": "cn",
     "language": "zh",
-    "rootAliases": [
-      "/model-studio/model-api-reference"
+    "modelRootAlias": "/model-studio/model-api-reference",
+    "supplementalAliases": [
+      "/model-studio/models",
+      "/model-studio/model-pricing",
+      "/model-studio/newly-released-models"
     ],
-    "minimumDocumentCount": 100
+    "minimumDocumentCount": 200
   },
   "documents": [
     {
@@ -20,2676 +23,3373 @@
       "nodeId": 3030679,
       "url": "https://help.aliyun.com/zh/model-studio/tripo-3d-generation-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "3D模型生成",
         "Tripo-3D模型生成"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "错误码.md",
-      "nodeId": 2712216,
-      "url": "https://help.aliyun.com/zh/model-studio/error-code",
+      "path": "爱诗/3025608-爱诗-文生视频.md",
+      "nodeId": 3025608,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-text-to-video-api-reference",
       "navigationPath": [
-        "官方补充文档",
-        "错误码"
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-文生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3025609-爱诗-图生视频-基于首帧.md",
+      "nodeId": 3025609,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-image-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-图生视频-基于首帧"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3025611-爱诗-图生视频-基于首尾帧.md",
+      "nodeId": 3025611,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-keyframe-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-图生视频-基于首尾帧"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3025612-爱诗-参考生视频.md",
+      "nodeId": 3025612,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-reference-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-参考生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3046321-爱诗-视频对口型.md",
+      "nodeId": 3046321,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-lipsync-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-视频对口型"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3046322-爱诗-视频动作模仿.md",
+      "nodeId": 3046322,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-motioncontrol-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-视频动作模仿"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "爱诗/3046323-爱诗-视频超清.md",
+      "nodeId": 3046323,
+      "url": "https://help.aliyun.com/zh/model-studio/pixverse-upscale-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "爱诗",
+        "爱诗-视频超清"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "产品动态/2987781-模型上下架与更新.md",
+      "nodeId": 2987781,
+      "url": "https://help.aliyun.com/zh/model-studio/newly-released-models",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "用户指南（模型）",
+        "产品动态",
+        "模型上下架与更新"
       ],
       "origin": "supplemental"
+    },
+    {
+      "path": "产品计费/2987148-模型调用计费.md",
+      "nodeId": 2987148,
+      "url": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "用户指南（模型）",
+        "产品计费",
+        "模型调用计费"
+      ],
+      "origin": "supplemental"
+    },
+    {
+      "path": "创意工具/2712453-人物写真FaceChain.md",
+      "nodeId": 2712453,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-portrait-generation",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2712493-人像风格重绘.md",
+      "nodeId": 2712493,
+      "url": "https://help.aliyun.com/zh/model-studio/portrait-style-redraw-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人像风格重绘"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2712497-图像背景生成.md",
+      "nodeId": 2712497,
+      "url": "https://help.aliyun.com/zh/model-studio/wanx-background-generation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "图像背景生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2712508-创意文字WordArt锦书API.md",
+      "nodeId": 2712508,
+      "url": "https://help.aliyun.com/zh/model-studio/wordart-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "创意文字WordArt锦书API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2796624-AI试衣OutfitAnyone.md",
+      "nodeId": 2796624,
+      "url": "https://help.aliyun.com/zh/model-studio/outfitanyone",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2796845-图像画面扩展.md",
+      "nodeId": 2796845,
+      "url": "https://help.aliyun.com/zh/model-studio/image-scaling-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "图像画面扩展"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2796985-虚拟模特.md",
+      "nodeId": 2796985,
+      "url": "https://help.aliyun.com/zh/model-studio/virtual-model-api-details",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "虚拟模特"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2804662-鞋靴模特.md",
+      "nodeId": 2804662,
+      "url": "https://help.aliyun.com/zh/model-studio/shoe-model-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "鞋靴模特"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2807172-创意海报生成.md",
+      "nodeId": 2807172,
+      "url": "https://help.aliyun.com/zh/model-studio/creative-poster-generation-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "创意海报生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2840906-人物实例分割.md",
+      "nodeId": 2840906,
+      "url": "https://help.aliyun.com/zh/model-studio/image-instance-segmentation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人物实例分割"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意工具/2840907-图像擦除补全.md",
+      "nodeId": 2840907,
+      "url": "https://help.aliyun.com/zh/model-studio/image-erase-completion-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "图像擦除补全"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712509-计量计费.md",
+      "nodeId": 2712509,
+      "url": "https://help.aliyun.com/zh/model-studio/wordart-billing",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "创意文字WordArt锦书API",
+        "计量计费"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712510-文字纹理生成API详情.md",
+      "nodeId": 2712510,
+      "url": "https://help.aliyun.com/zh/model-studio/fill-texture-effect-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "创意文字WordArt锦书API",
+        "文字纹理生成API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "创意文字WordArt锦书API/2712513-文字变形API详情.md",
+      "nodeId": 2712513,
+      "url": "https://help.aliyun.com/zh/model-studio/word-transformer",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "创意文字WordArt锦书API",
+        "文字变形API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "定制热词/3024761-HTTP API参考.md",
+      "nodeId": 3024761,
+      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-http-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "定制热词",
+        "HTTP API参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "定制热词/3024762-Java SDK参考.md",
+      "nodeId": 3024762,
+      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "定制热词",
+        "Java SDK参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "定制热词/3024763-Python SDK参考.md",
+      "nodeId": 3024763,
+      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "定制热词",
+        "Python SDK参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "多模态向量/2712517-多模态向量.md",
+      "nodeId": 2712517,
+      "url": "https://help.aliyun.com/zh/model-studio/multimodal-embedding-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "向量与排序",
+        "多模态向量",
+        "多模态向量"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音合成（MiniMax）/3021951-同步语音合成.md",
+      "nodeId": 3021951,
+      "url": "https://help.aliyun.com/zh/model-studio/minimax-synchronous-speech-synthesis-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "非实时语音合成（MiniMax）",
+        "同步语音合成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029755-Java SDK参考.md",
+      "nodeId": 3029755,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "Java SDK参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029756-Python SDK参考.md",
+      "nodeId": 3029756,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "Python SDK参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音合成（Qwen-Audio-TTS_CosyVoice）/3029782-HTTP API参考.md",
+      "nodeId": 3029782,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-http-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "HTTP API参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2712537-最佳实践.md",
+      "nodeId": 2712537,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-best-practices",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "最佳实践"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869367-Java SDK.md",
+      "nodeId": 2869367,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869498-Python SDK.md",
+      "nodeId": 2869498,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2869541-HTTP API.md",
+      "nodeId": 2869541,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-restful-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "HTTP API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2987223-Android SDK.md",
+      "nodeId": 2987223,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-android-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Paraformer）/2987329-iOS SDK.md",
+      "nodeId": 2987329,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-ios-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Paraformer）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978299-Java SDK.md",
+      "nodeId": 2978299,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978300-Python SDK.md",
+      "nodeId": 2978300,
+      "url": "https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2978302-HTTP API.md",
+      "nodeId": 2978302,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
+        "HTTP API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2995958-Android SDK.md",
+      "nodeId": 2995958,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-android-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans_Fun-ASR）/2995965-iOS SDK.md",
+      "nodeId": 2995965,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-ios-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2746874-子业务空间的模型调用.md",
       "nodeId": 2746874,
       "url": "https://help.aliyun.com/zh/model-studio/model-calling-in-sub-workspace",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "子业务空间的模型调用"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2858866-管理异步任务.md",
       "nodeId": 2858866,
       "url": "https://help.aliyun.com/zh/model-studio/manage-asynchronous-tasks",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "管理异步任务"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2869454-上传文件获取临时URL.md",
       "nodeId": 2869454,
       "url": "https://help.aliyun.com/zh/model-studio/get-temporary-file-url",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "上传文件获取临时URL"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2874010-DashScope SDK连接复用配置.md",
       "nodeId": 2874010,
       "url": "https://help.aliyun.com/zh/model-studio/connection-multiplexing-configuration",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "DashScope SDK连接复用配置"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2879834-生成临时API Key.md",
       "nodeId": 2879834,
       "url": "https://help.aliyun.com/zh/model-studio/generate-temporary-api-key",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "生成临时API Key"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/2880071-配置异步任务回调.md",
       "nodeId": 2880071,
       "url": "https://help.aliyun.com/zh/model-studio/async-task-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "配置异步任务回调"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多/3042878-查询模型列表.md",
       "nodeId": 3042878,
       "url": "https://help.aliyun.com/zh/model-studio/list-models",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
         "查询模型列表"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "更多/3042879-查询模型限额.md",
+      "path": "更多/3042879-查询模型限流.md",
       "nodeId": 3042879,
       "url": "https://help.aliyun.com/zh/model-studio/list-quotas",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多",
-        "查询模型限额"
-      ]
+        "查询模型限流"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "更多/3050809-查询模型授权.md",
+      "nodeId": 3050809,
+      "url": "https://help.aliyun.com/zh/model-studio/list-model-permissions",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "更多",
+        "查询模型授权"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "更多/3050811-更新模型授权.md",
+      "nodeId": 3050811,
+      "url": "https://help.aliyun.com/zh/model-studio/update-model-permissions",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "更多",
+        "更新模型授权"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "更多/3050812-更新模型限流.md",
+      "nodeId": 3050812,
+      "url": "https://help.aliyun.com/zh/model-studio/update-model-rate-limits",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "更多",
+        "更新模型限流"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多模型/2778998-通义法睿.md",
       "nodeId": 2778998,
       "url": "https://help.aliyun.com/zh/model-studio/tongyi-farui-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
         "通义法睿"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多模型/2861138-意图理解.md",
       "nodeId": 2861138,
       "url": "https://help.aliyun.com/zh/model-studio/intent-detect-capability",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
         "意图理解"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "更多模型/2995807-Qwen-MT 翻译模型.md",
+      "path": "更多模型/2995807-Qwen-MT API参考.md",
       "nodeId": 2995807,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-mt-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
-        "Qwen-MT 翻译模型"
-      ]
+        "Qwen-MT API参考"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多模型/2995976-Qwen-Deep-Research 深入研究模型.md",
       "nodeId": 2995976,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-deep-research-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
         "Qwen-Deep-Research 深入研究模型"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多模型/2996283-Qwen-OCR 文字提取模型.md",
       "nodeId": 2996283,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-vl-ocr-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
         "Qwen-OCR 文字提取模型"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "更多模型/2997660-GUI-Plus 界面交互专用模型.md",
       "nodeId": 2997660,
       "url": "https://help.aliyun.com/zh/model-studio/gui-plus-interface-interaction-model",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "更多模型",
         "GUI-Plus 界面交互专用模型"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2587654-LangChain.md",
+      "path": "工具包_框架/2587654-LangChain.md",
       "nodeId": 2587654,
       "url": "https://help.aliyun.com/zh/model-studio/use-bailian-in-langchain",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "LangChain"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2833609-OpenAI兼容-Chat.md",
+      "path": "工具包_框架/2833609-OpenAI兼容-Chat.md",
       "nodeId": 2833609,
       "url": "https://help.aliyun.com/zh/model-studio/compatibility-of-openai-with-dashscope",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Chat"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2833610-OpenAI兼容-File.md",
+      "path": "工具包_框架/2833610-OpenAI兼容-File.md",
       "nodeId": 2833610,
       "url": "https://help.aliyun.com/zh/model-studio/openai-file-interface",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-File"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2842025-OpenAI兼容-Batch（文件输入）.md",
+      "path": "工具包_框架/2842025-OpenAI兼容-Batch（文件输入）.md",
       "nodeId": 2842025,
       "url": "https://help.aliyun.com/zh/model-studio/batch-interfaces-compatible-with-openai",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Batch（文件输入）"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2845564-OpenAI兼容-Vision.md",
+      "path": "工具包_框架/2845564-OpenAI兼容-Vision.md",
       "nodeId": 2845564,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-vl-compatible-with-openai",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Vision"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2846066-OpenAI兼容-Embedding.md",
+      "path": "工具包_框架/2846066-OpenAI兼容-Embedding.md",
       "nodeId": 2846066,
       "url": "https://help.aliyun.com/zh/model-studio/embedding-interfaces-compatible-with-openai",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Embedding"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2869921-OpenAI兼容-Completions.md",
+      "path": "工具包_框架/2869921-OpenAI兼容-Completions.md",
       "nodeId": 2869921,
       "url": "https://help.aliyun.com/zh/model-studio/completions",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Completions"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/2997130-OpenAI兼容-Batch Chat.md",
+      "path": "工具包_框架/2997130-OpenAI兼容-Batch Chat.md",
       "nodeId": 2997130,
       "url": "https://help.aliyun.com/zh/model-studio/openai-compatible-batch-chat",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Batch Chat"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/3016539-OpenAI兼容-Responses.md",
+      "path": "工具包_框架/3016539-OpenAI兼容-Responses.md",
       "nodeId": 3016539,
       "url": "https://help.aliyun.com/zh/model-studio/compatibility-with-openai-responses-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Responses"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "工具包／框架/3023274-OpenAI兼容-Conversations.md",
+      "path": "工具包_框架/3023274-OpenAI兼容-Conversations.md",
       "nodeId": 3023274,
       "url": "https://help.aliyun.com/zh/model-studio/openai-compatible-conversations",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "工具包/框架",
         "OpenAI兼容-Conversations"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型调用价格.md",
-      "nodeId": 2987148,
-      "url": "https://help.aliyun.com/zh/model-studio/model-pricing",
+      "path": "功能参考/3046066-连接状态管理.md",
+      "nodeId": 3046066,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-connection-management",
       "navigationPath": [
-        "官方补充文档",
-        "模型调用价格"
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "连接状态管理"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046067-媒体流发送管理.md",
+      "nodeId": 3046067,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-media-stream-control",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "媒体流发送管理"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046068-视频常用功能介绍.md",
+      "nodeId": 3046068,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-video-features",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "视频常用功能介绍"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046069-音频常用功能介绍.md",
+      "nodeId": 3046069,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-audio-features",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "音频常用功能介绍"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046070-自定义视频输入.md",
+      "nodeId": 3046070,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-video-input",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "自定义视频输入"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046071-自定义音频播放.md",
+      "nodeId": 3046071,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-playback",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "自定义音频播放"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "功能参考/3046072-自定义音频采集.md",
+      "nodeId": 3046072,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-capture",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "功能参考",
+        "自定义音频采集"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "开始使用/2840914-选择模型.md",
+      "nodeId": 2840914,
+      "url": "https://help.aliyun.com/zh/model-studio/models",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "用户指南（模型）",
+        "开始使用",
+        "选择模型"
       ],
       "origin": "supplemental"
+    },
+    {
+      "path": "可灵-视频生成/3026702-可灵-主体ID列表.md",
+      "nodeId": 3026702,
+      "url": "https://help.aliyun.com/zh/model-studio/kling-object-ids",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "可灵",
+        "可灵-视频生成",
+        "可灵-主体ID列表"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "可灵/3026701-可灵-视频生成.md",
+      "nodeId": 3026701,
+      "url": "https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "可灵",
+        "可灵-视频生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "可灵/3026706-可灵-图像生成.md",
+      "nodeId": 3026706,
+      "url": "https://help.aliyun.com/zh/model-studio/kling-image-generation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "可灵",
+        "可灵-图像生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "快速开始/3046059-SDK下载.md",
+      "nodeId": 3046059,
+      "url": "https://help.aliyun.com/zh/model-studio/realtime-sdk-download",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "快速开始",
+        "SDK下载"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "快速开始/3046060-Token鉴权.md",
+      "nodeId": 3046060,
+      "url": "https://help.aliyun.com/zh/model-studio/realtime-token-authentication",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "快速开始",
+        "Token鉴权"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "快速开始/3046061-接入模型与应用.md",
+      "nodeId": 3046061,
+      "url": "https://help.aliyun.com/zh/model-studio/realtime-connect-model",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "快速开始",
+        "接入模型与应用"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "模型部署/3039666-部署模型管理.md",
+      "nodeId": 3039666,
+      "url": "https://help.aliyun.com/zh/model-studio/get-deployment-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "模型生产",
+        "模型部署",
+        "部署模型管理"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "模型调优/3039652-调优任务管理.md",
+      "nodeId": 3039652,
+      "url": "https://help.aliyun.com/zh/model-studio/get-fine-tuning-job-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "模型生产",
+        "模型调优",
+        "调优任务管理"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "模型调优/3039672-Checkpoint 管理.md",
+      "nodeId": 3039672,
+      "url": "https://help.aliyun.com/zh/model-studio/list-checkpoints-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "模型生产",
+        "模型调优",
+        "Checkpoint 管理"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "模型生产/3039647-模型调优.md",
       "nodeId": 3039647,
       "url": "https://help.aliyun.com/zh/model-studio/fine-tuning-jobs-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "模型生产",
         "模型调优"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "模型生产/3039649-模型部署.md",
       "nodeId": 3039649,
       "url": "https://help.aliyun.com/zh/model-studio/deployments-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "模型生产",
         "模型部署"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型部署/3039664-列举可部署模型.md",
-      "nodeId": 3039664,
-      "url": "https://help.aliyun.com/zh/model-studio/list-deployable-models-api",
+      "path": "模型生产/3048861-TPM 预留 DashScope OpenAPI 接口文档.md",
+      "nodeId": 3048861,
+      "url": "https://help.aliyun.com/zh/model-studio/tpm-reserved-openapi",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "模型生产",
-        "模型部署",
-        "列举可部署模型"
-      ]
+        "TPM 预留 DashScope OpenAPI 接口文档"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型部署/3039665-创建部署.md",
-      "nodeId": 3039665,
-      "url": "https://help.aliyun.com/zh/model-studio/create-deployment-api",
+      "path": "排序模型（Rerank）/2780056-排序模型（Rerank）.md",
+      "nodeId": 2780056,
+      "url": "https://help.aliyun.com/zh/model-studio/text-rerank-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型部署",
-        "创建部署"
-      ]
+        "向量与排序",
+        "排序模型（Rerank）",
+        "排序模型（Rerank）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型部署/3039666-查询和管理部署.md",
-      "nodeId": 3039666,
-      "url": "https://help.aliyun.com/zh/model-studio/get-deployment-api",
+      "path": "千问-早期图像模型/2975126-千问-文生图.md",
+      "nodeId": 2975126,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型部署",
-        "查询和管理部署"
-      ]
+        "图像生成",
+        "千问",
+        "千问-早期图像模型",
+        "千问-文生图"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型调优/3039648-模型导入.md",
-      "nodeId": 3039648,
-      "url": "https://help.aliyun.com/zh/model-studio/custom-models-api",
+      "path": "千问-早期图像模型/2976416-千问-图像编辑.md",
+      "nodeId": 2976416,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-edit-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型调优",
-        "模型导入"
-      ]
+        "图像生成",
+        "千问",
+        "千问-早期图像模型",
+        "千问-图像编辑"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型调优/3039651-创建调优任务.md",
-      "nodeId": 3039651,
-      "url": "https://help.aliyun.com/zh/model-studio/create-fine-tuning-job-api",
+      "path": "千问/2977163-千问-图像翻译.md",
+      "nodeId": 2977163,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-mt-image-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型调优",
-        "创建调优任务"
-      ]
+        "图像生成",
+        "千问",
+        "千问-图像翻译"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型调优/3039652-查询和管理调优任务.md",
-      "nodeId": 3039652,
-      "url": "https://help.aliyun.com/zh/model-studio/get-fine-tuning-job-api",
+      "path": "千问/3047054-千问-图像生成与编辑3.0.md",
+      "nodeId": 3047054,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型调优",
-        "查询和管理调优任务"
-      ]
+        "图像生成",
+        "千问",
+        "千问-图像生成与编辑3.0"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型调优/3039672-Checkpoint 管理.md",
-      "nodeId": 3039672,
-      "url": "https://help.aliyun.com/zh/model-studio/list-checkpoints-api",
+      "path": "人物写真FaceChain/2712351-计量计费.md",
+      "nodeId": 2712351,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-billing",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型调优",
-        "Checkpoint 管理"
-      ]
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain",
+        "计量计费"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "模型生产/模型调优/3039885-模型压缩.md",
-      "nodeId": 3039885,
-      "url": "https://help.aliyun.com/zh/model-studio/model-compression-api",
+      "path": "人物写真FaceChain/2712501-人物写真生成API详情.md",
+      "nodeId": 2712501,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-generation",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "模型生产",
-        "模型调优",
-        "模型压缩"
-      ]
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain",
+        "人物写真生成API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人物写真FaceChain/2712505-快速开始.md",
+      "nodeId": 2712505,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain",
+        "快速开始"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人物写真FaceChain/2712506-人物形象训练API详情.md",
+      "nodeId": 2712506,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-finetune-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain",
+        "人物形象训练API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人物写真FaceChain/2712507-人物图像检测API详情.md",
+      "nodeId": 2712507,
+      "url": "https://help.aliyun.com/zh/model-studio/facechain-face-detection-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "人物写真FaceChain",
+        "人物图像检测API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2786459-图生舞蹈视频-舞动人像AnimateAnyone.md",
+      "nodeId": 2786459,
+      "url": "https://help.aliyun.com/zh/model-studio/animateanyone-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "图生舞蹈视频-舞动人像AnimateAnyone"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2786462-图生唱演视频-悦动人像EMO.md",
+      "nodeId": 2786462,
+      "url": "https://help.aliyun.com/zh/model-studio/emo-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "图生唱演视频-悦动人像EMO"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2846319-视频风格重绘.md",
+      "nodeId": 2846319,
+      "url": "https://help.aliyun.com/zh/model-studio/video-style-transform-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "视频风格重绘"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2856726-图生播报视频-灵动人像LivePortrait.md",
+      "nodeId": 2856726,
+      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "图生播报视频-灵动人像LivePortrait"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2860464-视频口型替换-声动人像VideoRetalk.md",
+      "nodeId": 2860464,
+      "url": "https://help.aliyun.com/zh/model-studio/videoretalk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "视频口型替换-声动人像VideoRetalk"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "人像驱动/2865372-图生表情包视频-表情包Emoji.md",
+      "nodeId": 2865372,
+      "url": "https://help.aliyun.com/zh/model-studio/emoji-quick-start",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "人像驱动",
+        "图生表情包视频-表情包Emoji"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "声音复刻/3027318-HTTP API参考.md",
+      "nodeId": 3027318,
+      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-design-http-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "声音复刻",
+        "HTTP API参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "声音复刻/3027319-Java SDK参考.md",
+      "nodeId": 3027319,
+      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "声音复刻",
+        "Java SDK参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "声音复刻/3027320-Python SDK参考.md",
+      "nodeId": 3027320,
+      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "声音复刻",
+        "Python SDK参考"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/2922854-客户端事件.md",
       "nodeId": 2922854,
       "url": "https://help.aliyun.com/zh/model-studio/client-events",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "客户端事件"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/2922855-服务端事件.md",
       "nodeId": 2922855,
       "url": "https://help.aliyun.com/zh/model-studio/server-events",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "服务端事件"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/2949956-Python SDK.md",
       "nodeId": 2949956,
       "url": "https://help.aliyun.com/zh/model-studio/omni-realtime-python-sdk",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "Python SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/2950053-Java SDK.md",
       "nodeId": 2950053,
       "url": "https://help.aliyun.com/zh/model-studio/omni-realtime-java-sdk",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "Java SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/2950095-实时多模态交互流程.md",
       "nodeId": 2950095,
       "url": "https://help.aliyun.com/zh/model-studio/omni-realtime-interaction-process",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "实时多模态交互流程"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "实时多模态/3029750-声音复刻.md",
       "nodeId": 3029750,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-omni-voice-cloning",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "实时多模态",
         "声音复刻"
-      ]
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/2983654-客户端事件.md",
+      "nodeId": 2983654,
+      "url": "https://help.aliyun.com/zh/model-studio/live-translator-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音翻译",
+        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/2983655-服务端事件.md",
+      "nodeId": 2983655,
+      "url": "https://help.aliyun.com/zh/model-studio/live-translator-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音翻译",
+        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/3000106-Python SDK.md",
+      "nodeId": 3000106,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音翻译",
+        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时音视频翻译（Qwen-Livetranslate-Realtime）/3000107-Java SDK.md",
+      "nodeId": 3000107,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音翻译",
+        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音对话/3041587-WebSocket API.md",
+      "nodeId": 3041587,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-audiochat-realtime-websocket-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音对话",
+        "实时语音对话",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音对话/3041588-客户端事件.md",
+      "nodeId": 3041588,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-audiochat-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音对话",
+        "实时语音对话",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音对话/3041589-服务端事件.md",
+      "nodeId": 3041589,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-audio-realtime-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音对话",
+        "实时语音对话",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2853143-WebSocket API参考.md",
+      "nodeId": 2853143,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-websocket-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "WebSocket API参考"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2868658-Java SDK.md",
+      "nodeId": 2868658,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2868678-Python SDK.md",
+      "nodeId": 2868678,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2985468-Android SDK.md",
+      "nodeId": 2985468,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-android-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/2985564-iOS SDK.md",
+      "nodeId": 2985564,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-ios-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/3032843-客户端事件.md",
+      "nodeId": 3032843,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-Audio-TTS_CosyVoice）/3032863-服务端事件.md",
+      "nodeId": 3032863,
+      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2938850-客户端事件.md",
+      "nodeId": 2938850,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-TTS-Realtime）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2938851-服务端事件.md",
+      "nodeId": 2938851,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-TTS-Realtime）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2950054-Python SDK.md",
+      "nodeId": 2950054,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-TTS-Realtime）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2950055-Java SDK.md",
+      "nodeId": 2950055,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-TTS-Realtime）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Qwen-TTS-Realtime）/2963385-WebSocket API.md",
+      "nodeId": 2963385,
+      "url": "https://help.aliyun.com/zh/model-studio/interactive-process-of-qwen-tts-realtime-synthesis",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Qwen-TTS-Realtime）",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/2857930-WebSocket API.md",
+      "nodeId": 2857930,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-websocket-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/2870013-Java SDK.md",
+      "nodeId": 2870013,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/2870050-Python SDK.md",
+      "nodeId": 2870050,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/2985562-Android SDK.md",
+      "nodeId": 2985562,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-android-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/2986029-iOS SDK.md",
+      "nodeId": 2986029,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-ios-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/3032903-客户端事件.md",
+      "nodeId": 3032903,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音合成（Sambert）/3032904-服务端事件.md",
+      "nodeId": 3032904,
+      "url": "https://help.aliyun.com/zh/model-studio/sambert-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音合成",
+        "实时语音合成（Sambert）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2856047-WebSocket API.md",
+      "nodeId": 2856047,
+      "url": "https://help.aliyun.com/zh/model-studio/websocket-for-paraformer-real-time-service",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2869146-Java SDK.md",
+      "nodeId": 2869146,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2869148-Python SDK.md",
+      "nodeId": 2869148,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2986975-Android SDK.md",
+      "nodeId": 2986975,
+      "url": "https://help.aliyun.com/zh/model-studio/android-sdk-for-paraformer-real-time-service",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/2987141-iOS SDK.md",
+      "nodeId": 2987141,
+      "url": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-paraformer-real-time-service",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/3034143-客户端事件.md",
+      "nodeId": 3034143,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Paraformer）/3034144-服务端事件.md",
+      "nodeId": 3034144,
+      "url": "https://help.aliyun.com/zh/model-studio/paraformer-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Paraformer）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987033-客户端事件.md",
+      "nodeId": 2987033,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-ASR-Realtime）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987059-服务端事件.md",
+      "nodeId": 2987059,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-ASR-Realtime）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2987072-WebSocket API.md",
+      "nodeId": 2987072,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-interaction-process",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-ASR-Realtime）",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2990134-Python SDK.md",
+      "nodeId": 2990134,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-ASR-Realtime）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-ASR-Realtime）/2990136-Java SDK.md",
+      "nodeId": 2990136,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-ASR-Realtime）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983776-Python SDK.md",
+      "nodeId": 2983776,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-python-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "Python SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983777-Java SDK.md",
+      "nodeId": 2983777,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-java-sdk",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "Java SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2983778-WebSocket API.md",
+      "nodeId": 2983778,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-websocket-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "WebSocket API"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2995891-Android SDK.md",
+      "nodeId": 2995891,
+      "url": "https://help.aliyun.com/zh/model-studio/android-sdk-for-fun-asr-real-time-service",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "Android SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/2995957-iOS SDK.md",
+      "nodeId": 2995957,
+      "url": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-fun-asr-real-time-service",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "iOS SDK"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/3034145-客户端事件.md",
+      "nodeId": 3034145,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-client-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "客户端事件"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming_Fun-ASR-Realtime）/3034146-服务端事件.md",
+      "nodeId": 3034146,
+      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-server-events",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "音频",
+        "语音识别",
+        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
+        "服务端事件"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "使用 API/2712193-安装SDK.md",
       "nodeId": 2712193,
       "url": "https://help.aliyun.com/zh/model-studio/install-sdk",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "使用 API",
         "安装SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "使用 API/2712195-获取API Key.md",
+      "path": "使用 API/2712195-获取与配置 API Key.md",
       "nodeId": 2712195,
       "url": "https://help.aliyun.com/zh/model-studio/get-api-key",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "使用 API",
-        "获取API Key"
-      ]
+        "获取与配置 API Key"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "使用 API/2712216-错误码.md",
       "nodeId": 2712216,
       "url": "https://help.aliyun.com/zh/model-studio/error-code",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "使用 API",
         "错误码"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "使用 API/3041691-使用百炼CLI.md",
       "nodeId": 3041691,
       "url": "https://help.aliyun.com/zh/model-studio/use-model-studio-cli",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "使用 API",
         "使用百炼CLI"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/爱诗/3025608-爱诗-文生视频.md",
-      "nodeId": 3025608,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-text-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-文生视频"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3025609-爱诗-图生视频-基于首帧.md",
-      "nodeId": 3025609,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-image-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-图生视频-基于首帧"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3025611-爱诗-图生视频-基于首尾帧.md",
-      "nodeId": 3025611,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-keyframe-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-图生视频-基于首尾帧"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3025612-爱诗-参考生视频.md",
-      "nodeId": 3025612,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-reference-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-参考生视频"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3046321-爱诗-视频对口型.md",
-      "nodeId": 3046321,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-lipsync-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-视频对口型"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3046322-爱诗-视频动作模仿.md",
-      "nodeId": 3046322,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-motioncontrol-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-视频动作模仿"
-      ]
-    },
-    {
-      "path": "视频生成/爱诗/3046323-爱诗-视频超清.md",
-      "nodeId": 3046323,
-      "url": "https://help.aliyun.com/zh/model-studio/pixverse-upscale-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "爱诗",
-        "爱诗-视频超清"
-      ]
-    },
-    {
-      "path": "视频生成/可灵/3026701-可灵-视频生成.md",
-      "nodeId": 3026701,
-      "url": "https://help.aliyun.com/zh/model-studio/kling-video-generation-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "可灵",
-        "可灵-视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/可灵/3026702-可灵-主体ID列表.md",
-      "nodeId": 3026702,
-      "url": "https://help.aliyun.com/zh/model-studio/kling-object-ids",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "可灵",
-        "可灵-视频生成",
-        "可灵-主体ID列表"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786459-图生舞蹈视频-舞动人像AnimateAnyone.md",
-      "nodeId": 2786459,
-      "url": "https://help.aliyun.com/zh/model-studio/animateanyone-quick-start",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生舞蹈视频-舞动人像AnimateAnyone"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786461-EMO 视频生成.md",
-      "nodeId": 2786461,
-      "url": "https://help.aliyun.com/zh/model-studio/emo-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生唱演视频-悦动人像EMO",
-        "EMO 视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786462-图生唱演视频-悦动人像EMO.md",
-      "nodeId": 2786462,
-      "url": "https://help.aliyun.com/zh/model-studio/emo-quick-start",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生唱演视频-悦动人像EMO"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786463-EMO 图像检测.md",
-      "nodeId": 2786463,
-      "url": "https://help.aliyun.com/zh/model-studio/emo-detect-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生唱演视频-悦动人像EMO",
-        "EMO 图像检测"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786464-AnimateAnyone 视频生成.md",
-      "nodeId": 2786464,
-      "url": "https://help.aliyun.com/zh/model-studio/animateanyone-video-generation-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生舞蹈视频-舞动人像AnimateAnyone",
-        "AnimateAnyone 视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2786465-AnimateAnyone 图像检测.md",
-      "nodeId": 2786465,
-      "url": "https://help.aliyun.com/zh/model-studio/animate-anyone-detect-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生舞蹈视频-舞动人像AnimateAnyone",
-        "AnimateAnyone 图像检测"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2807955-AnimateAnyone 动作模板生成.md",
-      "nodeId": 2807955,
-      "url": "https://help.aliyun.com/zh/model-studio/animate-anyone-template-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生舞蹈视频-舞动人像AnimateAnyone",
-        "AnimateAnyone 动作模板生成"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2846319-视频风格重绘.md",
-      "nodeId": 2846319,
-      "url": "https://help.aliyun.com/zh/model-studio/video-style-transform-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "视频风格重绘"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2856726-图生播报视频-灵动人像LivePortrait.md",
-      "nodeId": 2856726,
-      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-quick-start",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生播报视频-灵动人像LivePortrait"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2856727-LivePortrait 图像检测.md",
-      "nodeId": 2856727,
-      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-detect-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生播报视频-灵动人像LivePortrait",
-        "LivePortrait 图像检测"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2856730-LivePortrait 视频生成.md",
-      "nodeId": 2856730,
-      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生播报视频-灵动人像LivePortrait",
-        "LivePortrait 视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2860464-视频口型替换-声动人像VideoRetalk.md",
-      "nodeId": 2860464,
-      "url": "https://help.aliyun.com/zh/model-studio/videoretalk",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "视频口型替换-声动人像VideoRetalk"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2860466-VideoRetalk视频生成.md",
+      "path": "视频口型替换-声动人像VideoRetalk/2860466-VideoRetalk视频生成.md",
       "nodeId": 2860466,
       "url": "https://help.aliyun.com/zh/model-studio/videoretalk-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
         "人像驱动",
         "视频口型替换-声动人像VideoRetalk",
         "VideoRetalk视频生成"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/人像驱动/2865371-Emoji 图像检测.md",
+      "path": "视频生成/3048749-创建调优任务.md",
+      "nodeId": 3048749,
+      "url": "https://help.aliyun.com/zh/model-studio/video-generation-create-fine-tuning-job-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "模型生产",
+        "模型调优",
+        "视频生成",
+        "创建调优任务"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "视频生成/3048859-部署模型.md",
+      "nodeId": 3048859,
+      "url": "https://help.aliyun.com/zh/model-studio/video-generation-deploy-model-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "模型生产",
+        "模型部署",
+        "视频生成",
+        "部署模型"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "通用文本向量/2712515-同步接口API详情.md",
+      "nodeId": 2712515,
+      "url": "https://help.aliyun.com/zh/model-studio/text-embedding-synchronous-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "向量与排序",
+        "通用文本向量",
+        "同步接口API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "通用文本向量/2712516-批处理接口API详情.md",
+      "nodeId": 2712516,
+      "url": "https://help.aliyun.com/zh/model-studio/text-embedding-batch-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "向量与排序",
+        "通用文本向量",
+        "批处理接口API详情"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "图生表情包视频-表情包Emoji/2865371-Emoji 图像检测.md",
       "nodeId": 2865371,
       "url": "https://help.aliyun.com/zh/model-studio/emoji-detect-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
         "人像驱动",
         "图生表情包视频-表情包Emoji",
         "Emoji 图像检测"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/人像驱动/2865372-图生表情包视频-表情包Emoji.md",
-      "nodeId": 2865372,
-      "url": "https://help.aliyun.com/zh/model-studio/emoji-quick-start",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "人像驱动",
-        "图生表情包视频-表情包Emoji"
-      ]
-    },
-    {
-      "path": "视频生成/人像驱动/2865374-Emoji 视频生成.md",
+      "path": "图生表情包视频-表情包Emoji/2865374-Emoji 视频生成.md",
       "nodeId": 2865374,
       "url": "https://help.aliyun.com/zh/model-studio/emoji-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
         "人像驱动",
         "图生表情包视频-表情包Emoji",
         "Emoji 视频生成"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2865250-万相2.7-文生视频.md",
-      "nodeId": 2865250,
-      "url": "https://help.aliyun.com/zh/model-studio/text-to-video-api-reference",
+      "path": "图生播报视频-灵动人像LivePortrait/2856727-LivePortrait 图像检测.md",
+      "nodeId": 2856727,
+      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-detect-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相2.7-文生视频"
-      ]
+        "人像驱动",
+        "图生播报视频-灵动人像LivePortrait",
+        "LivePortrait 图像检测"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2867393-万相-图生视频-基于首帧（2.1-2.6）.md",
-      "nodeId": 2867393,
-      "url": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-api-reference",
+      "path": "图生播报视频-灵动人像LivePortrait/2856730-LivePortrait 视频生成.md",
+      "nodeId": 2856730,
+      "url": "https://help.aliyun.com/zh/model-studio/liveportrait-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-图生视频-基于首帧（2.1-2.6）"
-      ]
+        "人像驱动",
+        "图生播报视频-灵动人像LivePortrait",
+        "LivePortrait 视频生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2880649-万相-图生视频-基于首尾帧（2.2）.md",
-      "nodeId": 2880649,
-      "url": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-by-first-and-last-frame-api-reference",
+      "path": "图生唱演视频-悦动人像EMO/2786461-EMO 视频生成.md",
+      "nodeId": 2786461,
+      "url": "https://help.aliyun.com/zh/model-studio/emo-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-图生视频-基于首尾帧（2.2）"
-      ]
+        "人像驱动",
+        "图生唱演视频-悦动人像EMO",
+        "EMO 视频生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2922183-万相-视频编辑（2.1）.md",
-      "nodeId": 2922183,
-      "url": "https://help.aliyun.com/zh/model-studio/legacy-wanx-vace-api-reference",
+      "path": "图生唱演视频-悦动人像EMO/2786463-EMO 图像检测.md",
+      "nodeId": 2786463,
+      "url": "https://help.aliyun.com/zh/model-studio/emo-detect-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-视频编辑（2.1）"
-      ]
+        "人像驱动",
+        "图生唱演视频-悦动人像EMO",
+        "EMO 图像检测"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2930017-万相-图生视频-视频特效列表.md",
-      "nodeId": 2930017,
-      "url": "https://help.aliyun.com/zh/model-studio/wanx-video-effects",
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2786464-AnimateAnyone 视频生成.md",
+      "nodeId": 2786464,
+      "url": "https://help.aliyun.com/zh/model-studio/animateanyone-video-generation-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-图生视频-基于首帧（2.1-2.6）",
-        "万相-图生视频-视频特效列表"
-      ]
+        "人像驱动",
+        "图生舞蹈视频-舞动人像AnimateAnyone",
+        "AnimateAnyone 视频生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2978213-万相-数字人.md",
-      "nodeId": 2978213,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-overview",
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2786465-AnimateAnyone 图像检测.md",
+      "nodeId": 2786465,
+      "url": "https://help.aliyun.com/zh/model-studio/animate-anyone-detect-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-数字人"
-      ]
+        "人像驱动",
+        "图生舞蹈视频-舞动人像AnimateAnyone",
+        "AnimateAnyone 图像检测"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "视频生成/万相/2978214-wan2.2-s2v 图像检测.md",
-      "nodeId": 2978214,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api",
+      "path": "图生舞蹈视频-舞动人像AnimateAnyone/2807955-AnimateAnyone 动作模板生成.md",
+      "nodeId": 2807955,
+      "url": "https://help.aliyun.com/zh/model-studio/animate-anyone-template-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "视频生成",
-        "万相",
-        "万相-数字人",
-        "wan2.2-s2v 图像检测"
-      ]
-    },
-    {
-      "path": "视频生成/万相/2978215-wan2.2-s2v 视频生成.md",
-      "nodeId": 2978215,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相-数字人",
-        "wan2.2-s2v 视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/万相/2981852-万相-图生动作.md",
-      "nodeId": 2981852,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-animate-move-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相-图生动作"
-      ]
-    },
-    {
-      "path": "视频生成/万相/2982219-万相-视频换人.md",
-      "nodeId": 2982219,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-animate-mix-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相-视频换人"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3001146-万相2.7-参考生视频.md",
-      "nodeId": 3001146,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-video-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相2.7-参考生视频"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3021842-万相2.7-视频编辑.md",
-      "nodeId": 3021842,
-      "url": "https://help.aliyun.com/zh/model-studio/wan-video-editing-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相2.7-视频编辑"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3025059-万相2.7-图生视频.md",
-      "nodeId": 3025059,
-      "url": "https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相2.7-图生视频"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3030512-万相-参考生视频（2.6）.md",
-      "nodeId": 3030512,
-      "url": "https://help.aliyun.com/zh/model-studio/legacy-wan-reference-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-参考生视频（2.6）"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3030514-万相-文生视频（2.1-2.6）.md",
-      "nodeId": 3030514,
-      "url": "https://help.aliyun.com/zh/model-studio/legacy-wan-text-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相-早期视频模型（2.1-2.6）",
-        "万相-文生视频（2.1-2.6）"
-      ]
-    },
-    {
-      "path": "视频生成/万相/3049634-万相3.0-视频生成.md",
-      "nodeId": 3049634,
-      "url": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "万相",
-        "万相3.0-视频生成"
-      ]
-    },
-    {
-      "path": "视频生成/HappyHorse/3029820-HappyHorse-文生视频.md",
-      "nodeId": 3029820,
-      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "HappyHorse",
-        "HappyHorse-文生视频"
-      ]
-    },
-    {
-      "path": "视频生成/HappyHorse/3029821-HappyHorse-图生视频-基于首帧.md",
-      "nodeId": 3029821,
-      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-image-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "HappyHorse",
-        "HappyHorse-图生视频-基于首帧"
-      ]
-    },
-    {
-      "path": "视频生成/HappyHorse/3030778-HappyHorse-参考生视频.md",
-      "nodeId": 3030778,
-      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-reference-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "HappyHorse",
-        "HappyHorse-参考生视频"
-      ]
-    },
-    {
-      "path": "视频生成/HappyHorse/3030779-HappyHorse-视频编辑.md",
-      "nodeId": 3030779,
-      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "HappyHorse",
-        "HappyHorse-视频编辑"
-      ]
-    },
-    {
-      "path": "视频生成/Vidu/3026197-Vidu-文生视频.md",
-      "nodeId": 3026197,
-      "url": "https://help.aliyun.com/zh/model-studio/vidu-text-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "Vidu",
-        "Vidu-文生视频"
-      ]
-    },
-    {
-      "path": "视频生成/Vidu/3026198-Vidu-图生视频-基于首帧.md",
-      "nodeId": 3026198,
-      "url": "https://help.aliyun.com/zh/model-studio/vidu-image-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "Vidu",
-        "Vidu-图生视频-基于首帧"
-      ]
-    },
-    {
-      "path": "视频生成/Vidu/3026199-Vidu-图生视频-基于首尾帧.md",
-      "nodeId": 3026199,
-      "url": "https://help.aliyun.com/zh/model-studio/vidu-keyframe-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "Vidu",
-        "Vidu-图生视频-基于首尾帧"
-      ]
-    },
-    {
-      "path": "视频生成/Vidu/3026200-Vidu-参考生视频.md",
-      "nodeId": 3026200,
-      "url": "https://help.aliyun.com/zh/model-studio/vidu-reference-to-video-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "视频生成",
-        "Vidu",
-        "Vidu-参考生视频"
-      ]
+        "人像驱动",
+        "图生舞蹈视频-舞动人像AnimateAnyone",
+        "AnimateAnyone 动作模板生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "图像生成/2867348-常见问题.md",
       "nodeId": 2867348,
       "url": "https://help.aliyun.com/zh/model-studio/image-faq",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "常见问题"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712351-计量计费.md",
-      "nodeId": 2712351,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-billing",
+      "path": "图像生成/3048763-创建微调任务.md",
+      "nodeId": 3048763,
+      "url": "https://help.aliyun.com/zh/model-studio/image-generation-create-fine-tuning-job-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型调优",
         "图像生成",
-        "创意工具",
-        "人物写真FaceChain",
-        "计量计费"
-      ]
+        "创建微调任务"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712453-人物写真FaceChain.md",
-      "nodeId": 2712453,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-portrait-generation",
+      "path": "图像生成/3048872-部署模型.md",
+      "nodeId": 3048872,
+      "url": "https://help.aliyun.com/zh/model-studio/image-generation-deploy-model-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型部署",
         "图像生成",
-        "创意工具",
-        "人物写真FaceChain"
-      ]
+        "部署模型"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712493-人像风格重绘.md",
-      "nodeId": 2712493,
-      "url": "https://help.aliyun.com/zh/model-studio/portrait-style-redraw-api-reference",
+      "path": "万相-数字人/2978214-wan2.2-s2v 图像检测.md",
+      "nodeId": 2978214,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-detect-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人像风格重绘"
-      ]
+        "视频生成",
+        "万相",
+        "万相-数字人",
+        "wan2.2-s2v 图像检测"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712497-图像背景生成.md",
-      "nodeId": 2712497,
-      "url": "https://help.aliyun.com/zh/model-studio/wanx-background-generation-api-reference",
+      "path": "万相-数字人/2978215-wan2.2-s2v 视频生成.md",
+      "nodeId": 2978215,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "图像背景生成"
-      ]
+        "视频生成",
+        "万相",
+        "万相-数字人",
+        "wan2.2-s2v 视频生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712501-人物写真生成API详情.md",
-      "nodeId": 2712501,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-generation",
+      "path": "万相-图生视频-基于首帧（2.1-2.6）/2930017-万相-图生视频-视频特效列表.md",
+      "nodeId": 2930017,
+      "url": "https://help.aliyun.com/zh/model-studio/wanx-video-effects",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人物写真FaceChain",
-        "人物写真生成API详情"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-图生视频-基于首帧（2.1-2.6）",
+        "万相-图生视频-视频特效列表"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712505-快速开始.md",
-      "nodeId": 2712505,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-quick-start",
+      "path": "万相-早期视频模型（2.1-2.6）/2867393-万相-图生视频-基于首帧（2.1-2.6）.md",
+      "nodeId": 2867393,
+      "url": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人物写真FaceChain",
-        "快速开始"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-图生视频-基于首帧（2.1-2.6）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712506-人物形象训练API详情.md",
-      "nodeId": 2712506,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-finetune-api",
+      "path": "万相-早期视频模型（2.1-2.6）/2880649-万相-图生视频-基于首尾帧（2.2）.md",
+      "nodeId": 2880649,
+      "url": "https://help.aliyun.com/zh/model-studio/legacy-image-to-video-by-first-and-last-frame-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人物写真FaceChain",
-        "人物形象训练API详情"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-图生视频-基于首尾帧（2.2）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712507-人物图像检测API详情.md",
-      "nodeId": 2712507,
-      "url": "https://help.aliyun.com/zh/model-studio/facechain-face-detection-api",
+      "path": "万相-早期视频模型（2.1-2.6）/2922183-万相-视频编辑（2.1）.md",
+      "nodeId": 2922183,
+      "url": "https://help.aliyun.com/zh/model-studio/legacy-wanx-vace-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人物写真FaceChain",
-        "人物图像检测API详情"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-视频编辑（2.1）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712508-创意文字WordArt锦书API.md",
-      "nodeId": 2712508,
-      "url": "https://help.aliyun.com/zh/model-studio/wordart-quick-start",
+      "path": "万相-早期视频模型（2.1-2.6）/3030512-万相-参考生视频（2.6）.md",
+      "nodeId": 3030512,
+      "url": "https://help.aliyun.com/zh/model-studio/legacy-wan-reference-to-video-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "创意文字WordArt锦书API"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-参考生视频（2.6）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712509-计量计费.md",
-      "nodeId": 2712509,
-      "url": "https://help.aliyun.com/zh/model-studio/wordart-billing",
+      "path": "万相-早期视频模型（2.1-2.6）/3030514-万相-文生视频（2.1-2.6）.md",
+      "nodeId": 3030514,
+      "url": "https://help.aliyun.com/zh/model-studio/legacy-wan-text-to-video-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "创意文字WordArt锦书API",
-        "计量计费"
-      ]
+        "视频生成",
+        "万相",
+        "万相-早期视频模型（2.1-2.6）",
+        "万相-文生视频（2.1-2.6）"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/创意工具/2712510-文字纹理生成API详情.md",
-      "nodeId": 2712510,
-      "url": "https://help.aliyun.com/zh/model-studio/fill-texture-effect-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "创意文字WordArt锦书API",
-        "文字纹理生成API详情"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2712513-文字变形API详情.md",
-      "nodeId": 2712513,
-      "url": "https://help.aliyun.com/zh/model-studio/word-transformer",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "创意文字WordArt锦书API",
-        "文字变形API详情"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796624-AI试衣OutfitAnyone.md",
-      "nodeId": 2796624,
-      "url": "https://help.aliyun.com/zh/model-studio/outfitanyone",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796626-AI试衣-基础版.md",
-      "nodeId": 2796626,
-      "url": "https://help.aliyun.com/zh/model-studio/outfitanyone-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone",
-        "AI试衣-基础版"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796629-计量计费.md",
-      "nodeId": 2796629,
-      "url": "https://help.aliyun.com/zh/model-studio/billing-for-outfitanyone",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone",
-        "计量计费"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796663-AI试衣-图片精修.md",
-      "nodeId": 2796663,
-      "url": "https://help.aliyun.com/zh/model-studio/ai-fitting-picture-finishing-api-details",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone",
-        "AI试衣-图片精修"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796845-图像画面扩展.md",
-      "nodeId": 2796845,
-      "url": "https://help.aliyun.com/zh/model-studio/image-scaling-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "图像画面扩展"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2796985-虚拟模特.md",
-      "nodeId": 2796985,
-      "url": "https://help.aliyun.com/zh/model-studio/virtual-model-api-details",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "虚拟模特"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2804662-鞋靴模特.md",
-      "nodeId": 2804662,
-      "url": "https://help.aliyun.com/zh/model-studio/shoe-model-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "鞋靴模特"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2807172-创意海报生成.md",
-      "nodeId": 2807172,
-      "url": "https://help.aliyun.com/zh/model-studio/creative-poster-generation-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "创意海报生成"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2840906-人物实例分割.md",
-      "nodeId": 2840906,
-      "url": "https://help.aliyun.com/zh/model-studio/image-instance-segmentation-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "人物实例分割"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2840907-图像擦除补全.md",
-      "nodeId": 2840907,
-      "url": "https://help.aliyun.com/zh/model-studio/image-erase-completion-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "图像擦除补全"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2865249-AI试衣-图片分割.md",
-      "nodeId": 2865249,
-      "url": "https://help.aliyun.com/zh/model-studio/aitryon-parsing-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone",
-        "AI试衣-图片分割"
-      ]
-    },
-    {
-      "path": "图像生成/创意工具/2881846-AI试衣-Plus版.md",
-      "nodeId": 2881846,
-      "url": "https://help.aliyun.com/zh/model-studio/aitryon-plus-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "创意工具",
-        "AI试衣OutfitAnyone",
-        "AI试衣-Plus版"
-      ]
-    },
-    {
-      "path": "图像生成/可灵/3026706-可灵-图像生成.md",
-      "nodeId": 3026706,
-      "url": "https://help.aliyun.com/zh/model-studio/kling-image-generation-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "可灵",
-        "可灵-图像生成"
-      ]
-    },
-    {
-      "path": "图像生成/千问/2975126-千问-文生图.md",
-      "nodeId": 2975126,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "千问",
-        "千问-文生图"
-      ]
-    },
-    {
-      "path": "图像生成/千问/2976416-千问-图像编辑.md",
-      "nodeId": 2976416,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-edit-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "千问",
-        "千问-图像编辑"
-      ]
-    },
-    {
-      "path": "图像生成/千问/2977163-千问-图像翻译.md",
-      "nodeId": 2977163,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-mt-image-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "千问",
-        "千问-图像翻译"
-      ]
-    },
-    {
-      "path": "图像生成/千问/3047054-千问-图像生成与编辑3.0.md",
-      "nodeId": 3047054,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-image-generation-and-editing-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "图像生成",
-        "千问",
-        "千问-图像生成与编辑3.0"
-      ]
-    },
-    {
-      "path": "图像生成/万相/2712483-万相-文生图V1.md",
+      "path": "万相/2712483-万相-文生图V1.md",
       "nodeId": 2712483,
       "url": "https://help.aliyun.com/zh/model-studio/text-to-image-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-文生图V1"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/2712498-万相-涂鸦作画.md",
+      "path": "万相/2712498-万相-涂鸦作画.md",
       "nodeId": 2712498,
       "url": "https://help.aliyun.com/zh/model-studio/wanx-sketch-to-image-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-涂鸦作画"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/2797051-万相-图像局部重绘.md",
+      "path": "万相/2797051-万相-图像局部重绘.md",
       "nodeId": 2797051,
       "url": "https://help.aliyun.com/zh/model-studio/vary-region-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-图像局部重绘"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/2862677-万相-文生图V2.md",
+      "path": "万相/2862677-万相-文生图V2.md",
       "nodeId": 2862677,
       "url": "https://help.aliyun.com/zh/model-studio/text-to-image-v2-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-文生图V2"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/2868981-万相-通用图像编辑2.1.md",
+      "path": "万相/2865250-万相2.7-文生视频.md",
+      "nodeId": 2865250,
+      "url": "https://help.aliyun.com/zh/model-studio/text-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相2.7-文生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/2868981-万相-通用图像编辑2.1.md",
       "nodeId": 2868981,
       "url": "https://help.aliyun.com/zh/model-studio/wanx-image-edit-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-通用图像编辑2.1"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/2982258-万相-通用图像编辑2.5.md",
+      "path": "万相/2978213-万相-数字人.md",
+      "nodeId": 2978213,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-s2v-overview",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相-数字人"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/2981852-万相-图生动作.md",
+      "nodeId": 2981852,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-animate-move-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相-图生动作"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/2982219-万相-视频换人.md",
+      "nodeId": 2982219,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-animate-mix-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相-视频换人"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/2982258-万相-通用图像编辑2.5.md",
       "nodeId": 2982258,
       "url": "https://help.aliyun.com/zh/model-studio/wan2-5-image-edit-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-通用图像编辑2.5"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/3001143-万相-图像生成与编辑2.6.md",
+      "path": "万相/3001143-万相-图像生成与编辑2.6.md",
       "nodeId": 3001143,
       "url": "https://help.aliyun.com/zh/model-studio/wan-image-generation-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-图像生成与编辑2.6"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/万相/3026980-万相-图像生成与编辑2.7.md",
+      "path": "万相/3001146-万相2.7-参考生视频.md",
+      "nodeId": 3001146,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-video-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相2.7-参考生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/3021842-万相2.7-视频编辑.md",
+      "nodeId": 3021842,
+      "url": "https://help.aliyun.com/zh/model-studio/wan-video-editing-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相2.7-视频编辑"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/3025059-万相2.7-图生视频.md",
+      "nodeId": 3025059,
+      "url": "https://help.aliyun.com/zh/model-studio/image-to-video-general-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "万相",
+        "万相2.7-图生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "万相/3026980-万相-图像生成与编辑2.7.md",
       "nodeId": 3026980,
       "url": "https://help.aliyun.com/zh/model-studio/wan-image-generation-and-editing-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "图像生成",
         "万相",
         "万相-图像生成与编辑2.7"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "图像生成/Z-Image/3002354-文生图Z-Image.md",
-      "nodeId": 3002354,
-      "url": "https://help.aliyun.com/zh/model-studio/z-image-api-reference",
+      "path": "万相/3049634-万相3.0-视频生成.md",
+      "nodeId": 3049634,
+      "url": "https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "图像生成",
-        "Z-Image",
-        "文生图Z-Image"
-      ]
-    },
-    {
-      "path": "文本生成/2712576-文本生成.md",
-      "nodeId": 2712576,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "文本生成"
-      ]
+        "视频生成",
+        "万相",
+        "万相3.0-视频生成"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "文本生成/2980295-Anthropic兼容-Messages.md",
       "nodeId": 2980295,
       "url": "https://help.aliyun.com/zh/model-studio/anthropic-api-messages",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "文本生成",
         "Anthropic兼容-Messages"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "文本生成/3016807-OpenAI兼容-Chat.md",
       "nodeId": 3016807,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-chat-completions",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "文本生成",
         "OpenAI兼容-Chat"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "文本生成/3016809-DashScope.md",
       "nodeId": 3016809,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-api-via-dashscope",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "文本生成",
         "DashScope"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "文本生成/OpenAI兼容-Responses/3016808-创建响应.md",
-      "nodeId": 3016808,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses",
+      "path": "文本生成/3039648-模型导入.md",
+      "nodeId": 3039648,
+      "url": "https://help.aliyun.com/zh/model-studio/custom-models-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型调优",
         "文本生成",
-        "OpenAI兼容-Responses",
-        "创建响应"
-      ]
+        "模型导入"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "文本生成/OpenAI兼容-Responses/3033492-获取响应.md",
-      "nodeId": 3033492,
-      "url": "https://help.aliyun.com/zh/model-studio/retrieve-a-response",
+      "path": "文本生成/3039651-创建调优任务.md",
+      "nodeId": 3039651,
+      "url": "https://help.aliyun.com/zh/model-studio/create-fine-tuning-job-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型调优",
         "文本生成",
-        "OpenAI兼容-Responses",
-        "获取响应"
-      ]
+        "创建调优任务"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "文本生成/OpenAI兼容-Responses/3033494-删除响应.md",
-      "nodeId": 3033494,
-      "url": "https://help.aliyun.com/zh/model-studio/delete-a-response",
+      "path": "文本生成/3039665-部署模型.md",
+      "nodeId": 3039665,
+      "url": "https://help.aliyun.com/zh/model-studio/create-deployment-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型部署",
         "文本生成",
-        "OpenAI兼容-Responses",
-        "删除响应"
-      ]
+        "部署模型"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "文本生成/OpenAI兼容-Responses/3033495-获取输入项列表.md",
-      "nodeId": 3033495,
-      "url": "https://help.aliyun.com/zh/model-studio/list-input-items",
+      "path": "文本生成/3039885-模型压缩.md",
+      "nodeId": 3039885,
+      "url": "https://help.aliyun.com/zh/model-studio/model-compression-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
+        "模型生产",
+        "模型调优",
         "文本生成",
-        "OpenAI兼容-Responses",
-        "获取输入项列表"
-      ]
-    },
-    {
-      "path": "文件管理/3039634-文件管理.md",
-      "nodeId": 3039634,
-      "url": "https://help.aliyun.com/zh/model-studio/file-management-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "文件管理"
-      ]
+        "模型压缩"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "文件管理/3039636-上传文件.md",
       "nodeId": 3039636,
       "url": "https://help.aliyun.com/zh/model-studio/upload-file-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "文件管理",
         "上传文件"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "文件管理/3039637-查询和管理文件.md",
       "nodeId": 3039637,
       "url": "https://help.aliyun.com/zh/model-studio/get-file-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "文件管理",
         "查询和管理文件"
-      ]
-    },
-    {
-      "path": "向量与排序/多模态向量/2712517-多模态向量.md",
-      "nodeId": 2712517,
-      "url": "https://help.aliyun.com/zh/model-studio/multimodal-embedding-api-reference",
-      "navigationPath": [
-        "API参考（模型）",
-        "向量与排序",
-        "多模态向量",
-        "多模态向量"
-      ]
-    },
-    {
-      "path": "向量与排序/排序模型（Rerank）/2780056-排序模型（Rerank）.md",
-      "nodeId": 2780056,
-      "url": "https://help.aliyun.com/zh/model-studio/text-rerank-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "向量与排序",
-        "排序模型（Rerank）",
-        "排序模型（Rerank）"
-      ]
-    },
-    {
-      "path": "向量与排序/通用文本向量/2712515-同步接口API详情.md",
-      "nodeId": 2712515,
-      "url": "https://help.aliyun.com/zh/model-studio/text-embedding-synchronous-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "向量与排序",
-        "通用文本向量",
-        "同步接口API详情"
-      ]
-    },
-    {
-      "path": "向量与排序/通用文本向量/2712516-批处理接口API详情.md",
-      "nodeId": 2712516,
-      "url": "https://help.aliyun.com/zh/model-studio/text-embedding-batch-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "向量与排序",
-        "通用文本向量",
-        "批处理接口API详情"
-      ]
-    },
-    {
-      "path": "选择模型.md",
-      "nodeId": 2840914,
-      "url": "https://help.aliyun.com/zh/model-studio/models",
-      "navigationPath": [
-        "官方补充文档",
-        "选择模型"
       ],
-      "origin": "supplemental"
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/音乐生成/3030449-音乐生成（Fun-Music）.md",
+      "path": "音乐生成/3030449-音乐生成（Fun-Music）.md",
       "nodeId": 3030449,
       "url": "https://help.aliyun.com/zh/model-studio/fun-music-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "音乐生成",
         "音乐生成（Fun-Music）"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音对话/3041587-WebSocket API.md",
-      "nodeId": 3041587,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-audiochat-realtime-websocket-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音对话",
-        "实时语音对话",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音对话/3041588-客户端事件.md",
-      "nodeId": 3041588,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-audiochat-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音对话",
-        "实时语音对话",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音对话/3041589-服务端事件.md",
-      "nodeId": 3041589,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-audio-realtime-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音对话",
-        "实时语音对话",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音翻译/2983654-客户端事件.md",
-      "nodeId": 2983654,
-      "url": "https://help.aliyun.com/zh/model-studio/live-translator-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音翻译",
-        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音翻译/2983655-服务端事件.md",
-      "nodeId": 2983655,
-      "url": "https://help.aliyun.com/zh/model-studio/live-translator-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音翻译",
-        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音翻译/2999751-音视频翻译-通义千问.md",
+      "path": "语音翻译/2999751-音视频翻译-通义千问.md",
       "nodeId": 2999751,
       "url": "https://help.aliyun.com/zh/model-studio/qwen3-livetranslate-flash-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "语音翻译",
         "音视频翻译-通义千问"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音翻译/3000106-Python SDK.md",
-      "nodeId": 3000106,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音翻译",
-        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音翻译/3000107-Java SDK.md",
-      "nodeId": 3000107,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-livetranslate-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音翻译",
-        "实时音视频翻译（Qwen-Livetranslate-Realtime）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2853143-WebSocket API参考.md",
-      "nodeId": 2853143,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-websocket-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "WebSocket API参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2857930-WebSocket API.md",
-      "nodeId": 2857930,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-websocket-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Sambert）",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2868658-Java SDK.md",
-      "nodeId": 2868658,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2868678-Python SDK.md",
-      "nodeId": 2868678,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2870013-Java SDK.md",
-      "nodeId": 2870013,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Sambert）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2870050-Python SDK.md",
-      "nodeId": 2870050,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Sambert）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2881635-非实时语音合成（Qwen-TTS）.md",
+      "path": "语音合成/2881635-非实时语音合成（Qwen-TTS）.md",
       "nodeId": 2881635,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "语音合成",
         "非实时语音合成（Qwen-TTS）"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音合成/2938850-客户端事件.md",
-      "nodeId": 2938850,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-TTS-Realtime）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2938851-服务端事件.md",
-      "nodeId": 2938851,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-TTS-Realtime）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2950054-Python SDK.md",
-      "nodeId": 2950054,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-TTS-Realtime）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2950055-Java SDK.md",
-      "nodeId": 2950055,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-tts-realtime-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-TTS-Realtime）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2963385-WebSocket API.md",
-      "nodeId": 2963385,
-      "url": "https://help.aliyun.com/zh/model-studio/interactive-process-of-qwen-tts-realtime-synthesis",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-TTS-Realtime）",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2985468-Android SDK.md",
-      "nodeId": 2985468,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-android-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2985562-Android SDK.md",
-      "nodeId": 2985562,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-android-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Sambert）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2985564-iOS SDK.md",
-      "nodeId": 2985564,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-ios-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/2986029-iOS SDK.md",
-      "nodeId": 2986029,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-ios-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Sambert）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3021951-同步语音合成.md",
-      "nodeId": 3021951,
-      "url": "https://help.aliyun.com/zh/model-studio/minimax-synchronous-speech-synthesis-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "非实时语音合成（MiniMax）",
-        "同步语音合成"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3027318-HTTP API参考.md",
-      "nodeId": 3027318,
-      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-design-http-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "声音复刻",
-        "HTTP API参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3027319-Java SDK参考.md",
-      "nodeId": 3027319,
-      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "声音复刻",
-        "Java SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3027320-Python SDK参考.md",
-      "nodeId": 3027320,
-      "url": "https://help.aliyun.com/zh/model-studio/voice-clone-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "声音复刻",
-        "Python SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3029755-Java SDK参考.md",
-      "nodeId": 3029755,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "Java SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3029756-Python SDK参考.md",
-      "nodeId": 3029756,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "Python SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3029782-HTTP API参考.md",
-      "nodeId": 3029782,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-tts-http-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "非实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "HTTP API参考"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3032843-客户端事件.md",
-      "nodeId": 3032843,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3032863-服务端事件.md",
-      "nodeId": 3032863,
-      "url": "https://help.aliyun.com/zh/model-studio/cosyvoice-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音合成",
-        "实时语音合成（Qwen-Audio-TTS/CosyVoice）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音合成/3032884-声音设计.md",
+      "path": "语音合成/3032884-声音设计.md",
       "nodeId": 3032884,
       "url": "https://help.aliyun.com/zh/model-studio/voice-design-api-references",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "语音合成",
         "声音设计"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音合成/3032903-客户端事件.md",
-      "nodeId": 3032903,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-client-events",
+      "path": "语音合成/3048764-创建调优任务.md",
+      "nodeId": 3048764,
+      "url": "https://help.aliyun.com/zh/model-studio/voice-synthesis-create-fine-tuning-job-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "音频",
+        "模型生产",
+        "模型调优",
         "语音合成",
-        "实时语音合成（Sambert）",
-        "客户端事件"
-      ]
+        "创建调优任务"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音合成/3032904-服务端事件.md",
-      "nodeId": 3032904,
-      "url": "https://help.aliyun.com/zh/model-studio/sambert-server-events",
+      "path": "语音合成/3048888-部署模型.md",
+      "nodeId": 3048888,
+      "url": "https://help.aliyun.com/zh/model-studio/tts-deploy-model-api",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "音频",
+        "模型生产",
+        "模型部署",
         "语音合成",
-        "实时语音合成（Sambert）",
-        "服务端事件"
-      ]
+        "部署模型"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音识别/2712537-最佳实践.md",
-      "nodeId": 2712537,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-best-practices",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "最佳实践"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2856047-WebSocket API.md",
-      "nodeId": 2856047,
-      "url": "https://help.aliyun.com/zh/model-studio/websocket-for-paraformer-real-time-service",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2869146-Java SDK.md",
-      "nodeId": 2869146,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2869148-Python SDK.md",
-      "nodeId": 2869148,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-real-time-speech-recognition-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2869367-Java SDK.md",
-      "nodeId": 2869367,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2869498-Python SDK.md",
-      "nodeId": 2869498,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2869541-HTTP API.md",
-      "nodeId": 2869541,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-restful-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "HTTP API"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2978299-Java SDK.md",
-      "nodeId": 2978299,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2978300-Python SDK.md",
-      "nodeId": 2978300,
-      "url": "https://help.aliyun.com/zh/model-studio/funauidio-asr-recorded-speech-recognition-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2978302-HTTP API.md",
-      "nodeId": 2978302,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-http-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
-        "HTTP API"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2983776-Python SDK.md",
-      "nodeId": 2983776,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2983777-Java SDK.md",
-      "nodeId": 2983777,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2983778-WebSocket API.md",
-      "nodeId": 2983778,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-realtime-websocket-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2986952-非实时语音识别（Qwen-ASR）.md",
+      "path": "语音识别/2986952-非实时语音识别（Qwen-ASR）.md",
       "nodeId": 2986952,
       "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "语音识别",
         "非实时语音识别（Qwen-ASR）"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "音频/语音识别/2986975-Android SDK.md",
-      "nodeId": 2986975,
-      "url": "https://help.aliyun.com/zh/model-studio/android-sdk-for-paraformer-real-time-service",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987033-客户端事件.md",
-      "nodeId": 2987033,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-ASR-Realtime）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987059-服务端事件.md",
-      "nodeId": 2987059,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-ASR-Realtime）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987072-WebSocket API.md",
-      "nodeId": 2987072,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-interaction-process",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-ASR-Realtime）",
-        "WebSocket API"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987141-iOS SDK.md",
-      "nodeId": 2987141,
-      "url": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-paraformer-real-time-service",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987223-Android SDK.md",
-      "nodeId": 2987223,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-android-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2987329-iOS SDK.md",
-      "nodeId": 2987329,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-recorded-speech-recognition-ios-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Paraformer）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2990134-Python SDK.md",
-      "nodeId": 2990134,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-ASR-Realtime）",
-        "Python SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2990136-Java SDK.md",
-      "nodeId": 2990136,
-      "url": "https://help.aliyun.com/zh/model-studio/qwen-asr-realtime-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-ASR-Realtime）",
-        "Java SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2995891-Android SDK.md",
-      "nodeId": 2995891,
-      "url": "https://help.aliyun.com/zh/model-studio/android-sdk-for-fun-asr-real-time-service",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2995957-iOS SDK.md",
-      "nodeId": 2995957,
-      "url": "https://help.aliyun.com/zh/model-studio/ios-sdk-for-fun-asr-real-time-service",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2995958-Android SDK.md",
-      "nodeId": 2995958,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-android-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
-        "Android SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/2995965-iOS SDK.md",
-      "nodeId": 2995965,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-recorded-speech-recognition-ios-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "非实时语音识别（Qwen-Audio-3.0-ASR-Flash-Filetrans/Fun-ASR）",
-        "iOS SDK"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3024761-HTTP API参考.md",
-      "nodeId": 3024761,
-      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-http-api",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "定制热词",
-        "HTTP API参考"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3024762-Java SDK参考.md",
-      "nodeId": 3024762,
-      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-java-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "定制热词",
-        "Java SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3024763-Python SDK参考.md",
-      "nodeId": 3024763,
-      "url": "https://help.aliyun.com/zh/model-studio/vocabulary-python-sdk",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "定制热词",
-        "Python SDK参考"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3034143-客户端事件.md",
-      "nodeId": 3034143,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3034144-服务端事件.md",
-      "nodeId": 3034144,
-      "url": "https://help.aliyun.com/zh/model-studio/paraformer-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Paraformer）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3034145-客户端事件.md",
-      "nodeId": 3034145,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-client-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "客户端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3034146-服务端事件.md",
-      "nodeId": 3034146,
-      "url": "https://help.aliyun.com/zh/model-studio/fun-asr-server-events",
-      "navigationPath": [
-        "API参考（模型）",
-        "音频",
-        "语音识别",
-        "实时语音识别（Qwen-Audio-3.0-ASR-Flash-Streaming/Fun-ASR-Realtime）",
-        "服务端事件"
-      ]
-    },
-    {
-      "path": "音频/语音识别/3047297-非实时语音识别（Qwen-Audio-3.0-ASR-Flash／Fun-ASR-Flash）.md",
+      "path": "语音识别/3047297-非实时语音识别（Qwen-Audio-3.0-ASR-Flash_Fun-ASR-Flash）.md",
       "nodeId": 3047297,
       "url": "https://help.aliyun.com/zh/model-studio/non-real-time-speech-recognition-for-fun-asr-flash",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "音频",
         "语音识别",
         "非实时语音识别（Qwen-Audio-3.0-ASR-Flash/Fun-ASR-Flash）"
-      ]
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2796626-AI试衣-基础版.md",
+      "nodeId": 2796626,
+      "url": "https://help.aliyun.com/zh/model-studio/outfitanyone-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone",
+        "AI试衣-基础版"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2796629-计量计费.md",
+      "nodeId": 2796629,
+      "url": "https://help.aliyun.com/zh/model-studio/billing-for-outfitanyone",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone",
+        "计量计费"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2796663-AI试衣-图片精修.md",
+      "nodeId": 2796663,
+      "url": "https://help.aliyun.com/zh/model-studio/ai-fitting-picture-finishing-api-details",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone",
+        "AI试衣-图片精修"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2865249-AI试衣-图片分割.md",
+      "nodeId": 2865249,
+      "url": "https://help.aliyun.com/zh/model-studio/aitryon-parsing-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone",
+        "AI试衣-图片分割"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AI试衣OutfitAnyone/2881846-AI试衣-Plus版.md",
+      "nodeId": 2881846,
+      "url": "https://help.aliyun.com/zh/model-studio/aitryon-plus-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "创意工具",
+        "AI试衣OutfitAnyone",
+        "AI试衣-Plus版"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "AOQ客户端SDK/3046056-SDK简介.md",
+      "nodeId": 3046056,
+      "url": "https://help.aliyun.com/zh/model-studio/realtime-api-aoq-sdk-desc",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "Realtime API",
+        "AOQ客户端SDK",
+        "SDK简介"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "API参考（模型）/2712576-文本生成.md",
+      "nodeId": 2712576,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文本生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "API参考（模型）/3039634-文件管理.md",
+      "nodeId": 3039634,
+      "url": "https://help.aliyun.com/zh/model-studio/file-management-api",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文件管理"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "HappyHorse/3029820-HappyHorse-文生视频.md",
+      "nodeId": 3029820,
+      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-text-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "HappyHorse",
+        "HappyHorse-文生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "HappyHorse/3029821-HappyHorse-图生视频-基于首帧.md",
+      "nodeId": 3029821,
+      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-image-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "HappyHorse",
+        "HappyHorse-图生视频-基于首帧"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "HappyHorse/3030778-HappyHorse-参考生视频.md",
+      "nodeId": 3030778,
+      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-reference-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "HappyHorse",
+        "HappyHorse-参考生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "HappyHorse/3030779-HappyHorse-视频编辑.md",
+      "nodeId": 3030779,
+      "url": "https://help.aliyun.com/zh/model-studio/happyhorse-video-edit-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "HappyHorse",
+        "HappyHorse-视频编辑"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "MiniMax/3052216-MiniMax-视频生成.md",
+      "nodeId": 3052216,
+      "url": "https://help.aliyun.com/zh/model-studio/minimax-video-generation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "MiniMax",
+        "MiniMax-视频生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "OpenAI兼容-Responses/3016808-创建响应.md",
+      "nodeId": 3016808,
+      "url": "https://help.aliyun.com/zh/model-studio/qwen-api-via-openai-responses",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文本生成",
+        "OpenAI兼容-Responses",
+        "创建响应"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033492-获取响应.md",
+      "nodeId": 3033492,
+      "url": "https://help.aliyun.com/zh/model-studio/retrieve-a-response",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文本生成",
+        "OpenAI兼容-Responses",
+        "获取响应"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033494-删除响应.md",
+      "nodeId": 3033494,
+      "url": "https://help.aliyun.com/zh/model-studio/delete-a-response",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文本生成",
+        "OpenAI兼容-Responses",
+        "删除响应"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "OpenAI兼容-Responses/3033495-获取输入项列表.md",
+      "nodeId": 3033495,
+      "url": "https://help.aliyun.com/zh/model-studio/list-input-items",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "文本生成",
+        "OpenAI兼容-Responses",
+        "获取输入项列表"
+      ],
+      "origin": "model-api-reference"
     },
     {
       "path": "Realtime API/3046058-概述.md",
       "nodeId": 3046058,
       "url": "https://help.aliyun.com/zh/model-studio/realtime-api-overview",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "概述"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/快速开始/3046059-SDK下载.md",
-      "nodeId": 3046059,
-      "url": "https://help.aliyun.com/zh/model-studio/realtime-sdk-download",
-      "navigationPath": [
-        "API参考（模型）",
-        "Realtime API",
-        "快速开始",
-        "SDK下载"
-      ]
-    },
-    {
-      "path": "Realtime API/快速开始/3046060-Token鉴权.md",
-      "nodeId": 3046060,
-      "url": "https://help.aliyun.com/zh/model-studio/realtime-token-authentication",
-      "navigationPath": [
-        "API参考（模型）",
-        "Realtime API",
-        "快速开始",
-        "Token鉴权"
-      ]
-    },
-    {
-      "path": "Realtime API/快速开始/3046061-接入模型与应用.md",
-      "nodeId": 3046061,
-      "url": "https://help.aliyun.com/zh/model-studio/realtime-connect-model",
-      "navigationPath": [
-        "API参考（模型）",
-        "Realtime API",
-        "快速开始",
-        "接入模型与应用"
-      ]
-    },
-    {
-      "path": "Realtime API/AOQ客户端SDK/3046056-SDK简介.md",
-      "nodeId": 3046056,
-      "url": "https://help.aliyun.com/zh/model-studio/realtime-api-aoq-sdk-desc",
-      "navigationPath": [
-        "API参考（模型）",
-        "Realtime API",
-        "AOQ客户端SDK",
-        "SDK简介"
-      ]
-    },
-    {
-      "path": "Realtime API/AOQ客户端SDK/3046063-Android SDK.md",
+      "path": "SDK简介/3046063-Android SDK.md",
       "nodeId": 3046063,
       "url": "https://help.aliyun.com/zh/model-studio/aoq-android-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
         "SDK简介",
         "Android SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046064-iOS SDK.md",
+      "path": "SDK简介/3046064-iOS SDK.md",
       "nodeId": 3046064,
       "url": "https://help.aliyun.com/zh/model-studio/aoq-ios-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
         "SDK简介",
         "iOS SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046065-HarmonyOS SDK.md",
+      "path": "SDK简介/3046065-HarmonyOS SDK.md",
       "nodeId": 3046065,
       "url": "https://help.aliyun.com/zh/model-studio/aoq-harmony-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
         "SDK简介",
         "HarmonyOS SDK"
-      ]
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046066-连接状态管理.md",
-      "nodeId": 3046066,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-connection-management",
+      "path": "SDK简介/3052524-Windows SDK.md",
+      "nodeId": 3052524,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-windows-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
-        "功能参考",
-        "连接状态管理"
-      ]
+        "SDK简介",
+        "Windows SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046067-媒体流发送管理.md",
-      "nodeId": 3046067,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-media-stream-control",
+      "path": "SDK简介/3052525-macOS SDK.md",
+      "nodeId": 3052525,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-macos-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
-        "功能参考",
-        "媒体流发送管理"
-      ]
+        "SDK简介",
+        "macOS SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046068-视频常用功能介绍.md",
-      "nodeId": 3046068,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-video-features",
+      "path": "SDK简介/3052526-Electron SDK.md",
+      "nodeId": 3052526,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-electron-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
-        "功能参考",
-        "视频常用功能介绍"
-      ]
+        "SDK简介",
+        "Electron SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046069-音频常用功能介绍.md",
-      "nodeId": 3046069,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-audio-features",
+      "path": "SDK简介/3052527-Linux Python SDK.md",
+      "nodeId": 3052527,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-linux-python-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
-        "功能参考",
-        "音频常用功能介绍"
-      ]
+        "SDK简介",
+        "Linux Python SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046070-自定义视频输入.md",
-      "nodeId": 3046070,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-video-input",
+      "path": "SDK简介/3052528-Linux C++ SDK.md",
+      "nodeId": 3052528,
+      "url": "https://help.aliyun.com/zh/model-studio/aoq-linux-cpp-sdk-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
         "Realtime API",
         "AOQ客户端SDK",
-        "功能参考",
-        "自定义视频输入"
-      ]
+        "SDK简介",
+        "Linux C++ SDK"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046071-自定义音频播放.md",
-      "nodeId": 3046071,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-playback",
+      "path": "Vidu/3026197-Vidu-文生视频.md",
+      "nodeId": 3026197,
+      "url": "https://help.aliyun.com/zh/model-studio/vidu-text-to-video-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "Realtime API",
-        "AOQ客户端SDK",
-        "功能参考",
-        "自定义音频播放"
-      ]
+        "视频生成",
+        "Vidu",
+        "Vidu-文生视频"
+      ],
+      "origin": "model-api-reference"
     },
     {
-      "path": "Realtime API/AOQ客户端SDK/3046072-自定义音频采集.md",
-      "nodeId": 3046072,
-      "url": "https://help.aliyun.com/zh/model-studio/aoq-custom-audio-capture",
+      "path": "Vidu/3026198-Vidu-图生视频-基于首帧.md",
+      "nodeId": 3026198,
+      "url": "https://help.aliyun.com/zh/model-studio/vidu-image-to-video-api-reference",
       "navigationPath": [
+        "大模型服务平台百炼",
         "API参考（模型）",
-        "Realtime API",
-        "AOQ客户端SDK",
-        "功能参考",
-        "自定义音频采集"
-      ]
+        "视频生成",
+        "Vidu",
+        "Vidu-图生视频-基于首帧"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "Vidu/3026199-Vidu-图生视频-基于首尾帧.md",
+      "nodeId": 3026199,
+      "url": "https://help.aliyun.com/zh/model-studio/vidu-keyframe-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "Vidu",
+        "Vidu-图生视频-基于首尾帧"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "Vidu/3026200-Vidu-参考生视频.md",
+      "nodeId": 3026200,
+      "url": "https://help.aliyun.com/zh/model-studio/vidu-reference-to-video-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "视频生成",
+        "Vidu",
+        "Vidu-参考生视频"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "Vidu/3045893-Vidu-图像生成.md",
+      "nodeId": 3045893,
+      "url": "https://help.aliyun.com/zh/model-studio/vidu-image-generation-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "Vidu",
+        "Vidu-图像生成"
+      ],
+      "origin": "model-api-reference"
+    },
+    {
+      "path": "Z-Image/3002354-文生图Z-Image.md",
+      "nodeId": 3002354,
+      "url": "https://help.aliyun.com/zh/model-studio/z-image-api-reference",
+      "navigationPath": [
+        "大模型服务平台百炼",
+        "API参考（模型）",
+        "图像生成",
+        "Z-Image",
+        "文生图Z-Image"
+      ],
+      "origin": "model-api-reference"
     }
   ]
 }

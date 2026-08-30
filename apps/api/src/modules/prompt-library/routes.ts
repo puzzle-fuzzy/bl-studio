@@ -36,7 +36,7 @@ export function createPromptLibraryRoutes(deps: ApiDependencies) {
     .get('/api/prompt-library', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(ListPromptsQuerySchema, query)
-      const page = await deps.generationRepository.listPromptLibrary({
+      const page = await deps.promptLibraryRepository.listPromptLibrary({
         userId: user.id,
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
@@ -48,14 +48,14 @@ export function createPromptLibraryRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(CreatePromptSchema, body)
       try {
-        const item = await deps.generationRepository.createPromptLibraryItem({
+        const item = await deps.promptLibraryRepository.createPromptLibraryItem({
           userId: user.id,
           name: input.name,
           modelId: input.modelId,
           prompt: input.prompt,
           ...(input.params !== undefined ? { params: input.params } : { params: {} }),
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'prompt-library.create',
           outcome: 'succeeded',
@@ -65,7 +65,7 @@ export function createPromptLibraryRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { item } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'prompt-library.create',
           outcome: 'failed',
@@ -78,15 +78,15 @@ export function createPromptLibraryRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const { id } = validateInput(PromptIdParamsSchema, params)
       const input = validateInput(UpdatePromptSchema, body)
-      const item = await deps.generationRepository.updatePromptLibraryItem({ userId: user.id, itemId: id, ...input })
+      const item = await deps.promptLibraryRepository.updatePromptLibraryItem({ userId: user.id, itemId: id, ...input })
       return { success: true, data: { item } }
     })
     .delete('/api/prompt-library/:id', async ({ request, params }) => {
       const user = await requireAuthUser(request, deps.authService)
       const { id } = validateInput(PromptIdParamsSchema, params)
       try {
-        await deps.generationRepository.deletePromptLibraryItem({ userId: user.id, itemId: id })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await deps.promptLibraryRepository.deletePromptLibraryItem({ userId: user.id, itemId: id })
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'prompt-library.delete',
           outcome: 'succeeded',
@@ -95,7 +95,7 @@ export function createPromptLibraryRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: null }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'prompt-library.delete',
           outcome: 'failed',

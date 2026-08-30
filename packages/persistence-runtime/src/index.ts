@@ -26,21 +26,23 @@ import {
 } from "@bailian-studio/credit-ledger";
 import { type BailianStudioDb, createDb } from "@bailian-studio/db";
 import {
+	createCanvasRepository,
+	type CanvasRepository,
+} from "@bailian-studio/canvas-repository";
+import {
 	createDirectorRepository,
 	type DirectorRepository,
 } from "@bailian-studio/director-repository";
 import {
-	type AdminGalleryRepository,
-	type AdminTaskRepository,
-	type AnalyticsRepository,
+	createAdminRepository,
+	type AdminRepository,
+} from "@bailian-studio/admin-repository";
+import {
 	type AssetRepository,
 	type AuditRepository,
 	type ContentReportRepository,
-	createAdminGalleryRepository,
-	createAdminTaskRepository,
 	createAssetRepository,
 	createAuditRepository,
-	createAnalyticsRepository,
 	createContentReportRepository,
 	createFeedbackRepository,
 	createGenerationRepository,
@@ -98,9 +100,8 @@ export interface ApiPersistenceRuntime {
 	readonly promptLibraryRepository: PromptLibraryRepository;
 	readonly feedbackRepository: FeedbackRepository;
 	readonly contentReportRepository: ContentReportRepository;
-	readonly adminGalleryRepository: AdminGalleryRepository;
-	readonly adminTaskRepository: AdminTaskRepository;
-	readonly analyticsRepository: AnalyticsRepository;
+	readonly adminRepository: AdminRepository;
+	readonly canvasRepository: CanvasRepository;
 	readonly usageRepository: UsageRepository;
 	readonly directorRepository: DirectorRepository;
 	readonly creativeAssetRepository: CreativeAssetRepository;
@@ -169,9 +170,8 @@ export function createApiPersistenceRuntime(
 			promptLibraryRepository: createPromptLibraryRepository(db),
 			feedbackRepository: createFeedbackRepository(db),
 			contentReportRepository: createContentReportRepository(db),
-			adminGalleryRepository: createAdminGalleryRepository(db),
-			adminTaskRepository: createAdminTaskRepository(db),
-			analyticsRepository: createAnalyticsRepository(db),
+			adminRepository: createAdminRepository(db),
+			canvasRepository: createCanvasRepository(db),
 			usageRepository: createUsageRepository(db),
 			directorRepository: createDirectorRepository({ db, taskQueueTransactionStore }),
 			creativeAssetRepository: createCreativeAssetRepository({ db }),

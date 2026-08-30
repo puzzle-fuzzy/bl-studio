@@ -64,6 +64,23 @@ describe('generationSseHub', () => {
     expect(hub.drain('user_1')).toEqual([])
   })
 
+  it('routes director entity invalidations through the user channel', () => {
+    const hub = new GenerationSseHub()
+    hub.publish({
+      event: 'director.entities.changed',
+      data: {
+        userId: 'user_1',
+        projectId: 'project_1',
+        candidateId: 'candidate_1',
+        reason: 'candidate_reviewed',
+      },
+    })
+
+    expect(hub.drain('user_1')).toEqual([
+      'event: director.entities.changed\ndata: {"userId":"user_1","projectId":"project_1","candidateId":"candidate_1","reason":"candidate_reviewed"}\n\n',
+    ])
+  })
+
   it('ignores generation events without a string userId', () => {
     const hub = new GenerationSseHub()
 

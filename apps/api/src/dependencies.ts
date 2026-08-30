@@ -1,16 +1,34 @@
+import type { AuditOutboxRepository } from '@bailian-studio/audit-repository'
 import type { AuthService } from '@bailian-studio/auth'
-import type { CreditLedger } from '@bailian-studio/credit-ledger'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
-import type { GenerationDiagnosticsRepository } from '@bailian-studio/generation-repository'
-import type { DirectorRepository } from '@bailian-studio/director-repository'
+import type { AdminRepository } from '@bailian-studio/admin-repository'
+import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import type { CreativeAssetRepository } from '@bailian-studio/creative-asset-repository'
+import type { CreditLedger } from '@bailian-studio/credit-ledger'
+import type { DirectorRepository } from '@bailian-studio/director-repository'
+import type {
+  AssetRepository,
+  AuditRepository,
+  ContentReportRepository,
+  FeedbackRepository,
+  GenerationDiagnosticsRepository,
+  GenerationRepository,
+  NotificationRepository,
+  PromptLibraryRepository,
+  PublicShareRepository,
+  ShareRepository,
+  SocialRepository,
+  UsageRepository,
+} from '@bailian-studio/generation-repository'
 import type { MediaRepository } from '@bailian-studio/media-repository'
 import type { StorageAdapter } from '@bailian-studio/storage'
+import type { ArtifactConfig } from './lib/artifact-config'
+import type { AssetConfig } from './lib/asset-config'
 import type { GenerationLimits } from './lib/limits'
 import type { ApiRateLimitConfig } from './lib/rate-limit'
 import type { RequestGuardConfig } from './lib/request-guards'
-import type { AssetConfig } from './lib/asset-config'
-import type { ArtifactConfig } from './lib/artifact-config'
+import type { CreativeAssetApplicationService } from './modules/creative-assets/service'
+import type { DirectorApplicationService } from './modules/director/service'
+import type { GenerationApplicationService } from './modules/generations/service'
 import type { GenerationSseHub } from './modules/generations/sse-hub'
 
 /**
@@ -30,14 +48,45 @@ export interface GithubOAuthConfig {
 }
 
 export interface ApiDependencies {
+  readonly auditOutboxRepository: Pick<
+    AuditOutboxRepository,
+    'listFailed' | 'requeueFailed'
+  >
+  /** API 横切审计写入的最小 port。 */
+  readonly auditRepository: AuditRepository
   readonly authService: AuthService
   readonly githubOAuth?: GithubOAuthConfig
   readonly creditLedger: CreditLedger
+  readonly generationRepository: GenerationRepository
   /** 当前用户生成详情的安全诊断投影。 */
   readonly generationDiagnosticsRepository: GenerationDiagnosticsRepository
-  readonly generationRepository: GenerationRepository
+  /** 用户资产读写的窄持久化 port。 */
+  readonly assetRepository: AssetRepository
+  /** generation 分享创建与撤销的窄持久化 port。 */
+  readonly shareRepository: ShareRepository
+  /** 匿名分享读取的窄持久化 port，与所有者写入能力分离。 */
+  readonly publicShareRepository: PublicShareRepository
+  /** 画廊/点赞/收藏的窄持久化 port；generationRepository 仅保留兼容与审计等能力。 */
+  readonly socialRepository: SocialRepository
+  /** 通知收件箱与社交通知写入的窄持久化 port。 */
+  readonly notificationRepository: NotificationRepository
+  /** 用户提示词资产库的窄持久化 port。 */
+  readonly promptLibraryRepository: PromptLibraryRepository
+  /** 用户反馈及 admin 状态流转的窄持久化 port。 */
+  readonly feedbackRepository: FeedbackRepository
+  /** 内容举报读写的窄持久化 port；admin 下架联动由 social/admin port 显式编排。 */
+  readonly contentReportRepository: ContentReportRepository
+  /** admin 跨域读模型与治理 port 的组合根。 */
+  readonly adminRepository: AdminRepository
+  /** 当前用户 Canvas 文档、版本和乐观并发控制。 */
+  readonly canvasRepository: CanvasRepository
+  /** 用户用量读模型的窄持久化 port。 */
+  readonly usageRepository: UsageRepository
+  readonly generationApplicationService: GenerationApplicationService
   readonly directorRepository: DirectorRepository
+  readonly directorApplicationService: DirectorApplicationService
   readonly creativeAssetRepository: CreativeAssetRepository
+  readonly creativeAssetApplicationService: CreativeAssetApplicationService
   readonly mediaRepository: MediaRepository
   readonly storage: StorageAdapter
   readonly generationSseHub: GenerationSseHub

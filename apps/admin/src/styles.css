@@ -1,4 +1,7 @@
 @import "tailwindcss";
+
+/* 共享 UI 包源码参与本 app 的 Tailwind 扫描（@bailian-studio/ui）。 */
+@source "../../../packages/ui/src";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
 

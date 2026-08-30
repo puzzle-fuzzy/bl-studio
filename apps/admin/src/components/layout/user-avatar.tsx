@@ -1,6 +1,6 @@
 import { avatarUrlFor } from '@bailian-studio/api-client'
 import { resolveApiUrl } from '@/lib/api'
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
+import { Avatar, AvatarFallback, AvatarImage } from '@bailian-studio/ui'
 
 /**
  * 用户头像（管理后台镜像版）。

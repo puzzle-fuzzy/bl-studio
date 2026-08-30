@@ -3,6 +3,7 @@ import {
 	type BailianStudioDbTransaction,
 	directorAssets,
 	directorCharacters,
+	directorEntityCandidates,
 	directorLocations,
 	directorPhaseRuns,
 	directorPhaseStates,
@@ -22,6 +23,7 @@ import {
 	type DirectorPhaseRun,
 	type DirectorPhaseState,
 	type DirectorCharacter,
+	type DirectorEntityCandidate,
 	type DirectorAsset,
 	type DirectorLocation,
 	type DirectorShot,
@@ -375,8 +377,8 @@ async function materializePhaseOutput(
 				version: run.version,
 				createdBy: run.createdBy,
 				updatedBy: run.updatedBy,
-				createdAt: now,
-				updatedAt: now,
+				createdAt: new Date(now),
+				updatedAt: new Date(now),
 			})),
 		);
 		return;
@@ -1215,6 +1217,9 @@ export function createDirectorRepository({
 							isNull(directorShots.deletedAt),
 						),
 					)
+					// 行锁串行化并发编辑：expectedVersion 乐观检查必须基于锁定的当前行，
+					// 否则两个并发写入方都能通过版本检查，后者静默覆盖前者（丢失更新）。
+					.for("update")
 					.limit(1);
 				if (current === undefined) {
 					throw new DirectorRepositoryError(
@@ -2015,6 +2020,32 @@ export function createDirectorRepository({
 					inputSnapshot.analysis = analysis;
 					inputSnapshot.characters = characters;
 					inputSnapshot.locations = locations;
+					const currentCharacters = await tx
+						.select()
+						.from(directorCharacters)
+						.where(
+							and(
+								eq(directorCharacters.projectId, input.projectId),
+								isNull(directorCharacters.deletedAt),
+								isNull(directorCharacters.staleAt),
+							),
+						)
+						.orderBy(desc(directorCharacters.createdAt), desc(directorCharacters.id));
+					const currentLocations = await tx
+						.select()
+						.from(directorLocations)
+						.where(
+							and(
+								eq(directorLocations.projectId, input.projectId),
+								isNull(directorLocations.deletedAt),
+								isNull(directorLocations.staleAt),
+							),
+						)
+						.orderBy(desc(directorLocations.createdAt), desc(directorLocations.id));
+					inputSnapshot.directorEntities = {
+						characters: currentCharacters.map(toCharacter),
+						locations: currentLocations.map(toLocation),
+					};
 				} else if (input.phase === "continuity") {
 					const shotRows = await tx
 						.select({
@@ -2555,5 +2586,219 @@ export function createDirectorRepository({
 				return toPhaseRun(updated);
 			});
 		},
-	};
+		async listEntityCandidates(input) {
+			const rows = await db
+				.select({ candidate: directorEntityCandidates })
+				.from(directorEntityCandidates)
+				.innerJoin(
+					directorProjects,
+					eq(directorEntityCandidates.projectId, directorProjects.id),
+				)
+				.where(
+					and(
+						eq(directorEntityCandidates.projectId, input.projectId),
+						eq(directorProjects.userId, input.userId),
+						isNull(directorProjects.deletedAt),
+						isNull(directorEntityCandidates.deletedAt),
+						...(input.status !== undefined ? [eq(directorEntityCandidates.status, input.status)] : []),
+						...(input.kind !== undefined ? [eq(directorEntityCandidates.kind, input.kind)] : []),
+					),
+				)
+				.orderBy(directorEntityCandidates.kind, directorEntityCandidates.name)
+			return rows.map(({ candidate }) => mapEntityCandidate(candidate))
+		},
+
+		async createEntityCandidates(input) {
+			const now = new Date().toISOString()
+			const rows = input.candidates.map(candidate => ({
+				id: `dec_${crypto.randomUUID()}`,
+				projectId: input.projectId,
+				sourceRunId: input.sourceRunId ?? null,
+				kind: candidate.kind,
+				name: candidate.name,
+				description: candidate.description,
+				traitsJson: candidate.traits,
+				status: 'provisional' as const,
+				mentionsJson: candidate.mentions,
+				createdBy: input.userId,
+				updatedBy: input.userId,
+				createdAt: new Date(now),
+				updatedAt: new Date(now),
+			}))
+			if (rows.length === 0) return []
+			const inserted = await db.insert(directorEntityCandidates).values(rows).returning()
+			return inserted.map(row => mapEntityCandidate(row))
+		},
+
+		async reviewEntityCandidate(input) {
+			const now = new Date()
+			return db.transaction(async (tx) => {
+				const [row] = await tx
+					.select({ candidate: directorEntityCandidates })
+					.from(directorEntityCandidates)
+					.innerJoin(
+						directorProjects,
+						eq(directorEntityCandidates.projectId, directorProjects.id),
+					)
+					.where(
+						and(
+							eq(directorEntityCandidates.id, input.candidateId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+							isNull(directorEntityCandidates.deletedAt),
+						),
+					)
+					.limit(1)
+					.for("update")
+				const current = row?.candidate
+				if (current === undefined) return undefined
+
+				const [updated] = await tx
+					.update(directorEntityCandidates)
+					.set({
+						status: input.status,
+						reviewedBy: input.userId,
+						reviewedAt: now,
+						updatedBy: input.userId,
+						updatedAt: now,
+					})
+					.where(eq(directorEntityCandidates.id, current.id))
+					.returning()
+				if (updated === undefined) return undefined
+
+				if (input.status === "accepted") {
+					await materializeAcceptedEntityCandidate(tx, updated, input.userId, now)
+				}
+				return mapEntityCandidate(updated)
+			})
+		},
+
+		async deleteEntityCandidate(input) {
+			const now = new Date()
+			return db.transaction(async (tx) => {
+				const [row] = await tx
+					.select({ id: directorEntityCandidates.id })
+					.from(directorEntityCandidates)
+					.innerJoin(
+						directorProjects,
+						eq(directorEntityCandidates.projectId, directorProjects.id),
+					)
+					.where(
+						and(
+							eq(directorEntityCandidates.id, input.candidateId),
+							eq(directorProjects.userId, input.userId),
+							isNull(directorProjects.deletedAt),
+							isNull(directorEntityCandidates.deletedAt),
+						),
+					)
+					.limit(1)
+					.for("update")
+				if (row === undefined) return false
+
+				const result = await tx
+					.update(directorEntityCandidates)
+					.set({
+						deletedAt: now,
+						deletedBy: input.userId,
+						updatedAt: now,
+						updatedBy: input.userId,
+					})
+					.where(eq(directorEntityCandidates.id, row.id))
+					.returning({ id: directorEntityCandidates.id })
+				return result.length > 0
+			})
+		},
+}
+
+async function materializeAcceptedEntityCandidate(
+	tx: BailianStudioDbTransaction,
+	candidate: typeof directorEntityCandidates.$inferSelect,
+	userId: string,
+	now: Date,
+): Promise<void> {
+	if (candidate.kind === "prop") return
+
+	const metadata = {
+		source: "entity_candidate",
+		entityCandidateId: candidate.id,
+		mentions: candidate.mentionsJson,
+	}
+
+	if (candidate.kind === "character") {
+		const existing = await tx
+			.select({ metadataJson: directorCharacters.metadataJson })
+			.from(directorCharacters)
+			.where(
+				and(
+					eq(directorCharacters.projectId, candidate.projectId),
+					isNull(directorCharacters.deletedAt),
+				),
+			)
+		if (existing.some(row => row.metadataJson.entityCandidateId === candidate.id)) return
+
+		await tx.insert(directorCharacters).values({
+			id: `dc_${crypto.randomUUID()}`,
+			projectId: candidate.projectId,
+			sourceRunId: candidate.sourceRunId,
+			name: candidate.name,
+			role: null,
+			description: candidate.description,
+			traitsJson: candidate.traitsJson,
+			referenceAssetIdsJson: [],
+			metadataJson: metadata,
+			locked: false,
+			version: 1,
+			createdBy: userId,
+			updatedBy: userId,
+			createdAt: now,
+			updatedAt: now,
+		})
+		return
+	}
+
+	const existing = await tx
+		.select({ metadataJson: directorLocations.metadataJson })
+		.from(directorLocations)
+		.where(
+			and(
+				eq(directorLocations.projectId, candidate.projectId),
+				isNull(directorLocations.deletedAt),
+			),
+		)
+	if (existing.some(row => row.metadataJson.entityCandidateId === candidate.id)) return
+
+	await tx.insert(directorLocations).values({
+		id: `dl_${crypto.randomUUID()}`,
+		projectId: candidate.projectId,
+		sourceRunId: candidate.sourceRunId,
+		name: candidate.name,
+		description: candidate.description,
+		atmosphere: null,
+		referenceAssetIdsJson: [],
+		metadataJson: metadata,
+		locked: false,
+		version: 1,
+		createdBy: userId,
+		updatedBy: userId,
+		createdAt: now,
+		updatedAt: now,
+	})
+}
+
+function mapEntityCandidate(row: typeof directorEntityCandidates.$inferSelect): DirectorEntityCandidate {
+  return {
+    id: row.id,
+    projectId: row.projectId,
+    kind: row.kind as DirectorEntityCandidate['kind'],
+    name: row.name,
+    description: row.description,
+    traits: row.traitsJson,
+    status: row.status as DirectorEntityCandidate['status'],
+    mentions: row.mentionsJson,
+    reviewedBy: row.reviewedBy,
+    reviewedAt: row.reviewedAt?.toISOString() ?? null,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
 }

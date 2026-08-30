@@ -7,6 +7,7 @@ import { z } from 'zod'
  */
 export const DIRECTOR_PHASES = [
   'analyze',
+  'entities',
   'characters',
   'locations',
   'characterRefs',
@@ -24,6 +25,7 @@ export type DirectorPhase = (typeof DIRECTOR_PHASES)[number]
 
 export const DIRECTOR_PHASE_LABELS: Record<DirectorPhase, string> = {
   analyze: '剧本分析',
+  entities: '实体提取',
   characters: '角色',
   locations: '场景',
   characterRefs: '角色参考',
@@ -555,3 +557,47 @@ export type DirectorDialogueShot = z.infer<typeof DirectorDialogueShotSchema>
 export type DirectorDialogueResult = z.infer<typeof DirectorDialogueResultSchema>
 export type UpdateDirectorShotInput = z.infer<typeof UpdateDirectorShotSchema>
 export type DirectorProjectListResult = z.infer<typeof DirectorProjectListResponseSchema>
+
+
+// ── 实体候选（剧本 AI 提取 → 人工审核）──
+
+export const DirectorEntityCandidateKindSchema = z.enum(['character', 'scene', 'prop'])
+export const DirectorEntityCandidateStatusSchema = z.enum(['provisional', 'accepted', 'rejected'])
+
+export const DirectorEntityMentionSchema = z.object({
+  text: z.string(),
+  start: z.number().int().min(0),
+  end: z.number().int().min(0),
+})
+
+export const DirectorEntityCandidateSchema = z.object({
+  id: z.string(),
+  projectId: z.string(),
+  kind: DirectorEntityCandidateKindSchema,
+  name: z.string(),
+  description: z.string(),
+  traits: z.array(z.string()),
+  status: DirectorEntityCandidateStatusSchema,
+  mentions: z.array(DirectorEntityMentionSchema),
+  reviewedBy: z.string().nullable(),
+  reviewedAt: z.string().nullable(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+})
+
+export const ListDirectorEntityCandidatesSchema = z.object({
+  projectId: z.string().min(1),
+  status: DirectorEntityCandidateStatusSchema.optional(),
+  kind: DirectorEntityCandidateKindSchema.optional(),
+})
+
+export const ReviewDirectorEntityCandidateSchema = z.object({
+  status: z.enum(['accepted', 'rejected']),
+})
+
+export type DirectorEntityCandidateKind = z.infer<typeof DirectorEntityCandidateKindSchema>
+export type DirectorEntityCandidateStatus = z.infer<typeof DirectorEntityCandidateStatusSchema>
+export type DirectorEntityMention = z.infer<typeof DirectorEntityMentionSchema>
+export type DirectorEntityCandidate = z.infer<typeof DirectorEntityCandidateSchema>
+export type ListDirectorEntityCandidatesInput = z.infer<typeof ListDirectorEntityCandidatesSchema>
+export type ReviewDirectorEntityCandidateInput = z.infer<typeof ReviewDirectorEntityCandidateSchema>

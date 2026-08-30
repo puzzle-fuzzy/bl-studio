@@ -2,7 +2,8 @@
  * Node 运行时进程原语。
  *
  * bailian-studio 原实现基于 Bun 运行时，使用了 `Bun.spawn` / `Bun.spawnSync` /
- * `Bun.sleep`。重写为 Node 运行时（pnpm + tsx）后，这些 Bun 专属 API 不再可用。
+ * `Bun.sleep`。重写为 Node 运行时（bun 安装 + node --import tsx 运行）后，这些 Bun
+ * 专属 API 在 Worker/脚本进程中不再可用。
  * 本模块把它们收敛为一份 Node 实现，作为整个迁移的单一接缝：业务代码只依赖
  * 这里导出的形状（Web 可读流 + exited 承诺），不感知底层是 Bun 还是 Node。
  *

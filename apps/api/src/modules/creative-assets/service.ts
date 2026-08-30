@@ -3,11 +3,14 @@ import type {
   AddCreativeAssetReferenceRepositoryInput,
   ArchiveCreativeAssetRepositoryInput,
   AttachCreativeAssetRepositoryInput,
+  CollectCreativeAssetFromGenerationBatchRepositoryInput,
   CreateCreativeAssetRepositoryInput,
   CreateCreativeAssetVersionFromGenerationRepositoryInput,
   CreateCreativeAssetVersionRepositoryInput,
+  CollectCreativeAssetFromGenerationRepositoryInput,
   CreateCreativeProjectRepositoryInput,
   CreativeAssetDetail,
+  CreativeAssetCollectionBatch,
   CreativeAssetRepository,
   CreativeProjectDetail,
   DetachCreativeAssetRepositoryInput,
@@ -28,7 +31,7 @@ import type {
  * 带入所有资产操作，并统一处理“按用户查不到资源”的公开错误语义。
  * repository 继续负责事务、锁、软删除和状态机不变量。
  */
-export interface CreativeAssetUseCases {
+export interface CreativeAssetApplicationService {
   listProjects(input: ListCreativeProjectsRepositoryInput): Promise<ListCreativeProjectsResult>
   createProject(input: CreateCreativeProjectRepositoryInput): Promise<CreativeProjectDetail>
   getProject(input: GetCreativeProjectRepositoryInput): Promise<CreativeProjectDetail>
@@ -41,9 +44,12 @@ export interface CreativeAssetUseCases {
   archiveAsset(input: ArchiveCreativeAssetRepositoryInput): Promise<CreativeAssetDetail>
   createVersion(input: CreateCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
   createVersionFromGeneration(input: CreateCreativeAssetVersionFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
+  collectAssetFromGeneration(input: CollectCreativeAssetFromGenerationRepositoryInput): Promise<CreativeAssetDetail>
+  collectAssetFromGenerationBatch(input: CollectCreativeAssetFromGenerationBatchRepositoryInput): Promise<CreativeAssetCollectionBatch>
   addReference(input: AddCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   removeReference(input: RemoveCreativeAssetReferenceRepositoryInput): Promise<CreativeAssetDetail>
   transitionVersion(input: TransitionCreativeAssetVersionRepositoryInput): Promise<CreativeAssetDetail>
+  publishVersion(input: Omit<TransitionCreativeAssetVersionRepositoryInput, 'status'>): Promise<CreativeAssetDetail>
 }
 
 export interface CreativeAssetUseCaseDependencies {
@@ -58,7 +64,7 @@ function assetNotFound(assetId: string): CreativeAssetRepositoryError {
   return new CreativeAssetRepositoryError('CREATIVE_ASSET_NOT_FOUND', `Creative asset not found: ${assetId}`)
 }
 
-export function createCreativeAssetUseCases({ repository }: CreativeAssetUseCaseDependencies): CreativeAssetUseCases {
+export function createCreativeAssetApplicationService({ repository }: CreativeAssetUseCaseDependencies): CreativeAssetApplicationService {
   return {
     listProjects: input => repository.listProjects(input),
     createProject: input => repository.createProject(input),
@@ -80,8 +86,18 @@ export function createCreativeAssetUseCases({ repository }: CreativeAssetUseCase
     archiveAsset: input => repository.archiveAsset(input),
     createVersion: input => repository.createVersion(input),
     createVersionFromGeneration: input => repository.createVersionFromGeneration(input),
+    collectAssetFromGeneration: input => repository.collectAssetFromGeneration(input),
+    collectAssetFromGenerationBatch: input => repository.collectAssetFromGenerationBatch(input),
     addReference: input => repository.addReference(input),
     removeReference: input => repository.removeReference(input),
     transitionVersion: input => repository.transitionVersion(input),
+    publishVersion: input => repository.transitionVersion({ ...input, status: 'approved' }),
   }
+}
+
+/** @deprecated 新代码请使用 createCreativeAssetApplicationService。 */
+export function createCreativeAssetUseCases(
+  dependencies: CreativeAssetUseCaseDependencies,
+): CreativeAssetApplicationService {
+  return createCreativeAssetApplicationService(dependencies)
 }

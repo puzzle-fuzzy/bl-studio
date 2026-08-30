@@ -9,6 +9,7 @@
 
 export { createLogger, resolveLogFormat, safeJsonStringify, type LogFormat, type Logger } from './logger'
 export { MetricsCollector, type MetricsSnapshot, type TimerSummary } from './metrics'
+export { readGenerationLimits, type GenerationLimits } from './generation-limits'
 export {
   CreateGenerationSchema,
   GenerationListViewSchema,
@@ -144,6 +145,21 @@ export {
   type UpdateDirectorProjectInput,
 } from './director'
 export {
+  DirectorEntityCandidateSchema,
+  DirectorEntityCandidateKindSchema,
+  DirectorEntityCandidateStatusSchema,
+  DirectorEntityMentionSchema,
+  ListDirectorEntityCandidatesSchema,
+  ReviewDirectorEntityCandidateSchema,
+  type DirectorEntityCandidate,
+  type DirectorEntityCandidateKind,
+  type DirectorEntityCandidateStatus,
+  type DirectorEntityMention,
+  type ListDirectorEntityCandidatesInput,
+  type ReviewDirectorEntityCandidateInput,
+} from './director'
+
+export {
   DEFAULT_DIRECTOR_ASSEMBLY_SETTINGS,
   DirectorAssemblyIssueSchema,
   DirectorAssemblyMusicSchema,
@@ -164,3 +180,7 @@ export {
   type DirectorAssemblyAssetCandidate,
   type DirectorAssemblyShotCandidate,
 } from './director-assembly'
+
+// ── Repository 层共享工具（P1-H 统一五套并行约定） ──
+export { encodeCursor, decodeCursor, clampLimit, RepositoryError, DEFAULT_LIMIT_POLICY, WIDE_LIMIT_POLICY } from './repository-kit'
+export type { CursorPayload, LimitPolicy } from './repository-kit'

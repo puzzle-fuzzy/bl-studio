@@ -1,18 +1,19 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { ImageIcon, Loader2, Search } from 'lucide-react'
 import type { AdminGalleryItem } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Checkbox } from '@/components/ui/checkbox'
-import { Input } from '@/components/ui/input'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog'
+import { Button } from '@bailian-studio/ui'
+import { Badge } from '@bailian-studio/ui'
+import { Card, CardContent } from '@bailian-studio/ui'
+import { Checkbox } from '@bailian-studio/ui'
+import { Input } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@bailian-studio/ui'
 
 type VisibilityFilter = 'all' | 'hidden'
 
@@ -33,11 +34,9 @@ function formatTime(iso: string): string {
  */
 export function GalleryManagePage() {
   const [visibility, setVisibility] = useState<VisibilityFilter>('all')
-  const [items, setItems] = useState<AdminGalleryItem[]>([])
-  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  // 操作反馈（批量治理结果/失败）；查询错误来自 useInfiniteQuery。
+  const [notice, setNotice] = useState<string | null>(null)
+  const queryClient = useQueryClient()
   const [q, setQ] = useState('')
   const [qInput, setQInput] = useState('')
 
@@ -51,55 +50,39 @@ export function GalleryManagePage() {
   const [batchBusy, setBatchBusy] = useState(false)
   const [batchDeleteOpen, setBatchDeleteOpen] = useState(false)
 
-  const requestSeq = useRef(0)
+  // Batch 0c：useInfiniteQuery 承载 首载+追加（键含 q），requestSeq 守卫作废。
+  const {
+    data,
+    isPending: loading,
+    error: queryError,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage: loadingMore,
+  } = useInfiniteQuery({
+    queryKey: ['admin', 'gallery', q],
+    queryFn: ({ pageParam }) => apiClient.adminListGallery({
+      ...(pageParam !== undefined ? { cursor: pageParam } : {}),
+      ...(q.trim().length > 0 ? { q: q.trim() } : {}),
+      // admin 治理需要看到全部（含已下架）；「仅已下架」在客户端筛选（下架项很少）。
+      includeHidden: true,
+    }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+  })
+  const items = data?.pages.flatMap(page => page.items) ?? []
+  const error = notice ?? (queryError !== null ? userErrorMessage(queryError) : null)
 
-  // 首载与翻页分离（同 web 端模式）：loadFirst 依赖过滤器；loadMore 闭包游标。
-  const loadFirst = useCallback(async () => {
-    const seq = ++requestSeq.current
-    setLoading(true)
-    setError(null)
-    setItems([])
-    setNextCursor(undefined)
-    setSelected(new Set())
-    try {
-      const page = await apiClient.adminListGallery({
-        ...(q.trim().length > 0 ? { q: q.trim() } : {}),
-        // admin 治理需要看到全部（含已下架）；「仅已下架」在客户端筛选（下架项很少）。
-        includeHidden: true,
-      })
-      if (seq !== requestSeq.current) return
-      setItems(page.items)
-      setNextCursor(page.nextCursor)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoading(false)
-    }
-  }, [q, visibility])
+  const invalidateGallery = () => queryClient.invalidateQueries({ queryKey: ['admin', 'gallery'] })
 
+  const loadMore = () => {
+    if (!hasNextPage || loadingMore) return
+    void fetchNextPage()
+  }
+
+  // 搜索词变化清空勾选（原先在 loadFirst 里做）。
   useEffect(() => {
-    void loadFirst()
-  }, [loadFirst])
-
-  const loadMore = useCallback(async () => {
-    if (nextCursor === undefined) return
-    const seq = requestSeq.current
-    setLoadingMore(true)
-    try {
-      const page = await apiClient.adminListGallery({
-        cursor: nextCursor,
-        ...(q.trim().length > 0 ? { q: q.trim() } : {}),
-        includeHidden: true,
-      })
-      if (seq !== requestSeq.current) return
-      setItems(current => [...current, ...page.items])
-      setNextCursor(page.nextCursor)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoadingMore(false)
-    }
-  }, [nextCursor, q, visibility])
+    setSelected(new Set())
+  }, [q])
 
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault()
@@ -138,16 +121,16 @@ export function GalleryManagePage() {
   const runBatch = async (op: () => Promise<unknown>, okMessage: string) => {
     if (selectedCount === 0) return
     setBatchBusy(true)
-    setError(null)
+    setNotice(null)
     try {
       const result = await op()
       const affected = typeof result === 'object' && result !== null && 'affected' in result
         ? String((result as { affected: number }).affected)
         : String(selectedCount)
-      setError(`${okMessage}：${affected} 个作品`)
-      void loadFirst()
+      setNotice(`${okMessage}：${affected} 个作品`)
+      void invalidateGallery()
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setBatchBusy(false)
     }
@@ -181,7 +164,7 @@ export function GalleryManagePage() {
   /** 拉取该记录的全部产物 → 映射 LightboxMedia → 打开全屏预览弹窗（遮罩 + 下载）。 */
   const openPreview = async (item: AdminGalleryItem) => {
     setPreviewLoadingId(item.id)
-    setError(null)
+    setNotice(null)
     try {
       const { items } = await apiClient.adminListGalleryArtifacts(item.id)
       const media: LightboxMedia[] = items.map(artifact => ({
@@ -194,7 +177,7 @@ export function GalleryManagePage() {
       }))
       setPreview({ items: media, index: 0 })
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setPreviewLoadingId(null)
     }
@@ -207,17 +190,10 @@ export function GalleryManagePage() {
     try {
       if (action === 'hide') await apiClient.adminHideGalleryItem(item.id)
       else await apiClient.adminUnhideGalleryItem(item.id)
-      setItems(current => current.map(candidate => candidate.id === item.id
-        ? {
-            ...candidate,
-            ...(action === 'hide'
-              ? { hiddenAt: new Date().toISOString() }
-              : { hiddenAt: undefined, hiddenBy: undefined }),
-          }
-        : candidate))
+      void invalidateGallery()
       setConfirmTarget(null)
     } catch (err) {
-      setError(userErrorMessage(err))
+      setNotice(userErrorMessage(err))
     } finally {
       setMutating(false)
     }
@@ -351,7 +327,7 @@ export function GalleryManagePage() {
         </CardContent>
       </Card>
 
-      {nextCursor !== undefined && visibleItems.length > 0 && (
+      {hasNextPage && visibleItems.length > 0 && (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
             {loadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}

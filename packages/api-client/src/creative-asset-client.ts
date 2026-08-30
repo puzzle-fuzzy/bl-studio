@@ -8,6 +8,8 @@ import {
 } from '@bailian-studio/creative-asset-contracts'
 import type {
   CreateCreativeAssetInput,
+  CollectCreativeAssetFromGenerationInput,
+  CollectCreativeAssetFromGenerationBatchInput,
   CreateCreativeAssetReferenceInput,
   CreateCreativeAssetVersionInput,
   CreateCreativeAssetVersionFromGenerationInput,
@@ -101,6 +103,13 @@ const CreativeAssetDetailSchema = CreativeAssetSummarySchema.extend({
   versions: z.array(CreativeAssetVersionSchema),
 })
 
+const CreativeAssetCollectionBatchResponseSchema = z.object({
+  batch: z.object({
+    id: z.string(),
+    assets: z.array(CreativeAssetDetailSchema),
+  }),
+})
+
 const CreativeProjectDetailSchema = CreativeProjectSchema.extend({
   assets: z.array(CreativeAssetSummarySchema),
 })
@@ -124,6 +133,7 @@ export type CreativeAssetPreview = z.infer<typeof CreativeAssetPreviewSchema>
 export type CreativeAssetVersion = z.infer<typeof CreativeAssetVersionSchema>
 export type CreativeAssetSummary = z.infer<typeof CreativeAssetSummarySchema>
 export type CreativeAssetDetail = z.infer<typeof CreativeAssetDetailSchema>
+export type CreativeAssetCollectionBatchResult = z.infer<typeof CreativeAssetCollectionBatchResponseSchema>['batch']
 export type CreativeProjectListResult = z.infer<typeof CreativeProjectListResponseSchema>
 export type CreativeAssetListResult = z.infer<typeof CreativeAssetListResponseSchema>
 
@@ -140,6 +150,8 @@ export type AttachCreativeAssetRequest = {
 export type CreateCreativeAssetRequest = CreateCreativeAssetInput & {
   projectId?: string
 }
+export type CollectCreativeAssetFromGenerationRequest = CollectCreativeAssetFromGenerationInput
+export type CollectCreativeAssetFromGenerationBatchRequest = CollectCreativeAssetFromGenerationBatchInput
 export type CreateCreativeAssetVersionRequest = Omit<CreateCreativeAssetVersionInput, 'assetId'>
 export type CreateCreativeAssetVersionFromGenerationRequest = CreateCreativeAssetVersionFromGenerationInput
 export type AddCreativeAssetReferenceRequest = Omit<CreateCreativeAssetReferenceInput, 'assetVersionId' | 'position' | 'metadata'> & {
@@ -180,6 +192,14 @@ export interface CreativeAssetApiClient {
   detachCreativeAssetFromProject(projectId: string, assetId: string): Promise<CreativeProjectDetail>
   listCreativeAssets(params?: ListCreativeAssetsParams): Promise<CreativeAssetListResult>
   createCreativeAsset(input: CreateCreativeAssetRequest): Promise<CreativeAssetDetail>
+  collectCreativeAssetFromGeneration(
+    input: CollectCreativeAssetFromGenerationRequest,
+    options: { idempotencyKey: string },
+  ): Promise<CreativeAssetDetail>
+  collectCreativeAssetFromGenerationBatch(
+    input: CollectCreativeAssetFromGenerationBatchRequest,
+    options: { idempotencyKey: string },
+  ): Promise<CreativeAssetCollectionBatchResult>
   getCreativeAsset(assetId: string): Promise<CreativeAssetDetail>
   archiveCreativeAsset(assetId: string): Promise<CreativeAssetDetail>
   createCreativeAssetVersion(assetId: string, input: CreateCreativeAssetVersionRequest): Promise<CreativeAssetDetail>
@@ -198,10 +218,13 @@ function queryString(params: object): string {
   return query.length === 0 ? '' : `?${query}`
 }
 
-function jsonInit(method: 'POST' | 'PATCH', body: unknown): RequestInit {
+function jsonInit(method: 'POST' | 'PATCH', body: unknown, options: { idempotencyKey?: string } = {}): RequestInit {
   return {
     method,
-    headers: { 'content-type': 'application/json' },
+    headers: {
+      'content-type': 'application/json',
+      ...(options.idempotencyKey === undefined ? {} : { 'Idempotency-Key': options.idempotencyKey }),
+    },
     body: JSON.stringify(body),
     credentials: 'include',
   }
@@ -288,6 +311,26 @@ export function createCreativeAssetClient(options: CreativeAssetClientOptions): 
         CreativeAssetResponseSchema,
       )
       return data.asset
+    },
+
+    async collectCreativeAssetFromGeneration(input, options) {
+      const data = await unwrapData(
+        `${base}/api/creative/assets/collect-from-generation`,
+        jsonInit('POST', input, options),
+        fetchImpl,
+        CreativeAssetResponseSchema,
+      )
+      return data.asset
+    },
+
+    async collectCreativeAssetFromGenerationBatch(input, options) {
+      const data = await unwrapData(
+        `${base}/api/creative/assets/collect-from-generation/batch`,
+        jsonInit('POST', input, options),
+        fetchImpl,
+        CreativeAssetCollectionBatchResponseSchema,
+      )
+      return data.batch
     },
 
     async getCreativeAsset(assetId) {

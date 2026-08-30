@@ -43,7 +43,7 @@ export function requireDatabaseUrl(): string {
  * "刷新"场景，独占库（createIsolatedTestDb）不需要 TRUNCATE。
  */
 export async function resetBailianStudioTestDb(db: BailianStudioDb): Promise<void> {
-  await db.execute(sql`truncate table audit_logs, worker_heartbeats, generation_shares, sessions, generation_artifacts, provider_request_audits, usage_records, task_records, generation_records, users restart identity cascade`)
+  await db.execute(sql`truncate table canvas_document_versions, canvas_documents, audit_logs, worker_heartbeats, generation_shares, sessions, generation_artifacts, provider_request_audits, usage_records, task_records, generation_records, users restart identity cascade`)
 }
 
 /**

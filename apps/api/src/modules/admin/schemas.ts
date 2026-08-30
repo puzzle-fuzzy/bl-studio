@@ -84,6 +84,21 @@ export const ListAdminTasksQuerySchema = z.object({
 
 export type ListAdminTasksQueryInput = z.infer<typeof ListAdminTasksQuerySchema>
 
+/** 审计 outbox 终态失败列表：只允许有限条数和时间上界分页。 */
+export const ListFailedAuditOutboxQuerySchema = z.object({
+  limit: z.coerce.number().int().min(1).max(100).optional(),
+  before: z.string().datetime({ offset: true }).optional(),
+}).strict()
+
+export type ListFailedAuditOutboxQueryInput = z.infer<typeof ListFailedAuditOutboxQuerySchema>
+
+/** 审计 outbox 人工重放目标。 */
+export const AuditOutboxEventParamsSchema = z.object({
+  eventId: z.string().trim().min(1).max(256),
+}).strict()
+
+export type AuditOutboxEventParamsInput = z.infer<typeof AuditOutboxEventParamsSchema>
+
 /** admin 任务请求上下文读取目标。 */
 export const AdminTaskParamsSchema = z.object({
   id: z.string().trim().min(1).max(256),

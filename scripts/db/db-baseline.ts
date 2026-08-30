@@ -6,8 +6,8 @@
  * 本命令刻意保持保守：只创建台账表、校验当前应用表存在，然后按仓库记录
  * 精确的 SHA-256/hash 与时间戳配对。它绝不改动应用数据行或 schema 表。
  *
- * 开发环境使用 `pnpm run db:baseline`，或显式设置 DATABASE_URL；全新数据库请改用
- * `pnpm run db:migrate`。
+ * 开发环境使用 `bun run db:baseline`，或显式设置 DATABASE_URL；全新数据库请改用
+ * `bun run db:migrate`。
  */
 
 import { createHash } from 'node:crypto'

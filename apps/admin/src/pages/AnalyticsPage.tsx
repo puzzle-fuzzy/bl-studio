@@ -1,17 +1,17 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
+import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Bar, BarChart, CartesianGrid, XAxis, YAxis } from 'recharts'
-import type { AdminAnalytics, ModelCatalogItem, ModelCost } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
-import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart'
+import { Button } from '@bailian-studio/ui'
+import { Input } from '@bailian-studio/ui'
+import { Label } from '@bailian-studio/ui'
+import { Card, CardContent, CardHeader, CardTitle } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@bailian-studio/ui'
+import { ChartContainer, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@bailian-studio/ui'
 
 const CHART_CONFIG = {
   margin: { label: '毛利', color: 'var(--chart-2)' },
@@ -33,38 +33,35 @@ function centsToYuan(cents: number): string {
  */
 export function AnalyticsPage() {
   const [days, setDays] = useState(30)
-  const [analytics, setAnalytics] = useState<AdminAnalytics | null>(null)
-  const [costs, setCosts] = useState<ModelCost[]>([])
-  const [models, setModels] = useState<ModelCatalogItem[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  // 保存成本单价的操作反馈；查询错误来自 useQuery。
+  const [mutationError, setMutationError] = useState<string | null>(null)
 
   const [costEditOpen, setCostEditOpen] = useState(false)
   const [costDrafts, setCostDrafts] = useState<Record<string, string>>({})
   const [savingCosts, setSavingCosts] = useState(false)
 
-  const load = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const [analyticsResult, costsResult, modelsResult] = await Promise.all([
-        apiClient.adminGetAnalytics({ days }),
-        apiClient.adminListModelCosts(),
-        apiClient.getModels(),
-      ])
-      setAnalytics(analyticsResult)
-      setCosts(costsResult.costs)
-      setModels(modelsResult)
-    } catch (err) {
-      setError(userErrorMessage(err))
-    } finally {
-      setLoading(false)
-    }
-  }, [days])
-
-  useEffect(() => {
-    void load()
-  }, [load])
+  // Batch 0c：三个独立查询各自缓存（analytics 随 days 失效），互不阻塞。
+  const queryClient = useQueryClient()
+  const { data: analyticsData, isPending: analyticsPending, error: analyticsError } = useQuery({
+    queryKey: ['admin', 'analytics', days],
+    queryFn: () => apiClient.adminGetAnalytics({ days }),
+  })
+  const { data: costsData, isPending: costsPending, error: costsError } = useQuery({
+    queryKey: ['admin', 'model-costs'],
+    queryFn: () => apiClient.adminListModelCosts(),
+  })
+  const { data: modelsData, isPending: modelsPending, error: modelsError } = useQuery({
+    queryKey: ['models', 'catalog'],
+    queryFn: () => apiClient.getModels(),
+  })
+  const models = modelsData ?? []
+  const analytics = analyticsPending ? null : analyticsData ?? null
+  const costs = costsData?.costs ?? []
+  const loading = analyticsPending || costsPending || modelsPending
+  const error = mutationError
+    ?? (analyticsError ?? costsError ?? modelsError) !== null
+      ? userErrorMessage(analyticsError ?? costsError ?? modelsError)
+      : null
 
   const costByModel = useMemo(() => {
     const map = new Map<string, number>()
@@ -96,9 +93,9 @@ export function AnalyticsPage() {
     try {
       await apiClient.adminUpdateModelCosts(entries)
       setCostEditOpen(false)
-      await load()
+      await queryClient.invalidateQueries({ queryKey: ['admin', 'model-costs'] })
     } catch (err) {
-      setError(userErrorMessage(err))
+      setMutationError(userErrorMessage(err))
     } finally {
       setSavingCosts(false)
     }

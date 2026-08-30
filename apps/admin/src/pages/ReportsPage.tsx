@@ -1,14 +1,15 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useState } from 'react'
+import { useInfiniteQuery, useQueryClient } from '@tanstack/react-query'
 import { Flag, Loader2 } from 'lucide-react'
 import type { ContentReport } from '@bailian-studio/api-client'
 import { apiClient } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
-import { Card, CardContent } from '@/components/ui/card'
-import { Skeleton } from '@/components/ui/skeleton'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Button } from '@bailian-studio/ui'
+import { Badge } from '@bailian-studio/ui'
+import { Card, CardContent } from '@bailian-studio/ui'
+import { Skeleton } from '@bailian-studio/ui'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@bailian-studio/ui'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@bailian-studio/ui'
 
 const REASON_LABELS: Record<string, string> = {
   unsafe: '不安全或违法',
@@ -39,66 +40,39 @@ function formatTime(iso: string): string {
 /** 内容举报管理：状态流转与可审计的目标作品下架。 */
 export function ReportsPage() {
   const [status, setStatus] = useState<string>('all')
-  const [items, setItems] = useState<ContentReport[]>([])
-  const [nextCursor, setNextCursor] = useState<string | undefined>(undefined)
-  const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
-  const [error, setError] = useState<string | null>(null)
-  const requestSeq = useRef(0)
+  // 变更操作（行内状态流转）的错误反馈；查询错误来自 useInfiniteQuery。
+  const [mutationError, setMutationError] = useState<string | null>(null)
+  const queryClient = useQueryClient()
+// Batch 0c：useInfiniteQuery 承载 首载+追加（键含 status），requestSeq 守卫作废。
+  const { data, isPending, error: queryError, fetchNextPage, hasNextPage, isFetchingNextPage } = useInfiniteQuery({
+    queryKey: ['admin', 'reports', status],
+    queryFn: ({ pageParam }) => apiClient.adminListContentReports({
+      ...(pageParam !== undefined ? { cursor: pageParam } : {}),
+      ...(status !== 'all' ? { status: status as 'open' | 'reviewing' | 'resolved' | 'dismissed' } : {}),
+    }),
+    initialPageParam: undefined as string | undefined,
+    getNextPageParam: lastPage => lastPage.nextCursor,
+  })
+  const items = data?.pages.flatMap(page => page.items) ?? []
+  const loading = isPending
+  const loadingMore = isFetchingNextPage
+  const error = mutationError ?? (queryError !== null ? userErrorMessage(queryError) : null)
 
-  const loadFirst = useCallback(async () => {
-    const seq = ++requestSeq.current
-    setLoading(true)
-    setError(null)
-    setItems([])
-    setNextCursor(undefined)
-    try {
-      const page = await apiClient.adminListContentReports({
-        ...(status !== 'all' ? { status: status as 'open' | 'reviewing' | 'resolved' | 'dismissed' } : {}),
-      })
-      if (seq !== requestSeq.current) return
-      setItems(page.items)
-      setNextCursor(page.nextCursor)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoading(false)
-    }
-  }, [status])
-
-  useEffect(() => {
-    void loadFirst()
-  }, [loadFirst])
-
-  const loadMore = useCallback(async () => {
-    if (nextCursor === undefined) return
-    const seq = requestSeq.current
-    setLoadingMore(true)
-    try {
-      const page = await apiClient.adminListContentReports({
-        cursor: nextCursor,
-        ...(status !== 'all' ? { status: status as 'open' | 'reviewing' | 'resolved' | 'dismissed' } : {}),
-      })
-      if (seq !== requestSeq.current) return
-      setItems(current => [...current, ...page.items])
-      setNextCursor(page.nextCursor)
-    } catch (err) {
-      if (seq === requestSeq.current) setError(userErrorMessage(err))
-    } finally {
-      if (seq === requestSeq.current) setLoadingMore(false)
-    }
-  }, [nextCursor, status])
+  const loadMore = () => {
+    if (!hasNextPage || isFetchingNextPage) return
+    void fetchNextPage()
+  }
 
   const updateReport = async (item: ContentReport, nextStatus: string, hideTarget: boolean) => {
     if (hideTarget && !window.confirm('确认下架这条公开作品？下架后普通用户将无法继续查看。')) return
     try {
-      const updated = await apiClient.adminUpdateContentReport(item.id, {
+      await apiClient.adminUpdateContentReport(item.id, {
         status: nextStatus as 'open' | 'reviewing' | 'resolved' | 'dismissed',
         ...(hideTarget ? { hideTarget: true } : {}),
       })
-      setItems(current => current.map(candidate => candidate.id === item.id ? updated : candidate))
+      void queryClient.invalidateQueries({ queryKey: ['admin', 'reports'] })
     } catch (err) {
-      setError(userErrorMessage(err))
+      setMutationError(userErrorMessage(err))
     }
   }
 
@@ -179,7 +153,7 @@ export function ReportsPage() {
         </CardContent>
       </Card>
 
-      {nextCursor !== undefined && items.length > 0 && (
+      {hasNextPage && items.length > 0 && (
         <div className="flex justify-center">
           <Button variant="outline" size="sm" disabled={loadingMore} onClick={() => void loadMore()}>
             {loadingMore ? <Loader2 className="size-4 animate-spin" /> : '加载更多'}

@@ -32,12 +32,12 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(SubmitFeedbackSchema, body)
       try {
-        const item = await deps.generationRepository.submitFeedback({
+        const item = await deps.feedbackRepository.submitFeedback({
           userId: user.id,
           kind: input.kind,
           content: input.content,
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'feedback.submit',
           outcome: 'succeeded',
@@ -47,7 +47,7 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { item } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: user.id,
           action: 'feedback.submit',
           outcome: 'failed',
@@ -59,7 +59,7 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
     .get('/api/feedback', async ({ request, query }) => {
       const user = await requireAuthUser(request, deps.authService)
       const input = validateInput(ListFeedbackQuerySchema, query)
-      const page = await deps.generationRepository.listMyFeedback({
+      const page = await deps.feedbackRepository.listMyFeedback({
         userId: user.id,
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
@@ -69,7 +69,7 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
     .get('/api/admin/feedback', async ({ request, query }) => {
       await requireAdminUser(request, deps.authService)
       const input = validateInput(ListFeedbackQuerySchema, query)
-      const page = await deps.generationRepository.listFeedback({
+      const page = await deps.feedbackRepository.listFeedback({
         ...(input.limit !== undefined ? { limit: input.limit } : {}),
         ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
         ...(input.status !== undefined ? { status: input.status } : {}),
@@ -81,12 +81,12 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
       const { id } = validateInput(FeedbackIdParamsSchema, params)
       const { status } = validateInput(UpdateFeedbackStatusSchema, body)
       try {
-        const item = await deps.generationRepository.updateFeedbackStatus({
+        const item = await deps.feedbackRepository.updateFeedbackStatus({
           itemId: id,
           status,
           resolvedBy: actor.id,
         })
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'feedback.update',
           outcome: 'succeeded',
@@ -96,7 +96,7 @@ export function createFeedbackRoutes(deps: ApiDependencies) {
         })
         return { success: true, data: { item } }
       } catch (error) {
-        await recordApiAuditEvent(deps.generationRepository, request, {
+        await recordApiAuditEvent(deps.auditRepository, request, {
           userId: actor.id,
           action: 'feedback.update',
           outcome: 'failed',
