@@ -178,8 +178,8 @@ flowchart LR
 - 用户可以通过 `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` 从一条已结束的执行派生新任务；
   新任务保留成功节点的稳定资产结果，只将目标节点及其下游置回 `queued`。失败任务中的其它失败分支也会
   一并失效，取消任务中的非成功节点不会被复用。原任务保持不可变，接口使用幂等键保护派生任务创建。
-- Canvas 页面已提供选中节点后的“重跑节点”入口，并复用同一条 SSE/轮询跟踪链路；因此节点级重跑不会
-  另起一套前端状态机。
+- Canvas 页面已提供失败节点诊断面板：可以定位并选中异常节点，查看节点错误码、generation/trace 链路与耗时，
+  并从同一面板重跑节点及其下游；它复用同一条 SSE/轮询跟踪链路，因此节点级重跑不会另起一套前端状态机。
 - 普通 Canvas 执行会按 `modelManifestHash + params + resolvedAssetRefs` 生成版本化节点缓存键，复用同一
   用户下成功且未软删除的 generation 幂等结果；缓存命中不重复创建 generation，也不重复扣费。失败/取消
   的旧缓存会自动降级为本次任务的 fresh key，节点级手动重跑固定使用 `refresh` 策略。

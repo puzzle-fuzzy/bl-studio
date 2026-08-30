@@ -12,17 +12,21 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import type { CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
+import type { CanvasExecutionTaskSummary, GenerationDiagnostics } from '@bailian-studio/api-client'
 import type { CanvasPreflightIssue } from '@bailian-studio/canvas-validation'
 import { apiClient } from '@bailian-studio/lib-client'
-import { History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
+import { CircleAlert, History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
 import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
+import { CanvasExecutionDiagnosticsPanel } from '../components/canvas/CanvasExecutionDiagnosticsPanel'
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
 import { useCanvasExecution } from '../hooks/use-canvas-execution'
 import { useModelCatalog } from '../hooks/use-model-catalog'
 import { preflightCanvasState } from '../lib/canvas-preflight'
+import {
+  getCanvasExecutionAttentionNodes,
+} from '../lib/canvas-execution-diagnostics'
 
 const nodeTypes: NodeTypes = { mediaNode: MediaNode }
 
@@ -45,6 +49,7 @@ export function CanvasPage() {
     retryNode,
     loadExecution,
     status: executionStatus,
+    execution,
     error: executionError,
   } = useCanvasExecution()
   const { data: models } = useModelCatalog()
@@ -58,7 +63,8 @@ export function CanvasPage() {
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
   const onConnect = useCanvasStore(state => state.onConnect)
-  const { screenToFlowPosition } = useReactFlow()
+  const selectNode = useCanvasStore(state => state.selectNode)
+  const { screenToFlowPosition, getNode, setCenter } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [showVersions, setShowVersions] = useState(false)
   const [showExecutions, setShowExecutions] = useState(false)
@@ -69,6 +75,11 @@ export function CanvasPage() {
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
   const [refreshingDocument, setRefreshingDocument] = useState(false)
   const [showPreflightIssues, setShowPreflightIssues] = useState(false)
+  const [showExecutionDiagnostics, setShowExecutionDiagnostics] = useState(false)
+  const [diagnosticNodeId, setDiagnosticNodeId] = useState<string | undefined>()
+  const [generationDiagnostics, setGenerationDiagnostics] = useState<GenerationDiagnostics | undefined>()
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState(false)
+  const [diagnosticsError, setDiagnosticsError] = useState<string | undefined>()
 
   const preflight = useMemo(
     () => models === undefined
@@ -76,6 +87,24 @@ export function CanvasPage() {
       : preflightCanvasState(nodes, edges, models),
     [edges, models, nodes],
   )
+  const attentionNodes = useMemo(
+    () => getCanvasExecutionAttentionNodes(execution),
+    [execution],
+  )
+  const diagnosticNode = attentionNodes.find(node => node.nodeId === diagnosticNodeId) ?? attentionNodes[0]
+
+  const focusCanvasNode = useCallback((nodeId: string) => {
+    selectNode(nodeId)
+    const node = getNode(nodeId)
+    if (node === undefined) return
+    void setCenter(node.position.x + 128, node.position.y + 96, { duration: 280, zoom: 1 })
+  }, [getNode, selectNode, setCenter])
+
+  const openNodeDiagnostics = useCallback((nodeId: string) => {
+    setDiagnosticNodeId(nodeId)
+    setShowExecutionDiagnostics(true)
+    focusCanvasNode(nodeId)
+  }, [focusCanvasNode])
 
   const handleExecute = useCallback(() => {
     if (models === undefined) return
@@ -90,6 +119,43 @@ export function CanvasPage() {
   useEffect(() => {
     if (preflight.valid) setShowPreflightIssues(false)
   }, [preflight.valid])
+
+  useEffect(() => {
+    if (attentionNodes.length === 0) {
+      setDiagnosticNodeId(undefined)
+      setGenerationDiagnostics(undefined)
+      return
+    }
+    setDiagnosticNodeId(current => (
+      current !== undefined && attentionNodes.some(node => node.nodeId === current)
+        ? current
+        : attentionNodes[0]?.nodeId
+    ))
+    if (execution?.status === 'failed' || execution?.status === 'cancelled') {
+      setShowExecutionDiagnostics(true)
+    }
+  }, [attentionNodes, execution?.status])
+
+  useEffect(() => {
+    setGenerationDiagnostics(undefined)
+    setDiagnosticsError(undefined)
+    setDiagnosticsLoading(false)
+    const generationId = diagnosticNode?.generationId
+    if (!showExecutionDiagnostics || generationId === undefined) return
+    let disposed = false
+    setDiagnosticsLoading(true)
+    void apiClient.getGenerationDiagnostics(generationId)
+      .then(next => {
+        if (!disposed) setGenerationDiagnostics(next)
+      })
+      .catch(() => {
+        if (!disposed) setDiagnosticsError('链路诊断暂时不可用，请稍后重试')
+      })
+      .finally(() => {
+        if (!disposed) setDiagnosticsLoading(false)
+      })
+    return () => { disposed = true }
+  }, [diagnosticNode?.generationId, showExecutionDiagnostics])
 
   useEffect(() => {
     if (showVersions) void refreshVersions()
@@ -335,6 +401,21 @@ export function CanvasPage() {
               重跑节点
             </Button>
           )}
+        {attentionNodes.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              const nodeId = diagnosticNode?.nodeId ?? attentionNodes[0]?.nodeId
+              if (nodeId !== undefined) openNodeDiagnostics(nodeId)
+            }}
+            aria-expanded={showExecutionDiagnostics}
+            title="查看失败或未完成节点的诊断"
+          >
+            <CircleAlert className="mr-1 size-3.5 text-destructive" aria-hidden />
+            诊断（{attentionNodes.length}）
+          </Button>
+        )}
         <Button size="sm" variant="ghost" onClick={() => setShowVersions(open => !open)} aria-expanded={showVersions}>
           <History className="mr-1 size-3.5" aria-hidden />
           版本
@@ -367,6 +448,24 @@ export function CanvasPage() {
         <div role="alert" className="absolute top-14 right-3 z-30 max-w-80 rounded-xl border border-destructive/40 bg-surface/95 px-3 py-2 text-[10px] leading-4 text-destructive shadow-lg backdrop-blur">
           {executionError}
         </div>
+      )}
+
+      {showExecutionDiagnostics && execution !== undefined && attentionNodes.length > 0 && (
+        <CanvasExecutionDiagnosticsPanel
+          execution={execution}
+          attentionNodes={attentionNodes}
+          selectedNode={diagnosticNode}
+          generationDiagnostics={generationDiagnostics}
+          diagnosticsLoading={diagnosticsLoading}
+          diagnosticsError={diagnosticsError}
+          canRetry={executionStatus === 'succeeded' || executionStatus === 'failed' || executionStatus === 'cancelled'}
+          onSelectNode={openNodeDiagnostics}
+          onRetryNode={nodeId => {
+            focusCanvasNode(nodeId)
+            void retryNode(nodeId)
+          }}
+          onClose={() => setShowExecutionDiagnostics(false)}
+        />
       )}
 
       {showVersions && (

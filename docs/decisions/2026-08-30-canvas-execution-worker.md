@@ -60,8 +60,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` 从已结束任务派生新的
   `canvas.execute`。服务端通过纯函数计算目标节点及下游失效范围，并复用成功节点的 `assetIds`；原任务
   不原地改写，派生任务带有 `rerun.sourceExecutionId` / `rerun.nodeId` 元数据和独立幂等边界。
-- Canvas 页面通过选中节点后的“重跑节点”操作调用该接口，并继续使用 Canvas execution SSE；SSE 不可用时
-  使用同一个 fallback polling 实现。
+- Canvas 页面通过失败节点诊断面板定位节点、查看安全的 generation 链路信息，并调用“重跑节点”接口；重跑继续使用
+  Canvas execution SSE，SSE 不可用时使用同一个 fallback polling 实现。
 - 普通执行输入携带 `cachePolicy=reuse`，Worker 以 `modelManifestHash + params + resolvedAssetRefs` 生成
   版本化 cache idempotency key，交给已有 generation repository 的用户级幂等边界。只有成功且未软删除的
   结果可被继续复用；失败/取消结果切换到任务级 fresh key，避免坏缓存永久阻塞后续运行。节点级手动重跑

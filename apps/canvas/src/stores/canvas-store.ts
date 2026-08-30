@@ -36,6 +36,7 @@ export interface CanvasState {
   onEdgesChange: (changes: EdgeChange[]) => void
   onConnect: (connection: Connection) => void
   addNode: (node: Node) => void
+  selectNode: (id: string) => void
   updateNodeData: (id: string, data: Partial<Node['data']>) => void
   removeNode: (id: string) => void
   clear: () => void
@@ -115,6 +116,15 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   addNode: (node) => {
     set(state => ({ nodes: [...state.nodes, node] }))
     persist(get)
+  },
+
+  selectNode: (id) => {
+    set(state => ({
+      nodes: state.nodes.map(node => ({
+        ...node,
+        selected: node.id === id,
+      })),
+    }))
   },
 
   updateNodeData: (id, data) => {

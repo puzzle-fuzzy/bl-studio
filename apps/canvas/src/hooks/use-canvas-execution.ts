@@ -44,6 +44,7 @@ export function useCanvasExecution() {
   const runIdRef = useRef(0)
   const [status, setStatus] = useState<CanvasExecutionStatus>('idle')
   const [taskId, setTaskId] = useState<string | undefined>()
+  const [execution, setExecution] = useState<CanvasExecutionTaskSummary | undefined>()
   const [error, setError] = useState<string | undefined>()
   const resumedDocumentRef = useRef<string | undefined>(undefined)
 
@@ -122,6 +123,7 @@ export function useCanvasExecution() {
       canvasId: string,
     ): Promise<void> => {
       if (runIdRef.current !== runId) return
+      setExecution(execution)
       await applySummary(execution, runId)
       if (runIdRef.current !== runId) return
       setTaskId(execution.id)
@@ -142,6 +144,7 @@ export function useCanvasExecution() {
       }
       const finish = async (next: CanvasExecutionTaskSummary): Promise<void> => {
         if (runIdRef.current !== runId || finished) return
+        setExecution(next)
         await applySummary(next, runId)
         if (runIdRef.current !== runId || finished) return
         if (isTerminalExecution(next)) {
@@ -216,6 +219,7 @@ export function useCanvasExecution() {
     }
     stop()
     setTaskId(undefined)
+    setExecution(undefined)
     const runId = runIdRef.current
     setExecutionStatus('submitting')
     setError(undefined)
@@ -265,6 +269,7 @@ export function useCanvasExecution() {
     try {
       const execution = await apiClient.cancelCanvasExecution(documentId, taskId)
       if (runIdRef.current !== runId) return
+      setExecution(execution)
       await applySummary(execution, runId)
       setExecutionStatus(toUiExecutionStatus(execution.status))
       if (execution.error !== undefined) setError(execution.error)
@@ -280,10 +285,12 @@ export function useCanvasExecution() {
     stop()
     const runId = runIdRef.current
     setTaskId(executionId)
+    setExecution(undefined)
     setError(undefined)
     try {
       const execution = await apiClient.getCanvasExecution(documentId, executionId)
       if (runIdRef.current !== runId) return
+      setExecution(execution)
       await applySummary(execution, runId)
       if (runIdRef.current !== runId) return
       setExecutionStatus(toUiExecutionStatus(execution.status))
@@ -318,7 +325,7 @@ export function useCanvasExecution() {
 
   useEffect(() => () => stop(), [stop])
 
-  return { execute, cancel, retryNode, loadExecution, stop, status, taskId, error }
+  return { execute, cancel, retryNode, loadExecution, stop, status, taskId, execution, error }
 }
 
 function formatNodeError(error: string | undefined, errorCode: string | undefined, fallback: string): string {
