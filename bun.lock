@@ -477,6 +477,7 @@
         "@bailian-studio/task-repository": "workspace:*",
         "drizzle-orm": "catalog:",
         "postgres": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "@bailian-studio/admin-repository": "workspace:*",
@@ -509,6 +510,7 @@
         "@bailian-studio/task-engine": "workspace:*",
         "@bailian-studio/task-repository": "workspace:*",
         "drizzle-orm": "catalog:",
+        "zod": "catalog:",
       },
       "devDependencies": {
         "typescript": "catalog:",

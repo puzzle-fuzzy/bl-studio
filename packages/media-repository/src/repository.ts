@@ -2,6 +2,7 @@ import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
 import { mediaJobs, userAssets, type BailianStudioDb } from '@bailian-studio/db'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { TaskQueueTransactionStore } from '@bailian-studio/task-repository'
+import { z } from 'zod'
 import { createMediaJobId, createMediaTaskId } from './id'
 import { MediaRepositoryError } from './errors'
 import { toMediaJob } from './mappers'
@@ -32,38 +33,26 @@ export interface MediaRepository {
   failMediaJob(input: FailMediaJobInput): Promise<MediaJob>
 }
 
-interface AssemblySourceReference {
-  assetId: string
-  kind: 'video' | 'audio'
-  fileName?: string
-}
+const AssemblySourceReferenceSchema = z.object({
+  assetId: z.string().trim().min(1),
+  kind: z.enum(['video', 'audio']),
+  fileName: z.string().optional(),
+}).strict()
 
-interface AssemblyInput {
-  videoSources: AssemblySourceReference[]
-  musicSource?: AssemblySourceReference
-}
+const AssemblyInputSchema = z.object({
+  videoSources: z.array(AssemblySourceReferenceSchema),
+  musicSource: AssemblySourceReferenceSchema.optional(),
+}).strict()
+
+type AssemblyInput = z.infer<typeof AssemblyInputSchema>
 
 function readAssemblyInput(value: unknown): AssemblyInput | undefined {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined
-  const record = value as Record<string, unknown>
-  const videoSources = Array.isArray(record.videoSources)
-    ? record.videoSources.flatMap(item => {
-        if (typeof item !== 'object' || item === null || Array.isArray(item)) return []
-        const source = item as Record<string, unknown>
-        return typeof source.assetId === 'string' && source.kind === 'video'
-          ? [{ assetId: source.assetId, kind: 'video' as const, ...(typeof source.fileName === 'string' ? { fileName: source.fileName } : {}) }]
-          : []
-      })
-    : []
-  const musicValue = record.musicSource
-  let musicSource: AssemblySourceReference | undefined
-  if (typeof musicValue === 'object' && musicValue !== null && !Array.isArray(musicValue)) {
-    const source = musicValue as Record<string, unknown>
-    if (typeof source.assetId === 'string' && source.kind === 'audio') {
-      musicSource = { assetId: source.assetId, kind: 'audio', ...(typeof source.fileName === 'string' ? { fileName: source.fileName } : {}) }
-    }
+  if (value === undefined) return undefined
+  const parsed = AssemblyInputSchema.safeParse(value)
+  if (!parsed.success) {
+    throw new MediaRepositoryError('DATABASE_ERROR', 'Stored media assembly input is invalid')
   }
-  return { videoSources, ...(musicSource === undefined ? {} : { musicSource }) }
+  return parsed.data
 }
 
 function nowIso(): string {

@@ -21,7 +21,8 @@
     "@bailian-studio/task-repository": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",
     "drizzle-orm": "catalog:",
-    "postgres": "catalog:"
+    "postgres": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "@bailian-studio/admin-repository": "workspace:*",

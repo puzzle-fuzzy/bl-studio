@@ -373,6 +373,32 @@ describe('generation repository', () => {
     })).rejects.toMatchObject({ code: 'POINTS_INSUFFICIENT' })
   })
 
+  it('rejects malformed stored generation JSON instead of returning an unchecked value', async () => {
+    const recordId = 'malformed-generation-json'
+    await db.insert(generationRecords).values({
+      id: recordId,
+      userId: 'user_1',
+      modelId: 'qwen-image',
+      provider: 'dashscope',
+      providerModel: 'qwen-image-v1',
+      category: 'image',
+      status: 'succeeded',
+      inputParamsJson: { prompt: 'valid before corruption' },
+      costEstimate: 20,
+      providerCancelStatus: 'not_requested',
+      createdAt: new Date('2026-08-01T03:00:00.000Z'),
+      updatedAt: new Date('2026-08-01T03:00:00.000Z'),
+    })
+
+    await db
+      .update(generationRecords)
+      .set({ inputParamsJson: [] as unknown as Record<string, unknown> })
+      .where(eq(generationRecords.id, recordId))
+
+    await expect(repository.getGenerationRecord(recordId))
+      .rejects.toMatchObject({ code: 'DATABASE_ERROR' })
+  })
+
   it('serializes concurrent reservations so one request cannot overspend the account', async () => {
     await db.insert(creditAccounts).values({
       id: 'credit-account-user_empty',

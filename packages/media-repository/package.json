@@ -16,7 +16,8 @@
     "@bailian-studio/db": "workspace:*",
     "@bailian-studio/task-repository": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",
-    "drizzle-orm": "catalog:"
+    "drizzle-orm": "catalog:",
+    "zod": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:"

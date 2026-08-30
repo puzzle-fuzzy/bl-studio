@@ -141,6 +141,27 @@ describe('media repository', () => {
     ])
   })
 
+  it('rejects malformed stored assembly input instead of silently dropping sources', async () => {
+    const user = await createMediaTestUser(iso.db, { id: 'malformed-assembly-owner' })
+    await seedVideoAsset(user.id, 'malformed-assembly-source')
+    const created = await iso.repository.createMediaJob({
+      userId: user.id,
+      operation: 'video.assemble',
+      source: { assetId: 'malformed-assembly-source', kind: 'video' },
+      assembly: {
+        videoSources: [{ assetId: 'malformed-assembly-source', kind: 'video' }],
+      },
+    })
+
+    await iso.db
+      .update(mediaJobs)
+      .set({ inputJson: { assembly: { videoSources: [{ assetId: 'malformed-assembly-source', kind: 'unknown' }] } } })
+      .where(eq(mediaJobs.id, created.job.id))
+
+    await expect(iso.repository.getMediaSources(created.job.id))
+      .rejects.toMatchObject({ code: 'DATABASE_ERROR' })
+  })
+
   it('does not accept an asset id belonging to another user', async () => {
     const owner = await createMediaTestUser(iso.db, { id: 'owner' })
     const other = await createMediaTestUser(iso.db, { id: 'other' })

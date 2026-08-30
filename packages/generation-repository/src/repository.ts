@@ -173,28 +173,6 @@ import {
 	readGenerationUsage,
 } from "./usage";
 
-/**
- * 把任意值安全地当作 JSON 记录返回。
- * 输入为 null/undefined、或不是「普通对象」时返回 null，避免把数组/原始值
- * 误当成 record 写进数据库。
- */
-function safeParseJsonRecord(value: unknown): Record<string, unknown> | null {
-	if (value === null || value === undefined) {
-		return null;
-	}
-
-	if (typeof value === "object" && !Array.isArray(value)) {
-		try {
-			// 这里仅做结构判定：只要走到了「非数组 object」就认为是 plain object。
-			return value as Record<string, unknown>;
-		} catch {
-			return null;
-		}
-	}
-
-	return null;
-}
-
 function toGenerationArtifactWithThumbnail(
 	artifact: typeof generationArtifacts.$inferSelect,
 	thumbnail?: typeof assetDerivatives.$inferSelect | null,
@@ -885,10 +863,6 @@ function generationListViewCondition(
 	return or(...conditions) ?? defaultGenerationListCondition();
 }
 
-/**
- * 把领域 TaskRecord 拼成 task_records 表的 insert/update 列值。
- * 所有 ISO 时间字符串在这里转回 Date；errorJson 走 safeParseJsonRecord 兜底。
- */
 // P1-C：任务序列化与写入已统一到 @bailian-studio/task-repository
 
 /**

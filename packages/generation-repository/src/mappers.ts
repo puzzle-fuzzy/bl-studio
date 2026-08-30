@@ -11,7 +11,9 @@
  */
 import type { InferSelectModel } from 'drizzle-orm'
 import type { auditLogs, generationArtifacts, generationEvents, generationRecords, generationShares, providerRequestAudits, taskRecords, workerHeartbeats } from '@bailian-studio/db'
+import { z } from 'zod'
 import type { AuditLog, AuditEventMetadata } from './audit-types'
+import { GenerationRepositoryError } from './errors'
 import type { ProviderRequestAudit } from './provider-request-types'
 import type { GenerationArtifact, GenerationAssetRefs, GenerationEvent, GenerationRecord, GenerationShare, WorkerHeartbeat } from './types'
 
@@ -23,6 +25,25 @@ export type TaskRecordRow = InferSelectModel<typeof taskRecords>
 export type ProviderRequestAuditRow = InferSelectModel<typeof providerRequestAudits>
 export type WorkerHeartbeatRow = InferSelectModel<typeof workerHeartbeats>
 export type AuditLogRow = InferSelectModel<typeof auditLogs>
+
+const JsonRecordSchema = z.record(z.string(), z.unknown())
+
+function readOptionalJsonRecord(value: unknown, field: string): Record<string, unknown> | undefined {
+	if (value === null || value === undefined) return undefined
+	const parsed = JsonRecordSchema.safeParse(value)
+	if (!parsed.success) {
+		throw new GenerationRepositoryError('DATABASE_ERROR', `Stored ${field} JSON value is invalid`)
+	}
+	return parsed.data
+}
+
+function readRequiredJsonRecord(value: unknown, field: string): Record<string, unknown> {
+	const parsed = JsonRecordSchema.safeParse(value)
+	if (!parsed.success) {
+		throw new GenerationRepositoryError('DATABASE_ERROR', `Stored ${field} JSON value is invalid`)
+	}
+	return parsed.data
+}
 
 // 任务行映射由 task-repository 统一拥有；这里保留 re-export 让旧的
 // 保留这些映射在共享模块，避免跨 repository 包重复定义。
@@ -40,7 +61,7 @@ export function toGenerationRecord(
     provider: row.provider as GenerationRecord['provider'],
     providerModel: row.providerModel,
     category: row.category as GenerationRecord['category'],
-    inputParams: row.inputParamsJson,
+		inputParams: readRequiredJsonRecord(row.inputParamsJson, 'generation inputParams'),
     ...(assetRefs !== undefined && Object.keys(assetRefs).length > 0
       ? { assetRefs }
       : {}),
@@ -52,8 +73,8 @@ export function toGenerationRecord(
     providerStatus: row.providerStatus ?? undefined,
     requestId: row.requestId ?? undefined,
     traceId: row.traceId ?? undefined,
-    outputResult: row.outputResultJson ?? undefined,
-    errorJson: row.errorJson ?? undefined,
+		outputResult: readOptionalJsonRecord(row.outputResultJson, 'generation outputResult'),
+		errorJson: readOptionalJsonRecord(row.errorJson, 'generation error'),
     costEstimate: row.costEstimate,
     currency: row.currency as GenerationRecord['currency'],
     pricingVersion: row.pricingVersion,
@@ -124,7 +145,7 @@ export function toGenerationArtifact(row: GenerationArtifactRow, assetId?: strin
     storageUrl: row.storageUrl ?? undefined,
     byteSize: row.byteSize ?? undefined,
     status: row.status as GenerationArtifact['status'],
-    errorJson: row.errorJson ?? undefined,
+		errorJson: readOptionalJsonRecord(row.errorJson, 'generation artifact error'),
     createdAt: row.createdAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
   }
