@@ -122,6 +122,8 @@ bun run deploy:prod                       # 会先在干净工作区强制跑 ve
    - **审计 Outbox 运营**：查看终态失败量、消费异常、Worker 消费耗时 max 和失败明细；数据来自 Worker 的结构化指标快照日志。
    - **Canvas 运营**：查看 Canvas 执行成功率、平均/P95 耗时、任务与节点失败原因，以及节点生成排队和缓存命中情况；数据来自 Worker 的结构化事件日志。
 
+Canvas 当前只提供运营看板和发布后健康冒烟，不预置单次失败即告警的规则；先采集生产基线，再按失败率、最小样本数和延迟分位数配置低噪告警。详见 [Canvas 可观测性告警边界](decisions/2026-08-30-canvas-observability-alert-boundary.md)。
+
 ### 5.2 常用 LogQL
 
 ```logql
