@@ -27,8 +27,8 @@ function persistedData(data: Record<string, unknown>): Record<string, unknown> {
 function normalizeRestoredNodeData(data: Record<string, unknown>): MediaNodeData {
   const normalized = normalizeMediaNodeData(data)
   const generationId = normalized.generationId
-  if (normalized.status === 'generating' && generationId !== undefined) return normalized
-  if (normalized.status === 'error' || normalized.status === 'ready' || normalized.status === 'empty') return normalized
+  if (data.status === 'generating' && generationId !== undefined) return normalized
+  if (data.status === 'error' || data.status === 'ready' || data.status === 'empty') return normalized
   return {
     ...normalized,
     status: generationId !== undefined
