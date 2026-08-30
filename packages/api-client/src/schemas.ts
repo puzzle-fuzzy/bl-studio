@@ -1177,6 +1177,24 @@ const AdminGenerationTaskContextSchema = z.object({
 })
 
 /** Canvas 任务的编排快照与每个节点的成本诊断。 */
+export const AdminCanvasTaskAssetSchema = AssetItemSchema.pick({
+  id: true,
+  kind: true,
+  source: true,
+  url: true,
+  thumbnailUrl: true,
+  thumbnailStatus: true,
+  text: true,
+  mimeType: true,
+  byteSize: true,
+  durationSeconds: true,
+  declaredResolution: true,
+  fileName: true,
+  recordId: true,
+  modelId: true,
+  createdAt: true,
+}).strict()
+
 export const AdminCanvasTaskContextSchema = z.object({
   kind: z.literal('canvas'),
   documentId: z.string(),
@@ -1186,6 +1204,8 @@ export const AdminCanvasTaskContextSchema = z.object({
     sourceExecutionId: z.string(),
     nodeId: z.string(),
   }).strict().optional(),
+  /** 输出资产的元数据和短期预览 URL；老版本 API 可能不返回此字段。 */
+  assets: z.array(AdminCanvasTaskAssetSchema).optional(),
   nodes: z.array(z.object({
     nodeId: z.string(),
     kind: z.enum(['image', 'video']),
@@ -1418,6 +1438,7 @@ export type ListAdminTasksResult = z.infer<typeof ListAdminTasksResponseSchema>
 export type AdminTaskInputAsset = z.infer<typeof AdminTaskInputAssetSchema>
 export type AdminTaskRequestContext = z.infer<typeof AdminTaskRequestContextSchema>
 export type AdminCanvasTaskContext = z.infer<typeof AdminCanvasTaskContextSchema>
+export type AdminCanvasTaskAsset = z.infer<typeof AdminCanvasTaskAssetSchema>
 export type AdminCanvasTaskNode = AdminCanvasTaskContext['nodes'][number]
 export type AdminGalleryArtifact = z.infer<typeof AdminGalleryArtifactSchema>
 export type AdminGalleryArtifactsResult = z.infer<typeof AdminGalleryArtifactsResponseSchema>

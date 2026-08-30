@@ -62,8 +62,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
   复用同一套字段，旧任务缺少字段时保持兼容。Canvas 历史面板显示总耗时、失败节点数量和任务错误码，节点错误提示保留错误码。
 - 节点耗时同时进入 Worker 进程内 timing 指标，后续可接入外部指标后端；本阶段不复制第二份任务状态表。
 - Canvas 父任务与实际创建的子 generation 共用任务 `traceId`，管理侧成本分析据此关联 `task_records` 与 `generation_records`；
-  `nodeRuns.cacheHit` 只统计缓存复用次数，不再次计入 generation 成本。该分析先复用现有表结构，不新增成本明细表，后续
-  若需要按节点或单次执行钻取，再在此关联契约上扩展读模型。
+  `nodeRuns.cacheHit` 只统计缓存复用次数，不再次计入 generation 成本。该分析先复用现有表结构，不新增成本明细表；节点和
+  单次执行钻取通过 admin 读模型关联已有 generation 与 `user_assets`，不复制成本或 Canvas 运行态表。
 - 管理任务详情沿用 `/api/admin/tasks/:id/request-context`，对合法的 `canvas.execute` 返回带
-  `kind="canvas"` 的节点级诊断与费用投影；只有子 generation 的 `traceId` 与父任务一致、且节点未命中缓存时才核算费用。
-  这样 admin 可以定位单次执行而不读取用户侧权限接口，也不新增 Canvas 专用运行态表。
+  `kind="canvas"` 的节点级诊断、费用投影和批量回溯的输出资产元数据；只有子 generation 的 `traceId` 与父任务一致、且节点未命中缓存时才核算费用。
+  存储坐标只在 API 层转换为短期预览 URL，不进入 wire。这样 admin 可以定位单次执行和输出资产而不读取用户侧权限接口，也不新增 Canvas 专用运行态表。

@@ -475,6 +475,15 @@ describe('createApiClient', () => {
             documentId: 'canvas-1',
             documentRevision: 3,
             cachePolicy: 'reuse',
+            assets: [{
+              id: 'asset-canvas-output-1',
+              kind: 'image',
+              source: 'generation',
+              url: '/signed/output.png?ttl=3600',
+              thumbnailUrl: '/signed/output-thumb.png?ttl=3600',
+              thumbnailStatus: 'ready',
+              createdAt: '2026-08-30T00:00:03.000Z',
+            }],
             nodes: [{
               nodeId: 'node-1',
               kind: 'image',
@@ -485,6 +494,7 @@ describe('createApiClient', () => {
               dependsOn: [],
               status: 'succeeded',
               generationId: 'generation-canvas-1',
+              assetIds: ['asset-canvas-output-1'],
               cacheHit: false,
               generationStatus: 'succeeded',
               accountedCents: 120,
@@ -503,6 +513,10 @@ describe('createApiClient', () => {
       nodeId: 'node-1',
       generationId: 'generation-canvas-1',
       accountedCents: 120,
+    })
+    expect(context.assets?.[0]).toMatchObject({
+      id: 'asset-canvas-output-1',
+      thumbnailUrl: '/signed/output-thumb.png?ttl=3600',
     })
   })
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { ChevronLeft, ChevronRight, FileArchive, FileText, Film, Image as ImageIcon, Loader2, Music } from 'lucide-react'
-import type { AdminCanvasTaskContext, AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
+import type { AdminCanvasTaskAsset, AdminCanvasTaskContext, AdminTaskItem, AdminTaskRequestContext } from '@bailian-studio/api-client'
 import { apiClient, resolveApiUrl } from '@/lib/api'
 import { userErrorMessage } from '@/lib/user-error'
 import { MediaLightbox, isLightboxKind, type LightboxMedia } from '@/components/shared/MediaLightbox'
@@ -61,6 +61,73 @@ function shortId(id: string | undefined, len = 8): string {
 
 function centsToYuan(cents: number): string {
   return (cents / 100).toFixed(2)
+}
+
+function CanvasTaskOutputAssets({
+  assets,
+  nodes,
+}: {
+  assets: AdminCanvasTaskAsset[]
+  nodes: AdminCanvasTaskContext['nodes']
+}) {
+  if (assets.length === 0) return null
+
+  return (
+    <section className="flex flex-col gap-3">
+      <div>
+        <h4 className="text-sm font-medium">输出资产回溯</h4>
+        <p className="mt-1 text-sm text-muted-foreground">从节点输出 ID 回溯到资产元数据；预览地址为短期签名 URL。</p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {assets.map(asset => {
+          const previewUrl = asset.thumbnailUrl ?? (asset.kind === 'image' ? asset.url : undefined)
+          const usedBy = nodes
+            .filter(node => node.assetIds?.includes(asset.id))
+            .map(node => node.nodeId)
+          const KindIcon = assetKindIcon(asset.kind)
+          const preview = previewUrl !== undefined ? (
+            <img
+              src={resolveApiUrl(previewUrl)}
+              alt={asset.fileName ?? asset.id}
+              className="aspect-video w-full object-cover"
+            />
+          ) : asset.kind === 'text' && asset.text !== undefined ? (
+            <pre className="line-clamp-5 min-h-24 whitespace-pre-wrap bg-muted p-3 text-xs">{asset.text}</pre>
+          ) : (
+            <div className="flex min-h-24 items-center justify-center gap-2 bg-muted text-sm text-muted-foreground">
+              <KindIcon className="size-5" />
+              {asset.kind}
+            </div>
+          )
+
+          return (
+            <div key={asset.id} className="overflow-hidden rounded-lg border">
+              {asset.url !== undefined ? (
+                <a
+                  href={resolveApiUrl(asset.url)}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block transition-opacity hover:opacity-85 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+                  aria-label={`打开输出资产 ${asset.fileName ?? asset.id}`}
+                >
+                  {preview}
+                </a>
+              ) : preview}
+              <div className="flex flex-col gap-1 p-3">
+                <span className="truncate text-xs font-medium" title={asset.fileName ?? asset.id}>
+                  {asset.fileName ?? shortId(asset.id, 18)}
+                </span>
+                <span className="truncate font-mono text-[11px] text-muted-foreground" title={asset.id}>{asset.id}</span>
+                <span className="text-xs text-muted-foreground">
+                  节点：{usedBy.length > 0 ? usedBy.join('、') : '未关联'}
+                </span>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </section>
+  )
 }
 
 function assetKindIcon(kind: string) {
@@ -139,6 +206,8 @@ function CanvasTaskContextSection({ context }: { context: AdminCanvasTaskContext
           </TableBody>
         </Table>
       </div>
+
+      <CanvasTaskOutputAssets assets={context.assets ?? []} nodes={context.nodes} />
 
       {context.nodes.some(node => node.error !== undefined) && (
         <div className="flex flex-col gap-2 rounded-lg bg-destructive/5 p-3">

@@ -1,4 +1,4 @@
-import { createDb, generationRecords, taskRecords, users, type BailianStudioDb } from '@bailian-studio/db'
+import { createDb, generationRecords, taskRecords, userAssets, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { createAdminTaskRepository, createAnalyticsRepository, type AdminTaskRepository, type AnalyticsRepository } from '../src'
@@ -27,12 +27,13 @@ function canvasInput(cacheHit: boolean): Record<string, unknown> {
         dependsOn: [],
       }],
     },
-    nodeRuns: {
-      'node-1': {
-        status: 'succeeded',
-        generationId: cacheHit ? 'generation-from-previous-execution' : 'generation-current',
-        cacheHit,
-      },
+      nodeRuns: {
+        'node-1': {
+          status: 'succeeded',
+          generationId: cacheHit ? 'generation-from-previous-execution' : 'generation-current',
+          cacheHit,
+          assetIds: ['asset_generation_current'],
+        },
     },
     cachePolicy: 'reuse',
   }
@@ -136,6 +137,24 @@ describe('admin analytics repository', () => {
       },
     ])
 
+    await db.insert(userAssets).values({
+      id: 'asset_generation_current',
+      userId: USER_ID,
+      kind: 'image',
+      source: 'generation',
+      recordId: 'generation-current',
+      modelId: 'qwen-image',
+      storageProvider: 'local',
+      storageKey: 'outputs/generation-current.png',
+      mimeType: 'image/png',
+      byteSize: 120,
+      status: 'ready',
+      createdBy: 'system',
+      updatedBy: 'system',
+      createdAt: new Date('2026-08-10T00:00:02.000Z'),
+      updatedAt: new Date('2026-08-10T00:00:02.000Z'),
+    })
+
     analytics = createAnalyticsRepository(db)
     adminTasks = createAdminTaskRepository(db)
   })
@@ -165,6 +184,13 @@ describe('admin analytics repository', () => {
       documentId: 'canvas-1',
       documentRevision: 1,
       cachePolicy: 'reuse',
+      assets: [{
+        id: 'asset_generation_current',
+        kind: 'image',
+        source: 'generation',
+        storageProvider: 'local',
+        storageKey: 'outputs/generation-current.png',
+      }],
       nodes: [{
         nodeId: 'node-1',
         modelId: 'qwen-image',

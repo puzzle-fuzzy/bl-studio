@@ -229,11 +229,22 @@ const fakeAdminTaskRepository: AdminTaskRepository = {
   getAdminTaskRequestContext: async id => {
     if (id === 'canvas-task-1') {
       return {
-        task: { id, type: 'canvas.execute', domain: 'canvas' } as never,
+        task: { id, type: 'canvas.execute', domain: 'canvas', userId: 'user-1' } as never,
         canvas: {
           documentId: 'canvas-1',
           documentRevision: 3,
           cachePolicy: 'reuse',
+          assets: [{
+            id: 'asset-canvas-output-1',
+            kind: 'image',
+            source: 'generation',
+            storageProvider: 'local',
+            storageKey: 'outputs/canvas-1.png',
+            thumbnailStatus: 'ready',
+            thumbnailStorageProvider: 'local',
+            thumbnailStorageKey: 'outputs/canvas-1-thumb.png',
+            createdAt: '2026-08-30T00:00:03.000Z',
+          }],
           nodes: [{
             nodeId: 'node-1',
             kind: 'image',
@@ -244,6 +255,7 @@ const fakeAdminTaskRepository: AdminTaskRepository = {
             dependsOn: [],
             status: 'succeeded',
             generationId: 'generation-canvas-1',
+            assetIds: ['asset-canvas-output-1'],
             cacheHit: false,
             generationStatus: 'succeeded',
             accountedCents: 120,
@@ -608,22 +620,31 @@ describe('admin routes', () => {
       adminRequest('/api/admin/tasks/canvas-task-1/request-context'),
     )
     expect(response.status).toBe(200)
-    expect(await response.json()).toEqual({
+    const body = await response.json()
+    expect(body).toEqual({
       success: true,
       data: {
         context: expect.objectContaining({
           kind: 'canvas',
           documentId: 'canvas-1',
           documentRevision: 3,
+          assets: [expect.objectContaining({
+            id: 'asset-canvas-output-1',
+            url: '/signed/outputs/canvas-1.png?ttl=3600',
+            thumbnailUrl: '/signed/outputs/canvas-1-thumb.png?ttl=3600',
+          })],
           nodes: [expect.objectContaining({
             nodeId: 'node-1',
             modelId: 'qwen-image',
             generationId: 'generation-canvas-1',
+            assetIds: ['asset-canvas-output-1'],
             accountedCents: 120,
           })],
         }),
       },
     })
+    expect(body.data.context.assets[0]).not.toHaveProperty('storageKey')
+    expect(body.data.context.assets[0]).not.toHaveProperty('storageProvider')
   })
 
   it('bans and unbans a user via admin endpoints with audit', async () => {

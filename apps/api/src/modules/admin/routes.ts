@@ -600,12 +600,21 @@ export function createAdminRoutes(deps: ApiDependencies) {
           }
 
           if (requestContext.canvas !== undefined) {
+            const assets = await Promise.all(
+              requestContext.canvas.assets.map(async (asset) =>
+                assetWithReadUrl(
+                  asset as Parameters<typeof assetWithReadUrl>[0],
+                  deps.storage,
+                ),
+              ),
+            )
             return {
               success: true,
               data: {
                 context: {
                   kind: 'canvas' as const,
                   ...requestContext.canvas,
+                  assets,
                 },
               },
             }

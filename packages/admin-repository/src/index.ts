@@ -4,6 +4,9 @@ export { createAdminTaskRepository, type AdminTaskRepository } from './admin-tas
 export { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
 export type {
   AdminGalleryItem,
+  AdminCanvasTaskAsset,
+  AdminCanvasTaskContext,
+  AdminCanvasTaskNode,
   AdminTaskItem,
   AdminTaskRequestContext,
   AdminTaskRequestContextRecord,

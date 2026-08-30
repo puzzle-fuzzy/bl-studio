@@ -124,6 +124,25 @@ export interface AdminCanvasTaskNode {
   accountedCents: number
 }
 
+/** Canvas 节点输出资产的 admin 内部只读投影；存储坐标只供 API 生成短期 read URL。 */
+export interface AdminCanvasTaskAsset {
+  id: string
+  kind: ArtifactKind
+  source: 'upload' | 'link' | 'generation' | 'derived'
+  storageProvider?: string
+  storageKey?: string
+  thumbnailStatus?: 'queued' | 'processing' | 'ready' | 'failed'
+  thumbnailStorageProvider?: string
+  thumbnailStorageKey?: string
+  text?: string
+  mimeType?: string
+  byteSize?: number
+  fileName?: string
+  recordId?: string
+  modelId?: string
+  createdAt: string
+}
+
 export interface AdminCanvasTaskContext {
   documentId: string
   documentRevision: number
@@ -132,6 +151,7 @@ export interface AdminCanvasTaskContext {
     sourceExecutionId: string
     nodeId: string
   }
+  assets: AdminCanvasTaskAsset[]
   nodes: AdminCanvasTaskNode[]
 }
 

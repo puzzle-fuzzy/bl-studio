@@ -6,6 +6,7 @@
  */
 import {
 	type BailianStudioDb,
+	assetDerivatives,
 	generationInputAssets,
 	generationRecords,
 	taskRecords,
@@ -19,9 +20,10 @@ import { clampLimit, decodeCursor, encodeCursor } from "./cursor";
 import { AdminRepositoryError } from "./errors";
 import { toTaskRecord } from "./mappers";
 import type {
-	AdminTaskItem,
+	AdminCanvasTaskAsset,
 	AdminCanvasTaskContext,
 	AdminCanvasTaskNode,
+	AdminTaskItem,
 	AdminTaskRequestContext,
 	GenerationInputAsset,
 	ListAdminTasksResult,
@@ -59,6 +61,67 @@ export function createAdminTaskRepository(
 		if (task.type === "canvas.execute" && task.domain === "canvas") {
 			const parsed = CanvasExecutionTaskInputSchema.safeParse(task.input);
 			if (parsed.success) {
+				const outputAssetIds = [
+					...new Set(
+						Object.values(parsed.data.nodeRuns).flatMap(
+							(run) => run.assetIds ?? [],
+						),
+					),
+				];
+				const outputAssetRows =
+					task.userId === undefined || outputAssetIds.length === 0
+						? []
+						: await db
+								.select({ asset: userAssets, thumbnail: assetDerivatives })
+								.from(userAssets)
+								.leftJoin(
+									assetDerivatives,
+									and(
+										eq(assetDerivatives.assetId, userAssets.id),
+										eq(assetDerivatives.kind, "thumbnail"),
+										isNull(assetDerivatives.deletedAt),
+									),
+								)
+								.where(
+									and(
+										eq(userAssets.userId, task.userId),
+										inArray(userAssets.id, outputAssetIds),
+										eq(userAssets.status, "ready"),
+									),
+								)
+				const assets = outputAssetRows.map(({ asset, thumbnail }) => {
+					const thumbnailFields =
+						thumbnail === null
+							? {}
+							: {
+									thumbnailStatus:
+										thumbnail.status as AdminCanvasTaskAsset["thumbnailStatus"],
+									...(thumbnail.storageProvider === null
+										? {}
+										: { thumbnailStorageProvider: thumbnail.storageProvider }),
+									...(thumbnail.storageKey === null
+										? {}
+										: { thumbnailStorageKey: thumbnail.storageKey }),
+								};
+					return {
+						id: asset.id,
+						kind: asset.kind as AdminCanvasTaskAsset["kind"],
+						source: asset.source as AdminCanvasTaskAsset["source"],
+						...(asset.storageProvider === null
+							? {}
+							: { storageProvider: asset.storageProvider }),
+						...(asset.storageKey === null
+							? {}
+							: { storageKey: asset.storageKey }),
+						...(asset.mimeType === null ? {} : { mimeType: asset.mimeType }),
+						...(asset.byteSize === null ? {} : { byteSize: asset.byteSize }),
+						...(asset.fileName === null ? {} : { fileName: asset.fileName }),
+						...(asset.recordId === null ? {} : { recordId: asset.recordId }),
+						...(asset.modelId === null ? {} : { modelId: asset.modelId }),
+						...thumbnailFields,
+						createdAt: asset.createdAt.toISOString(),
+					};
+				});
 				const generationIds = Object.values(parsed.data.nodeRuns)
 					.map((run) => run.generationId)
 					.filter((id): id is string => id !== undefined);
@@ -134,6 +197,7 @@ export function createAdminTaskRepository(
 				const canvas: AdminCanvasTaskContext = {
 					documentId: parsed.data.documentId,
 					documentRevision: parsed.data.documentRevision,
+					assets,
 					nodes,
 					...(parsed.data.cachePolicy === undefined
 						? {}

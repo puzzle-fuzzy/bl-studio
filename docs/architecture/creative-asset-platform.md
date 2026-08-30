@@ -416,4 +416,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度、整图取消、SSE 实时进度、节点级重跑、缓存复用、执行历史以及节点耗时和失败诊断已经落地，并已接入管理侧成本分析、任务域筛选和单次执行钻取；下一步优先补强输出资产回溯与运营可观测性，而不是再次扩张 Canvas 运行态模型。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度、整图取消、SSE 实时进度、节点级重跑、缓存复用、执行历史以及节点耗时和失败诊断已经落地，并已接入管理侧成本分析、任务域筛选、单次执行钻取和输出资产回溯；下一步优先补强运营可观测性，而不是再次扩张 Canvas 运行态模型。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
