@@ -6,7 +6,24 @@
  * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository。
  */
 import { createDb, type BailianStudioDb } from '@bailian-studio/db'
-import { createGenerationRepository, type GenerationRepositoryCompat } from './repository'
+import { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
+import { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
+import { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
+import { createAssetRepository } from './assets'
+import type { AssetRepository } from './asset-port'
+import { createAuditRepository } from './audit-events'
+import type { AuditRepository } from './audit-port'
+import { createContentReportRepository, type ContentReportRepository } from './content-reports'
+import { createFeedbackRepository, type FeedbackRepository } from './feedback'
+import { createGenerationRepository, type GenerationRepository } from './repository'
+import { createNotificationRepository, type NotificationRepository } from './notifications'
+import { createPromptLibraryRepository, type PromptLibraryRepository } from './prompt-library'
+import type { ProviderRequestAuditRepository } from './provider-request-port'
+import { createProviderRequestAuditRepository } from './provider-requests'
+import { createShareRepository } from './shares'
+import type { PublicShareRepository, ShareRepository } from './share-port'
+import { createSocialRepository, type SocialRepository } from './social'
+import { createUsageRepository, type UsageRepository } from './usage'
 
 export interface CreateGenerationRepositoryFromUrlOptions {
   max?: number
@@ -14,8 +31,22 @@ export interface CreateGenerationRepositoryFromUrlOptions {
 
 export interface GenerationRepositoryHandle {
   db: BailianStudioDb
-  /** URL 工厂保留完整兼容形状；生产组合根应使用窄 repository port。 */
-  repository: GenerationRepositoryCompat
+  /** 核心 generation/worker 能力；其他上下文通过下面的窄 port 暴露。 */
+  repository: GenerationRepository
+  adminGalleryRepository: AdminGalleryRepository
+  adminTaskRepository: AdminTaskRepository
+  analyticsRepository: AnalyticsRepository
+  assetRepository: AssetRepository
+  auditRepository: AuditRepository
+  contentReportRepository: ContentReportRepository
+  feedbackRepository: FeedbackRepository
+  notificationRepository: NotificationRepository
+  promptLibraryRepository: PromptLibraryRepository
+  providerRequestAuditRepository: ProviderRequestAuditRepository
+  shareRepository: ShareRepository
+  publicShareRepository: PublicShareRepository
+  socialRepository: SocialRepository
+  usageRepository: UsageRepository
   close(): Promise<void>
 }
 
@@ -27,6 +58,20 @@ export function createGenerationRepositoryFromUrl(
   return {
     db,
     repository: createGenerationRepository({ db }),
+    adminGalleryRepository: createAdminGalleryRepository(db),
+    adminTaskRepository: createAdminTaskRepository(db),
+    analyticsRepository: createAnalyticsRepository(db),
+    assetRepository: createAssetRepository(db),
+    auditRepository: createAuditRepository(db),
+    contentReportRepository: createContentReportRepository(db),
+    feedbackRepository: createFeedbackRepository(db),
+    notificationRepository: createNotificationRepository(db),
+    promptLibraryRepository: createPromptLibraryRepository(db),
+    providerRequestAuditRepository: createProviderRequestAuditRepository(db),
+    shareRepository: createShareRepository(db),
+    publicShareRepository: createShareRepository(db),
+    socialRepository: createSocialRepository(db),
+    usageRepository: createUsageRepository(db),
     close: () => db.close(),
   }
 }

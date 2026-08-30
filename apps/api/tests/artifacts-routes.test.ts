@@ -112,7 +112,7 @@ describe('artifact routes', () => {
   it('uses the path-derived content type for unnamed legacy local downloads', async () => {
     const root = await makeRoot()
     await prepareLocalRouteTest()
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'legacy_image',
       userId: currentUserId,
       kind: 'image',
@@ -277,7 +277,7 @@ async function seedLocalAsset(
   id = `local_${storageKey.replaceAll('/', '_')}`,
   fileName?: string,
 ): Promise<void> {
-  await iso.repository.createUserAsset({
+  await iso.assetRepository.createUserAsset({
     id,
     userId: currentUserId,
     kind: mimeType.startsWith('video/') ? 'video' : mimeType.startsWith('audio/') ? 'audio' : 'image',
@@ -402,7 +402,7 @@ describe('artifact library routes', () => {
   it('returns a signed read URL for stored image assets in the unified Library list', async () => {
     currentUserId = 'library_owner'
     await ensureCurrentUserSeeded()
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'uploaded_image_1',
       userId: currentUserId,
       kind: 'image',
@@ -438,7 +438,7 @@ describe('artifact library routes', () => {
       generationRepository: iso.repository,
       storage: new FakeStorageAdapter('oss'),
     }).app
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'uploaded_image_oss_1',
       userId: currentUserId,
       kind: 'image',
@@ -471,7 +471,7 @@ describe('artifact library routes', () => {
       generationRepository: iso.repository,
       storage: new FakeStorageAdapter('oss'),
     }).app
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'uploaded_video_1',
       userId: currentUserId,
       kind: 'video',

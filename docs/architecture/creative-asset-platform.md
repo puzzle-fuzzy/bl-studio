@@ -98,7 +98,8 @@ flowchart LR
 - admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
   SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；`content.ts` 只用于兼容旧调用方。
 - `content.ts` 仅保留 `ContentRepository` 兼容聚合，`GenerationRepository` 核心接口不再
-  重复声明这些内容域方法；只有 URL 工厂/隔离测试使用 `GenerationRepositoryCompat`。
+  重复声明这些内容域方法；URL 工厂/隔离测试句柄分别暴露核心 repository 与各域窄 port。
+  完整兼容聚合仅留在仓储包自身的低层回归接缝。
 - 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；
   SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，旧
   `GenerationRepository` 仅为未迁移调用方保留兼容 facade。
@@ -111,8 +112,8 @@ flowchart LR
 - 用户用量接口通过 `UsageRepository` 读取，调用统计由 `AnalyticsRepository` 读取；相关
   聚合 SQL 分别位于 `usage.ts` 与 `analytics.ts`，避免报表/用量查询继续扩大 generation
   生命周期接口。生成应用服务的每日限额预检也通过显式的 `UsageRepository` 注入完成，
-  `GenerationRepository` 核心接口不再承载用量读模型；旧 URL 工厂/隔离测试仍可通过
-  兼容 facade 过渡。
+  `GenerationRepository` 核心接口不再承载用量读模型；URL 工厂/隔离测试句柄直接暴露
+  `UsageRepository`。
 - director 的 application service 由 API 组合根创建并注入，统一承接阶段运行的估价、预检、
   视频/音乐/合成运行创建和单镜头重试；Worker 继续负责异步 Provider 调用与运行状态推进。
 

@@ -69,7 +69,8 @@
   与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；`content.ts` 仅为旧接口提供聚合。
 - `content.ts` 现在仅是 `ContentRepository` 兼容聚合；`GenerationRepository` 核心接口不再
   重复声明 gallery、通知、提示词库、反馈、举报、admin 与分析方法，旧 URL 工厂/隔离
-  测试通过 `GenerationRepositoryCompat` 继续获得完整兼容形状。
+  测试句柄现在分别暴露核心 repository 与各域窄 port；完整兼容形状只留在
+  `createGenerationRepository` 的仓储包内部回归接缝。
 - 资产与分享由显式窄 port 约束 API：`AssetRepository`、`ShareRepository`、
   `PublicShareRepository`；SQL 已分别归档在 `assets.ts`、`shares.ts`，旧
   `GenerationRepository` 核心接口不再暴露这些方法；仅 `GenerationRepositoryCompat`
@@ -84,7 +85,7 @@
 - 用户用量读模型由 `src/usage.ts` 的 `UsageRepository` 拥有；用量查询 SQL 与 generation
   生命周期写入分离，API 只获取当前用户的时间窗口聚合。生成应用服务也显式注入
   `UsageRepository` 做每日限额预检；`GenerationRepository` 核心接口不再包含用量读取，
-  只有 URL 工厂/隔离测试兼容形状保留转发。
+  URL 工厂/隔离测试句柄改为直接暴露 `UsageRepository`。
 - 成本估算/结算只 import model-core 的纯函数（`estimateModelCost` / `calculateUsageCostCents`）；禁止 provider-dashscope、DashScope HTTP、解析 provider 端点、维护第二份契约/价格表。
 
 ### packages/task-repository（任务生命周期持久化）

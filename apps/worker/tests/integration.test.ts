@@ -27,7 +27,7 @@ afterAll(async () => {
 })
 
 afterEach(async () => {
-  const queued = await iso.repository.listAdminTasks({ status: 'queued', limit: 100 })
+  const queued = await iso.adminTaskRepository.listAdminTasks({ status: 'queued', limit: 100 })
   expect(queued.items).toHaveLength(0)
 })
 
@@ -68,7 +68,7 @@ function buildLoop(
   return new WorkerLoop({
     workerId,
     repository: iso.repository,
-    providerRequestAuditRepository: iso.repository,
+    providerRequestAuditRepository: iso.providerRequestAuditRepository,
     providerRegistry: registry,
     modelRegistry: { getModelById },
     storage: new FakeStorageAdapter(),
@@ -89,7 +89,7 @@ async function runUntilSucceeded(loop: WorkerLoop, recordId: string, timeoutMs: 
         // generation 状态会在可选的 artifact.persist 任务完成前先到达 succeeded。
         // 不要让下一个测试认领仍排队的该任务，否则集成测试套件会产生顺序依赖。
         const pendingArtifacts = await iso.repository.listPendingArtifactsForRecord(recordId)
-        const generatedAsset = (await iso.repository.listUnifiedAssets(record.userId, {
+    const generatedAsset = (await iso.assetRepository.listUnifiedAssets(record.userId, {
           source: 'generation',
         })).items.find(asset => asset.recordId === recordId)
         if (
@@ -131,7 +131,7 @@ describe('worker e2e', () => {
     if (Array.isArray(artifacts)) {
       expect(artifacts[0]).toMatchObject({ kind: 'image', sourceUrl: IMAGE_DATA_URL })
     }
-    const generatedAsset = (await iso.repository.listUnifiedAssets('user_e2e', {
+    const generatedAsset = (await iso.assetRepository.listUnifiedAssets('user_e2e', {
       source: 'generation',
     })).items.find(asset => asset.recordId === created.record.id)
     expect(generatedAsset).toMatchObject({

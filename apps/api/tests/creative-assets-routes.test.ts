@@ -95,7 +95,7 @@ describe('creative asset routes', () => {
     const versionId = versionBody.data.asset.versions[0]?.id
     if (versionId === undefined) throw new Error('expected version id')
 
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'api-character-front',
       userId: currentUserId,
       kind: 'image',

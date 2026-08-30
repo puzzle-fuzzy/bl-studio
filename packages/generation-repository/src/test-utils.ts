@@ -14,7 +14,7 @@ import {
   type CreateGenerationRepositoryFromUrlOptions,
   type GenerationRepositoryHandle,
 } from './factory'
-import type { GenerationRepositoryCompat } from './repository'
+import type { GenerationRepository } from './repository'
 
 /** 取得测试用的 DATABASE_URL；若缺失则抛错（避免静默走到默认值）。 */
 export function requireRepositoryDatabaseUrl(): string {
@@ -30,8 +30,22 @@ export type GenerationRepositoryTestDb = GenerationRepositoryHandle
  * （包边界规则禁止），也避免并行测试文件争抢同一个共享数据库。
  */
 export interface IsolatedGenerationRepository {
-  /** 测试隔离接缝保留旧 facade；生产 app 不应依赖这些附加能力。 */
-  repository: GenerationRepositoryCompat
+  /** 核心 generation/worker 能力；其他上下文通过独立 port 暴露。 */
+  repository: GenerationRepository
+  adminGalleryRepository: GenerationRepositoryHandle['adminGalleryRepository']
+  adminTaskRepository: GenerationRepositoryHandle['adminTaskRepository']
+  analyticsRepository: GenerationRepositoryHandle['analyticsRepository']
+  assetRepository: GenerationRepositoryHandle['assetRepository']
+  auditRepository: GenerationRepositoryHandle['auditRepository']
+  contentReportRepository: GenerationRepositoryHandle['contentReportRepository']
+  feedbackRepository: GenerationRepositoryHandle['feedbackRepository']
+  notificationRepository: GenerationRepositoryHandle['notificationRepository']
+  promptLibraryRepository: GenerationRepositoryHandle['promptLibraryRepository']
+  providerRequestAuditRepository: GenerationRepositoryHandle['providerRequestAuditRepository']
+  shareRepository: GenerationRepositoryHandle['shareRepository']
+  publicShareRepository: GenerationRepositoryHandle['publicShareRepository']
+  socialRepository: GenerationRepositoryHandle['socialRepository']
+  usageRepository: GenerationRepositoryHandle['usageRepository']
   /** 共享连接池——reset/seed 时复用它，避免每个用例各自开池导致的池抖动。 */
   db: BailianStudioDb
   /** 隔离数据库的 URL，供测试间重置使用。 */
@@ -46,6 +60,20 @@ export async function createIsolatedGenerationRepository(
   const handle = createGenerationRepositoryFromUrl(testDb.url, options)
   return {
     repository: handle.repository,
+    adminGalleryRepository: handle.adminGalleryRepository,
+    adminTaskRepository: handle.adminTaskRepository,
+    analyticsRepository: handle.analyticsRepository,
+    assetRepository: handle.assetRepository,
+    auditRepository: handle.auditRepository,
+    contentReportRepository: handle.contentReportRepository,
+    feedbackRepository: handle.feedbackRepository,
+    notificationRepository: handle.notificationRepository,
+    promptLibraryRepository: handle.promptLibraryRepository,
+    providerRequestAuditRepository: handle.providerRequestAuditRepository,
+    shareRepository: handle.shareRepository,
+    publicShareRepository: handle.publicShareRepository,
+    socialRepository: handle.socialRepository,
+    usageRepository: handle.usageRepository,
     db: handle.db,
     databaseUrl: testDb.url,
     async close() {

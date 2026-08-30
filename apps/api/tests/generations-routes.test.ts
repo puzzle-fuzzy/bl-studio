@@ -152,7 +152,7 @@ describe('generation routes', () => {
   it('creates, lists, and reads a generation with ordered stable asset references', async () => {
     currentUserId = 'user_asset_refs'
     await ensureCurrentUserSeeded()
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'api_asset_a',
       userId: currentUserId,
       kind: 'image',
@@ -160,7 +160,7 @@ describe('generation routes', () => {
       storageProvider: 'oss',
       storageKey: 'users/user_asset_refs/a.png',
     })
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'api_asset_b',
       userId: currentUserId,
       kind: 'image',
@@ -202,7 +202,7 @@ describe('generation routes', () => {
   it('estimates asset-backed media requests and rejects another owner asset without disclosure', async () => {
     currentUserId = 'asset_owner'
     await ensureCurrentUserSeeded()
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'asset_owned',
       userId: currentUserId,
       kind: 'image',
@@ -255,7 +255,7 @@ describe('generation routes', () => {
     })
     const versionId = versioned.versions[0]?.id
     if (versionId === undefined) throw new Error('expected creative asset version')
-    await iso.repository.createUserAsset({
+    await iso.assetRepository.createUserAsset({
       id: 'creative-submit-reference',
       userId: currentUserId,
       kind: 'image',

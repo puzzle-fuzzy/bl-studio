@@ -48,8 +48,8 @@ admin gallery 也已完成独立 `AdminGalleryRepository` port：隐藏/恢复�
 收敛：`AssetRepository`、`ShareRepository`、`PublicShareRepository` 已进入 `ApiDependencies`，
 生产组合根复用同一个数据库句柄并分别创建 repository。资产/分享 SQL 已物理归档到
 `assets.ts`、`shares.ts`。随后已从 `GenerationRepository` 核心接口移除这些方法，
-仅 URL 工厂/隔离测试使用 `GenerationRepositoryCompat` 过渡形状；下一步继续盘点其余
-兼容聚合的生产消费者。
+URL 工厂与隔离测试句柄已改为分别暴露核心 repository 和各域窄 port；完整兼容聚合只保留
+在仓储包自身的低层回归接缝。下一步继续清理测试应用工厂里的隐式 legacy cast。
 
 API 审计也已独立为 `AuditRepository` port：路由只注入审计写入能力，不再为了
 `recordApiAuditEvent` 持有完整 `GenerationRepository`；审计写入失败继续由 API 层吞并并记录
@@ -64,16 +64,17 @@ API 审计也已独立为 `AuditRepository` port：路由只注入审计写入�
 聚合，`AnalyticsRepository` 负责后台调用统计；两者的查询 SQL 分别归档在 `usage.ts`
 与 `analytics.ts`。随后已把生成应用服务的每日限额预检改为显式注入 `UsageRepository`，
 并从 `GenerationRepository` 核心接口移除 `getDailyGenerationUsage` / `getGenerationUsage`；
-兼容 URL 工厂与隔离测试仍通过 `GenerationRepositoryCompat` 转发 `UsageRepository` 的
-读方法。这一步只移动读模型职责，不改变 generation 账本的写入与结算事务。
+URL 工厂与隔离测试句柄现在直接暴露 `UsageRepository`。这一步只移动读模型职责，不改变
+generation 账本的写入与结算事务。
 
 Provider 出站请求审计也已完成写入边界收敛：Worker 通过
 `ProviderRequestAuditRepository` 写入 `started` / `finished` 记录，具体 SQL 位于
 `provider-requests.ts`；生成详情读取的 provider 请求投影继续留在 generation repository，
 因此没有改变对外响应。`GenerationRepository` 核心接口不再暴露这两个 Worker 写入方法，
-仅兼容 URL 工厂与隔离测试保留转发。
+仓储包自身的低层回归接缝仍保留转发，URL 工厂与隔离测试句柄则直接提供该 port。
 
 最后一轮 content 接口收缩已完成：生产 API/Worker 均已使用窄 port，`GenerationRepository`
 核心接口移除了 gallery、通知、提示词库、反馈/举报、admin 和分析方法；`content.ts` 与
-`GenerationRepositoryCompat` 仅作为旧 URL 工厂和隔离测试的迁移接缝。后续可以在兼容
-窗口到期后删除 facade，而不再影响生产组合根。
+`GenerationRepositoryCompat` 已不再由 URL 工厂/隔离测试句柄向外传播，仅作为仓储包自身
+低层回归接缝存在。待测试应用工厂的 legacy cast 清零后，可删除该类型、中央转发和对应
+兼容测试，而不影响生产组合根。

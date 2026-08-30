@@ -3,7 +3,8 @@ import {
   createIsolatedGenerationRepository,
   createTestUser,
   resetGenerationRepositoryTestDb,
-  type GenerationRepositoryCompat,
+  type AssetRepository,
+  type AuditRepository,
   type IsolatedGenerationRepository,
   type RecordAuditEventInput,
   type ListUnifiedAssetsOptions,
@@ -62,15 +63,9 @@ function authed(url: string, init: RequestInit = {}): Request {
   return new Request(url, { ...init, headers })
 }
 
-function auditedRepository(repository: GenerationRepositoryCompat): GenerationRepositoryCompat {
+function auditedAssetRepository(repository: AssetRepository): AssetRepository {
   return new Proxy(repository, {
     get(target, property, receiver) {
-      if (property === 'recordAuditEvent') {
-        return async (input: RecordAuditEventInput) => {
-          auditInputs.push(input)
-          return target.recordAuditEvent(input)
-        }
-      }
       if (property === 'listUnifiedAssets') {
         return async (userId: string, options: ListUnifiedAssetsOptions = {}) => {
           listInputs.push(options)
@@ -80,6 +75,15 @@ function auditedRepository(repository: GenerationRepositoryCompat): GenerationRe
       return Reflect.get(target, property, receiver)
     },
   })
+}
+
+function auditedAuditRepository(repository: AuditRepository): AuditRepository {
+  return {
+    async recordAuditEvent(input) {
+      auditInputs.push(input)
+      return repository.recordAuditEvent(input)
+    },
+  }
 }
 
 beforeAll(async () => {
@@ -99,7 +103,9 @@ beforeEach(async () => {
   storage = new TestStorage()
   app = createTestApp({
     authService,
-    generationRepository: auditedRepository(isolated.repository),
+    generationRepository: isolated.repository,
+    assetRepository: auditedAssetRepository(isolated.assetRepository),
+    auditRepository: auditedAuditRepository(isolated.auditRepository),
     storage,
   }).app
 })
@@ -124,7 +130,7 @@ describe('asset routes', () => {
   })
 
   it('searches generated assets by model display name and hides storage coordinates', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_qwen',
       userId: currentUserId,
       kind: 'image',
@@ -134,7 +140,7 @@ describe('asset routes', () => {
       storageKey: 'generations/qwen/result.png',
       mimeType: 'image/png',
     })
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_other',
       userId: currentUserId,
       kind: 'video',
@@ -160,7 +166,7 @@ describe('asset routes', () => {
   })
 
   it('validates and passes through asset sort while returning declared resolution metadata', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_metadata',
       userId: currentUserId,
       kind: 'image',
@@ -188,7 +194,7 @@ describe('asset routes', () => {
   })
 
   it('returns fresh detail download URLs, omits them from lists, and scopes details to the owner', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_detail',
       userId: currentUserId,
       kind: 'image',
@@ -231,7 +237,7 @@ describe('asset routes', () => {
   })
 
   it('adds a MIME-derived extension when a generated asset has no stored filename', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_generated_download',
       userId: currentUserId,
       kind: 'image',
@@ -254,14 +260,14 @@ describe('asset routes', () => {
   })
 
   it('omits download URLs and download signing for external or mismatched storage', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_external',
       userId: currentUserId,
       kind: 'image',
       source: 'link',
       originalUrl: 'https://example.test/external.png',
     })
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_provider_mismatch',
       userId: currentUserId,
       kind: 'image',
@@ -283,7 +289,7 @@ describe('asset routes', () => {
   })
 
   it('returns a persisted local thumbnail without exposing derivative coordinates', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_with_thumbnail',
       userId: currentUserId,
       kind: 'image',
@@ -320,7 +326,7 @@ describe('asset routes', () => {
   })
 
   it('soft-deletes an owned asset and records a non-sensitive audit event', async () => {
-    await isolated.repository.createUserAsset({
+    await isolated.assetRepository.createUserAsset({
       id: 'asset_delete',
       userId: currentUserId,
       kind: 'text',
@@ -333,11 +339,11 @@ describe('asset routes', () => {
     }))
 
     expect(response.status).toBe(204)
-    expect(await isolated.repository.getUserAsset({
+    expect(await isolated.assetRepository.getUserAsset({
       userId: currentUserId,
       assetId: 'asset_delete',
     })).toBeUndefined()
-    expect(await isolated.repository.getUserAsset({
+    expect(await isolated.assetRepository.getUserAsset({
       userId: currentUserId,
       assetId: 'asset_delete',
       includeDeleted: true,
