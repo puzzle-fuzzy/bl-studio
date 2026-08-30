@@ -16,8 +16,8 @@
 
 ### 已保留的仓库级选择
 
-- **保留 `pnpm + Node + Turborepo`**：当前仓库已经使用 `pnpm@10.9.0`、Node 24 下限和 `pnpm-lock.yaml`，属于已有稳定项目。个人规范允许既有项目保留兼容链路，不为了偏好强行切换到 Bun。
-- **保留 `apps/api`、`apps/web`、`apps/worker`**：目录已经符合 HTTP 服务、Web 客户端和后台消费者的职责划分，不新增 `apps/server`。
+- **采用 `bun + Node 24 + Turborepo`**：仓库使用 `bun@1.4.0` 和 `bun.lock` 管理 workspace；API 由 Bun 启动，Worker 和脚本使用 Node 24。
+- **前端按职责拆分为 `apps/studio`、`apps/writer`、`apps/canvas`、`apps/admin`**：四个 app 通过同源路径部署，共享 API client、认证层和 UI 原语。
 - **保留 PostgreSQL + Docker Compose**：项目是多进程、需要历史/恢复/审计的服务，当前数据库和迁移链路已经运行，不改成 SQLite。
 - **保留 Biome、Elysia、Drizzle、Zod 和现有 Vitest**：现有工具链已经形成稳定约定；测试 runner 后续可以按领域逐步评估 Bun test，但本次不做全仓库迁移。
 
@@ -33,34 +33,89 @@
 
 ```mermaid
 flowchart LR
-  Web["apps/web"] --> Client["packages/api-client"]
+  Studio["apps/studio"] --> Client["packages/api-client"]
+  Writer["apps/writer"] --> Client
+  Canvas["apps/canvas"] --> Client
+  Admin["apps/admin"] --> Client
   Client --> API["apps/api"]
 
-  API --> Auth["auth"]
-  API --> AssetService["creative-assets use cases"]
-  AssetService --> AssetRepo["creative-asset-repository"]
+  API --> Persistence["persistence-runtime"]
+  Worker["apps/worker"] --> Persistence
+  Persistence --> Auth["auth"]
+  Persistence --> Credit["credit-ledger"]
+  Persistence --> AssetRepo["creative-asset-repository"]
+  Persistence --> GenerationRepo["generation-repository"]
+  Persistence --> TaskRepo["task-repository"]
+  Persistence --> DirectorRepo["director-repository"]
+  Persistence --> MediaRepo["media-repository"]
+  API --> GenerationService["generation application service"]
+  GenerationService --> GenerationRepo
+  GenerationService --> Compiler
+  API --> DirectorService["director application service"]
+  DirectorService --> DirectorRepo
+  API --> AssetService["creative asset application service"]
+  AssetService --> AssetRepo
   AssetService --> AssetDomain["creative-asset-domain"]
-  API --> Compiler["creative-asset-compiler"]
   Compiler --> Contracts["creative-asset-contracts"]
   Compiler --> ModelCore["model-core"]
-  API --> GenerationRepo["generation-repository"]
-
-  Worker["apps/worker"] --> GenerationRepo
   Worker --> Storage["storage"]
   Worker --> Provider["provider-dashscope"]
   Provider --> ModelCore
   AssetRepo --> DB["db / PostgreSQL"]
   GenerationRepo --> DB
+  TaskRepo --> DB
 ```
 
 ### 依赖规则
 
 - `apps/api` 可以依赖 repository、domain、compiler 和 api-client contracts，但不能依赖 `db` 或 provider。
-- `apps/worker` 可以依赖 generation repository、storage、model-core 和 provider runner，但不能依赖 API 或直接访问 `db`。
+- `apps/worker` 可以依赖 generation repository、task-repository、storage、model-core 和 provider runner，但不能依赖 API 或直接访问 `db`。
 - `creative-asset-domain` 和 `creative-asset-compiler` 不读取环境变量、不访问数据库、不发 HTTP、不启动 listener。
 - `creative-asset-repository` 只负责资产域持久化、事务和数据库不变量；不负责 HTTP、Provider、UI 和 prompt 编排。
 - `provider-dashscope` 不依赖资产 repository、generation repository、Worker 或 API；资产输入必须已经被编译成 provider-neutral 的生成输入。
-- `apps/web` 只通过 `packages/api-client` 访问资产 API，不 deep-import repository、db 或 app 源码。
+- `apps/studio`、`apps/writer`、`apps/canvas`、`apps/admin` 只通过 `packages/api-client` 访问 API，不 deep-import repository、db 或 app 源码。
+
+### 3.1 进程级数据库生命周期（已实现）
+
+- API 和 Worker 的组合根通过 `@bailian-studio/persistence-runtime` 各自只创建一个
+  PostgreSQL/Drizzle 句柄，再把同一实例注入 generation、director、creative-asset、
+  media、task、auth 和 credit 边界。
+- 只有创建句柄的组合根负责关闭连接池。各 repository/service 不拥有也不重复关闭共享池。
+- 生成事件的 `LISTEN/NOTIFY` 仍使用独立长连接；它是通知传输，不是第二套业务查询连接池。
+- `create…FromUrl` 仍保留给独立包测试和单模块工具；API/Worker 进程入口不再为每个模块
+  调用一个 URL 工厂。
+- generation 的 application service 由 API 组合根创建并注入，统一承接估价、提交、取消和重试；
+  路由不再分别编排这些写入/状态转换流程。
+- gallery/social 的 API 路由已改为依赖窄 `SocialRepository` port；SQL 已物理归档在
+  `generation-repository/src/social.ts`，`content.ts` 只保留兼容聚合，后续可在不改路由的情况下
+  移动到独立 social repository。
+- 通知收件箱、已读状态和点赞/收藏通知编排已改为依赖窄 `NotificationRepository` port；
+  SQL 位于 `generation-repository/src/notifications.ts`，旧 `content.ts` facade 仍兼容保留。
+- 提示词库、用户反馈和内容举报分别依赖 `PromptLibraryRepository`、`FeedbackRepository`、
+  `ContentReportRepository`；SQL 已归档到对应模块，API 组合根负责实例化和注入。
+- admin gallery 的治理/预览依赖 `AdminGalleryRepository`，SQL 位于
+  `generation-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
+- admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
+  SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；`content.ts` 只用于兼容旧调用方。
+- 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；
+  SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，旧
+  `GenerationRepository` 仅为未迁移调用方保留兼容 facade。
+- API 审计通过独立 `AuditRepository` port 注入；约 115 个审计调用已不再把完整
+  `GenerationRepository` 作为横切能力传入，审计失败仍保持 best-effort。
+- 用户用量接口通过 `UsageRepository` 读取，调用统计由 `AnalyticsRepository` 读取；相关
+  聚合 SQL 分别位于 `usage.ts` 与 `analytics.ts`，避免报表/用量查询继续扩大 generation
+  生命周期接口。
+- director 的 application service 由 API 组合根创建并注入，统一承接阶段运行的估价、预检、
+  视频/音乐/合成运行创建和单镜头重试；Worker 继续负责异步 Provider 调用与运行状态推进。
+
+### 3.2 任务队列生命周期（迁移中）
+
+- `@bailian-studio/task-engine` 只拥有纯状态机；`@bailian-studio/task-repository` 拥有
+  `task_records` 的 claim、租约续期、状态保存和读取，以及 Drizzle 行映射。
+- `apps/worker` 通过 `persistence-runtime` 接收 `claim/renew/save` 最小 port；
+  `generation-repository` 暂保旧方法作为兼容 facade，降低迁移风险。
+- generation/media/director 的业务 repository 暂时继续在自己的“业务记录 + 初始任务”事务中写任务；
+  后续以可注入事务 store 收敛这些生产路径，保持跨域事务边界清晰。
 
 ## 4. 领域模型归属
 
@@ -149,7 +204,8 @@ apps/worker
 - 纯状态/兼容性规则目前由 contracts 暴露的无 IO 函数支撑；未来若规则复杂度继续增长，再提取 `creative-asset-domain`。
 - 把查询结果与写入输入继续保持领域类型，不向 API 暴露 Drizzle row。
 - 保留分页、软删除、恢复和事务边界。
-- 补齐并发冲突、唯一约束冲突和审计字段的稳定错误映射。
+- `collectAssetFromGeneration` 在一个事务内完成资产、项目关系、版本和参考图写入；重复请求由用户范围内的幂等键与服务端指纹收敛到同一结果。
+- 补齐并发冲突、唯一约束冲突和审计字段的稳定错误映射；普通 `createAsset` 不携带收录幂等字段。
 
 ### 6.4 `apps/api/src/modules/creative-assets/service.ts`（已实现）
 
@@ -157,10 +213,35 @@ apps/worker
 
 - 接收认证后的 principal 和已解析输入。
 - 调用 repository 完成项目/资产/版本 use case。
-- 统一 ownership、状态、幂等、错误和审计动作。
-- 为生成提交提供“已解析的 approved 版本和参考图快照”。
+- 统一 ownership、状态入口和公开错误语义；repository 继续持有事务、锁和状态机不变量。
+- 提供显式的 `publishVersion` 入口，并复用 repository 的原子版本状态迁移。
+- `createVersionFromGeneration` 已由 repository 在一个事务中完成版本与参考图写入。
+- `collectAssetFromGeneration` 已形成单次收录的应用边界，API 要求 `Idempotency-Key`，重复同指纹请求返回原资产，参数变化返回稳定冲突。
+- `collectAssetFromGenerationBatch` 已形成批次应用边界：批次、批次项、资产、项目关系、版本和参考图在一个事务内写入，批次 key 与指纹支持安全重试；Studio 多选 UI 尚未接线。
+- 单资源和批次收录成功会在同一事务写入脱敏审计 outbox；Worker 通过独立 `audit-repository` 消费并幂等投递到 `audit_logs`，终态失败保留在 outbox 中；管理员可通过 admin API 查询并人工重放。Worker 同时输出 `worker.audit_outbox.events`、`worker.audit_outbox.drain` 和 `worker.audit_outbox.drain_ms` 三组最小指标，并由现有 Alloy → Loki → Grafana 链路提供运营视图。
+- 操作人可见的恢复记录和发布幂等仍需要后续独立契约，当前不把数据库回滚误称为外部副作用恢复。
 
-Elysia route 只做认证、Zod 入参、调用 use case 和响应整形；简单读取也通过同一个 facade，避免路由逐渐变成第二个 service。
+API 组合根负责创建并注入该 application service；Elysia route 只做认证、Zod 入参、调用 service 和响应整形。
+简单读取也通过同一个 facade，避免路由逐渐变成第二个 service。
+
+### 6.4.1 `apps/api/src/modules/generations/service.ts`（已实现）
+
+generation 的 application service 统一负责估价、创意资产编译、每日配额校验、生成记录提交、
+取消和重试。它只接收认证后的用户输入与已注入的 repository/compiler 依赖，不读取 HTTP 上下文，
+因此既能被 API 组合根注入，也能被单元测试直接验证。
+
+当前边界是渐进迁移：列表、详情、SSE 回放、审计和响应整形仍由路由负责；director 的阶段运行
+写入与估价、creative asset 的服务注入和版本发布入口已经按同一模式收敛。
+单资源和多资产收录已经具备原子写入和幂等重试；审计 outbox 的生产/消费、终态失败运营入口、操作人可见的恢复记录、Worker 最小指标契约和 Grafana 运营视图已经落地，发布幂等与专用指标存储仍待按实际规模决定。
+
+### 6.4.2 `apps/api/src/modules/director/service.ts`（已实现）
+
+director 的 application service 统一负责视频单镜头/批量估价、BGM 估价、合成预检、阶段运行创建、
+脚本聊天运行和单镜头视频重试前置校验。它接收认证后的用户输入与已注入的 `DirectorRepository`，
+不读取 HTTP 上下文；路由只保留认证、Zod 入参、日志和响应整形。
+
+异步运行的持久化状态仍由 `director-repository` 和 Worker 协作推进。API service 只负责在创建运行
+前验证当前项目/镜头状态与模型能力，并把 `traceId` 传入仓储，避免把 Worker 生命周期逻辑复制到 API。
 
 ### 6.5 `packages/creative-asset-compiler`（已实现）
 
@@ -194,14 +275,22 @@ CreativeGenerationRequest
 | generation repository 直接读取 creative 表做准入校验 | 生成持久化层承担了部分资产域规则 | 短期保留数据库事务防线；先让 compiler/service 负责正常路径，后续将校验收敛为可注入的快照准入接口 |
 | `creativeContext` 已能持久化 | API/前端自行拼 provider 参数会产生漂移 | 已由 compiler 统一生成 provider-neutral 输入 |
 | worker 已有物理资产 URL 解析 | 只能解决文件访问，不能解决语义资产映射 | 继续保留；它只消费 compiler 生成的持久化输入 |
-| Web 工作台仍在快速调整 | 过早固化页面测试会抬高重构成本 | 保留 API/client/纯函数测试，页面级 E2E 延后到布局稳定后 |
+| Studio 工作台仍在快速调整 | 过早固化页面测试会抬高重构成本 | 保留 API/client/纯函数测试，页面级 E2E 延后到布局稳定后 |
 | `director_projects` 与 `creative_projects` 并存 | 名称都叫 project，容易误合并 | 明确为素材组织域与导演工作流域，暂不合表 |
+| API/Worker 曾为每个持久化模块分别创建连接池 | 单进程连接上限、事务协作和关闭责任分散 | 已统一为组合根创建一个共享 DB 句柄；通知监听器保留独立长连接 |
+| generation 路由分别编排估价、提交、取消和重试 | 同一业务域的配额、编译和状态转换入口不一致 | 已增加并注入 `GenerationApplicationService`；路由保留认证、审计、SSE 与响应适配 |
+| director 路由分别编排阶段估价、预检和运行创建 | 模型能力、镜头状态和合成准入规则容易在多个入口漂移 | 已增加并注入 `DirectorApplicationService`；Worker 仍负责异步状态推进 |
+| creative asset 路由内部创建 use-case facade | 组合根无法统一替换 application service，测试和运行时依赖边界不一致 | 已由 API 组合根创建并注入 `CreativeAssetApplicationService`；版本 `approved` 迁移走显式 `publishVersion` |
+| creative asset 的生成产物收录曾拆成资产创建 + 版本创建两次请求 | 中间失败会留下半成品，重复提交可能生成重复资产 | 已增加单次 `collect-from-generation` 事务入口、用户范围幂等键和请求指纹 |
+| creative asset 的多资产收录曾无批次边界 | 无法表达整批 all-or-nothing、顺序和批次级重试 | 已增加 batch command、批次表、批次项和公开 API；Studio 多选入口待接线 |
+| creative asset 尚无跨资源审计 outbox | 业务成功后审计可能丢失，失败恢复边界不清晰 | 已增加同事务 producer、独立 consumer、脱敏 payload、租约恢复、退避、管理员恢复 API、Worker 最小指标契约和 Grafana 运营视图；专用指标存储按规模决定 |
 
 ## 8. 分阶段迁移顺序
 
 ### Phase 0：架构冻结（本阶段）
 
-- 已确认保留 pnpm/Node/PostgreSQL/现有目录。
+- 已确认采用 Bun/Node 24/PostgreSQL，并完成前端 app 拆分的基础迁移。
+- API/Worker 的持久化模块复用进程级共享 DB 句柄，连接池关闭责任收敛到各自组合根。
 - 以本文作为资产域重构依据。
 - 不改剧本、分镜、剪辑和导演流程。
 
@@ -213,7 +302,12 @@ CreativeGenerationRequest
 
 ### Phase 2：API 应用层和 API Client（已完成）
 
-- 增加 `creative-assets/service.ts`。
+- 让 `creative-assets/service.ts` 由 API 组合根创建并注入，并提供显式版本发布入口。
+- 增加 `generations/service.ts` application service，统一估价、提交、取消和重试入口。
+- 增加 `director/service.ts` application service，统一阶段估价、预检、运行创建和单镜头重试入口。
+- 增加 `collect-from-generation` API/client 入口，将生成产物收录为资产、项目关系、版本和参考图的单次事务；通过 `Idempotency-Key` 支持安全重试。
+- 增加 `collect-from-generation/batch` API/client 入口，将多资产收录收敛为批次级 all-or-nothing 事务；Studio 多选 UI 后续接入。
+- 增加 `audit_event_outbox` producer 与 `audit-repository` consumer：Worker 负责并发 claim、幂等投递 `audit_logs`、过期租约恢复、指数退避和终态失败；admin API 提供失败查询和管理员人工重放；Worker 已补失败量/延迟/异常的最小指标契约，并通过现有 Loki/Grafana 观测栈提供运营视图。
 - 让路由只保留认证、输入校验和响应适配。
 - 在 `packages/api-client` 增加项目/资产/版本/参考图 client。
 - 保持 Web 视觉和页面布局可调整，先确保真实数据接缝、加载、空态、错误和分页语义稳定。
@@ -232,7 +326,7 @@ CreativeGenerationRequest
 
 ### Phase 5：素材工作台（基础版已完成，视觉验收延后）
 
-- Web 端按“项目 → 资产类型 → 资产版本 → 参考图”组织浏览。
+- Studio 端按“项目 → 资产类型 → 资产版本 → 参考图”组织浏览。
 - 支持项目筛选、搜索、分页、版本状态、归档恢复和引用生成。
 - 长列表达到阈值后使用虚拟滚动，但保留 cursor 分页和失败重试。
 - 只有页面交互稳定后，才考虑 Playwright 页面级测试；当前不新增页面级 UI 测试。
@@ -248,13 +342,18 @@ CreativeGenerationRequest
 - 不实现“一键生成整条短剧”的自动导演流程。
 - 不由 AI 决定视频节奏、镜头切换、镜头取舍或最终合片。
 - 不把 `creative_projects` 改造成 `director_projects` 的别名。
-- 不为了个人偏好把当前 pnpm 项目强制迁移到 Bun。
+- 不在 Bun 迁移完成后再引入第二套包管理器或锁文件。
 - 不在 `model-core`、asset compiler、API 或 Worker 中复制 Provider 参数、价格或 endpoint 表。
 - 不把用户上传媒体、生产数据库、备份和运行时文件放回 Git checkout。
 - 不在本阶段新增真实 Provider 调用或公开部署验收声明。
 
-## 10. 待确认的最小问题
+## 10. 当前无待确认问题
 
-推荐默认采用本文的两步包拆分：`creative-asset-contracts` + `creative-asset-domain`，随后再加 API service 和 compiler。这样可以先解决“万能 shared”和“route 直接调 repository”两个维护问题，再进入 Provider 映射。
+本文的两步包拆分、API/Worker 进程级持久化组合以及独立的 `LISTEN/NOTIFY` 监听连接已经落地。
 
-唯一需要用户确认的是：是否接受在下一次代码变更中，把创意资产协议从 `@bailian-studio/shared` 提取为独立包，并同步迁移现有引用。接受后，后续所有资产、场景、道具和未来剧本分析相关协议都以独立 contracts 为唯一来源。
+当前已完成 generation、director 和 creative asset 主要写入入口的 application service 收敛；并新增单次及批量生成产物收录
+vertical slice：`collect-from-generation` 在一个数据库事务内写入资产、项目关系、版本和参考图，使用用户范围幂等键
+与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
+重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
+`task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 暂保兼容 facade。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port。下一步是盘点剩余消费者并逐步收缩兼容 facade；只有在引入多实例部署或需要跨模块事务时，才评估是否继续向 request-scoped transaction context 演进。

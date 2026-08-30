@@ -3,7 +3,7 @@ import {
   createIsolatedGenerationRepository,
   createTestUser,
   resetGenerationRepositoryTestDb,
-  type GenerationRepository,
+  type GenerationRepositoryCompat,
   type IsolatedGenerationRepository,
   type RecordAuditEventInput,
   type ListUnifiedAssetsOptions,
@@ -62,7 +62,7 @@ function authed(url: string, init: RequestInit = {}): Request {
   return new Request(url, { ...init, headers })
 }
 
-function auditedRepository(repository: GenerationRepository): GenerationRepository {
+function auditedRepository(repository: GenerationRepositoryCompat): GenerationRepositoryCompat {
   return new Proxy(repository, {
     get(target, property, receiver) {
       if (property === 'recordAuditEvent') {

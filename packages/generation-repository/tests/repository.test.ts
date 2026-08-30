@@ -18,11 +18,11 @@ import {
   type BailianStudioDb,
 } from '@bailian-studio/db'
 import { createIsolatedTestDb, resetBailianStudioTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
-import { createGenerationRepository, GenerationRepositoryError, type GenerationRepository } from '../src'
+import { createGenerationRepository, GenerationRepositoryError, type GenerationRepositoryCompat } from '../src'
 
 let testDb!: IsolatedTestDb
 let db!: BailianStudioDb
-let repository!: GenerationRepository
+let repository!: GenerationRepositoryCompat
 
 beforeAll(async () => {
   testDb = await createIsolatedTestDb()

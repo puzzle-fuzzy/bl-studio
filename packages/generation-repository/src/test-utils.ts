@@ -14,7 +14,7 @@ import {
   type CreateGenerationRepositoryFromUrlOptions,
   type GenerationRepositoryHandle,
 } from './factory'
-import type { GenerationRepository } from './repository'
+import type { GenerationRepositoryCompat } from './repository'
 
 /** 取得测试用的 DATABASE_URL；若缺失则抛错（避免静默走到默认值）。 */
 export function requireRepositoryDatabaseUrl(): string {
@@ -30,7 +30,8 @@ export type GenerationRepositoryTestDb = GenerationRepositoryHandle
  * （包边界规则禁止），也避免并行测试文件争抢同一个共享数据库。
  */
 export interface IsolatedGenerationRepository {
-  repository: GenerationRepository
+  /** 测试隔离接缝保留旧 facade；生产 app 不应依赖这些附加能力。 */
+  repository: GenerationRepositoryCompat
   /** 共享连接池——reset/seed 时复用它，避免每个用例各自开池导致的池抖动。 */
   db: BailianStudioDb
   /** 隔离数据库的 URL，供测试间重置使用。 */

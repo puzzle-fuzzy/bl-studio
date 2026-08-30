@@ -11,147 +11,191 @@
  *  - runtime factory 与 test helper 分离：生产 wiring 只消费 factory 导出的
  *    createGenerationRepositoryFromUrl，测试隔离数据库 helper 留在 test-utils。
  */
-export { GenerationRepositoryError, type GenerationRepositoryErrorCode } from './errors'
-export {
-  createGenerationRepository,
-  estimateGenerationRequest,
-  type ClaimNextQueuedTaskInput,
-  type DailyGenerationUsage,
-  type DailyGenerationUsageInput,
-  type GenerationCallStats,
-  type GenerationUsage,
-  type GenerationUsageInput,
-  type GenerationEstimate,
-  type GenerationRepository,
-  type ListStuckGenerationRecordsInput,
-  type RenewTaskLockInput,
-  type SaveTaskOptions,
-} from './repository'
-export type {
-  ContentReport,
-  ContentReportReason,
-  ContentReportStatus,
-  ListContentReportsResult,
-} from './types'
-export {
-  createGenerationRepositoryFromUrl,
-  type CreateGenerationRepositoryFromUrlOptions,
-  type GenerationRepositoryHandle,
-} from './factory'
-export type {
-  FinishProviderRequestInput,
-  ProviderRequestAudit,
-  ProviderRequestErrorSummary,
-  ProviderRequestOperation,
-  ProviderRequestStatus,
-  StartProviderRequestInput,
-} from './provider-request-types'
-export { AUDIT_ACTIONS } from './audit-types'
-export type {
-  AuditAction,
-  AuditEventMetadata,
-  AuditEventMetadataValue,
-  AuditLog,
-  AuditOutcome,
-  RecordAuditEventInput,
-} from './audit-types'
-export type {
-  GenerationListView,
-  ListGenerationRecordsOptions,
-  ListGenerationRecordsResult,
-} from './cursor'
-export { createGenerationEventListener, type GenerationEventNotification } from './event-listener'
-export { ensureGenerationEventsTrigger } from './notify'
+
 // 监听器 transport 仍来自 db；generation trigger DDL 由本包自己拥有。
-export type { NotificationListener } from '@bailian-studio/db'
+export type { NotificationListener } from "@bailian-studio/db";
 export {
-  createIsolatedGenerationRepository,
-  createTestUser,
-  grantTestCredits,
-  requireRepositoryDatabaseUrl,
-  resetGenerationRepositoryTestDb,
-  type GenerationRepositoryTestDb,
-  type IsolatedGenerationRepository,
-} from './test-utils'
+	type AdminGalleryRepository,
+	createAdminGalleryRepository,
+} from "./admin-gallery";
+export {
+	type AdminTaskRepository,
+	createAdminTaskRepository,
+} from "./admin-tasks";
+export {
+	type AnalyticsRepository,
+	createAnalyticsRepository,
+	type GenerationCallStats,
+} from "./analytics";
+export type { AssetRepository } from "./asset-port";
+export { createAssetRepository } from "./assets";
 export type {
-  AdminGalleryItem,
-  AdminTaskItem,
-  ArtifactKind,
-  ArtifactStatus,
-  ArtifactStorageProvider,
-  CancelGenerationInput,
-  CostMarginRow,
-  FeedbackKind,
-  FeedbackStatus,
-  GalleryDetail,
-  GalleryItem,
-  GallerySort,
-  GalleryVisibility,
-  ListAdminGalleryResult,
-  ListAdminTasksResult,
-  ListFeedbackResult,
-  ListGalleryResult,
-  ListNotificationsResult,
-  ListPromptLibraryResult,
-  ModelCost,
-  NotificationItem,
-  NotificationKind,
-  PromptLibraryItem,
-  RetentionAnalytics,
-  UserFeedback,
-  CompleteGenerationInput,
-  CompleteGenerationResult,
-  CreateGenerationInput,
-  CreateGenerationResult,
-  GenerationEvent,
-  GenerationEventCursor,
-  GenerationAssetRefInput,
-  GenerationAssetRefs,
-  GenerationInputAsset,
-  GenerationLibraryState,
-  CreateGenerationShareInput,
-  FailGenerationInput,
-  GenerationDiagnostics,
-  GenerationArtifact,
-  GenerationRecord,
-  GenerationShare,
-  GetOwnedStorageObjectInput,
-  GetGenerationShareForRecordInput,
-  ListGenerationArtifactsOptions,
-  ListGenerationArtifactsResult,
-  ListGenerationEventsOptions,
-  MarkArtifactFailedInput,
-  MarkArtifactStoredInput,
-  MarkGenerationProcessingInput,
-  NormalizedGenerationOutput,
-  PublicSharedGeneration,
-  PublicSharedGenerationArtifact,
-  PublicSharedGenerationRecord,
-  OwnedStorageObject,
-  RevokeGenerationShareInput,
-  RepositoryGenerationStatus,
-  RegisterWorkerHeartbeatInput,
-  RequestGenerationCancelInput,
-  RetryGenerationInput,
-  ScheduleGenerationPollInput,
-  SetGenerationLibraryStateInput,
-  TaskDiagnosticError,
-  TaskDiagnostics,
-  UpdateGenerationRecordPatch,
-  WorkerHealth,
-  WorkerHeartbeat,
-  GenerationQuotaLimits,
-} from './types'
+	AssetDerivativeStatus,
+	AssetSort,
+	AssetSource,
+	AssetThumbnailSource,
+	CompleteAssetThumbnailInput,
+	CreateUserAssetInput,
+	FailAssetThumbnailInput,
+	ListUnifiedAssetsOptions,
+	ListUnifiedAssetsResult,
+	MarkAssetThumbnailProcessingInput,
+	UnifiedAssetItem,
+} from "./asset-types";
+export type { AuditRepository } from "./audit-port";
 export type {
-  AssetDerivativeStatus,
-  AssetThumbnailSource,
-  AssetSource,
-  AssetSort,
-  CompleteAssetThumbnailInput,
-  CreateUserAssetInput,
-  FailAssetThumbnailInput,
-  ListUnifiedAssetsOptions,
-  ListUnifiedAssetsResult,
-  MarkAssetThumbnailProcessingInput,
-  UnifiedAssetItem,
-} from './asset-types'
+	AuditAction,
+	AuditEventMetadata,
+	AuditEventMetadataValue,
+	AuditLog,
+	AuditOutcome,
+	RecordAuditEventInput,
+} from "./audit-types";
+export { AUDIT_ACTIONS } from "./audit-types";
+export {
+	type ContentReportRepository,
+	createContentReportRepository,
+} from "./content-reports";
+export type {
+	GenerationListView,
+	ListGenerationRecordsOptions,
+	ListGenerationRecordsResult,
+} from "./cursor";
+export {
+	GenerationRepositoryError,
+	type GenerationRepositoryErrorCode,
+} from "./errors";
+export {
+	createGenerationEventListener,
+	type GenerationEventNotification,
+} from "./event-listener";
+export {
+	type CreateGenerationRepositoryFromUrlOptions,
+	createGenerationRepositoryFromUrl,
+	type GenerationRepositoryHandle,
+} from "./factory";
+export { createFeedbackRepository, type FeedbackRepository } from "./feedback";
+export {
+	createNotificationRepository,
+	type NotificationRepository,
+} from "./notifications";
+export { ensureGenerationEventsTrigger } from "./notify";
+export {
+	createPromptLibraryRepository,
+	type PromptLibraryRepository,
+} from "./prompt-library";
+export type {
+	FinishProviderRequestInput,
+	ProviderRequestAudit,
+	ProviderRequestErrorSummary,
+	ProviderRequestOperation,
+	ProviderRequestStatus,
+	StartProviderRequestInput,
+} from "./provider-request-types";
+export {
+	type ClaimNextQueuedTaskInput,
+	createGenerationRepository,
+	estimateGenerationRequest,
+	type GenerationEstimate,
+	type GenerationRepository,
+	type GenerationRepositoryCompat,
+	type ListStuckGenerationRecordsInput,
+	type RenewTaskLockInput,
+	type SaveTaskOptions,
+} from "./repository";
+export type {
+	PublicShareRepository,
+	ShareRepository,
+} from "./share-port";
+export { createShareRepository } from "./shares";
+export { createSocialRepository, type SocialRepository } from "./social";
+export {
+	createIsolatedGenerationRepository,
+	createTestUser,
+	type GenerationRepositoryTestDb,
+	grantTestCredits,
+	type IsolatedGenerationRepository,
+	requireRepositoryDatabaseUrl,
+	resetGenerationRepositoryTestDb,
+} from "./test-utils";
+export type {
+	AdminGalleryItem,
+	AdminTaskItem,
+	ArtifactKind,
+	ArtifactStatus,
+	ArtifactStorageProvider,
+	CancelGenerationInput,
+	CompleteGenerationInput,
+	CompleteGenerationResult,
+	ContentReport,
+	ContentReportReason,
+	ContentReportStatus,
+	CostMarginRow,
+	CreateGenerationInput,
+	CreateGenerationResult,
+	CreateGenerationShareInput,
+	FailGenerationInput,
+	FeedbackKind,
+	FeedbackStatus,
+	GalleryDetail,
+	GalleryItem,
+	GallerySort,
+	GalleryVisibility,
+	GenerationArtifact,
+	GenerationAssetRefInput,
+	GenerationAssetRefs,
+	GenerationDiagnostics,
+	GenerationEvent,
+	GenerationEventCursor,
+	GenerationInputAsset,
+	GenerationLibraryState,
+	GenerationQuotaLimits,
+	GenerationRecord,
+	GenerationShare,
+	GetGenerationShareForRecordInput,
+	GetOwnedStorageObjectInput,
+	ListAdminGalleryResult,
+	ListAdminTasksResult,
+	ListContentReportsResult,
+	ListFeedbackResult,
+	ListGalleryResult,
+	ListGenerationArtifactsOptions,
+	ListGenerationArtifactsResult,
+	ListGenerationEventsOptions,
+	ListNotificationsResult,
+	ListPromptLibraryResult,
+	MarkArtifactFailedInput,
+	MarkArtifactStoredInput,
+	MarkGenerationProcessingInput,
+	ModelCost,
+	NormalizedGenerationOutput,
+	NotificationItem,
+	NotificationKind,
+	OwnedStorageObject,
+	PromptLibraryItem,
+	PublicSharedGeneration,
+	PublicSharedGenerationArtifact,
+	PublicSharedGenerationRecord,
+	RegisterWorkerHeartbeatInput,
+	RepositoryGenerationStatus,
+	RequestGenerationCancelInput,
+	RetentionAnalytics,
+	RetryGenerationInput,
+	RevokeGenerationShareInput,
+	ScheduleGenerationPollInput,
+	SetGenerationLibraryStateInput,
+	TaskDiagnosticError,
+	TaskDiagnostics,
+	UpdateGenerationRecordPatch,
+	UserFeedback,
+	WorkerHealth,
+	WorkerHeartbeat,
+} from "./types";
+export {
+	createUsageRepository,
+	type DailyGenerationUsage,
+	type DailyGenerationUsageInput,
+	type GenerationUsage,
+	type GenerationUsageInput,
+	type UsageRepository,
+} from "./usage";

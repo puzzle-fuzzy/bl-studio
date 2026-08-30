@@ -1,11 +1,12 @@
 /**
  * 运行时 repository 装配。
  *
- * 本模块刻意不提供测试数据库 helper。API 与 worker 的组合根只需一个
- * DATABASE_URL 即可构造 repository，无需直接 import 测试脚手架或数据库包。
+ * 本模块刻意不提供测试数据库 helper。API 与 worker 的进程组合由
+ * @bailian-studio/persistence-runtime 统一创建共享数据库句柄，再把同一 db 注入
+ * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository。
  */
 import { createDb, type BailianStudioDb } from '@bailian-studio/db'
-import { createGenerationRepository, type GenerationRepository } from './repository'
+import { createGenerationRepository, type GenerationRepositoryCompat } from './repository'
 
 export interface CreateGenerationRepositoryFromUrlOptions {
   max?: number
@@ -13,7 +14,8 @@ export interface CreateGenerationRepositoryFromUrlOptions {
 
 export interface GenerationRepositoryHandle {
   db: BailianStudioDb
-  repository: GenerationRepository
+  /** URL 工厂保留完整兼容形状；生产组合根应使用窄 repository port。 */
+  repository: GenerationRepositoryCompat
   close(): Promise<void>
 }
 

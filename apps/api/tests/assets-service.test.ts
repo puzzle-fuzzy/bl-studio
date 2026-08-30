@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import type { GenerationRepository } from '@bailian-studio/generation-repository'
+import type { AssetRepository } from '@bailian-studio/generation-repository'
 import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from '@bailian-studio/storage'
 import { assetDownloadStorageKey, uploadAsset } from '../src/modules/assets/service'
 import { parseMediaDuration } from '../src/modules/assets/media-metadata'
@@ -76,7 +76,7 @@ describe('asset media duration validation', () => {
       createUserAsset: async (input: { metadata?: Record<string, unknown>; enqueueThumbnail?: boolean }) => {
         created = input
       },
-    } as unknown as GenerationRepository
+    } as unknown as AssetRepository
 
     const result = await uploadAsset({
       file: new File([new Uint8Array(MP4_MAGIC)], 'clip.mp4', { type: 'video/mp4' }),
@@ -96,7 +96,7 @@ describe('asset media duration validation', () => {
   })
 
   it('rejects media longer than the configured maximum before storage', async () => {
-    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+    const repository = { createUserAsset: async () => undefined } as unknown as AssetRepository
     await expect(uploadAsset({
       file: new File([new Uint8Array(MP4_MAGIC)], 'clip.mp4', { type: 'video/mp4' }),
       userId: 'user_1',
@@ -112,7 +112,7 @@ describe('asset media duration validation', () => {
     const storage = new TestStorage()
     const repository = {
       createUserAsset: async () => { throw new Error('database unavailable') },
-    } as unknown as GenerationRepository
+    } as unknown as AssetRepository
 
     await expect(uploadAsset({
       file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
@@ -131,7 +131,7 @@ describe('asset media duration validation', () => {
 describe('asset upload streaming and magic-number validation', () => {
   it('streams to writeObjectStream when the adapter supports it', async () => {
     const storage = new TestStorage()
-    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+    const repository = { createUserAsset: async () => undefined } as unknown as AssetRepository
 
     await uploadAsset({
       file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
@@ -149,7 +149,7 @@ describe('asset upload streaming and magic-number validation', () => {
 
   it('prefers multipart upload when the adapter supports replayable files', async () => {
     const storage = new MultipartTestStorage()
-    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+    const repository = { createUserAsset: async () => undefined } as unknown as AssetRepository
 
     await uploadAsset({
       file: new File([new Uint8Array(PNG_MAGIC)], 'image.png', { type: 'image/png' }),
@@ -168,7 +168,7 @@ describe('asset upload streaming and magic-number validation', () => {
 
   it('rejects media whose magic number does not match the declared type', async () => {
     const storage = new TestStorage()
-    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+    const repository = { createUserAsset: async () => undefined } as unknown as AssetRepository
 
     await expect(uploadAsset({
       file: new File([new Uint8Array([0x89, 0x50, 0x4e, 0x47])], 'fake.mp4', { type: 'video/mp4' }),
@@ -184,7 +184,7 @@ describe('asset upload streaming and magic-number validation', () => {
 
   it('rejects an image/png declared file whose body is not PNG', async () => {
     const storage = new TestStorage()
-    const repository = { createUserAsset: async () => undefined } as unknown as GenerationRepository
+    const repository = { createUserAsset: async () => undefined } as unknown as AssetRepository
 
     await expect(uploadAsset({
       file: new File(['just text'], 'image.png', { type: 'image/png' }),

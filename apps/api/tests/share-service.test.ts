@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { GenerationRepositoryError, type GenerationRecord, type GenerationRepository, type GenerationShare } from '@bailian-studio/generation-repository'
+import { GenerationRepositoryError, type GenerationRecord, type GenerationShare, type ShareRepository } from '@bailian-studio/generation-repository'
 import { createShareUseCase } from '../src/modules/shares/service'
 
 const share: GenerationShare = {
@@ -34,7 +34,7 @@ describe('share use cases', () => {
   it('creates a share through the repository and preserves explicit options', async () => {
     let received: unknown
     const repository = {
-      createGenerationShare: async (input: Parameters<GenerationRepository['createGenerationShare']>[0]) => {
+      createGenerationShare: async (input: Parameters<ShareRepository['createGenerationShare']>[0]) => {
         received = input
         return share
       },
@@ -79,7 +79,7 @@ describe('share use cases', () => {
       createGenerationShare: async () => share,
       getGenerationRecord: async () => record('owner'),
       getGenerationShareForRecord: async () => share,
-      revokeGenerationShare: async (input: Parameters<GenerationRepository['revokeGenerationShare']>[0]) => {
+      revokeGenerationShare: async (input: Parameters<ShareRepository['revokeGenerationShare']>[0]) => {
         revoked = input
         return share
       },
