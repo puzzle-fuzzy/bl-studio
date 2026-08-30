@@ -20,6 +20,7 @@
     "lint:fix": "biome lint --write .",
     "typecheck": "turbo run typecheck",
     "typecheck:root": "tsc -p tsconfig.json --noEmit",
+    "check:workspace-deps": "tsx scripts/verify/check-workspace-dependencies.ts",
     "test": "dotenv -e deploy/env/.env.test -- tsx scripts/verify/run-workflow.ts test",
     "test:root": "dotenv -e deploy/env/.env.test -- vitest run tests scripts --exclude='**/tests/e2e/**' --exclude='tools/**' --exclude='reference-materials/**' --hookTimeout=30000",
     "test:coverage": "dotenv -e deploy/env/.env.test -- tsx scripts/verify/run-workflow.ts coverage",

@@ -117,6 +117,7 @@ bun run test             # 根契约测试 + 全仓 vitest（串行，共享 tes
 bun run test:coverage    # 覆盖率
 bun run verify           # migrations + boundaries + manifests + lint + typecheck + test
 bun run check:boundaries # 包边界（import 规则）
+bun run check:workspace-deps # workspace 内部依赖必须在各自 manifest 显式声明
 bun run check:manifests  # 模型 manifest 一致性
 bun run model:acceptance # 所有 enabled 模型的离线请求/响应矩阵
 bun run model:acceptance -- --live=<model-id> # 单模型真实供应商 canary（需 DASHSCOPE_API_KEY）

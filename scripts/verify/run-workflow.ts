@@ -15,6 +15,7 @@ const commands: Record<Workflow, string[][]> = {
   verify: [
     ['run', 'check:db-migrations'],
     ['run', 'check:boundaries'],
+    ['run', 'check:workspace-deps'],
     ['run', 'check:local-capture-boundary'],
     ['run', 'check:manifests'],
     ['run', 'docs:bailian:snapshot:check'],

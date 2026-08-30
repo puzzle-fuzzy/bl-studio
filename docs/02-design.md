@@ -162,7 +162,7 @@ bl-studio/
 | 前端集成 | vitest + happy-dom + Testing Library | 路由守卫 / auth 流 / 任务抽屉 / 画廊 / 重试回填 |
 | 后端包 | vitest（node） | 原 101 个 bun:test 全量迁移 + 新增 |
 | API 契约 | vitest | routes 测试（保持原 api-success-contract） |
-| 门禁 | turbo | typecheck + test + check:boundaries + check:manifests + production-env |
+| 门禁 | turbo | typecheck + test + check:boundaries + check:workspace-deps + check:manifests + production-env |
 
 ## 七、验收清单
 
