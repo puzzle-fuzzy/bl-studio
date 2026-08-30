@@ -6,7 +6,10 @@ import type {
   CreativeGenerationPurpose,
   CreativeGenerationBindingRole,
 } from '@bailian-studio/creative-asset-contracts'
-import type { FrozenModelManifest } from '@bailian-studio/dashscope-manifests'
+import type {
+  FrozenModelManifest,
+  ModelParameterBinding,
+} from '@bailian-studio/model-core'
 
 export type CreativeAssetCompilerMediaKind = 'image' | 'video' | 'audio'
 
@@ -31,8 +34,20 @@ export interface ApprovedCreativeAssetBindingInput {
   references: readonly CreativeAssetCompilerReferenceInput[]
 }
 
+/**
+ * Minimal provider-neutral manifest view needed by the creative asset compiler.
+ * Provider packages can keep richer request mappings while satisfying this
+ * structural seam through their `input.*` binding targets.
+ */
+export type CreativeAssetCompilerManifest = FrozenModelManifest & {
+  readonly request: FrozenModelManifest['request'] & {
+    readonly bindings: Readonly<Record<string, ModelParameterBinding>>
+    readonly referenceFormat?: string
+  }
+}
+
 export interface CompileCreativeGenerationInput {
-  manifest: FrozenModelManifest
+  manifest: CreativeAssetCompilerManifest
   purpose: CreativeGenerationPurpose
   prompt: string
   negativePrompt?: string

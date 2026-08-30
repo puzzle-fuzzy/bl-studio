@@ -14,7 +14,7 @@
 | `@bailian-studio/creative-asset-repository` | `packages/creative-asset-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 | `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
-| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
+| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-validation` / `packages/provider-dashscope` / `scripts`（`creative-asset-compiler` 仅测试 fixture） | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
@@ -46,6 +46,7 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/task-engine` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/task-repository` | 除 `@bailian-studio/(db\|task-engine)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/canvas-execution` | `@bailian-studio/(db\|storage\|provider-dashscope\|dashscope-manifests\|generation-repository\|task-repository\|task-engine\|api-client)`、services、apps、react、elysia |
+| `packages/creative-asset-compiler` | `@bailian-studio/dashscope-manifests`、services、apps、react、elysia |
 | `packages/sse-protocol` | `@bailian-studio/(db\|storage\|provider-dashscope)`、services、apps、react、elysia |
 | `packages/persistence-runtime` | services、apps、react、elysia；只负责进程级持久化资源组装 |
 | `apps/api` | `@bailian-studio/(db\|provider-dashscope)`、importsApps、worker sibling、provider-dashscope package 路径 |
@@ -129,6 +130,11 @@ Worker 与前端各自维护不同的 wire schema。
 ### packages/canvas-validation（Canvas 提交前预检）
 - **拥有**：前后端共享的图结构、模型参数、提示词和素材槽位预检，以及节点级、字段级错误投影。
 - **不拥有**：用户鉴权、资产 ownership、revision、任务入队、generation 状态推进、Provider 请求和 read URL；服务端的 `canvas-execution` 编译与 API 权威校验仍是最终边界。
+
+### packages/creative-asset-compiler（创意资产绑定编译器）
+- **拥有**：已授权素材绑定到模型参数的 provider-neutral 编译、提示词引用归一化和不可变能力快照生成。
+- **模型依赖**：只消费 model-core 的 `ModelParameterBinding` 与 manifest 基础契约，并在本包定义 `CreativeAssetCompilerManifest` 最小视图；provider-specific manifest 包只在测试中作为 fixture 使用。
+- **不拥有**：资产 ownership/approved 查询、Provider HTTP 请求、数据库和具体 provider registry。
 
 ## 4. 运行时应用
 

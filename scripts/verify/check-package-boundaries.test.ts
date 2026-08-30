@@ -89,6 +89,27 @@ describe('package boundary rules', () => {
     expect(source).toContain('packages\\/provider-dashscope')
   })
 
+  it('keeps the creative asset compiler provider-neutral at runtime', () => {
+    expect(
+      matchesRule(
+        'packages/creative-asset-compiler',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toBe(true)
+    expect(
+      checkBailianPackageSourceBoundary(
+        'packages/creative-asset-compiler/src/compiler.ts',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toHaveLength(1)
+    expect(
+      checkBailianPackageSourceBoundary(
+        'packages/creative-asset-compiler/tests/compiler.test.ts',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toEqual([])
+  })
+
   it('matches worker boundary violations by behavior', () => {
     const workerRule = rules.find((rule) => rule.scope === 'apps/worker')
     expect(workerRule).toBeDefined()
@@ -268,7 +289,6 @@ describe('package boundary rules', () => {
           'apps/api',
           'apps/worker',
           'packages/canvas-validation',
-          'packages/creative-asset-compiler',
           'packages/provider-dashscope',
           'scripts',
         ],
@@ -277,10 +297,12 @@ describe('package boundary rules', () => {
           'packages/generation-repository/src/test-utils.ts',
           'packages/generation-repository/tests',
           'packages/canvas-execution/tests',
+          'packages/creative-asset-compiler/tests',
         ],
         testOnlyDependencyScopes: [
           'packages/generation-repository',
           'packages/canvas-execution',
+          'packages/creative-asset-compiler',
         ],
       },
     ])
@@ -405,6 +427,26 @@ describe('package boundary rules', () => {
     expect(
       checkBailianPackageManifestBoundary(
         'packages/generation-repository/package.json',
+        {
+          dependencies: {
+            '@bailian-studio/dashscope-manifests': 'workspace:*',
+          },
+        },
+      ),
+    ).toHaveLength(1)
+    expect(
+      checkBailianPackageManifestBoundary(
+        'packages/creative-asset-compiler/package.json',
+        {
+          devDependencies: {
+            '@bailian-studio/dashscope-manifests': 'workspace:*',
+          },
+        },
+      ),
+    ).toEqual([])
+    expect(
+      checkBailianPackageManifestBoundary(
+        'packages/creative-asset-compiler/package.json',
         {
           dependencies: {
             '@bailian-studio/dashscope-manifests': 'workspace:*',

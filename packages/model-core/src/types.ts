@@ -227,6 +227,13 @@ export type ModelValidationRule =
  * 具体 provider 可以在自己的 manifest 包里扩展 kind、bindings 和其它字段；
  * model-core 的通用契约不再要求所有 provider 共享 DashScope 的请求联合。
  */
+export type ModelParameterBinding =
+  | { readonly target: 'input.prompt' }
+  | { readonly target: 'input.media' }
+  | { readonly target: 'input.field'; readonly field: string }
+  | { readonly target: 'parameters.field'; readonly field?: string }
+  | { readonly target: 'ui.only' }
+
 export interface ProviderRequestContract {
   readonly [key: string]: unknown
   kind: string

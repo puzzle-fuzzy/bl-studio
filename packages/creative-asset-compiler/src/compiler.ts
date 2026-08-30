@@ -2,11 +2,7 @@ import {
   getModelAuditMetadata,
   validateModelParams,
 } from '@bailian-studio/model-core'
-import type {
-  FrozenModelManifest,
-  ParameterBinding,
-  ReferenceFormat,
-} from '@bailian-studio/dashscope-manifests'
+import type { ModelParameterBinding } from '@bailian-studio/model-core'
 import {
   CREATIVE_ASSET_PROTOCOL_VERSION,
   CreativeGenerationContextSchema,
@@ -20,6 +16,7 @@ import type {
   CompileCreativeGenerationInput,
   CompiledCreativeGeneration,
   CreativeAssetCompilerMediaKind,
+  CreativeAssetCompilerManifest,
   CreativeAssetCompilerReferenceInput,
 } from './types'
 
@@ -148,7 +145,7 @@ export function compileCreativeGeneration(
   }
 }
 
-function assertModelAvailable(manifest: FrozenModelManifest): void {
+function assertModelAvailable(manifest: CreativeAssetCompilerManifest): void {
   if (!manifest.availability.enabled) {
     throw new CreativeAssetCompilerError(
       'CREATIVE_COMPILER_MODEL_UNAVAILABLE',
@@ -158,11 +155,11 @@ function assertModelAvailable(manifest: FrozenModelManifest): void {
   }
 }
 
-function findPromptParameter(manifest: FrozenModelManifest): FrozenModelManifest['parameters'][number] {
+function findPromptParameter(manifest: CreativeAssetCompilerManifest): CreativeAssetCompilerManifest['parameters'][number] {
   const candidates = manifest.parameters.filter(parameter => (
     parameter.type === 'text' && bindingFor(manifest, parameter.name)?.target === 'input.prompt'
   ))
-  if (candidates.length === 1) return candidates[0] as FrozenModelManifest['parameters'][number]
+  if (candidates.length === 1) return candidates[0] as CreativeAssetCompilerManifest['parameters'][number]
   const fallback = manifest.parameters.find(parameter => parameter.type === 'text' && parameter.name === 'prompt')
   if (fallback !== undefined) return fallback
   throw new CreativeAssetCompilerError(
@@ -172,7 +169,7 @@ function findPromptParameter(manifest: FrozenModelManifest): FrozenModelManifest
   )
 }
 
-function findNegativePromptParameter(manifest: FrozenModelManifest): FrozenModelManifest['parameters'][number] | undefined {
+function findNegativePromptParameter(manifest: CreativeAssetCompilerManifest): CreativeAssetCompilerManifest['parameters'][number] | undefined {
   const candidates = manifest.parameters.filter(parameter => {
     if (parameter.type !== 'text') return false
     if (parameter.name === 'negativePrompt') return true
@@ -328,7 +325,7 @@ function selectReferences(bindings: readonly ApprovedCreativeAssetBindingInput[]
 }
 
 function resolveMediaParameters(
-  manifest: FrozenModelManifest,
+  manifest: CreativeAssetCompilerManifest,
   references: readonly SelectedReference[],
   explicitParameterName: string | undefined,
 ): Map<string, SelectedReference[]> {
@@ -387,7 +384,7 @@ function resolveMediaParameters(
 
 function orderProviderReferences(
   mediaParameterByKind: ReadonlyMap<string, readonly SelectedReference[]>,
-  manifest: FrozenModelManifest,
+  manifest: CreativeAssetCompilerManifest,
 ): SelectedReferenceWithParameter[] {
   const byParameter = new Map<string, readonly SelectedReference[]>()
   for (const [parameterName, items] of mediaParameterByKind) byParameter.set(parameterName, items)
@@ -396,26 +393,29 @@ function orderProviderReferences(
   ))
 }
 
-function providerMediaParameterNames(manifest: FrozenModelManifest): string[] {
+function providerMediaParameterNames(manifest: CreativeAssetCompilerManifest): string[] {
   return Object.entries(manifest.request.bindings)
     .filter(([, binding]) => binding?.target === 'input.media')
     .map(([parameterName]) => parameterName)
 }
 
-function mediaParameterNames(manifest: FrozenModelManifest): string[] {
+function mediaParameterNames(manifest: CreativeAssetCompilerManifest): string[] {
   const names = new Set(manifest.parameters
     .filter(parameter => parameter.type === 'media')
     .map(parameter => parameter.name))
   return providerMediaParameterNames(manifest).filter(name => names.has(name))
 }
 
-function bindingFor(manifest: FrozenModelManifest, parameterName: string): ParameterBinding | undefined {
+function bindingFor(manifest: CreativeAssetCompilerManifest, parameterName: string): ModelParameterBinding | undefined {
   return manifest.request.bindings[parameterName]
 }
 
-function referenceFormatFor(manifest: FrozenModelManifest): ReferenceFormat {
-  return manifest.request.kind === 'dashscope-video-task'
-    ? manifest.request.referenceFormat ?? 'angle-bracket'
+type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'
+
+function referenceFormatFor(manifest: CreativeAssetCompilerManifest): ReferenceFormat {
+  const format = manifest.request.referenceFormat
+  return format === 'angle-bracket' || format === 'image-bracket' || format === 'chinese'
+    ? format
     : 'angle-bracket'
 }
 

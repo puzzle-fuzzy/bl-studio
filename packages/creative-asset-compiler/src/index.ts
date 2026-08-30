@@ -6,5 +6,6 @@ export type {
   CompiledCreativeGeneration,
   CompiledCreativeGenerationReference,
   CreativeAssetCompilerMediaKind,
+  CreativeAssetCompilerManifest,
   CreativeAssetCompilerReferenceInput,
 } from './types'

@@ -40,6 +40,7 @@ export type {
   ModelManifestContract,
   ModelManifestExamples,
   ModelManifestSourceRefs,
+  ModelParameterBinding,
   ModelParameter,
   ModelParameterType,
   ModelProvider,
