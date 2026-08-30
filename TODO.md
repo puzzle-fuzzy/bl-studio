@@ -110,10 +110,12 @@ admin gallery、admin 任务中心和成本/留存分析已分别切换到 `Admi
 - ✅ `packages/task-repository` 新增，集中拥有 claim/renew/save/get 与 Date/JSON mapper；`task-engine` 继续只拥有状态机。
 - ✅ `persistence-runtime` 为 Worker 注入独立任务队列句柄；WorkerLoop 只依赖 claim/renew/save 的最小 port。
 - ✅ `generation-repository` 的任务 SQL 已委托 `task-repository`；新增并发认领、租约护栏、毒丸隔离和错误映射测试。GenerationRepository 核心接口中的旧任务方法已移除，Worker 强制注入任务队列 port。
+- ✅ `TaskQueueTransactionStore.findTask` 已收敛 media 幂等命中路径的任务查询，避免业务 repository 为简单关联查询直接 import `task_records`。
 
 当前仍由 3 个业务 repository 构造各自领域的 TaskRecord，并由持久化组合根注入同一个
 `TaskQueueTransactionStore`；各 repository 继续把调用方事务传给该 store，这是有意保留的原子性边界。
 `task-repository` 已接管 task_records 的序列化、插入、生命周期和回读，但不接管跨域业务事务的开启。
+业务事务内的简单任务查询也应通过其窄 transaction store；generation 的轮询去重、僵尸检测和资产删除联动仍待按各自原子性需求继续迁移。
 
 ### P1-D. API 分层不一致（✅ gallery + admin service 层完成 2026-08-29，其余 11 个渐进迁移）
 

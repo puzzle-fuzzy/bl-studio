@@ -1,10 +1,11 @@
-import { and, eq, gt, sql } from 'drizzle-orm'
+import { and, asc, eq, gt, inArray, ne, sql } from 'drizzle-orm'
 import { taskInsertValues, taskRecords, type BailianStudioDb, type BailianStudioDbTransaction } from '@bailian-studio/db'
 import { transitionTask } from '@bailian-studio/task-engine'
 import { toTaskRecord } from './mappers'
 import {
   TaskRepositoryError,
   type ClaimNextQueuedTaskInput,
+  type FindTaskInput,
   type RenewTaskLockInput,
   type SaveTaskOptions,
   type TaskQueueRepository,
@@ -33,6 +34,31 @@ export async function enqueueTask(
   return toTaskRecord(inserted)
 }
 
+/** 在调用方事务内读取一条任务，封闭 task_records 的查询与领域映射细节。 */
+async function findTask(
+  tx: BailianStudioDbTransaction,
+  input: FindTaskInput,
+): Promise<TaskRecord | undefined> {
+  const conditions = []
+  if (input.recordId !== undefined) conditions.push(eq(taskRecords.recordId, input.recordId))
+  if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
+  if (input.statuses !== undefined && input.statuses.length > 0) {
+    conditions.push(inArray(taskRecords.status, [...input.statuses]))
+  }
+  if (input.excludeTaskId !== undefined) {
+    conditions.push(ne(taskRecords.id, input.excludeTaskId))
+  }
+
+  const [row] = await tx
+    .select()
+    .from(taskRecords)
+    .where(conditions.length === 0 ? undefined : and(...conditions))
+    .orderBy(asc(taskRecords.createdAt), asc(taskRecords.id))
+    .limit(1)
+
+  return row === undefined ? undefined : toTaskRecord(row)
+}
+
 /**
  * 创建业务 repository 使用的事务内任务写入端口。
  *
@@ -40,7 +66,7 @@ export async function enqueueTask(
  * 注入 generation、media、director，而不是让各 repository 隐式持有函数依赖。
  */
 export function createTaskQueueTransactionStore(): TaskQueueTransactionStore {
-  return { enqueueTask }
+  return { enqueueTask, findTask }
 }
 
 /**

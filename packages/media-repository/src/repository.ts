@@ -1,10 +1,10 @@
 import { and, eq, inArray, isNull, notInArray, sql } from 'drizzle-orm'
-import { mediaJobs, taskRecords, userAssets, type BailianStudioDb } from '@bailian-studio/db'
+import { mediaJobs, userAssets, type BailianStudioDb } from '@bailian-studio/db'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { TaskQueueTransactionStore } from '@bailian-studio/task-repository'
 import { createMediaJobId, createMediaTaskId } from './id'
 import { MediaRepositoryError } from './errors'
-import { toMediaJob, toTaskRecord } from './mappers'
+import { toMediaJob } from './mappers'
 import type {
   CompleteMediaJobInput,
   CreateMediaJobInput,
@@ -144,13 +144,12 @@ export function createMediaRepository(options: CreateMediaRepositoryOptions): Me
             ))
             .limit(1)
           if (existingJob !== undefined) {
-            const [existingTask] = await tx
-              .select()
-              .from(taskRecords)
-              .where(and(eq(taskRecords.recordId, existingJob.id), eq(taskRecords.type, 'media.process')))
-              .limit(1)
+            const existingTask = await taskQueueTransactionStore.findTask(tx, {
+              recordId: existingJob.id,
+              type: 'media.process',
+            })
             if (existingTask === undefined) throw new MediaRepositoryError('DATABASE_ERROR', `Media task missing for idempotent job: ${existingJob.id}`)
-            return { job: toMediaJob(existingJob), task: toTaskRecord(existingTask) }
+            return { job: toMediaJob(existingJob), task: existingTask }
           }
         }
         const [sourceAsset] = await tx

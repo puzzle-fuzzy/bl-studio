@@ -8,7 +8,11 @@ import {
 } from '@bailian-studio/db'
 import { createIsolatedTestDb, resetBailianStudioTestDb } from '@bailian-studio/db/test'
 import { transitionTask, type TaskRecord } from '@bailian-studio/task-engine'
-import { createTaskQueueRepository, enqueueTask } from '../src/repository'
+import {
+  createTaskQueueRepository,
+  createTaskQueueTransactionStore,
+  enqueueTask,
+} from '../src/repository'
 
 let isolated!: Awaited<ReturnType<typeof createIsolatedTestDb>>
 let db!: ReturnType<typeof createDb>
@@ -63,6 +67,21 @@ describe('task queue repository', () => {
       status: 'queued',
     })
     expect((await db.select().from(taskRecords).where(eq(taskRecords.id, task.id)))).toHaveLength(1)
+  })
+
+  it('finds a task through the transaction store without exposing task table details', async () => {
+    const task = makeTask({ id: 'task-find', type: 'media.process', domain: 'media', recordId: 'media-1' })
+    await seedTask(task)
+
+    const found = await db.transaction(tx =>
+      createTaskQueueTransactionStore().findTask(tx, {
+        recordId: 'media-1',
+        type: 'media.process',
+        statuses: ['queued'],
+      }),
+    )
+
+    expect(found).toMatchObject({ id: task.id, recordId: 'media-1', type: 'media.process' })
   })
 
   it('claims distinct tasks under concurrency', async () => {

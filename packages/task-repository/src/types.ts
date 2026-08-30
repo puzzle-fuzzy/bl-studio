@@ -1,5 +1,5 @@
 import type { BailianStudioDbTransaction } from '@bailian-studio/db'
-import type { TaskRecord } from '@bailian-studio/task-engine'
+import type { TaskRecord, TaskStatus, TaskType } from '@bailian-studio/task-engine'
 
 /** Worker 认领下一条可执行任务所需的租约信息。 */
 export interface ClaimNextQueuedTaskInput {
@@ -19,6 +19,14 @@ export interface RenewTaskLockInput {
 /** 保存任务时可选的 owner 护栏。 */
 export interface SaveTaskOptions {
   expectedWorkerId?: string
+}
+
+/** 业务事务内读取任务时可复用的窄筛选条件。 */
+export interface FindTaskInput {
+  recordId?: string
+  type?: TaskType
+  statuses?: readonly TaskStatus[]
+  excludeTaskId?: string
 }
 
 export type TaskRepositoryErrorCode = 'TASK_NOT_FOUND' | 'DATABASE_ERROR'
@@ -50,4 +58,8 @@ export interface TaskQueueRepository {
  */
 export interface TaskQueueTransactionStore {
   enqueueTask(tx: BailianStudioDbTransaction, task: TaskRecord): Promise<TaskRecord>
+  findTask(
+    tx: BailianStudioDbTransaction,
+    input: FindTaskInput,
+  ): Promise<TaskRecord | undefined>
 }

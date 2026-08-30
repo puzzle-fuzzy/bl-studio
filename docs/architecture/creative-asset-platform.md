@@ -125,7 +125,7 @@ flowchart LR
   generation repository 不再承担任务生命周期 port。
 - generation/media/director 的业务 repository 由持久化组合根注入同一个
   `TaskQueueTransactionStore`，但仍各自开启“业务记录 + 初始任务”事务；任务包只负责事务内的
-  task row 写入，不负责跨域事务的开启与提交。
+  task row 写入和窄查询，不负责跨域事务的开启与提交。
 - generation 详情诊断由 `GenerationDiagnosticsRepository` 单独承载，核心
   `GenerationRepository` 只保留生成状态与业务事务能力。
 
