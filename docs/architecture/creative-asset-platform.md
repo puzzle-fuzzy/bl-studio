@@ -156,6 +156,9 @@ flowchart LR
   不提交未知 provider 参数，界面不显示不可用选项。
 - 节点的普通模型参数保存在 `parameterValues`，由 manifest 的 `type/options/visibleWhen` 驱动节点面板；
   编译器只投影当前模型仍声明且枚举值仍有效的字段，模型切换不会把旧模型参数带入新请求。
+- Canvas 前端在单节点生成和整图执行前调用 `@bailian-studio/canvas-validation` 的纯预检，
+  复用 `model-core` 的参数规则并按节点汇总中文字段错误；这只是用户反馈层，资产归属、版本一致性
+  和最终执行仍由 API 的权威编译与校验负责。
 - API 以当前 `revision` 编译 React Flow DAG，拒绝未知节点、环路、不可用模型、模型类型不匹配、
   缺失/越权素材和不支持的媒体输入；任务提交以 `(user, canvas, idempotencyKey)` 的确定性任务 ID
   提供幂等边界。

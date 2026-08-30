@@ -96,6 +96,7 @@ export type {
   ProviderPollingTransport,
   ProviderStreamingTransport,
   ProviderTransportHeader,
+  ParameterIssueCode,
   ParameterValidationIssue,
   ParametersValidationInput,
   ValidationResult,

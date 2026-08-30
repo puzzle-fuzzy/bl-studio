@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import { canvasNodeCacheKey, compileCanvasGraph, CanvasExecutionError, prepareCanvasNodeRerun } from '../src/index'
+import {
+  canvasNodeCacheKey,
+  compileCanvasGraph,
+  CanvasExecutionError,
+  prepareCanvasNodeRerun,
+} from '../src/index'
 import type { CanvasExecutionPlanNode, CanvasExecutionTaskInput, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
 
 function snapshot(

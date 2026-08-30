@@ -32,6 +32,8 @@ Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错�
 某个 provider 字段。前端和编译器通过
 `canvas-contracts` 的纯函数按当前模型 manifest 映射到 `aspectRatio`、`ratio` 或 `size`；
 普通参数按 manifest 的 `type/options/visibleWhen` 编辑，模型没有对应能力时不提交未知参数，前端也不展示不可用的比例选项。
+单节点生成与整图执行提交前会复用 `canvas-validation` 的纯预检，直接显示节点级、字段级中文错误；预检不承担
+资产归属、当前 revision 或最终 provider 请求的权威判断，这些仍由 API 编译器负责。
 
 Worker 把每一个计划节点转换为普通 generation。同一依赖层中满足输入条件的节点会在并发上限内
 并行创建；默认单个 Canvas 任务最多同时运行 4 个节点。节点生成完成后，Worker 等待 artifact persist

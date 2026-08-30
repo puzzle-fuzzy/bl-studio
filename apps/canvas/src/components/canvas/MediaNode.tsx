@@ -13,6 +13,7 @@ import { ImagePlus, Loader2, RefreshCw, Send, Video, X } from 'lucide-react'
 import { memo, useCallback, useEffect, useMemo, useState } from 'react'
 import { useCanvasGeneration } from '@/hooks/use-canvas-generation'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
+import { preflightCanvasState } from '@/lib/canvas-preflight'
 import {
   buildCanvasAssetRefs,
   type CanvasReferenceAsset,
@@ -141,6 +142,21 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     () => projectCanvasParameterValues(selectedModel?.parameters ?? [], parameterValues),
     [parameterValues, selectedModel],
   )
+  const nodePreflightIssues = useMemo(
+    () => models === undefined
+      ? []
+      : preflightCanvasState(nodes, edges, models).issues.filter(issue => issue.nodeId === id),
+    [edges, id, models, nodes],
+  )
+  const parameterErrors = useMemo(
+    () => new Map(
+      nodePreflightIssues
+        .filter(issue => issue.field !== undefined && issue.field !== 'prompt')
+        .map(issue => [issue.field as string, issue.message]),
+    ),
+    [nodePreflightIssues],
+  )
+  const promptError = nodePreflightIssues.find(issue => issue.field === 'prompt')?.message
   const selectableReferenceKinds = useMemo<MediaKind[]>(
     () => [...new Set(mediaParameters.map(parameter => parameter.mediaKind))],
     [mediaParameters],
@@ -221,8 +237,10 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const handleGenerate = useCallback(() => {
     if (
       modelId.length === 0
+      || selectedModel === undefined
       || prompt.trim().length === 0
       || referenceError !== undefined
+      || nodePreflightIssues.length > 0
     ) return
 
     const generationParams = {
@@ -237,7 +255,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
       ...(Object.keys(generationParams).length > 0 ? { params: generationParams } : {}),
       ...(Object.keys(assetRefs).length > 0 ? { assetRefs } : {}),
     })
-  }, [aspectRatioParameter, assetRefs, generate, generationParameterValues, modelId, prompt, referenceError])
+  }, [aspectRatioParameter, assetRefs, generate, generationParameterValues, modelId, nodePreflightIssues.length, prompt, referenceError, selectedModel])
 
   const updateParameterValue = useCallback((name: string, value: unknown) => {
     const nextValues = { ...parameterValues }
@@ -342,6 +360,16 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
       {/* 配置面板 */}
       {showForm && (
         <div className="space-y-2 p-3">
+          {nodePreflightIssues.length > 0 && (
+            <div role="alert" className="rounded-md border border-destructive/40 bg-destructive/5 px-2 py-1.5 text-[10px] text-destructive">
+              <p className="font-medium">提交前检查</p>
+              <ul className="mt-0.5 list-disc space-y-0.5 pl-3">
+                {nodePreflightIssues.map((issue, index) => (
+                  <li key={`${issue.code}-${issue.field ?? 'node'}-${index}`}>{issue.message}</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {connectedReferences.length > 0 ? (
             <div className="flex gap-1 overflow-x-auto">
               {connectedReferences.map((reference, index) => (
@@ -390,10 +418,13 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
 
           <textarea
             value={prompt}
+            aria-invalid={promptError !== undefined}
+            aria-describedby={promptError === undefined ? undefined : `${id}-prompt-error`}
             onChange={event => updateNodeData(id, { prompt: event.target.value })}
             placeholder="描述你想生成的内容…"
-            className="min-h-[60px] w-full resize-none rounded-lg border bg-surface px-2.5 py-2 text-xs outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring"
+            className={cn('min-h-[60px] w-full resize-none rounded-lg border bg-surface px-2.5 py-2 text-xs outline-none placeholder:text-muted-foreground/60 focus-visible:border-ring', promptError !== undefined && 'border-destructive')}
           />
+          {promptError !== undefined && <p id={`${id}-prompt-error`} className="text-[10px] leading-4 text-destructive">{promptError}</p>}
 
           <div className="flex items-center gap-2">
             <Select
@@ -415,11 +446,16 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
               disabled={
                 prompt.trim().length === 0
                 || modelId.length === 0
+                || selectedModel === undefined
                 || nodeData.status === 'generating'
                 || canvasExecutionBusy
                 || referenceError !== undefined
               }
-              title={canvasExecutionBusy ? '画布正在执行，请等待整图任务完成后再生成单节点' : undefined}
+              title={canvasExecutionBusy
+                ? '画布正在执行，请等待整图任务完成后再生成单节点'
+                : selectedModel === undefined
+                  ? '正在加载模型目录或当前模型不可用'
+                : nodePreflightIssues[0]?.message}
               onClick={handleGenerate}
             >
               <Send className="mr-1 size-3" aria-hidden />
@@ -456,6 +492,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
             parameters={selectedModel?.parameters ?? []}
             values={parameterValues}
             excludedNames={aspectParameterNames}
+            errors={parameterErrors}
             onChange={updateParameterValue}
           />
         </div>

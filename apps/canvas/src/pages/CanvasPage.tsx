@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -13,6 +13,7 @@ import {
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import type { CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
+import type { CanvasPreflightIssue } from '@bailian-studio/canvas-validation'
 import { apiClient } from '@bailian-studio/lib-client'
 import { History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
@@ -20,6 +21,8 @@ import { MediaNode, type MediaKind, type MediaNodeData } from '../components/can
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
 import { useCanvasExecution } from '../hooks/use-canvas-execution'
+import { useModelCatalog } from '../hooks/use-model-catalog'
+import { preflightCanvasState } from '../lib/canvas-preflight'
 
 const nodeTypes: NodeTypes = { mediaNode: MediaNode }
 
@@ -44,6 +47,7 @@ export function CanvasPage() {
     status: executionStatus,
     error: executionError,
   } = useCanvasExecution()
+  const { data: models } = useModelCatalog()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
   const hasNodeGenerationInFlight = nodes.some(node => (
@@ -64,6 +68,28 @@ export function CanvasPage() {
   const [executionHistoryError, setExecutionHistoryError] = useState<string | undefined>()
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
   const [refreshingDocument, setRefreshingDocument] = useState(false)
+  const [showPreflightIssues, setShowPreflightIssues] = useState(false)
+
+  const preflight = useMemo(
+    () => models === undefined
+      ? { valid: false, issues: [] as CanvasPreflightIssue[] }
+      : preflightCanvasState(nodes, edges, models),
+    [edges, models, nodes],
+  )
+
+  const handleExecute = useCallback(() => {
+    if (models === undefined) return
+    if (!preflight.valid) {
+      setShowPreflightIssues(true)
+      return
+    }
+    setShowPreflightIssues(false)
+    void execute()
+  }, [execute, models, preflight.valid])
+
+  useEffect(() => {
+    if (preflight.valid) setShowPreflightIssues(false)
+  }, [preflight.valid])
 
   useEffect(() => {
     if (showVersions) void refreshVersions()
@@ -269,13 +295,20 @@ export function CanvasPage() {
           variant="secondary"
           disabled={
             saveStatus !== 'saved' ||
+            models === undefined ||
             hasNodeGenerationInFlight ||
             executionStatus === 'submitting' ||
             executionStatus === 'running' ||
             executionStatus === 'cancelling'
           }
-          onClick={() => void execute()}
-          title={hasNodeGenerationInFlight ? '请等待节点生成完成后再运行画布' : executionError}
+          onClick={handleExecute}
+          title={hasNodeGenerationInFlight
+            ? '请等待节点生成完成后再运行画布'
+            : models === undefined
+              ? '正在加载模型目录'
+              : preflight.valid
+                ? executionError
+                : '请先修正提交前检查中的问题'}
         >
           {executionStatus === 'submitting' || executionStatus === 'running' ? (
             <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
@@ -311,6 +344,30 @@ export function CanvasPage() {
           运行记录
         </Button>
       </div>
+
+      {showPreflightIssues && !preflight.valid && preflight.issues.length > 0 && (
+        <div role="alert" className="absolute top-14 right-3 z-30 w-80 rounded-xl border border-destructive/40 bg-surface/95 p-2 shadow-lg backdrop-blur">
+          <div className="mb-1 flex items-center justify-between px-1">
+            <span className="text-xs font-medium text-destructive">提交前检查（{preflight.issues.length}）</span>
+            <Button size="xs" variant="ghost" onClick={() => setShowPreflightIssues(false)} aria-label="关闭提交前检查">
+              <X className="size-3.5" aria-hidden />
+            </Button>
+          </div>
+          <ul className="max-h-64 space-y-1 overflow-y-auto px-1 text-[10px] leading-4 text-destructive">
+            {preflight.issues.map((issue, index) => (
+              <li key={`${issue.code}-${issue.nodeId ?? 'canvas'}-${issue.field ?? 'node'}-${index}`}>
+                {formatPreflightIssue(issue)}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {executionError !== undefined && executionStatus === 'failed' && !showPreflightIssues && (
+        <div role="alert" className="absolute top-14 right-3 z-30 max-w-80 rounded-xl border border-destructive/40 bg-surface/95 px-3 py-2 text-[10px] leading-4 text-destructive shadow-lg backdrop-blur">
+          {executionError}
+        </div>
+      )}
 
       {showVersions && (
         <div className="absolute top-14 right-3 z-20 w-64 rounded-xl border bg-surface/95 p-2 shadow-lg backdrop-blur">
@@ -484,4 +541,11 @@ function formatDuration(milliseconds: number): string {
   const minutes = Math.floor(milliseconds / 60_000)
   const seconds = Math.round((milliseconds % 60_000) / 1_000)
   return seconds === 60 ? `${minutes + 1}m` : `${minutes}m ${seconds}s`
+}
+
+function formatPreflightIssue(issue: CanvasPreflightIssue): string {
+  const target = issue.nodeId === undefined
+    ? '画布'
+    : `节点 ${issue.nodeId}${issue.field === undefined ? '' : ` · ${issue.field}`}`
+  return `${target}：${issue.message}`
 }

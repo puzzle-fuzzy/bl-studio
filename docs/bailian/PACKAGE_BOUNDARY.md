@@ -17,6 +17,7 @@
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
 - **`@bailian-studio/model-core` 不在此表**：它是被前后端共享的纯数据 + 纯函数叶子（唯一数据源），允许 `apps/studio` / `apps/writer` / `apps/canvas` / `apps/admin`（提交前实时校验）与 `apps/worker` / `generation-repository` / `api` / `provider-dashscope` 消费，不受消费者白名单限制（仅受第 2 节 import 禁令约束）。
+- **`@bailian-studio/canvas-validation` 不在执行层白名单表**：它是前后端共享的 Canvas 预检纯函数包，仅依赖 `canvas-contracts` 与 `model-core`，允许 `apps/canvas` 及服务端按需消费。它不负责资产 ownership、revision、任务入队或 provider 请求。
 
 ## 2. 各包 import 禁令（check-package-boundaries.ts 的 rules 表）
 
@@ -111,6 +112,10 @@ Worker 与前端各自维护不同的 wire schema。
 - **不拥有**：用户鉴权、资产 ownership 查询、任务入队、generation 状态推进、Provider
   请求和 read URL。API 在调用编译器前解析用户资产种类，Worker 只消费已固化的执行计划。
 - 执行计划只保存稳定资产 ID，不保存签名 URL；这保证任务重试和版本历史不依赖过期地址。
+
+### packages/canvas-validation（Canvas 提交前预检）
+- **拥有**：前后端共享的图结构、模型参数、提示词和素材槽位预检，以及节点级、字段级错误投影。
+- **不拥有**：用户鉴权、资产 ownership、revision、任务入队、generation 状态推进、Provider 请求和 read URL；服务端的 `canvas-execution` 编译与 API 权威校验仍是最终边界。
 
 ## 4. 运行时应用
 

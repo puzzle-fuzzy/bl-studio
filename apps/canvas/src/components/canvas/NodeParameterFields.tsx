@@ -1,7 +1,7 @@
 import type { ModelCatalogItem } from '@bailian-studio/api-client'
 import { isModelParameterVisible } from '@bailian-studio/model-core'
 import { Checkbox, Input, Label, Select, SelectContent, SelectItem, SelectTrigger, SelectValue, Textarea } from '@bailian-studio/ui'
-import { safeDomId } from '@bailian-studio/lib-client'
+import { cn, safeDomId } from '@bailian-studio/lib-client'
 import type { ChangeEvent } from 'react'
 
 type CanvasModelParameter = ModelCatalogItem['parameters'][number]
@@ -12,6 +12,7 @@ interface NodeParameterFieldsProps {
   parameters: readonly CanvasModelParameter[]
   values: Readonly<Record<string, unknown>>
   excludedNames?: ReadonlySet<string>
+  errors?: ReadonlyMap<string, string>
   onChange: (name: string, value: unknown) => void
 }
 
@@ -26,6 +27,7 @@ export function NodeParameterFields({
   parameters,
   values,
   excludedNames,
+  errors,
   onChange,
 }: NodeParameterFieldsProps) {
   const effectiveValues = withDefaults(parameters, values)
@@ -47,6 +49,7 @@ export function NodeParameterFields({
         {fields.map(parameter => {
           const id = safeDomId(`${nodeId}-${parameter.name}`)
           const value = effectiveValues[parameter.name]
+          const error = errors?.get(parameter.name)
           return (
             <div key={parameter.name} className="space-y-1">
               <Label htmlFor={id} className="text-[10px]">
@@ -57,10 +60,13 @@ export function NodeParameterFields({
                 id={id}
                 parameter={parameter}
                 value={value}
+                error={error}
                 onChange={nextValue => onChange(parameter.name, nextValue)}
               />
-              {parameter.description !== undefined ? (
-                <p className="text-[10px] leading-4 text-muted-foreground">{parameter.description}</p>
+              {error !== undefined || parameter.description !== undefined ? (
+                <p id={error === undefined ? undefined : `${id}-error`} className={cn('text-[10px] leading-4', error === undefined ? 'text-muted-foreground' : 'text-destructive')}>
+                  {error ?? parameter.description}
+                </p>
               ) : null}
             </div>
           )
@@ -74,11 +80,13 @@ function NodeParameterControl({
   id,
   parameter,
   value,
+  error,
   onChange,
 }: {
   id: string
   parameter: CanvasModelParameter
   value: unknown
+  error?: string
   onChange: (value: unknown) => void
 }) {
   if (parameter.type === 'text') {
@@ -87,11 +95,15 @@ function NodeParameterControl({
       id,
       value: asString(value),
       maxLength: parameter.maxLength,
+      'aria-invalid': error !== undefined,
+      'aria-describedby': error === undefined ? undefined : `${id}-error`,
       onChange: (event: ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
         onChange(event.target.value === '' ? undefined : event.target.value)
       },
     }
-    return isLongText ? <Textarea {...props} className="min-h-14 text-xs" /> : <Input {...props} className="h-7 text-xs" />
+    return isLongText
+      ? <Textarea {...props} className={cn('min-h-14 text-xs', error !== undefined && 'border-destructive')} />
+      : <Input {...props} className={cn('h-7 text-xs', error !== undefined && 'border-destructive')} />
   }
 
   if (parameter.type === 'number') {
@@ -103,14 +115,16 @@ function NodeParameterControl({
         max={parameter.max}
         step={parameter.step ?? 1}
         value={typeof value === 'number' ? String(value) : ''}
-        className="h-7 text-xs"
+        aria-invalid={error !== undefined}
+        aria-describedby={error === undefined ? undefined : `${id}-error`}
+        className={cn('h-7 text-xs', error !== undefined && 'border-destructive')}
         onChange={event => onChange(event.target.value === '' ? undefined : Number(event.target.value))}
       />
     )
   }
 
   if (parameter.type === 'select') {
-    return <NodeSelectField id={id} parameter={parameter as CanvasSelectParameter} value={value} onChange={onChange} />
+    return <NodeSelectField id={id} parameter={parameter as CanvasSelectParameter} value={value} error={error} onChange={onChange} />
   }
 
   if (parameter.type === 'boolean') {
@@ -119,6 +133,8 @@ function NodeParameterControl({
         <Checkbox
           id={id}
           checked={value === true}
+          aria-invalid={error !== undefined}
+          aria-describedby={error === undefined ? undefined : `${id}-error`}
           onCheckedChange={checked => onChange(checked === true)}
         />
       </div>
@@ -132,11 +148,13 @@ function NodeSelectField({
   id,
   parameter,
   value,
+  error,
   onChange,
 }: {
   id: string
   parameter: CanvasSelectParameter
   value: unknown
+  error?: string
   onChange: (value: unknown) => void
 }) {
   const options = parameter.options ?? []
@@ -152,7 +170,7 @@ function NodeSelectField({
         onChange(option === undefined ? undefined : option.value)
       }}
     >
-      <SelectTrigger id={id} size="sm" className="h-7 w-full text-xs">
+      <SelectTrigger id={id} size="sm" aria-invalid={error !== undefined} aria-describedby={error === undefined ? undefined : `${id}-error`} className={cn('h-7 w-full text-xs', error !== undefined && 'border-destructive')}>
         <SelectValue placeholder="请选择" />
       </SelectTrigger>
       <SelectContent>

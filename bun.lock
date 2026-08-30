@@ -101,6 +101,7 @@
         "@bailian-studio/api-client": "workspace:*",
         "@bailian-studio/app-shell": "workspace:*",
         "@bailian-studio/canvas-contracts": "workspace:*",
+        "@bailian-studio/canvas-validation": "workspace:*",
         "@bailian-studio/lib-client": "workspace:*",
         "@bailian-studio/model-core": "workspace:*",
         "@bailian-studio/ui": "workspace:*",
@@ -343,6 +344,18 @@
         "@bailian-studio/canvas-contracts": "workspace:*",
         "@bailian-studio/db": "workspace:*",
         "drizzle-orm": "catalog:",
+      },
+      "devDependencies": {
+        "typescript": "catalog:",
+        "vitest": "catalog:",
+      },
+    },
+    "packages/canvas-validation": {
+      "name": "@bailian-studio/canvas-validation",
+      "version": "0.1.0",
+      "dependencies": {
+        "@bailian-studio/canvas-contracts": "workspace:*",
+        "@bailian-studio/model-core": "workspace:*",
       },
       "devDependencies": {
         "typescript": "catalog:",
@@ -692,6 +705,8 @@
     "@bailian-studio/canvas-execution": ["@bailian-studio/canvas-execution@workspace:packages/canvas-execution"],
 
     "@bailian-studio/canvas-repository": ["@bailian-studio/canvas-repository@workspace:packages/canvas-repository"],
+
+    "@bailian-studio/canvas-validation": ["@bailian-studio/canvas-validation@workspace:packages/canvas-validation"],
 
     "@bailian-studio/creative-asset-compiler": ["@bailian-studio/creative-asset-compiler@workspace:packages/creative-asset-compiler"],
 
