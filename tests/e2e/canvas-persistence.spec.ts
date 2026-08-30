@@ -3,11 +3,12 @@ import { hash as hashPassword } from '@node-rs/argon2'
 import postgres, { type Sql } from 'postgres'
 
 /**
- * Canvas 持久化闭环验收（真实 HTTP + 真实迁移数据库）。
+ * Canvas 持久化与素材引用闭环验收（真实 HTTP + 真实迁移数据库）。
  *
  * 覆盖前端持久化 hook 依赖的服务端契约：创建画布 → 保存新 revision →
- * 读取不可变版本历史 → 恢复历史版本生成新 revision → 拒绝过期 revision。
- * 不启动 Worker，也不调用模型 provider；这条验收只验证画布源数据的可靠性。
+ * 读取素材库 → 使用当前用户的素材引用执行 → 读取不可变版本历史 →
+ * 恢复历史版本生成新 revision → 拒绝过期 revision。
+ * 不启动 Worker，也不调用模型 provider；执行只验证 Canvas 编译和排队契约。
  */
 const databaseUrl = process.env.DATABASE_URL
   ?? 'postgres://bailian-studio:bailian-studio@127.0.0.1:55432/bailian-studio_test'
@@ -16,6 +17,7 @@ const apiOrigin = process.env.E2E_API_ORIGIN
 const email = `canvas-persistence-${Date.now()}-${Math.random().toString(16).slice(2)}@example.com`
 const userId = `user_canvas_persistence_${Date.now()}_${Math.random().toString(16).slice(2)}`
 const password = 'canvas-persistence-password-123'
+const referenceAssetId = `asset_canvas_reference_${Date.now()}_${Math.random().toString(16).slice(2)}`
 
 const initialSnapshot = {
   nodes: [],
@@ -31,8 +33,9 @@ const editedSnapshot = {
       kind: 'image',
       status: 'empty',
       prompt: '一盏夜灯',
-      modelId: 'qwen-image',
-      referenceAssetIds: [],
+      modelId: 'qwen-image-edit',
+      referenceAssetIds: [referenceAssetId],
+      referenceAssetKinds: { [referenceAssetId]: 'image' },
     },
   }],
   edges: [],
@@ -52,6 +55,17 @@ test.beforeAll(async () => {
     values (
       ${userId}, ${email}, ${passwordHash}, ${now},
       ${'Canvas 持久化验收用户'}, ${'user'}, ${'e2e'}, ${'e2e'}, ${now}, ${now}
+    )
+  `
+  await sql`
+    insert into user_assets (
+      id, user_id, kind, source, file_name, original_url, mime_type, status,
+      created_by, updated_by, created_at, updated_at
+    )
+    values (
+      ${referenceAssetId}, ${userId}, ${'image'}, ${'link'},
+      ${'canvas-reference.png'}, ${'https://example.test/canvas-reference.png'}, ${'image/png'}, ${'ready'},
+      ${'e2e'}, ${'e2e'}, ${now}, ${now}
     )
   `
 })
@@ -89,6 +103,18 @@ test('canvas persistence loop: save → versions → restore → reject stale re
     snapshot: initialSnapshot,
   })
 
+  const assets = await request.get(`${apiOrigin}/api/assets?kind=image&limit=10`)
+  expect(assets.status()).toBe(200)
+  const assetsBody = await assets.json() as {
+    data: { items: Array<{ id: string; kind: string; source: string; url?: string }> }
+  }
+  expect(assetsBody.data.items).toContainEqual(expect.objectContaining({
+    id: referenceAssetId,
+    kind: 'image',
+    source: 'link',
+    url: 'https://example.test/canvas-reference.png',
+  }))
+
   const list = await request.get(`${apiOrigin}/api/canvases`)
   expect(list.status()).toBe(200)
   const listBody = await list.json() as {
@@ -119,6 +145,27 @@ test('canvas persistence loop: save → versions → restore → reject stale re
     snapshot: editedSnapshot,
   })
   expect(versionTwoId).not.toBe(versionOneId)
+
+  const execute = await request.post(`${apiOrigin}/api/canvases/${documentId}/execute`, {
+    data: { expectedRevision: 2, idempotencyKey: 'canvas-persistence-execute' },
+  })
+  expect(execute.status()).toBe(200)
+  const executeBody = await execute.json() as {
+    data: {
+      execution: {
+        status: string
+        documentId: string
+        documentRevision: number
+        nodeStatuses: Array<{ nodeId: string; status: string }>
+      }
+    }
+  }
+  expect(executeBody.data.execution).toMatchObject({
+    documentId,
+    documentRevision: 2,
+    status: 'queued',
+    nodeStatuses: [{ nodeId: 'node-1', status: 'queued' }],
+  })
 
   const versions = await request.get(`${apiOrigin}/api/canvases/${documentId}/versions?limit=10`)
   expect(versions.status()).toBe(200)
