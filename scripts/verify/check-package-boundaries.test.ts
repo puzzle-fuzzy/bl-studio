@@ -44,6 +44,12 @@ describe('package boundary rules', () => {
     ).toBe(true)
     expect(
       matchesRule(
+        'packages/generation-repository',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toBe(true)
+    expect(
+      matchesRule(
         'packages/provider-dashscope',
         "import { createGenerationRepository } from '@bailian-studio/generation-repository'",
       ),
@@ -264,11 +270,15 @@ describe('package boundary rules', () => {
           'packages/canvas-execution',
           'packages/canvas-validation',
           'packages/creative-asset-compiler',
-          'packages/generation-repository',
           'packages/provider-dashscope',
           'scripts',
         ],
         dependencyProtocol: 'workspace:*',
+        testOnlySourceFiles: [
+          'packages/generation-repository/src/test-utils.ts',
+          'packages/generation-repository/tests',
+        ],
+        testOnlyDependencyScopes: ['packages/generation-repository'],
       },
     ])
 
@@ -340,6 +350,18 @@ describe('package boundary rules', () => {
         "import { createDashScopeClient } from '@bailian-studio/provider-dashscope'",
       ),
     ).toEqual([])
+    expect(
+      checkBailianPackageSourceBoundary(
+        'packages/generation-repository/tests/model-port.test.ts',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toEqual([])
+    expect(
+      checkBailianPackageSourceBoundary(
+        'packages/generation-repository/src/repository.ts',
+        "import { getModelById } from '@bailian-studio/dashscope-manifests'",
+      ),
+    ).toHaveLength(1)
   })
 
   it('rejects package declaration drift', () => {
@@ -367,6 +389,26 @@ describe('package boundary rules', () => {
         dependencies: { '@bailian-studio/provider-dashscope': 'workspace:*' },
       }),
     ).toEqual([])
+    expect(
+      checkBailianPackageManifestBoundary(
+        'packages/generation-repository/package.json',
+        {
+          devDependencies: {
+            '@bailian-studio/dashscope-manifests': 'workspace:*',
+          },
+        },
+      ),
+    ).toEqual([])
+    expect(
+      checkBailianPackageManifestBoundary(
+        'packages/generation-repository/package.json',
+        {
+          dependencies: {
+            '@bailian-studio/dashscope-manifests': 'workspace:*',
+          },
+        },
+      ),
+    ).toHaveLength(1)
   })
 
   it('guards API and worker from direct persistence/provider coupling', () => {

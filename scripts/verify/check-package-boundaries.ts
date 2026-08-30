@@ -31,11 +31,23 @@ export const importsProviderDashScope = importSpecifier(
 )
 export const importsCreativeAssetTables = /import\s*\{[^}]*\b(?:creativeAssetReferences|creativeAssets|creativeAssetVersions|creativeGenerationContextAssets|creativeGenerationContextReferences|creativeGenerationContexts|creativeProjects)\b[^}]*\}\s*from\s*['"]@bailian-studio\/db['"]/s
 
+// generation-repository 的测试隔离工厂和包内集成测试可以直接使用真实的
+// DashScope catalog 作为测试 fixture；生产源码仍必须通过 ModelManifestResolver
+// 由组合根注入。这个例外只作用于明确的测试文件，不扩大运行时消费者白名单。
+const generationRepositoryTestOnlyFiles = [
+  'packages/generation-repository/src/test-utils.ts',
+  'packages/generation-repository/tests',
+] as const
+
 export interface BailianPackageBoundary {
   readonly packageName: string
   readonly ownerScope: string
   readonly allowedConsumerScopes: readonly string[]
   readonly dependencyProtocol: 'catalog:' | 'workspace:*'
+  /** 仅测试文件可使用的 source-level fixture 例外，不代表运行时消费者。 */
+  readonly testOnlySourceFiles?: readonly string[]
+  /** 仅测试包可声明的 devDependency 例外，不代表运行时依赖。 */
+  readonly testOnlyDependencyScopes?: readonly string[]
 }
 
 /**
@@ -106,11 +118,12 @@ export const bailianPackageBoundaries: readonly BailianPackageBoundary[] = [
       'packages/canvas-execution',
       'packages/canvas-validation',
       'packages/creative-asset-compiler',
-      'packages/generation-repository',
       'packages/provider-dashscope',
       'scripts',
     ],
     dependencyProtocol: 'workspace:*',
+    testOnlySourceFiles: generationRepositoryTestOnlyFiles,
+    testOnlyDependencyScopes: ['packages/generation-repository'],
   },
 ] as const
 
@@ -173,6 +186,13 @@ export function checkBailianPackageSourceBoundary(
 
   for (const boundary of bailianPackageBoundaries) {
     if (isWithinScope(relativeFile, boundary.ownerScope)) continue
+    if (
+      boundary.testOnlySourceFiles?.some((scope) =>
+        isWithinScope(relativeFile, scope),
+      )
+    ) {
+      continue
+    }
 
     const importsPackage = importSpecifier(
       escapeRegExp(boundary.packageName),
@@ -196,6 +216,7 @@ export function checkBailianPackageSourceBoundary(
 export const rules: Array<{
   scope: string
   banned: RegExp[]
+  testOnlyFiles?: readonly string[]
 }> = [
   {
     scope: 'packages/shared',
@@ -399,7 +420,7 @@ export const rules: Array<{
   {
     scope: 'packages/generation-repository',
     banned: [
-      /@bailian-studio\/provider-dashscope\b/,
+      /@bailian-studio\/(provider-dashscope|dashscope-manifests)\b/,
       // generation-repository 只消费创意资产 repository 的事务端口；它仍可依赖
       // db 读写 generation 自有表，但不能直接读取创意资产域表。
       importsCreativeAssetTables,
@@ -408,6 +429,7 @@ export const rules: Array<{
       importsReact,
       importsElysia,
     ],
+    testOnlyFiles: generationRepositoryTestOnlyFiles,
   },
   {
     scope: 'packages/admin-repository',
@@ -569,6 +591,16 @@ function declaredPackageVersion(
   return undefined
 }
 
+function declaresDevDependency(manifest: unknown, packageName: string): boolean {
+  if (typeof manifest !== 'object' || manifest === null) return false
+  const devDependencies = (manifest as Record<string, unknown>).devDependencies
+  return (
+    typeof devDependencies === 'object' &&
+    devDependencies !== null &&
+    packageName in devDependencies
+  )
+}
+
 export function checkBailianPackageManifestBoundary(
   relativeFile: string,
   manifest: unknown,
@@ -583,6 +615,11 @@ export function checkBailianPackageManifestBoundary(
     if (declaredVersion === undefined) continue
 
     if (!isBailianPackageConsumerAllowed(boundary, relativeFile)) {
+      const isTestOnlyDependency =
+        boundary.testOnlyDependencyScopes?.some((scope) =>
+          isWithinScope(relativeFile, scope),
+        ) === true && declaresDevDependency(manifest, boundary.packageName)
+      if (isTestOnlyDependency) continue
       violations.push(
         `${relativeFile} declares ${boundary.packageName} outside its consumer allowlist`,
       )
@@ -608,6 +645,14 @@ export function checkPackageBoundaries(): string[] {
     }
 
     for (const file of walk(absScope)) {
+      const relativeFile = relative(root, file).replaceAll('\\', '/')
+      if (
+        rule.testOnlyFiles?.some((scope) =>
+          isWithinScope(relativeFile, scope),
+        )
+      ) {
+        continue
+      }
       const source = readFileSync(file, 'utf8')
       for (const banned of rule.banned) {
         if (banned.test(source)) {

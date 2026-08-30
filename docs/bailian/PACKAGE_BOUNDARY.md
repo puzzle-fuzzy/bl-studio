@@ -14,7 +14,7 @@
 | `@bailian-studio/creative-asset-repository` | `packages/creative-asset-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository` | `workspace:*` |
 | `@bailian-studio/admin-repository` | `packages/admin-repository` | `apps/api` / `packages/persistence-runtime` / `packages/generation-repository`（仅仓储集成测试） | `workspace:*` |
 | `@bailian-studio/canvas-execution` | `packages/canvas-execution` | `apps/api`、`apps/worker` | `workspace:*` |
-| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-execution` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/generation-repository` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
+| `@bailian-studio/dashscope-manifests` | `packages/dashscope-manifests` | `apps/api` / `apps/worker` / `packages/canvas-execution` / `packages/canvas-validation` / `packages/creative-asset-compiler` / `packages/provider-dashscope` / `scripts` | `workspace:*` |
 
 - 消费者只允许从包的 **package root export**（`src/index.ts`）import；禁止 subpath、禁止 deep-import 任意 `packages/<owner>/src/*` 源码目录。
 - 新增消费者必须经过架构评审，并**同时**更新本文件、`check-package-boundaries.ts` 的 `bailianPackageBoundaries` 与对应测试。
@@ -36,7 +36,7 @@ Worker 与前端各自维护不同的 wire schema。
 | `packages/model-core` | `@bailian-studio/(db\|storage\|provider-dashscope\|dashscope-manifests)`、apps、services |
 | `packages/dashscope-manifests` | 除 `@bailian-studio/model-core` 外的其它 workspace 包、apps、services、elysia、react |
 | `packages/provider-dashscope` | `@bailian-studio/(db\|storage\|generation-repository\|task-engine\|sse-protocol)`、apps、services、elysia、react |
-| `packages/generation-repository` | `@bailian-studio/provider-dashscope`、直接从 `@bailian-studio/db` 导入创意资产域表、services、apps、react、elysia |
+| `packages/generation-repository` | `@bailian-studio/(provider-dashscope\|dashscope-manifests)`、直接从 `@bailian-studio/db` 导入创意资产域表、services、apps、react、elysia |
 | `packages/admin-repository` | `@bailian-studio/(provider-dashscope\|api\|worker\|storage\|sse-protocol)`、services、apps、react、elysia |
 | `packages/director-repository` | 除 `@bailian-studio/(db\|director-contracts\|task-repository)` 外的其它 `@bailian-studio/*`、services、apps、react、elysia |
 | `packages/credit-ledger` | 除 `@bailian-studio/(db\|shared)` 外的一切 `@bailian-studio/*`、services、apps、react、elysia |
@@ -72,6 +72,9 @@ Worker 与前端各自维护不同的 wire schema。
 
 ### packages/generation-repository（持久化接缝）
 - **拥有**：持久化事务、任务/记录状态迁移、幂等、存储成本快照。
+- **模型依赖**：通过 `src/model-port.ts` 的 `ModelManifestResolver` 注入模型目录；不直接依赖任何 provider catalog。
+- **测试例外**：`src/test-utils.ts` 与 `tests/` 可在 `devDependencies` 中使用真实 DashScope
+  catalog 作为 fixture；该例外不改变生产源码与运行时消费者白名单。
 - gallery/social 已先通过 `src/social.ts` 暴露窄 `SocialRepository` port；API 组合根注入该 port，
   SQL 已物理归档在 `social.ts`，后续再迁移为独立 repository 包。
 - 通知已通过 `src/notifications.ts` 暴露 `NotificationRepository` port；通知收件箱和 gallery

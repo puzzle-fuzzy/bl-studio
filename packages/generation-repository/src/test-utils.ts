@@ -2,14 +2,15 @@
  * Repository 层的测试/服务 wiring 工具。
  *
  * 这一组工厂是包边界规则的关键一环：services 层（api / worker）被架构规则
- * 禁止直接 import `@bailian-studio/db`，因此本包对外暴露这些「只持有一个数据库 URL」
- * 的工厂，让上层 wiring 持久化时完全不触碰 db 包。测试场景下也提供一次性
+ * 禁止直接 import `@bailian-studio/db`，因此本包对外暴露这些「只持有数据库 URL 与
+ * 模型解析 port」的工厂，让上层 wiring 持久化时完全不触碰 db 包。测试场景下也提供一次性
  * 隔离 DB（避免并行测试文件争抢同一个共享库）以及插入测试用户的 helper。
  */
 import { createDb, users, type BailianStudioDb } from '@bailian-studio/db'
 import { createIsolatedTestDb, requireDatabaseUrl, resetBailianStudioTestDb, type IsolatedTestDb } from '@bailian-studio/db/test'
 import { createCreditLedger } from '@bailian-studio/credit-ledger'
 import { createTaskQueueRepository, type TaskQueueRepository } from '@bailian-studio/task-repository'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 import {
   createGenerationRepositoryFromUrl,
   type CreateGenerationRepositoryFromUrlOptions,
@@ -58,7 +59,10 @@ export async function createIsolatedGenerationRepository(
   options: CreateGenerationRepositoryFromUrlOptions = {},
 ): Promise<IsolatedGenerationRepository> {
   const testDb: IsolatedTestDb = await createIsolatedTestDb()
-  const handle = createGenerationRepositoryFromUrl(testDb.url, options)
+  const handle = createGenerationRepositoryFromUrl(testDb.url, {
+    ...options,
+    modelResolver: options.modelResolver ?? { getModelById },
+  })
   return {
     repository: handle.repository,
     assetRepository: handle.assetRepository,

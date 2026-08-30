@@ -5,6 +5,7 @@
  * 都在这里创建并在退出时成对释放，避免 import API 模块就启动网络或泄漏连接。
  */
 import { createApiPersistenceRuntime } from '@bailian-studio/persistence-runtime'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 import { createLogger } from '@bailian-studio/shared'
 import {
   createStorageFromEnv,
@@ -34,6 +35,7 @@ async function main(): Promise<void> {
   const env = readApiEnvOrThrow()
   const persistence = createApiPersistenceRuntime({
     databaseUrl: env.databaseUrl,
+    modelResolver: { getModelById },
     jwtSecret: env.authJwtSecret,
     emailSender: createSmtpEmailSender(process.env),
     publicWebOrigin: env.authPublicWebOrigin,

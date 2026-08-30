@@ -98,9 +98,11 @@ export { createProviderRequestAuditRepository } from "./provider-requests";
 export {
 	createGenerationRepository,
 	estimateGenerationRequest,
+	type EstimateGenerationRequestInput,
 	type GenerationEstimate,
 	type GenerationRepository,
 } from "./repository";
+export type { ModelManifestResolver } from './model-port'
 export type {
 	PublicShareRepository,
 	ShareRepository,

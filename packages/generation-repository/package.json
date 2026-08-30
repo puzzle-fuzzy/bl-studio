@@ -15,7 +15,6 @@
     "@bailian-studio/credit-ledger": "workspace:*",
     "@bailian-studio/creative-asset-contracts": "workspace:*",
     "@bailian-studio/creative-asset-repository": "workspace:*",
-    "@bailian-studio/dashscope-manifests": "workspace:*",
     "@bailian-studio/db": "workspace:*",
     "@bailian-studio/sse-protocol": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
@@ -27,6 +26,7 @@
   },
   "devDependencies": {
     "@bailian-studio/admin-repository": "workspace:*",
+    "@bailian-studio/dashscope-manifests": "workspace:*",
     "typescript": "catalog:"
   },
   "author": {

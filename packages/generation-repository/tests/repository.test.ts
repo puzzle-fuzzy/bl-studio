@@ -44,6 +44,7 @@ import {
   createTaskQueueTransactionStore,
   type TaskQueueRepository,
 } from '@bailian-studio/task-repository'
+import { getModelById } from '@bailian-studio/dashscope-manifests'
 
 type RepositoryTestHarness = GenerationRepository &
   ReturnType<typeof createAssetRepository> &
@@ -79,6 +80,7 @@ beforeAll(async () => {
       db,
       taskQueueTransactionStore,
       creativeGenerationContextStore,
+      modelResolver: { getModelById },
     }),
     ...taskRepository,
     ...createAdminGalleryRepository(db),

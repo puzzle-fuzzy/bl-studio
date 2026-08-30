@@ -59,6 +59,7 @@ import {
   type GenerationDiagnosticsRepository,
   type GenerationRepository,
   type GenerationRecoveryRepository,
+  type ModelManifestResolver,
   type NotificationRepository,
   type PromptLibraryRepository,
   type PublicShareRepository,
@@ -84,6 +85,7 @@ export interface CreateApiPersistenceRuntimeOptions
   extends Omit<AuthServiceOptions, 'db'> {
   databaseUrl: string
   databasePoolMax?: number
+  modelResolver: ModelManifestResolver
 }
 
 export interface ApiPersistenceRuntime {
@@ -115,6 +117,7 @@ export interface ApiPersistenceRuntime {
 export interface CreateWorkerPersistenceRuntimeOptions {
   databaseUrl: string
   databasePoolMax?: number
+  modelResolver: ModelManifestResolver
 }
 
 export interface WorkerPersistenceRuntime {
@@ -159,6 +162,7 @@ export function createApiPersistenceRuntime(
       db,
       taskQueueTransactionStore,
       creativeGenerationContextStore,
+      modelResolver: options.modelResolver,
     })
     const shareRepository = createShareRepository(db)
     return {
@@ -215,6 +219,7 @@ export function createWorkerPersistenceRuntime(
         db,
         taskQueueTransactionStore,
         creativeGenerationContextStore,
+        modelResolver: options.modelResolver,
       }),
       generationRecoveryRepository: createGenerationRecoveryRepository(db, taskQueueReadStore),
       taskQueueRepository: createTaskQueueRepository({ db }),

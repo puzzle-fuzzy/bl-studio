@@ -3,7 +3,8 @@
  *
  * 本模块刻意不提供测试数据库 helper。API 与 worker 的进程组合由
  * @bailian-studio/persistence-runtime 统一创建共享数据库句柄，再把同一 db 注入
- * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository。
+ * 各持久化模块；独立使用时仍可通过本文件的 URL 工厂快速组装一个 repository，
+ * 同时显式传入模型解析 port。
  */
 import { createDb, type BailianStudioDb } from '@bailian-studio/db'
 import { createCreativeGenerationContextStore } from '@bailian-studio/creative-asset-repository'
@@ -16,6 +17,7 @@ import { createGenerationDiagnosticsRepository, type GenerationDiagnosticsReposi
 import { createGenerationRecoveryRepository, type GenerationRecoveryRepository } from './recovery'
 import { createFeedbackRepository, type FeedbackRepository } from './feedback'
 import { createGenerationRepository, type GenerationRepository } from './repository'
+import type { ModelManifestResolver } from './model-port'
 import { createNotificationRepository, type NotificationRepository } from './notifications'
 import { createPromptLibraryRepository, type PromptLibraryRepository } from './prompt-library'
 import type { ProviderRequestAuditRepository } from './provider-request-port'
@@ -31,6 +33,7 @@ import {
 
 export interface CreateGenerationRepositoryFromUrlOptions {
   max?: number
+  modelResolver?: ModelManifestResolver
 }
 
 export interface GenerationRepositoryHandle {
@@ -57,6 +60,9 @@ export function createGenerationRepositoryFromUrl(
   url: string,
   options: CreateGenerationRepositoryFromUrlOptions = {},
 ): GenerationRepositoryHandle {
+  if (options.modelResolver === undefined) {
+    throw new Error('A modelResolver is required to create the generation repository')
+  }
   const db = createDb({ url, max: options.max ?? 5 })
   const taskQueueReadStore = createTaskQueueReadStore()
   const taskQueueTransactionStore = createTaskQueueTransactionStore()
@@ -68,6 +74,7 @@ export function createGenerationRepositoryFromUrl(
       db,
       taskQueueTransactionStore,
       creativeGenerationContextStore,
+      modelResolver: options.modelResolver,
     }),
     assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
     auditRepository: createAuditRepository(db),

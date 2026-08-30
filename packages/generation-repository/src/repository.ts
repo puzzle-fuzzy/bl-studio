@@ -57,11 +57,14 @@ import {
 	estimateModelCost,
 	getModelAuditMetadata,
 	type ModelCategory,
+	type FrozenModelManifest,
+	type ModelManifest,
 	type ModelValidationRule,
+	type ProviderRequestContract,
+	type ProviderTransportContract,
 	validateModelParams,
 } from "@bailian-studio/model-core";
-import { getModelById, type FrozenModelManifest, type ModelManifest } from "@bailian-studio/dashscope-manifests";
-import type { ProviderTransport } from "@bailian-studio/dashscope-manifests";
+import type { ModelManifestResolver } from './model-port';
 import type { TaskError, TaskRecord } from "@bailian-studio/task-engine";
 import {
 	type TaskQueueTransactionStore,
@@ -585,6 +588,7 @@ export interface CreateGenerationRepositoryOptions {
 	db: BailianStudioDb;
 	taskQueueTransactionStore: TaskQueueTransactionStore;
 	creativeGenerationContextStore: CreativeGenerationContextStore;
+	modelResolver: ModelManifestResolver;
 }
 
 function mapCreditLedgerError(
@@ -614,6 +618,12 @@ export interface GenerationEstimate {
 	params: Record<string, unknown>;
 	costEstimate: number;
 	currency: "CNY";
+}
+
+export interface EstimateGenerationRequestInput {
+	modelId: string;
+	params: Record<string, unknown>;
+	assetRefs?: GenerationAssetRefInput;
 }
 
 /** 清扫器输入：找「任务已终态失败/取消、记录仍卡在 submitting/processing」的 generation。 */
@@ -778,7 +788,7 @@ function mutableManifest(
 			manifest.rules === undefined
 				? undefined
 				: (structuredClone(manifest.rules) as ModelValidationRule[]),
-		request: structuredClone(manifest.request),
+		request: structuredClone(manifest.request) as ProviderRequestContract,
 		output: { ...manifest.output },
 		pricing: {
 			...manifest.pricing,
@@ -787,7 +797,7 @@ function mutableManifest(
 				conditions: { ...rate.conditions },
 			})),
 		},
-		transport: structuredClone(manifest.transport) as ProviderTransport,
+		transport: structuredClone(manifest.transport) as ProviderTransportContract,
 		availability: { ...manifest.availability },
 	};
 }
@@ -1259,7 +1269,8 @@ async function refundGenerationInTransaction(
 /**
  * Repository 工厂：注入一个已建好的 BailianStudioDb 句柄，返回完整的 repository 对象。
  * services 层不应直接调用本函数（需要 db 句柄），而是走 test-utils.ts 的
- * `createGenerationRepositoryFromUrl(url)`，后者只要求一个 DATABASE_URL。
+ * `createGenerationRepositoryFromUrl(url, { modelResolver })`，由组合根显式提供
+ * 模型解析 port。
  */
 export function createGenerationRepository(
 	options: CreateGenerationRepositoryOptions,
@@ -1268,6 +1279,7 @@ export function createGenerationRepository(
 		db,
 		taskQueueTransactionStore,
 		creativeGenerationContextStore,
+		modelResolver,
 	} = options;
 
 	return {
@@ -1373,13 +1385,13 @@ export function createGenerationRepository(
 			);
 			const creativeContextFingerprint =
 				fingerprintCreativeContext(creativeContext);
-			const { estimate, prepared } = prepareGenerationRequest({
-				modelId: input.modelId,
-				params: input.params,
-				...(input.assetRefs !== undefined
-					? { assetRefs: input.assetRefs }
-					: {}),
-			});
+				const { estimate, prepared } = prepareGenerationRequest({
+					modelId: input.modelId,
+					params: input.params,
+					...(input.assetRefs !== undefined
+						? { assetRefs: input.assetRefs }
+						: {}),
+				}, modelResolver);
 			const model = mutableManifest(estimate.manifest);
 			const costEstimate = estimate.costEstimate;
 			const auditMetadata = getModelAuditMetadata(estimate.manifest);
@@ -3131,18 +3143,12 @@ export function createGenerationRepository(
 	};
 }
 
-interface PrepareGenerationRequestInput {
-	modelId: string;
-	params: Record<string, unknown>;
-	assetRefs?: GenerationAssetRefInput;
-}
-
 /** 解析模型 manifest、校验并规整参数、估算成本，产出创建生成所需的全套准备数据。 */
-function prepareGenerationRequest(input: PrepareGenerationRequestInput): {
+function prepareGenerationRequest(input: EstimateGenerationRequestInput, modelResolver: ModelManifestResolver): {
 	estimate: GenerationEstimate & { manifest: FrozenModelManifest };
 	prepared: PreparedGenerationParams;
 } {
-	const manifest = getModelById(input.modelId);
+	const manifest = modelResolver.getModelById(input.modelId);
 	if (!manifest) {
 		throw new GenerationRepositoryError(
 			"MODEL_NOT_FOUND",
@@ -3173,9 +3179,10 @@ function prepareGenerationRequest(input: PrepareGenerationRequestInput): {
 }
 
 export function estimateGenerationRequest(
-	input: PrepareGenerationRequestInput,
+	input: EstimateGenerationRequestInput,
+	modelResolver: ModelManifestResolver,
 ): GenerationEstimate & { manifest: FrozenModelManifest } {
-	return prepareGenerationRequest(input).estimate;
+	return prepareGenerationRequest(input, modelResolver).estimate;
 }
 
 /** 用 manifest 官方定价表估算生成成本；estimateModelCost 不抛错（保守回退）。 */

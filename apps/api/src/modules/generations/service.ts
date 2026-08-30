@@ -193,7 +193,7 @@ function estimatePreparedGeneration(
 		modelId: input.modelId,
 		params: input.params,
 		...(input.assetRefs !== undefined ? { assetRefs: input.assetRefs } : {}),
-	});
+	}, { getModelById });
 }
 
 /**

@@ -79,6 +79,7 @@ async function main(): Promise<void> {
 
   const persistence = createWorkerPersistenceRuntime({
     databaseUrl: env.databaseUrl,
+    modelResolver: { getModelById },
   })
 
   const providerRegistry = createProviderRegistry({
