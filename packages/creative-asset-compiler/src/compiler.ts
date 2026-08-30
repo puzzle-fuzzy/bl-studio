@@ -395,7 +395,7 @@ function orderProviderReferences(
 
 function providerMediaParameterNames(manifest: CreativeAssetCompilerManifest): string[] {
   return Object.entries(manifest.request.bindings)
-    .filter(([, binding]) => binding?.target === 'input.media')
+    .filter(([parameterName]) => bindingFor(manifest, parameterName)?.target === 'input.media')
     .map(([parameterName]) => parameterName)
 }
 
@@ -407,7 +407,22 @@ function mediaParameterNames(manifest: CreativeAssetCompilerManifest): string[] 
 }
 
 function bindingFor(manifest: CreativeAssetCompilerManifest, parameterName: string): ModelParameterBinding | undefined {
-  return manifest.request.bindings[parameterName]
+  const binding = manifest.request.bindings[parameterName]
+  if (typeof binding !== 'object' || binding === null || !('target' in binding)) return undefined
+  const record = binding as Record<string, unknown>
+  const target = record.target
+  if (target === 'input.prompt' || target === 'input.media' || target === 'ui.only') {
+    return { target }
+  }
+  if (target === 'input.field') {
+    return typeof record.field === 'string' ? { target, field: record.field } : undefined
+  }
+  if (target === 'parameters.field') {
+    return record.field === undefined || typeof record.field === 'string'
+      ? { target, ...(record.field === undefined ? {} : { field: record.field }) }
+      : undefined
+  }
+  return undefined
 }
 
 type ReferenceFormat = 'angle-bracket' | 'image-bracket' | 'chinese'

@@ -8,7 +8,6 @@ import type {
 } from '@bailian-studio/creative-asset-contracts'
 import type {
   FrozenModelManifest,
-  ModelParameterBinding,
 } from '@bailian-studio/model-core'
 
 export type CreativeAssetCompilerMediaKind = 'image' | 'video' | 'audio'
@@ -40,10 +39,7 @@ export interface ApprovedCreativeAssetBindingInput {
  * structural seam through their `input.*` binding targets.
  */
 export type CreativeAssetCompilerManifest = FrozenModelManifest & {
-  readonly request: FrozenModelManifest['request'] & {
-    readonly bindings: Readonly<Record<string, ModelParameterBinding>>
-    readonly referenceFormat?: string
-  }
+  readonly request: FrozenModelManifest['request']
 }
 
 export interface CompileCreativeGenerationInput {

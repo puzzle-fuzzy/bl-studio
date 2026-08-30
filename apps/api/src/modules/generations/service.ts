@@ -1,6 +1,5 @@
 import { compileCreativeGeneration } from "@bailian-studio/creative-asset-compiler";
 import type { CreativeAssetRepository } from "@bailian-studio/creative-asset-repository";
-import type { FrozenModelManifest } from "@bailian-studio/dashscope-manifests";
 import {
 	type CreateGenerationInput,
 	type CreateGenerationResult,
@@ -27,7 +26,7 @@ export interface CreateGenerationUseCaseDependencies {
 	repository: GenerationRepository;
 	usageRepository: UsageRepository;
 	limits: GenerationLimits;
-	modelResolver: ModelManifestResolver<FrozenModelManifest>;
+	modelResolver: ModelManifestResolver;
 	creativeAssetRepository: Pick<
 		CreativeAssetRepository,
 		"resolveGenerationBindings"
@@ -190,7 +189,7 @@ export function createGenerationApplicationService(
 
 function estimatePreparedGeneration(
 	input: CreateGenerationInput,
-	modelResolver: ModelManifestResolver<FrozenModelManifest>,
+	modelResolver: ModelManifestResolver,
 ): GenerationEstimate {
 	return estimateGenerationRequest({
 		modelId: input.modelId,

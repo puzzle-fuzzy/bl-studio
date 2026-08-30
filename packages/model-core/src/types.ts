@@ -239,6 +239,8 @@ export interface ProviderRequestContract {
   kind: string
   endpoint: string
   bindings: Readonly<Record<string, unknown>>
+  /** Optional provider-declared syntax used when prompts reference selected media. */
+  referenceFormat?: unknown
 }
 
 /** Provider 输出描述的最小公共形状。 */
