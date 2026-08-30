@@ -73,17 +73,24 @@ export function createTestApp(
     overrides.shareRepository ?? legacy<NonNullable<ApiDependencies['shareRepository']>>(generationRepository)
   const publicShareRepository =
     overrides.publicShareRepository ?? legacy<NonNullable<ApiDependencies['publicShareRepository']>>(generationRepository)
-  const socialRepository = overrides.socialRepository ?? generationRepository
+  const socialRepository =
+    overrides.socialRepository ??
+    legacy<NonNullable<ApiDependencies['socialRepository']>>(generationRepository)
   const notificationRepository =
-    overrides.notificationRepository ?? generationRepository
+    overrides.notificationRepository ??
+    legacy<NonNullable<ApiDependencies['notificationRepository']>>(generationRepository)
   const promptLibraryRepository =
-    overrides.promptLibraryRepository ?? generationRepository
+    overrides.promptLibraryRepository ??
+    legacy<NonNullable<ApiDependencies['promptLibraryRepository']>>(generationRepository)
   const feedbackRepository =
-    overrides.feedbackRepository ?? generationRepository
+    overrides.feedbackRepository ??
+    legacy<NonNullable<ApiDependencies['feedbackRepository']>>(generationRepository)
   const contentReportRepository =
-    overrides.contentReportRepository ?? generationRepository
+    overrides.contentReportRepository ??
+    legacy<NonNullable<ApiDependencies['contentReportRepository']>>(generationRepository)
   const adminGalleryRepository =
-    overrides.adminGalleryRepository ?? generationRepository
+    overrides.adminGalleryRepository ??
+    legacy<NonNullable<ApiDependencies['adminGalleryRepository']>>(generationRepository)
   const adminTaskRepository =
     overrides.adminTaskRepository ??
     missing<AdminTaskRepository>('adminTaskRepository')

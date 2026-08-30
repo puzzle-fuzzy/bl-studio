@@ -67,6 +67,9 @@
   后台预览隐藏作品，但不改变面向用户的 SocialRepository 可见性策略。
 - admin 任务中心和成本/留存读模型分别由 `src/admin-tasks.ts` 的 `AdminTaskRepository`
   与 `src/analytics.ts` 的 `AnalyticsRepository` 拥有；`content.ts` 仅为旧接口提供聚合。
+- `content.ts` 现在仅是 `ContentRepository` 兼容聚合；`GenerationRepository` 核心接口不再
+  重复声明 gallery、通知、提示词库、反馈、举报、admin 与分析方法，旧 URL 工厂/隔离
+  测试通过 `GenerationRepositoryCompat` 继续获得完整兼容形状。
 - 资产与分享由显式窄 port 约束 API：`AssetRepository`、`ShareRepository`、
   `PublicShareRepository`；SQL 已分别归档在 `assets.ts`、`shares.ts`，旧
   `GenerationRepository` 核心接口不再暴露这些方法；仅 `GenerationRepositoryCompat`

@@ -67,3 +67,8 @@ Provider 出站请求审计也已完成写入边界收敛：Worker 通过
 `provider-requests.ts`；生成详情读取的 provider 请求投影继续留在 generation repository，
 因此没有改变对外响应。`GenerationRepository` 核心接口不再暴露这两个 Worker 写入方法，
 仅兼容 URL 工厂与隔离测试保留转发。
+
+最后一轮 content 接口收缩已完成：生产 API/Worker 均已使用窄 port，`GenerationRepository`
+核心接口移除了 gallery、通知、提示词库、反馈/举报、admin 和分析方法；`content.ts` 与
+`GenerationRepositoryCompat` 仅作为旧 URL 工厂和隔离测试的迁移接缝。后续可以在兼容
+窗口到期后删除 facade，而不再影响生产组合根。

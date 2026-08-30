@@ -94,7 +94,7 @@
 
 单一接口混合：generation 生命周期、任务队列 claim/lock/save、worker 心跳、用量分析、provider 请求审计、gallery/点赞/收藏、admin 审核、admin 任务中心、社交通知、提示词库、模型成本。它仍是 generation 业务路由与整个 worker 的公共依赖——变更放大与合并冲突的直接来源。**方案**：按上下文拆分（任务队列 port 移入独立 task-repository；内容/社交/admin/通知/分析各自成 repository 或独立接口，在 `ApiDependencies` 组合）。**已开始**：Worker 已切到最小任务生命周期 port，gallery、通知、提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享和 API 审计已切到各自窄 port；对应 SQL 已从 `content.ts` 及中央 generation repository 物理移出，核心接口仅保留 generation/worker 所需能力，旧 facade 仅用于过渡。
 
-**P1-B 当前进度（2026-08-30）**：提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享、API 审计和用户用量已分别切换到窄 port；admin 任务请求上下文也已归档到 `AdminTaskRepository`，调用统计与用量查询 SQL 已分别移入 `analytics.ts`、`usage.ts`，资产/分享 SQL 已分别移入 `assets.ts`、`shares.ts`。生成应用服务的每日限额预检已显式注入 `UsageRepository`，Worker 的 provider 请求审计写入已迁移到 `ProviderRequestAuditRepository` 与 `provider-requests.ts`；`GenerationRepository` 核心接口已移除资产/分享/用量读取和 provider 审计写入方法。`GenerationRepositoryCompat` 仅为 URL 工厂和隔离测试保留过渡形状。下一步是继续盘点 content facade 的剩余消费者。
+**P1-B 当前进度（2026-08-30）**：提示词库、反馈、举报、admin gallery、admin 任务中心、分析、资产、分享、API 审计和用户用量已分别切换到窄 port；admin 任务请求上下文也已归档到 `AdminTaskRepository`，调用统计与用量查询 SQL 已分别移入 `analytics.ts`、`usage.ts`，资产/分享 SQL 已分别移入 `assets.ts`、`shares.ts`。生成应用服务的每日限额预检已显式注入 `UsageRepository`，Worker 的 provider 请求审计写入已迁移到 `ProviderRequestAuditRepository` 与 `provider-requests.ts`；`GenerationRepository` 核心接口已移除资产/分享/用量读取、provider 审计写入以及全部 content facade 方法。`content.ts` 和 `GenerationRepositoryCompat` 仅为 URL 工厂和隔离测试保留过渡形状。下一步是进入兼容 facade 删除窗口的定义与清理范围盘点。
 
 admin gallery、admin 任务中心和成本/留存分析已分别切换到 `AdminGalleryRepository`、`AdminTaskRepository`、`AnalyticsRepository`；用户资产、公开分享、API 审计和用户用量也已完成 API 依赖收敛，后台治理与举报下架联动不再直接依赖 `GenerationRepository`，当前剩余工作是盘点旧方法消费者并逐步收缩兼容 facade。
 

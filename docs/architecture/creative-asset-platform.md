@@ -97,6 +97,8 @@ flowchart LR
   `generation-repository/src/admin-gallery.ts`；举报后的隐藏动作由 API 显式调用该 port。
 - admin 任务中心与成本/留存分析分别依赖 `AdminTaskRepository`、`AnalyticsRepository`，
   SQL 位于 `admin-tasks.ts` 与 `analytics.ts`；`content.ts` 只用于兼容旧调用方。
+- `content.ts` 仅保留 `ContentRepository` 兼容聚合，`GenerationRepository` 核心接口不再
+  重复声明这些内容域方法；只有 URL 工厂/隔离测试使用 `GenerationRepositoryCompat`。
 - 资产路由与分享路由分别依赖 `AssetRepository`、`ShareRepository` / `PublicShareRepository`；
   SQL 已归档到 `generation-repository/src/assets.ts` 与 `shares.ts`，旧
   `GenerationRepository` 仅为未迁移调用方保留兼容 facade。

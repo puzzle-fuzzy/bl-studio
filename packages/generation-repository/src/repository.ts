@@ -105,7 +105,7 @@ import type {
 	MarkAssetThumbnailProcessingInput,
 } from "./asset-types";
 import type { AuditLog, RecordAuditEventInput } from "./audit-types";
-import { createContentRepository } from "./content";
+import { createContentRepository, type ContentRepository } from "./content";
 import type { ProviderRequestAuditRepository } from "./provider-request-port";
 import { createProviderRequestAuditRepository } from "./provider-requests";
 import { createShareRepository } from "./shares";
@@ -1018,203 +1018,6 @@ export interface GenerationRepository {
 	completeAssetThumbnail(input: CompleteAssetThumbnailInput): Promise<void>;
 	failAssetThumbnail(input: FailAssetThumbnailInput): Promise<void>;
 
-	// -------------------------------------------------------------------------
-	// 社区画廊（content.ts 实现）：作品可见性 / 画廊 / 收藏点赞。
-	// -------------------------------------------------------------------------
-	setGenerationVisibility(input: {
-		userId: string;
-		recordId: string;
-		visibility: GalleryVisibility;
-		now?: string;
-	}): Promise<GenerationRecord>;
-	listGalleryGenerations(input: {
-		cursor?: string;
-		limit?: number;
-		category?: ModelCategory;
-		modelId?: string;
-		authorId?: string;
-		q?: string;
-		sort?: GallerySort;
-		viewerId?: string;
-	}): Promise<ListGalleryResult>;
-	getGalleryGeneration(input: {
-		recordId: string;
-		viewerId?: string;
-	}): Promise<GalleryDetail | undefined>;
-	getGalleryArtifact(input: {
-		recordId: string;
-		artifactId: string;
-	}): Promise<GenerationArtifact | undefined>;
-	setGenerationLike(input: {
-		userId: string;
-		recordId: string;
-		liked: boolean;
-	}): Promise<{ liked: boolean; likeCount: number }>;
-	setGenerationFavorite(input: {
-		userId: string;
-		recordId: string;
-		favorited: boolean;
-	}): Promise<{ favorited: boolean }>;
-	/** 查询 viewer 是否已收藏某记录；记录对 viewer 不可见时返回 undefined。 */
-	getGenerationFavorited(input: {
-		userId: string;
-		recordId: string;
-	}): Promise<boolean | undefined>;
-	listGenerationFavorites(input: {
-		userId: string;
-		cursor?: string;
-		limit?: number;
-	}): Promise<ListGalleryResult>;
-
-	// -------------------------------------------------------------------------
-	// 社区治理（admin）：含隐藏作品的画廊列表 + 下架/恢复 + 封禁联动。
-	// -------------------------------------------------------------------------
-	listAdminGalleryGenerations(input: {
-		cursor?: string;
-		limit?: number;
-		includeHidden?: boolean;
-		q?: string;
-		authorId?: string;
-	}): Promise<ListAdminGalleryResult>;
-	/** admin 画廊产物读取：不检查 hiddenAt（治理需预览已隐藏作品）。 */
-	getAdminGalleryArtifact(input: {
-		recordId: string;
-		artifactId: string;
-	}): Promise<GenerationArtifact | undefined>;
-	/** admin 画廊一条记录的全部产物（stored 未删），不检查 hiddenAt；供预览弹窗多图切换。 */
-	listAdminGalleryRecordArtifacts(input: {
-		recordId: string;
-	}): Promise<GenerationArtifact[]>;
-	setGalleryRecordHidden(input: {
-		recordId: string;
-		hidden: boolean;
-		actorId: string;
-	}): Promise<void>;
-	/** admin 批量下架/恢复：只返回实际状态翻转的记录 id（hide 只命中未藏，unhide 只命中已藏）。 */
-	setGalleryRecordsHidden(input: {
-		recordIds: string[];
-		hidden: boolean;
-		actorId: string;
-	}): Promise<string[]>;
-	/** admin 批量软删（可恢复）：仅限 public+succeeded 未删记录。 */
-	softDeleteGalleryRecords(input: {
-		recordIds: string[];
-		actorId: string;
-	}): Promise<string[]>;
-	/** 封禁联动：把某用户全部公开成功且未隐藏的作品批量置 hiddenAt。 */
-	hideUserPublicWorks(input: {
-		userId: string;
-		actorId: string;
-	}): Promise<number>;
-
-	// -------------------------------------------------------------------------
-	// 管理后台 · 任务中心：全量 task_records 列表（含进行中 + 已完成）。
-	// -------------------------------------------------------------------------
-	listAdminTasks(input: {
-		cursor?: string;
-		limit?: number;
-		status?: "queued" | "running" | "succeeded" | "failed" | "cancelled";
-		type?: string;
-		domain?: string;
-		userId?: string;
-		recordId?: string;
-	}): Promise<ListAdminTasksResult>;
-
-	// -------------------------------------------------------------------------
-	// 社交通知：作者收到点赞/收藏通知。
-	// -------------------------------------------------------------------------
-	/** 读取记录作者 id（不存在或已删除返回 undefined）。 */
-	getGenerationOwner(recordId: string): Promise<string | undefined>;
-	createSocialNotification(input: {
-		recipientId: string;
-		actorId?: string;
-		kind: NotificationKind;
-		recordId?: string;
-		title: string;
-		body: string;
-	}): Promise<void>;
-	listNotifications(input: {
-		userId: string;
-		cursor?: string;
-		limit?: number;
-	}): Promise<ListNotificationsResult>;
-	countUnreadNotifications(userId: string): Promise<number>;
-	markNotificationRead(input: {
-		userId: string;
-		notificationId: string;
-	}): Promise<boolean>;
-	markAllNotificationsRead(userId: string): Promise<number>;
-
-	listPromptLibrary(input: {
-		userId: string;
-		cursor?: string;
-		limit?: number;
-		q?: string;
-	}): Promise<ListPromptLibraryResult>;
-	createPromptLibraryItem(input: {
-		userId: string;
-		name: string;
-		modelId: string;
-		prompt: string;
-		params: Record<string, unknown>;
-	}): Promise<PromptLibraryItem>;
-	updatePromptLibraryItem(input: {
-		userId: string;
-		itemId: string;
-		name?: string;
-		prompt?: string;
-		params?: Record<string, unknown>;
-	}): Promise<PromptLibraryItem>;
-	deletePromptLibraryItem(input: {
-		userId: string;
-		itemId: string;
-	}): Promise<void>;
-	listModelCosts(): Promise<ModelCost[]>;
-	upsertModelCosts(
-		entries: Array<{ modelId: string; unitCostCents: number }>,
-	): Promise<void>;
-	getCostMarginAnalytics(input: {
-		from: string;
-		to: string;
-	}): Promise<CostMarginRow[]>;
-	getRetentionAnalytics(input: { since: string }): Promise<RetentionAnalytics>;
-	submitFeedback(input: {
-		userId: string;
-		kind: FeedbackKind;
-		content: string;
-	}): Promise<UserFeedback>;
-	listFeedback(input: {
-		cursor?: string;
-		limit?: number;
-		status?: FeedbackStatus;
-	}): Promise<ListFeedbackResult>;
-	listMyFeedback(input: {
-		userId: string;
-		cursor?: string;
-		limit?: number;
-	}): Promise<ListFeedbackResult>;
-	updateFeedbackStatus(input: {
-		itemId: string;
-		status: FeedbackStatus;
-		resolvedBy: string;
-	}): Promise<UserFeedback>;
-	submitContentReport(input: {
-		reporterId: string;
-		generationId: string;
-		reason: ContentReportReason;
-		details?: string;
-	}): Promise<ContentReport>;
-	listContentReports(input: {
-		cursor?: string;
-		limit?: number;
-		status?: ContentReportStatus;
-	}): Promise<ListContentReportsResult>;
-	updateContentReport(input: {
-		reportId: string;
-		status: ContentReportStatus;
-		resolvedBy: string;
-		resolutionNote?: string;
-	}): Promise<ContentReport>;
 }
 
 /**
@@ -1223,14 +1026,15 @@ export interface GenerationRepository {
  * 生产 API/Worker 只依赖 GenerationRepository 核心接口；资产与分享能力由
  * persistence-runtime 的窄 port 注入。这个类型保留在迁移接缝，避免旧测试和
  * 直接使用 URL 工厂的调用方被一次性打断。新生产代码应直接注入各自的窄 port，
- * 包括 UsageRepository。
+ * 包括 UsageRepository、ProviderRequestAuditRepository 和 ContentRepository。
  */
 export type GenerationRepositoryCompat = GenerationRepository &
 	AssetRepository &
 	ShareRepository &
 	PublicShareRepository &
 	UsageRepository &
-	ProviderRequestAuditRepository;
+	ProviderRequestAuditRepository &
+	ContentRepository;
 
 type BailianStudioTx = Parameters<
 	Parameters<BailianStudioDb["transaction"]>[0]
