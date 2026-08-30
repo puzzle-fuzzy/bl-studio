@@ -164,6 +164,9 @@ flowchart LR
 - 普通 Canvas 执行会按 `modelManifestHash + params + resolvedAssetRefs` 生成版本化节点缓存键，复用同一
   用户下成功且未软删除的 generation 幂等结果；缓存命中不重复创建 generation，也不重复扣费。失败/取消
   的旧缓存会自动降级为本次任务的 fresh key，节点级手动重跑固定使用 `refresh` 策略。
+- Canvas 执行历史通过 `GET /api/canvases/:id/executions` 从 `task_records` 读取，不新增第二份运行态表；
+  查询由 `task-repository.listTasks` 提供用户隔离的 keyset 分页，并同时按新任务的 `recordId` 与旧任务输入中的
+  `documentId` 保持兼容。前端可点击历史记录，重新读取执行摘要和稳定资产结果来恢复节点预览。
 
 ## 4. 领域模型归属
 

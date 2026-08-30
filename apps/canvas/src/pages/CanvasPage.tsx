@@ -12,7 +12,9 @@ import {
   useReactFlow,
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
-import { History, ImagePlus, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
+import type { CanvasExecutionTaskSummary } from '@bailian-studio/api-client'
+import { apiClient } from '@bailian-studio/lib-client'
+import { History, ImagePlus, List, Loader2, Play, RefreshCw, Video, X } from 'lucide-react'
 import { Button } from '@bailian-studio/ui'
 import { MediaNode, type MediaKind, type MediaNodeData } from '../components/canvas/MediaNode'
 import { useCanvasStore } from '../stores/canvas-store'
@@ -38,23 +40,52 @@ export function CanvasPage() {
     execute,
     cancel,
     retryNode,
+    loadExecution,
     status: executionStatus,
     error: executionError,
   } = useCanvasExecution()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
   const selectedNodeId = nodes.find(node => node.selected)?.id
+  const documentId = useCanvasStore(state => state.documentId)
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
   const onConnect = useCanvasStore(state => state.onConnect)
   const { screenToFlowPosition } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [showVersions, setShowVersions] = useState(false)
+  const [showExecutions, setShowExecutions] = useState(false)
+  const [executions, setExecutions] = useState<CanvasExecutionTaskSummary[]>([])
+  const [executionCursor, setExecutionCursor] = useState<string | undefined>()
+  const [executionHistoryLoading, setExecutionHistoryLoading] = useState(false)
+  const [executionHistoryError, setExecutionHistoryError] = useState<string | undefined>()
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
 
   useEffect(() => {
     if (showVersions) void refreshVersions()
   }, [refreshVersions, showVersions])
+
+  const loadExecutionHistory = useCallback(async (cursor?: string, append = false) => {
+    if (documentId === undefined) return
+    setExecutionHistoryLoading(true)
+    setExecutionHistoryError(undefined)
+    try {
+      const page = await apiClient.listCanvasExecutions(documentId, {
+        limit: 20,
+        ...(cursor === undefined ? {} : { cursor }),
+      })
+      setExecutions(current => append ? [...current, ...page.items] : page.items)
+      setExecutionCursor(page.nextCursor)
+    } catch (error) {
+      setExecutionHistoryError(error instanceof Error ? error.message : String(error))
+    } finally {
+      setExecutionHistoryLoading(false)
+    }
+  }, [documentId])
+
+  useEffect(() => {
+    if (showExecutions) void loadExecutionHistory()
+  }, [executionStatus, loadExecutionHistory, showExecutions])
 
   const saveLabel =
     saveStatus === 'loading'
@@ -246,6 +277,10 @@ export function CanvasPage() {
           <History className="mr-1 size-3.5" aria-hidden />
           版本
         </Button>
+        <Button size="sm" variant="ghost" onClick={() => setShowExecutions(open => !open)} aria-expanded={showExecutions}>
+          <List className="mr-1 size-3.5" aria-hidden />
+          运行记录
+        </Button>
       </div>
 
       {showVersions && (
@@ -286,6 +321,54 @@ export function CanvasPage() {
               ))
             )}
           </div>
+        </div>
+      )}
+
+      {showExecutions && (
+        <div className="absolute top-14 right-44 z-20 w-72 rounded-xl border bg-surface/95 p-2 shadow-lg backdrop-blur">
+          <div className="mb-1 flex items-center justify-between px-1">
+            <span className="text-xs font-medium">运行记录</span>
+            <span className="text-[10px] text-muted-foreground">点击可恢复节点结果</span>
+          </div>
+          {executionHistoryError !== undefined ? (
+            <p className="px-1 py-3 text-center text-[10px] text-destructive">{executionHistoryError}</p>
+          ) : executions.length === 0 && !executionHistoryLoading ? (
+            <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无运行记录</p>
+          ) : (
+            <div className="max-h-72 space-y-1 overflow-y-auto">
+              {executions.map(execution => (
+                <button
+                  key={execution.id}
+                  type="button"
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-1.5 text-left hover:bg-accent"
+                  onClick={() => void loadExecution(execution.id)}
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate text-xs">
+                      {execution.rerun === undefined ? '画布执行' : `节点重跑 · ${execution.rerun.nodeId}`}
+                    </span>
+                    <span className="block text-[10px] text-muted-foreground">
+                      版本 {execution.documentRevision} · {new Date(execution.createdAt).toLocaleString()}
+                    </span>
+                  </span>
+                  <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">{executionStatusLabel(execution.status)}</span>
+                </button>
+              ))}
+              {executionHistoryLoading && (
+                <p className="px-1 py-2 text-center text-[10px] text-muted-foreground">加载中…</p>
+              )}
+              {executionCursor !== undefined && !executionHistoryLoading && (
+                <Button
+                  size="xs"
+                  variant="outline"
+                  className="w-full"
+                  onClick={() => void loadExecutionHistory(executionCursor, true)}
+                >
+                  加载更多
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       )}
 
@@ -346,4 +429,14 @@ export function CanvasPage() {
       )}
     </div>
   )
+}
+
+function executionStatusLabel(status: CanvasExecutionTaskSummary['status']): string {
+  return {
+    queued: '排队中',
+    running: '执行中',
+    succeeded: '已完成',
+    failed: '失败',
+    cancelled: '已取消',
+  }[status]
 }

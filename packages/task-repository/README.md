@@ -6,6 +6,7 @@
 - `renewTaskLock`：只允许当前 worker 在租约仍有效时续租；
 - `saveTask`：保存状态机结果，并在传入 owner 时阻止旧 worker 覆盖新 worker；
 - `getTask`：按 id 读取任务；
+- `listTasks`：按用户、类型、域和关联输入字段做用户隔离的 keyset 分页列表；
 - `findTask`：按关联记录、类型和状态筛选一条任务；调用方可传入正在执行的业务事务以保持读取一致性。
 - `cancelQueuedTasks`：在调用方事务内按 task-engine 取消仍处于 queued 的匹配任务。
 - `enqueueTask`：在调用方已开启的业务事务中写入初始/后续任务，并返回映射后的领域记录。

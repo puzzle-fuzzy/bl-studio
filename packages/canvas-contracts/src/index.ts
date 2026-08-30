@@ -176,6 +176,13 @@ export const CanvasExecutionTaskSummarySchema = z
     status: z.enum(['queued', 'running', 'succeeded', 'failed', 'cancelled']),
     nodeStatuses: z.array(CanvasExecutionNodeStatusSchema).max(500),
     error: z.string().trim().min(1).max(2000).optional(),
+    rerun: z
+      .object({
+        sourceExecutionId: z.string().trim().min(1).max(200),
+        nodeId: z.string().trim().min(1).max(120),
+      })
+      .strict()
+      .optional(),
     createdAt: z.string(),
     updatedAt: z.string(),
   })
@@ -184,6 +191,13 @@ export const CanvasExecutionTaskSummarySchema = z
 export const CanvasExecutionTaskResponseSchema = z
   .object({
     execution: CanvasExecutionTaskSummarySchema,
+  })
+  .strict()
+
+export const ListCanvasExecutionsResponseSchema = z
+  .object({
+    items: z.array(CanvasExecutionTaskSummarySchema).max(100),
+    nextCursor: z.string().trim().min(1).max(1024).optional(),
   })
   .strict()
 
@@ -234,4 +248,7 @@ export type CanvasExecutionNodeStatus = z.infer<
 >
 export type CanvasExecutionTaskSummary = z.infer<
   typeof CanvasExecutionTaskSummarySchema
+>
+export type ListCanvasExecutionsResult = z.infer<
+  typeof ListCanvasExecutionsResponseSchema
 >

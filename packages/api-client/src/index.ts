@@ -39,6 +39,7 @@ export type {
   CanvasExecutionPlanNode,
   CanvasExecutionTaskInput,
   CanvasExecutionTaskSummary,
+  ListCanvasExecutionsResult,
   CanvasNode,
   CanvasSnapshot,
   CanvasVersion,

@@ -1119,6 +1119,30 @@ describe('createApiClient', () => {
     expect(calls[3]?.body).toBe(JSON.stringify({ idempotencyKey: 'retry-1' }))
   })
 
+  it('lists canvas execution history with a keyset cursor', async () => {
+    const execution = {
+      id: 'canvas_execution_history_1',
+      documentId: 'canvas_1',
+      documentRevision: 2,
+      status: 'succeeded' as const,
+      nodeStatuses: [{ nodeId: 'node_1', status: 'succeeded' as const, assetIds: ['asset_1'] }],
+      createdAt: '2026-08-30T00:00:00.000Z',
+      updatedAt: '2026-08-30T00:00:01.000Z',
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { items: [execution], nextCursor: 'next-page' } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.listCanvasExecutions('canvas 1', { limit: 10, cursor: 'previous page' })).resolves.toEqual({
+      items: [execution],
+      nextCursor: 'next-page',
+    })
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/canvases/canvas%201/executions?limit=10&cursor=previous+page',
+    )
+  })
+
   it('registers without a session and completes the verified email lifecycle', async () => {
     const registration: RegistrationResult = {
       status: 'verification_required',

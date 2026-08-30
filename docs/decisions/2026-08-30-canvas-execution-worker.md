@@ -46,5 +46,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
   结果可被继续复用；失败/取消结果切换到任务级 fresh key，避免坏缓存永久阻塞后续运行。节点级手动重跑
   使用 `cachePolicy=refresh`，保证“重跑”仍然产生新结果。
 - 资产 ID 和画布 revision 都在服务端重新校验；客户端不能通过任务查询跨用户读取执行状态。
+- `GET /api/canvases/:id/executions` 通过 `task-repository.listTasks` 按用户和任务输入中的 `documentId`
+  做 keyset 分页；Canvas 任务同时写入 `recordId=documentId`，新旧任务都能进入同一历史读模型。前端点击历史
+  记录时重新读取该执行快照并恢复节点的稳定资产结果，不修改画布编辑快照。
 
-下一阶段可在不改变当前 generation 语义的前提下增加 Canvas 页面节点重跑入口，并继续定义可复用的节点结果缓存。
+下一阶段应继续把执行历史扩展为可观测的运行时间、缓存命中和节点级诊断，但不复制第二份任务状态表。

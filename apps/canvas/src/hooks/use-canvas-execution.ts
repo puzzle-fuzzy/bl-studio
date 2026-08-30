@@ -265,7 +265,27 @@ export function useCanvasExecution() {
     }
   }, [applySummary, documentId, status, stop, taskId])
 
+  const loadExecution = useCallback(async (executionId: string) => {
+    if (documentId === undefined) return
+    stop()
+    const runId = runIdRef.current
+    setTaskId(executionId)
+    setError(undefined)
+    try {
+      const execution = await apiClient.getCanvasExecution(documentId, executionId)
+      if (runIdRef.current !== runId) return
+      await applySummary(execution, runId)
+      if (runIdRef.current !== runId) return
+      setStatus(toUiExecutionStatus(execution.status))
+      if (execution.error !== undefined) setError(execution.error)
+    } catch (nextError) {
+      if (runIdRef.current !== runId) return
+      setStatus('failed')
+      setError(nextError instanceof Error ? nextError.message : String(nextError))
+    }
+  }, [applySummary, documentId, stop])
+
   useEffect(() => () => stop(), [stop])
 
-  return { execute, cancel, retryNode, stop, status, taskId, error }
+  return { execute, cancel, retryNode, loadExecution, stop, status, taskId, error }
 }

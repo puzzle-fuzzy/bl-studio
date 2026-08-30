@@ -1,4 +1,4 @@
-import { and, asc, eq, gt, inArray, isNull, ne, sql } from 'drizzle-orm'
+import { and, asc, desc, eq, gt, inArray, isNull, ne, sql, type SQL } from 'drizzle-orm'
 import {
   taskInsertValues,
   taskRecords,
@@ -13,6 +13,7 @@ import {
   type CancelTaskInput,
   type CancelQueuedTasksInput,
   type FindTaskInput,
+  type ListTasksInput,
   type RenewTaskLockInput,
   type SaveTaskOptions,
   type TaskQueueRepository,
@@ -20,6 +21,7 @@ import {
   type TaskQueueQuerySource,
 } from './types'
 import type { TaskRecord } from '@bailian-studio/task-engine'
+import { clampTaskLimit, decodeTaskCursor, encodeTaskCursor } from './cursor'
 
 export interface CreateTaskQueueRepositoryOptions {
   db: BailianStudioDb
@@ -271,6 +273,40 @@ export function createTaskQueueRepository(options: CreateTaskQueueRepositoryOpti
       const [row] = await db.select().from(taskRecords).where(eq(taskRecords.id, id)).limit(1)
 
       return row === undefined ? undefined : toTaskRecord(row)
+    },
+
+    async listTasks(input: ListTasksInput) {
+      const limit = clampTaskLimit(input.limit)
+      const cursor = input.cursor === undefined ? undefined : decodeTaskCursor(input.cursor)
+      const conditions: SQL[] = [
+        eq(taskRecords.userId, input.userId),
+        isNull(taskRecords.deletedAt),
+      ]
+      if (input.type !== undefined) conditions.push(eq(taskRecords.type, input.type))
+      if (input.domain !== undefined) conditions.push(eq(taskRecords.domain, input.domain))
+      if (input.recordId !== undefined) conditions.push(eq(taskRecords.recordId, input.recordId))
+      if (input.inputField !== undefined) {
+        conditions.push(sql`${taskRecords.inputJson}->>${input.inputField.key} = ${input.inputField.value}`)
+      }
+      if (cursor !== undefined) {
+        conditions.push(sql`(${taskRecords.createdAt} < ${cursor.createdAt} OR (${taskRecords.createdAt} = ${cursor.createdAt} AND ${taskRecords.id} < ${cursor.id}))`)
+      }
+
+      const rows = await db
+        .select()
+        .from(taskRecords)
+        .where(and(...conditions))
+        .orderBy(desc(taskRecords.createdAt), desc(taskRecords.id))
+        .limit(limit + 1)
+      const hasMore = rows.length > limit
+      const page = hasMore ? rows.slice(0, limit) : rows
+      const last = page[page.length - 1]
+      return {
+        items: page.map(toTaskRecord),
+        ...(hasMore && last !== undefined
+          ? { nextCursor: encodeTaskCursor({ createdAt: last.createdAt.toISOString(), id: last.id }) }
+          : {}),
+      }
     },
   }
 }

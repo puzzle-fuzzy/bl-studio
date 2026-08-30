@@ -80,6 +80,15 @@ function createFakeTaskRepository() {
       tasks.set(task.id, cancelled)
       return cancelled
     },
+    async listTasks(input: { userId: string; inputField?: { key: string; value: string }; limit?: number; cursor?: string }) {
+      const items = [...tasks.values()].filter(task => (
+        task.userId === input.userId
+        && task.type === 'canvas.execute'
+        && task.domain === 'canvas'
+        && (input.inputField === undefined || task.input[input.inputField.key] === input.inputField.value)
+      ))
+      return { items, nextCursor: undefined }
+    },
   }
 }
 
@@ -228,6 +237,16 @@ describe('canvas routes', () => {
     )
     expect(read.status).toBe(200)
     expect((await read.json()).data.execution.id).toBe(firstExecution.id)
+
+    const history = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/executions?limit=10', {
+        headers: { cookie: 'bailian_studio_session=fake-token' },
+      }),
+    )
+    expect(history.status).toBe(200)
+    expect((await history.json()).data.items).toMatchObject([
+      { id: firstExecution.id, documentId: 'canvas-1', status: 'queued' },
+    ])
   })
 
   it('derives an idempotent node rerun and preserves successful nodes', async () => {

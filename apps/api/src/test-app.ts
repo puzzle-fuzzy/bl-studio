@@ -134,7 +134,7 @@ export function createTestApp(overrides: TestAppOverrides = {}): TestAppContext 
     canvasRepository: overrides.canvasRepository ?? missing<CanvasRepository>('canvasRepository'),
     taskQueueRepository:
       overrides.taskQueueRepository ??
-      missing<Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask'>>('taskQueueRepository'),
+      missing<Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask' | 'listTasks'>>('taskQueueRepository'),
     usageRepository,
     generationApplicationService,
     directorRepository,

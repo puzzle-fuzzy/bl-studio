@@ -22,6 +22,7 @@ import { AuthError, type AuthErrorCode } from '@bailian-studio/auth'
 import { CreditLedgerError, type CreditLedgerErrorCode } from '@bailian-studio/credit-ledger'
 import { ValidationError } from '@bailian-studio/shared'
 import { StorageError } from '@bailian-studio/storage'
+import { TaskRepositoryError, type TaskRepositoryErrorCode } from '@bailian-studio/task-repository'
 import { ZodError } from 'zod'
 import { getRequestTrace } from './middleware'
 import { RequestBodyTooLargeError } from './request-guards'
@@ -85,6 +86,12 @@ const CANVAS_EXECUTION_STATUS: Record<CanvasExecutionErrorCode, number> = {
   CANVAS_EXECUTION_INVALID_TASK_INPUT: 500,
   CANVAS_EXECUTION_NODE_NOT_FOUND: 404,
   CANVAS_EXECUTION_NOT_RETRYABLE: 409,
+}
+
+const TASK_REPOSITORY_STATUS: Record<TaskRepositoryErrorCode, number> = {
+  TASK_NOT_FOUND: 404,
+  INVALID_CURSOR: 400,
+  DATABASE_ERROR: 500,
 }
 
 const CREATIVE_ASSET_COMPILER_STATUS: Record<CreativeAssetCompilerErrorCode, number> = {
@@ -182,6 +189,7 @@ export function httpStatusForError(error: unknown): number {
   if (error instanceof AdminRepositoryError) return ADMIN_REPOSITORY_STATUS[error.code]
   if (error instanceof CanvasRepositoryError) return CANVAS_REPOSITORY_STATUS[error.code]
   if (error instanceof CanvasExecutionError) return CANVAS_EXECUTION_STATUS[error.code]
+  if (error instanceof TaskRepositoryError) return TASK_REPOSITORY_STATUS[error.code]
   if (requestBodyTooLargeError(error) !== undefined) {
     return 413
   }
@@ -285,6 +293,17 @@ function errorResponseBodyWithoutTrace(error: unknown): ErrorResponseBody {
   }
 
   if (error instanceof CanvasExecutionError) {
+    return {
+      success: false,
+      error: {
+        code: error.code,
+        message: error.message,
+        ...(error.details !== undefined ? { details: error.details } : {}),
+      },
+    }
+  }
+
+  if (error instanceof TaskRepositoryError) {
     return {
       success: false,
       error: {

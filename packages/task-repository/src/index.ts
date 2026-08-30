@@ -8,6 +8,8 @@ export type {
   CancelTaskInput,
   CancelQueuedTasksInput,
   FindTaskInput,
+  ListTasksInput,
+  ListTasksResult,
   RenewTaskLockInput,
   SaveTaskOptions,
   TaskQueueRepository,

@@ -79,7 +79,7 @@ export interface ApiDependencies {
   /** 当前用户 Canvas 文档、版本和乐观并发控制。 */
   readonly canvasRepository: CanvasRepository
   /** Canvas 编排任务的独立队列写入/读取端口。 */
-  readonly taskQueueRepository: Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask'>
+  readonly taskQueueRepository: Pick<TaskQueueRepository, 'getTask' | 'enqueueTask' | 'cancelTask' | 'listTasks'>
   /** 用户用量读模型的窄持久化 port。 */
   readonly usageRepository: UsageRepository
   readonly generationApplicationService: GenerationApplicationService

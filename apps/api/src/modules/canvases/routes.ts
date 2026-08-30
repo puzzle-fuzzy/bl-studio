@@ -29,6 +29,10 @@ const ListCanvasesQuerySchema = z
   })
   .strict()
 
+const ListCanvasExecutionsQuerySchema = ListCanvasesQuerySchema.extend({
+  cursor: z.string().trim().min(1).max(1024).optional(),
+})
+
 const CANVAS_SSE_POLL_INTERVAL_MS = 1_000
 const CANVAS_SSE_HEARTBEAT_INTERVAL_MS = 15_000
 const CANVAS_SSE_RESPONSE_HEADERS = {
@@ -99,7 +103,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       }
 
       const now = new Date().toISOString()
-      const task: TaskRecord = {
+    const task: TaskRecord = {
         id: taskId,
         type: 'canvas.execute',
         domain: 'canvas',
@@ -115,6 +119,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         attempts: 0,
         maxAttempts: Math.min(10_000, Math.max(1_000, plan.nodes.length * 50)),
         nextRunAt: now,
+        recordId: document.id,
         userId: user.id,
         traceId: randomUUID(),
         createdAt: now,
@@ -189,6 +194,7 @@ export function createCanvasRoutes(deps: ApiDependencies) {
         attempts: 0,
         maxAttempts: Math.min(10_000, Math.max(1_000, rerunInput.plan.nodes.length * 50)),
         nextRunAt: now,
+        recordId: params.id,
         userId: user.id,
         traceId: randomUUID(),
         createdAt: now,
@@ -207,6 +213,32 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       return {
         success: true,
         data: { execution: toCanvasExecutionSummary(created) },
+      }
+    })
+    .get('/:id/executions', async ({ request, params, query }) => {
+      const user = await requireAuthUser(request, deps.authService)
+      const document = await deps.canvasRepository.getDocument({
+        userId: user.id,
+        documentId: params.id,
+      })
+      if (document === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas not found: ${params.id}`)
+      }
+      const input = validateInput(ListCanvasExecutionsQuerySchema, query)
+      const page = await deps.taskQueueRepository.listTasks({
+        userId: user.id,
+        type: 'canvas.execute',
+        domain: 'canvas',
+        inputField: { key: 'documentId', value: params.id },
+        ...(input.limit !== undefined ? { limit: input.limit } : {}),
+        ...(input.cursor !== undefined ? { cursor: input.cursor } : {}),
+      })
+      return {
+        success: true,
+        data: {
+          items: page.items.map(toCanvasExecutionSummary),
+          ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        },
       }
     })
     .get('/:id/executions/:taskId', async ({ request, params }) => {
@@ -515,6 +547,7 @@ function toCanvasExecutionSummary(task: TaskRecord) {
       }
     }),
     ...(task.errorJson?.message === undefined ? {} : { error: task.errorJson.message }),
+    ...(parsed.data.rerun === undefined ? {} : { rerun: parsed.data.rerun }),
     createdAt: task.createdAt,
     updatedAt: task.updatedAt,
   }

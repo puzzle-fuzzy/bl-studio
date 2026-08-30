@@ -85,6 +85,63 @@ describe('task queue repository', () => {
     })
   })
 
+  it('lists owned tasks with keyset pagination and legacy input filtering', async () => {
+    const repository = createTaskQueueRepository({ db })
+    await seedTask(makeTask({
+      id: 'canvas-history-old',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      recordId: undefined,
+      input: { documentId: 'canvas-history' },
+      createdAt: '2026-08-30T00:00:01.000Z',
+      updatedAt: '2026-08-30T00:00:01.000Z',
+    }))
+    await seedTask(makeTask({
+      id: 'canvas-history-new',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      recordId: 'canvas-history',
+      input: { documentId: 'canvas-history' },
+      createdAt: '2026-08-30T00:00:02.000Z',
+      updatedAt: '2026-08-30T00:00:02.000Z',
+    }))
+    await seedTask(makeTask({
+      id: 'canvas-history-other-user',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      recordId: 'canvas-history',
+      input: { documentId: 'canvas-history' },
+      userId: 'other-user',
+      createdAt: '2026-08-30T00:00:03.000Z',
+      updatedAt: '2026-08-30T00:00:03.000Z',
+    }))
+
+    const first = await repository.listTasks({
+      userId: 'user-1',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      inputField: { key: 'documentId', value: 'canvas-history' },
+      limit: 1,
+    })
+    expect(first.items.map(task => task.id)).toEqual(['canvas-history-new'])
+    expect(first.nextCursor).toBeDefined()
+
+    const second = await repository.listTasks({
+      userId: 'user-1',
+      type: 'canvas.execute',
+      domain: 'canvas',
+      inputField: { key: 'documentId', value: 'canvas-history' },
+      cursor: first.nextCursor,
+      limit: 1,
+    })
+    expect(second.items.map(task => task.id)).toEqual(['canvas-history-old'])
+  })
+
+  it('rejects malformed task cursors', async () => {
+    await expect(createTaskQueueRepository({ db }).listTasks({ userId: 'user-1', cursor: 'bad' }))
+      .rejects.toMatchObject({ code: 'INVALID_CURSOR' })
+  })
+
   it('finds a task through the transaction store without exposing task table details', async () => {
     const task = makeTask({
       id: 'task-find',

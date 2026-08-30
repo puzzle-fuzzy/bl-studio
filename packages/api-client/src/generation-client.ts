@@ -13,6 +13,7 @@ import type { CreativeGenerationContext } from '@bailian-studio/creative-asset-c
 import {
   CanvasDocumentResponseSchema,
   CanvasExecutionTaskResponseSchema,
+  ListCanvasExecutionsResponseSchema,
   CanvasVersionsResponseSchema,
   ListCanvasesResponseSchema,
   type CanvasDocument,
@@ -22,6 +23,7 @@ import {
   type CanvasVersion,
   type CreateCanvasInput,
   type ListCanvasesResult,
+  type ListCanvasExecutionsResult,
   type RestoreCanvasInput,
   type SaveCanvasInput,
 } from '@bailian-studio/canvas-contracts'
@@ -486,6 +488,8 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   executeCanvas(id: string, input: ExecuteCanvasInput): Promise<CanvasExecutionTaskSummary>
   /** `GET /api/canvases/:id/executions/:taskId` —— 查询画布执行状态。 */
   getCanvasExecution(id: string, taskId: string): Promise<CanvasExecutionTaskSummary>
+  /** `GET /api/canvases/:id/executions` —— 按创建时间倒序分页读取执行历史。 */
+  listCanvasExecutions(id: string, params?: { limit?: number; cursor?: string }): Promise<ListCanvasExecutionsResult>
   /** `GET /api/canvases/:id/executions/:taskId/events` —— 订阅画布执行状态 SSE。 */
   canvasExecutionEventsUrl(id: string, taskId: string): string
   /** `POST /api/canvases/:id/executions/:taskId/nodes/:nodeId/retry` —— 派生节点级重跑。 */
@@ -1408,6 +1412,19 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         CanvasExecutionTaskResponseSchema,
       )
       return data.execution
+    },
+
+    async listCanvasExecutions(id, params = {}) {
+      const query = new URLSearchParams()
+      if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.cursor !== undefined) query.set('cursor', params.cursor)
+      const qs = query.toString()
+      return unwrapData(
+        `${base}/api/canvases/${encodeURIComponent(id)}/executions${qs.length > 0 ? `?${qs}` : ''}`,
+        { method: 'GET', credentials: 'include' },
+        fetchImpl,
+        ListCanvasExecutionsResponseSchema,
+      )
     },
 
     canvasExecutionEventsUrl(id, taskId) {
