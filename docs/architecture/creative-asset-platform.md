@@ -139,7 +139,8 @@ flowchart LR
 ### 3.3 Canvas 执行生命周期（已实现，2026-08-30）
 
 - Canvas 的编辑快照和执行状态分离：`canvas_documents` / `canvas_document_versions` 只保存
-  用户编辑内容；`canvas.execute` 任务输入保存一次编译后的 plan 和可恢复的 `nodeRuns` 游标。
+  用户编辑内容以及稳定的生成/素材资产 ID，不保存 `status`、错误文本等运行态；`canvas.execute` 任务输入保存一次
+  编译后的 plan 和可恢复的 `nodeRuns` 游标。
 - Canvas 节点卡片保留单节点快捷生成作为试错入口；它直接创建普通 generation，不进入整图 `nodeRuns`
   或运行记录，但会保存 generation ID 并在刷新后恢复轮询；没有 ID 的旧“生成中”状态降级为可编辑状态。
   两条入口共享资产 ID 协议，但 UI 互斥：整图执行期间不能提交单节点，单节点生成期间不能启动整图执行，

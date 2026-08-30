@@ -1,16 +1,14 @@
 import type { CanvasEdge, CanvasNode, CanvasSnapshot } from '@bailian-studio/canvas-contracts'
 import type { Edge, Node } from '@xyflow/react'
 
-/** 只持久化生成节点下一次恢复所需的稳定字段；临时 read URL 由资产 API 重新解析。 */
+/** 只持久化编辑恢复所需的稳定字段；运行时状态和临时 read URL 不进入版本历史。 */
 const PERSISTED_DATA_KEYS = new Set([
   'kind',
-  'status',
   'prompt',
   'modelId',
   'resultKind',
   'resultAssetId',
   'generationId',
-  'errorMessage',
   'referenceUrls',
   'referenceAssetIds',
   'referenceAssetKinds',
@@ -25,10 +23,16 @@ function persistedData(data: Record<string, unknown>): Record<string, unknown> {
 
 /** 没有 generationId 的旧“生成中”状态无法恢复轮询，打开时降级为可编辑状态。 */
 function normalizeRestoredNodeData(data: Record<string, unknown>): Record<string, unknown> {
-  if (data.status !== 'generating' || typeof data.generationId === 'string') return data
+  const generationId = typeof data.generationId === 'string' && data.generationId.trim().length > 0
+    ? data.generationId
+    : undefined
+  if (data.status === 'generating' && generationId !== undefined) return data
+  if (data.status === 'error' || data.status === 'ready' || data.status === 'empty') return data
   return {
     ...data,
-    status: typeof data.resultAssetId === 'string' ? 'ready' : 'empty',
+    status: generationId !== undefined
+      ? 'generating'
+      : typeof data.resultAssetId === 'string' ? 'ready' : 'empty',
   }
 }
 

@@ -6,12 +6,14 @@
 
 ## 决策
 
-Canvas 不直接把 React Flow 节点交给 provider，也不把一次运行过程写回编辑快照。API 在用户
+Canvas 不直接把 React Flow 节点交给 provider，也不把一次运行过程写回编辑快照。编辑快照只保留
+提示词、模型、连接关系和稳定资产引用；节点 `status`、错误文本等运行态由当前页面/执行任务恢复。
+API 在用户
 请求 `POST /api/canvases/:id/execute` 时，基于当前 `revision` 编译成 provider-neutral 的
 `CanvasExecutionPlan`，再创建一个 `canvas.execute` 任务。
 
 Canvas 同时保留节点卡片上的单节点快捷生成，用于快速试错；它直接创建普通 generation，不进入
-`canvas.execute` 的 `nodeRuns` 和运行记录。单节点 generation ID 会随节点快照保存，页面刷新后恢复轮询；
+`canvas.execute` 的 `nodeRuns` 和运行记录。单节点 generation ID 作为可恢复指针随节点快照保存，页面刷新后恢复轮询；
 历史快照没有该 ID 时降级为可编辑状态。两条入口共享资产 ID、模型校验和结果持久化，但页面保证互斥：
 整图任务执行期间禁用单节点提交，单节点生成期间禁用“运行画布”，避免两个生命周期竞争写回同一个节点结果。
 需要完整拓扑、缓存、节点级重跑和统一运行记录时，应使用整图入口。
