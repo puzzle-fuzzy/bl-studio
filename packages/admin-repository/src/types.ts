@@ -133,3 +133,16 @@ export interface RetentionAnalytics {
   firstSuccess: number
   activeTwoDays: number
 }
+
+/** Canvas 窗口内的执行成本概览；generationCalls 只统计实际创建的子 generation。 */
+export interface CanvasCostAnalytics {
+  executions: number
+  generationCalls: number
+  cacheHitNodes: number
+  accountedCents: number
+  byModel: Array<{
+    modelId: string
+    calls: number
+    accountedCents: number
+  }>
+}

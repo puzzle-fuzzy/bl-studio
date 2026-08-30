@@ -61,3 +61,6 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - API 从 `task_records.startedAt/completedAt/errorJson` 投影整图执行诊断，并从 `nodeRuns` 投影节点诊断；历史读模型和 SSE
   复用同一套字段，旧任务缺少字段时保持兼容。Canvas 历史面板显示总耗时、失败节点数量和任务错误码，节点错误提示保留错误码。
 - 节点耗时同时进入 Worker 进程内 timing 指标，后续可接入外部指标后端；本阶段不复制第二份任务状态表。
+- Canvas 父任务与实际创建的子 generation 共用任务 `traceId`，管理侧成本分析据此关联 `task_records` 与 `generation_records`；
+  `nodeRuns.cacheHit` 只统计缓存复用次数，不再次计入 generation 成本。该分析先复用现有表结构，不新增成本明细表，后续
+  若需要按节点或单次执行钻取，再在此关联契约上扩展读模型。

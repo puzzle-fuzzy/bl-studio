@@ -5,11 +5,13 @@
  * 和 admin task 查询分开，避免一个 repository 同时拥有三种治理语义。
  */
 
+import { CanvasExecutionTaskInputSchema } from "@bailian-studio/canvas-contracts";
 import type { BailianStudioDbTransaction } from "@bailian-studio/db";
 import {
 	type BailianStudioDb,
 	generationRecords,
 	modelCosts,
+	taskRecords,
 } from "@bailian-studio/db";
 import {
 	and,
@@ -24,6 +26,7 @@ import {
 } from "drizzle-orm";
 import type {
 	CostMarginRow,
+	CanvasCostAnalytics,
 	GenerationCallStats,
 	ModelCost,
 	RetentionAnalytics,
@@ -43,6 +46,10 @@ export interface AnalyticsRepository {
 		to: string;
 	}): Promise<CostMarginRow[]>;
 	getRetentionAnalytics(input: { since: string }): Promise<RetentionAnalytics>;
+	getCanvasCostAnalytics(input: {
+		from: string;
+		to: string;
+	}): Promise<CanvasCostAnalytics>;
 }
 
 export function createAnalyticsRepository(
@@ -151,12 +158,73 @@ export function createAnalyticsRepository(
 		return { firstGeneration, firstSuccess, activeTwoDays };
 	}
 
+	async function getCanvasCostAnalytics(input: {
+		from: string;
+		to: string;
+	}): Promise<CanvasCostAnalytics> {
+		const taskWindow = and(
+			eq(taskRecords.type, "canvas.execute"),
+			eq(taskRecords.domain, "canvas"),
+			gte(taskRecords.createdAt, new Date(input.from)),
+			lt(taskRecords.createdAt, new Date(input.to)),
+			isNull(taskRecords.deletedAt),
+		);
+		const generationJoin = and(
+			eq(taskRecords.traceId, generationRecords.traceId),
+			isNull(generationRecords.deletedAt),
+		);
+		const [summaryRows, modelRows, taskRows] = await Promise.all([
+			db
+				.select({
+					executions: sql<number>`count(distinct ${taskRecords.id})::int`,
+					generationCalls: sql<number>`count(${generationRecords.id})::int`,
+					accountedCents: sql<number>`coalesce(sum(coalesce(${generationRecords.costFinal}, ${generationRecords.costEstimate})), 0)::int`,
+				})
+				.from(taskRecords)
+				.leftJoin(generationRecords, generationJoin)
+				.where(taskWindow),
+			db
+				.select({
+					modelId: generationRecords.modelId,
+					calls: sql<number>`count(*)::int`,
+					accountedCents: sql<number>`coalesce(sum(coalesce(${generationRecords.costFinal}, ${generationRecords.costEstimate})), 0)::int`,
+				})
+				.from(taskRecords)
+				.innerJoin(generationRecords, generationJoin)
+				.where(taskWindow)
+				.groupBy(generationRecords.modelId)
+				.orderBy(desc(sql`coalesce(sum(coalesce(${generationRecords.costFinal}, ${generationRecords.costEstimate})), 0)`)),
+			db
+				.select({ input: taskRecords.inputJson })
+				.from(taskRecords)
+				.where(taskWindow),
+		]);
+		const cacheHitNodes = taskRows.reduce((total, row) => {
+			const parsed = CanvasExecutionTaskInputSchema.safeParse(row.input);
+			if (!parsed.success) return total;
+			return total + Object.values(parsed.data.nodeRuns).filter(run => run.cacheHit === true).length;
+		}, 0);
+		const summary = summaryRows[0];
+		return {
+			executions: summary?.executions ?? 0,
+			generationCalls: summary?.generationCalls ?? 0,
+			cacheHitNodes,
+			accountedCents: summary?.accountedCents ?? 0,
+			byModel: modelRows.map(row => ({
+				modelId: row.modelId,
+				calls: row.calls,
+				accountedCents: row.accountedCents,
+			})),
+		};
+	}
+
 	return {
 		countGenerationCallsBetween,
 		listModelCosts,
 		upsertModelCosts,
 		getCostMarginAnalytics,
 		getRetentionAnalytics,
+		getCanvasCostAnalytics,
 	};
 }
 

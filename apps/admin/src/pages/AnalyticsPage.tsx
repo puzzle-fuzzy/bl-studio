@@ -145,6 +145,7 @@ export function AnalyticsPage() {
           <TabsList>
             <TabsTrigger value="margin">成本毛利</TabsTrigger>
             <TabsTrigger value="retention">留存漏斗</TabsTrigger>
+            <TabsTrigger value="canvas">Canvas 执行</TabsTrigger>
           </TabsList>
           <TabsContent value="margin" className="space-y-4 pt-2">
             <Card>
@@ -216,6 +217,45 @@ export function AnalyticsPage() {
               </CardContent>
             </Card>
           </TabsContent>
+          <TabsContent value="canvas" className="space-y-4 pt-2">
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <AnalyticsStatCard label="画布执行" value={String(analytics?.canvas?.executions ?? 0)} />
+              <AnalyticsStatCard label="实际生成调用" value={String(analytics?.canvas?.generationCalls ?? 0)} />
+              <AnalyticsStatCard label="命中缓存节点" value={String(analytics?.canvas?.cacheHitNodes ?? 0)} />
+              <AnalyticsStatCard label="核算费用" value={`${centsToYuan(analytics?.canvas?.accountedCents ?? 0)} 元`} />
+            </div>
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Canvas 子生成成本（近 {days} 天）</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {analytics?.canvas === undefined ? (
+                  <p className="text-sm text-muted-foreground">当前 API 尚未提供 Canvas 成本数据。</p>
+                ) : analytics.canvas.byModel.length === 0 ? (
+                  <p className="py-6 text-center text-sm text-muted-foreground">该窗口内暂无 Canvas 生成调用</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>模型</TableHead>
+                        <TableHead className="text-right">调用数</TableHead>
+                        <TableHead className="text-right">核算费用（元）</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {analytics.canvas.byModel.map(row => (
+                        <TableRow key={row.modelId}>
+                          <TableCell>{row.label}</TableCell>
+                          <TableCell className="text-right">{row.calls}</TableCell>
+                          <TableCell className="text-right">{centsToYuan(row.accountedCents)}</TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
         </Tabs>
       )}
 
@@ -247,5 +287,18 @@ export function AnalyticsPage() {
         </DialogContent>
       </Dialog>
     </div>
+  )
+}
+
+function AnalyticsStatCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardHeader className="pb-2">
+        <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-2xl font-semibold">{value}</p>
+      </CardContent>
+    </Card>
   )
 }

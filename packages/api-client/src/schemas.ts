@@ -1291,6 +1291,18 @@ export const AdminAnalyticsSchema = z.object({
     firstSuccess: z.number(),
     activeTwoDays: z.number(),
   }),
+  canvas: z.object({
+    executions: z.number(),
+    generationCalls: z.number(),
+    cacheHitNodes: z.number(),
+    accountedCents: z.number(),
+    byModel: z.array(z.object({
+      modelId: z.string(),
+      label: z.string(),
+      calls: z.number(),
+      accountedCents: z.number(),
+    })),
+  }).optional(),
 })
 
 // ---------------------------------------------------------------------------

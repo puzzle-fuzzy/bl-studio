@@ -12,6 +12,7 @@
     "build": "tsc -p tsconfig.json --noEmit"
   },
   "dependencies": {
+    "@bailian-studio/canvas-contracts": "workspace:*",
     "@bailian-studio/db": "workspace:*",
     "@bailian-studio/model-core": "workspace:*",
     "@bailian-studio/task-engine": "workspace:*",

@@ -350,6 +350,30 @@ describe('createApiClient', () => {
     })
   })
 
+  it('parses canvas cost analytics in the admin analytics response', async () => {
+    const { fetch, calls } = queuedFetch([jsonResponse({
+      success: true,
+      data: {
+        window: { from: '2026-08-01T00:00:00.000Z', to: '2026-08-31T00:00:00.000Z' },
+        costMargin: [],
+        retention: { registered: 0, firstGeneration: 0, firstSuccess: 0, activeTwoDays: 0 },
+        canvas: {
+          executions: 2,
+          generationCalls: 3,
+          cacheHitNodes: 1,
+          accountedCents: 420,
+          byModel: [{ modelId: 'qwen-image', label: '通义万相', calls: 3, accountedCents: 420 }],
+        },
+      },
+    })])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.adminGetAnalytics({ days: 30 })).resolves.toMatchObject({
+      canvas: { executions: 2, generationCalls: 3, cacheHitNodes: 1 },
+    })
+    expect(calls[0]?.url).toBe('http://api.test/api/admin/stats/analytics?days=30')
+  })
+
   it('lists, reviews, and removes director entity candidates through the typed client', async () => {
     const candidate = {
       id: 'entity-candidate-1',

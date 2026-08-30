@@ -267,6 +267,13 @@ const fakeAnalyticsRepository: AnalyticsRepository = {
   upsertModelCosts: async () => undefined,
   getCostMarginAnalytics: async () => [],
   getRetentionAnalytics: async () => ({ firstGeneration: 0, firstSuccess: 0, activeTwoDays: 0 }),
+  getCanvasCostAnalytics: async () => ({
+    executions: 2,
+    generationCalls: 3,
+    cacheHitNodes: 1,
+    accountedCents: 420,
+    byModel: [{ modelId: 'qwen-image', calls: 3, accountedCents: 420 }],
+  }),
 }
 
 const app = createTestApp({
@@ -296,6 +303,23 @@ describe('admin routes', () => {
     currentUser = { id: 'admin-1', role: 'admin' }
     audits.length = 0
     fakeAuthService.__setBanned(false)
+  })
+
+  it('exposes Canvas cost analytics with model display labels', async () => {
+    const response = await app.handle(adminRequest('/api/admin/stats/analytics?days=7'))
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual(expect.objectContaining({
+      success: true,
+      data: expect.objectContaining({
+        canvas: {
+          executions: 2,
+          generationCalls: 3,
+          cacheHitNodes: 1,
+          accountedCents: 420,
+          byModel: [{ modelId: 'qwen-image', label: 'Qwen Image', calls: 3, accountedCents: 420 }],
+        },
+      }),
+    }))
   })
 
   it('returns 403 for non-admin users on every admin endpoint', async () => {

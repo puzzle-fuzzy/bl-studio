@@ -117,7 +117,7 @@
 `apps/web/src/lib/deeplink-params.ts`（纯函数 + 单测）：`encodeParams(manifest, textParams)` / `decodeParams(manifest, base64)`，按 manifest 校验、丢弃未知字段与媒体值、默认值兜底。CreatePage 统一处理 `?select=&params=` / `?edit=` / `?ref=` / 已有 `?reuse=`。
 
 ### E5. admin 成本毛利 + 留存漏斗
-`model_costs` 表 + `scripts/db/seed-model-costs.ts`（从 `data/fixtures/model-costs.json` 播种）。API：`GET/PUT /api/admin/model-costs`；`GET /api/admin/stats/analytics`：按 modelId 分组成本毛利（收入 = Σ costFinal/costEstimate，成本 = 调用数 × unitCostCents）+ 留存漏斗（注册 → 首生成 → 成功生成 → 活跃 ≥2 日）。admin 新页 `/analytics`（recharts，成本毛利 + 留存漏斗两个 Tab）。
+`model_costs` 表 + `scripts/db/seed-model-costs.ts`（从 `data/fixtures/model-costs.json` 播种）。API：`GET/PUT /api/admin/model-costs`；`GET /api/admin/stats/analytics`：按 modelId 分组成本毛利（收入 = Σ costFinal/costEstimate，成本 = 调用数 × unitCostCents）+ 留存漏斗（注册 → 首生成 → 成功生成 → 活跃 ≥2 日）+ Canvas 执行/子 generation 成本概览（按 Canvas task traceId 关联，缓存命中不重复计费）。admin `/analytics` 提供对应的 Canvas 执行观测 Tab。
 
 ---
 

@@ -2,24 +2,25 @@ export { AdminRepositoryError, type AdminRepositoryErrorCode } from './errors'
 export { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
 export { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
 export { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
-export {
-  type AdminGalleryItem,
-  type AdminTaskItem,
-  type AdminTaskRequestContext,
-  type AdminTaskRequestContextRecord,
-  type ArtifactKind,
-  type ArtifactStatus,
-  type ArtifactStorageProvider,
-  type CostMarginRow,
-  type GenerationArtifact,
-  type GenerationCallStats,
-  type GenerationInputAsset,
-  type GalleryVisibility,
-  type ListAdminGalleryResult,
-  type ListAdminTasksResult,
-  type ModelCost,
-  type RetentionAnalytics,
-  type TaskDiagnosticError,
+export type {
+  AdminGalleryItem,
+  AdminTaskItem,
+  AdminTaskRequestContext,
+  AdminTaskRequestContextRecord,
+  ArtifactKind,
+  ArtifactStatus,
+  ArtifactStorageProvider,
+  CostMarginRow,
+  CanvasCostAnalytics,
+  GenerationArtifact,
+  GenerationCallStats,
+  GenerationInputAsset,
+  GalleryVisibility,
+  ListAdminGalleryResult,
+  ListAdminTasksResult,
+  ModelCost,
+  RetentionAnalytics,
+  TaskDiagnosticError,
 } from './types'
 import { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
 import { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
@@ -31,7 +32,7 @@ export interface AdminRepository {
   readonly analytics: AnalyticsRepository
 }
 
-import { type BailianStudioDb } from '@bailian-studio/db'
+import type { BailianStudioDb } from '@bailian-studio/db'
 
 export function createAdminRepository(db: BailianStudioDb): AdminRepository {
   return {
