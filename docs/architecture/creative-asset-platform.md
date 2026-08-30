@@ -167,6 +167,9 @@ flowchart LR
 - Canvas 执行历史通过 `GET /api/canvases/:id/executions` 从 `task_records` 读取，不新增第二份运行态表；
   查询由 `task-repository.listTasks` 提供用户隔离的 keyset 分页，并同时按新任务的 `recordId` 与旧任务输入中的
   `documentId` 保持兼容。前端可点击历史记录，重新读取执行摘要和稳定资产结果来恢复节点预览。
+- 生成仓储对幂等创建显式返回是否 `reused`；Canvas Worker 把该结果写入节点 `nodeRuns.cacheHit`，并通过
+  `worker.canvas.node_cache` 暴露 hit/miss 计数。API 历史摘要和 Canvas 运行记录面板只投影这个可恢复字段，
+  不把缓存命中误作 generation 已完成，也兼容尚未带该字段的历史任务。
 
 ## 4. 领域模型归属
 
@@ -407,4 +410,4 @@ vertical slice：`collect-from-generation` 在一个数据库事务内写入资�
 与服务端指纹解决重复提交；批量入口额外以批次表保存顺序和结果索引。审计 outbox 的持久化/消费契约、
 重试、终态失败、管理员人工重放、Worker 最小指标契约和 Loki/Grafana 运营视图已经落地。任务队列生命周期也已抽出
 `task-repository`，Worker 通过共享持久化组合根使用最小 claim/renew/save port，generation-repository 的任务生命周期方法已全部移除。
-当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度、整图取消和 SSE 实时进度已经落地；下一步应优先补节点级重跑/缓存。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。
+当前 generation/media/director 的任务生产已通过 task-repository 与共享持久化边界收敛，内容、社交、通知、管理画廊、管理任务和分析也已拆为窄 port；generation 详情诊断和故障恢复扫描也已脱离核心 repository。Canvas 图编译、同层并行调度、整图取消、SSE 实时进度、节点级重跑、缓存复用和执行历史已经落地；下一步应优先补节点耗时与失败诊断。request-scoped transaction context 仍只有在引入多实例部署或需要跨模块事务时才评估。

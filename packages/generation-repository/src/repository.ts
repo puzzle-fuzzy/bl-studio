@@ -1430,6 +1430,7 @@ async function getIdempotentGenerationResult(
 		record: toGenerationRecord(existing, existingRefs),
 		task,
 		event: toGenerationEvent(event),
+		reused: true,
 	};
 }
 
@@ -1893,6 +1894,7 @@ export function createGenerationRepository(
 						record: toGenerationRecord(insertedRecord, prepared.assetRefs),
 						task: insertedTask,
 						event: toGenerationEvent(insertedEvent),
+						reused: false,
 					};
 				});
 			} catch (error) {

@@ -998,6 +998,8 @@ describe('generation repository', () => {
 
     expect(second.record.id).toBe(first.record.id)
     expect(second.task.recordId).toBe(first.record.id)
+    expect(first.reused).toBe(false)
+    expect(second.reused).toBe(true)
   })
 
   it('returns the same generation for concurrent idempotent creates', async () => {

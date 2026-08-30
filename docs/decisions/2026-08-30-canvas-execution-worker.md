@@ -49,5 +49,8 @@ Worker 把每一个计划节点转换为普通 generation。同一依赖层中�
 - `GET /api/canvases/:id/executions` 通过 `task-repository.listTasks` 按用户和任务输入中的 `documentId`
   做 keyset 分页；Canvas 任务同时写入 `recordId=documentId`，新旧任务都能进入同一历史读模型。前端点击历史
   记录时重新读取该执行快照并恢复节点的稳定资产结果，不修改画布编辑快照。
+- 生成仓储对首次创建和幂等复用显式返回 `reused`；Canvas Worker 将其固化为节点级 `cacheHit`，并记录
+  `worker.canvas.node_cache` 的 hit/miss 指标。执行完成后的历史摘要继续从任务输入投影该字段，旧任务没有该字段
+  时保持兼容；因此缓存策略不会复制第二份运行态表，也不会把“命中缓存”混同为“节点已完成”。
 
-下一阶段应继续把执行历史扩展为可观测的运行时间、缓存命中和节点级诊断，但不复制第二份任务状态表。
+后续可在同一任务输入/历史读模型上继续增加节点耗时和失败诊断，但不复制第二份任务状态表。

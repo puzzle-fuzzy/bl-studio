@@ -7,6 +7,7 @@ import type {
   UnifiedAssetItem,
 } from '@bailian-studio/generation-repository'
 import type { CanvasExecutionTaskInput } from '@bailian-studio/canvas-contracts'
+import { MetricsCollector } from '@bailian-studio/shared'
 import { processCanvasExecutionTask } from '../src/canvas-task-handler'
 import { createRecordingLogger, makeArtifact, makeRecord, makeTask, NOW } from './fixtures'
 
@@ -44,7 +45,7 @@ function task(input: CanvasExecutionTaskInput, id = 'canvas_task_1') {
   })
 }
 
-function createdGeneration(record: GenerationRecord): CreateGenerationResult {
+function createdGeneration(record: GenerationRecord, reused = false): CreateGenerationResult {
   return {
     record,
     task: makeTask({ id: `generation_task_${record.id}`, recordId: record.id }),
@@ -57,6 +58,7 @@ function createdGeneration(record: GenerationRecord): CreateGenerationResult {
       updatedAt: NOW,
       createdAt: NOW,
     },
+    reused,
   }
 }
 
@@ -109,6 +111,27 @@ describe('processCanvasExecutionTask', () => {
     expect(requests[0]?.idempotencyKey).toMatch(/^canvas-cache:user_1:v1-/)
   })
 
+  it('records cache hits in the durable node run and metrics', async () => {
+    const metrics = new MetricsCollector()
+    const generated = makeRecord({ id: 'generation_cached', status: 'submitting' })
+    const repository = {
+      createGeneration: async () => createdGeneration(generated, true),
+      getGenerationRecord: async () => generated,
+      listArtifactsForRecord: async () => [],
+    }
+
+    const result = await processCanvasExecutionTask(task(canvasInput()), {
+      repository,
+      metrics,
+      logger: createRecordingLogger(),
+    })
+
+    expect(result).toMatchObject({
+      nextInput: { nodeRuns: { node_1: { status: 'generating', cacheHit: true } } },
+    })
+    expect(metrics.snapshot().counters['worker.canvas.node_cache|outcome=hit,policy=reuse']).toBe(1)
+  })
+
   it('falls back to a fresh generation key when the cached result is failed', async () => {
     const requests: CreateGenerationInput[] = []
     let calls = 0
@@ -134,7 +157,9 @@ describe('processCanvasExecutionTask', () => {
 
     expect(result).toMatchObject({
       status: 'retry',
-      nextInput: { nodeRuns: { node_1: { status: 'generating', generationId: 'generation_fresh' } } },
+      nextInput: {
+        nodeRuns: { node_1: { status: 'generating', generationId: 'generation_fresh', cacheHit: false } },
+      },
     })
     expect(requests).toHaveLength(2)
     expect(requests[0]?.idempotencyKey).not.toBe(requests[1]?.idempotencyKey)
@@ -246,7 +271,7 @@ describe('processCanvasExecutionTask', () => {
     }
     const runningInput = canvasInput({
       nodeRuns: {
-        node_1: { status: 'generating', generationId: generated.id },
+        node_1: { status: 'generating', generationId: generated.id, cacheHit: false },
       },
     })
 
@@ -273,6 +298,7 @@ describe('processCanvasExecutionTask', () => {
           node_1: {
             status: 'succeeded',
             assetIds: ['asset_generation_artifact_1'],
+            cacheHit: false,
           },
         },
       },

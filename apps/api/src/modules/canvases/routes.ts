@@ -543,6 +543,7 @@ function toCanvasExecutionSummary(task: TaskRecord) {
         status: run?.status ?? 'queued',
         ...(run?.generationId === undefined ? {} : { generationId: run.generationId }),
         ...(run?.assetIds === undefined ? {} : { assetIds: run.assetIds }),
+        ...(run?.cacheHit === undefined ? {} : { cacheHit: run.cacheHit }),
         ...(run?.error === undefined ? {} : { error: run.error }),
       }
     }),

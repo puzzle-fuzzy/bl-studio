@@ -88,6 +88,7 @@ export class TaskExecutor {
         ...(this.deps.canvasMaxParallelNodes === undefined
           ? {}
           : { maxParallelNodes: this.deps.canvasMaxParallelNodes }),
+        metrics: this.metrics,
         logger: this.logger,
       })
     }

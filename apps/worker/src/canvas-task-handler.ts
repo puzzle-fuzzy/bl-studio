@@ -7,7 +7,7 @@ import type {
 } from '@bailian-studio/generation-repository'
 import { CanvasExecutionTaskInputSchema, type CanvasExecutionTaskInput } from '@bailian-studio/canvas-contracts'
 import { canvasNodeCacheKey } from '@bailian-studio/canvas-execution'
-import type { Logger } from '@bailian-studio/shared'
+import type { Logger, MetricsCollector } from '@bailian-studio/shared'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { TaskProcessOutcome } from './task-contracts'
 
@@ -23,6 +23,8 @@ export interface CanvasExecutionTaskHandlerDeps {
   readonly generationQuota?: GenerationQuotaLimits
   /** 单个 Canvas 任务内允许同时运行的节点数；默认 4。 */
   readonly maxParallelNodes?: number
+  /** 可选的进程内指标采集器，用于 Canvas 节点缓存诊断。 */
+  readonly metrics?: MetricsCollector
   readonly logger: Logger
 }
 
@@ -161,14 +163,21 @@ export async function processCanvasExecutionTask(
     for (const result of startResults) {
       if (result.created !== undefined) {
         createdCount += 1
+        const cacheHit = result.created.reused === true
         nextInput = withNodeRun(nextInput, result.nodeId, {
           status: 'generating',
           generationId: result.created.record.id,
+          cacheHit,
+        })
+        deps.metrics?.increment('worker.canvas.node_cache', {
+          outcome: cacheHit ? 'hit' : 'miss',
+          policy: nextInput.cachePolicy ?? 'reuse',
         })
         deps.logger.info('canvas.node_generation_queued', {
           taskId: task.id,
           nodeId: result.nodeId,
           generationId: result.created.record.id,
+          cacheHit,
           modelId: nextInput.plan.nodes.find(node => node.nodeId === result.nodeId)?.modelId,
         })
       } else if (result.error !== undefined) {
@@ -308,6 +317,7 @@ async function inspectGeneratingNode(
       status: 'succeeded',
       generationId: generation.id,
       assetIds,
+      ...(currentRun?.cacheHit === undefined ? {} : { cacheHit: currentRun.cacheHit }),
     },
   }
 }

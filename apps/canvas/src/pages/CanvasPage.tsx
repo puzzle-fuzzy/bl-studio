@@ -349,6 +349,7 @@ export function CanvasPage() {
                     </span>
                     <span className="block text-[10px] text-muted-foreground">
                       版本 {execution.documentRevision} · {new Date(execution.createdAt).toLocaleString()}
+                      {execution.nodeStatuses.some(node => node.cacheHit === true) ? ' · 命中缓存' : ''}
                     </span>
                   </span>
                   <span className="ml-2 shrink-0 text-[10px] text-muted-foreground">{executionStatusLabel(execution.status)}</span>

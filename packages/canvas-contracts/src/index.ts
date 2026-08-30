@@ -133,6 +133,8 @@ export const CanvasExecutionNodeRunSchema = z
     status: z.enum(['queued', 'generating', 'succeeded', 'failed']),
     generationId: z.string().trim().min(1).max(160).optional(),
     assetIds: z.array(z.string().trim().min(1).max(160)).optional(),
+    /** Whether this node reused an existing generation through the Canvas cache. */
+    cacheHit: z.boolean().optional(),
     error: z.string().trim().min(1).max(2000).optional(),
   })
   .strict()
@@ -164,6 +166,7 @@ export const CanvasExecutionNodeStatusSchema = z
     status: z.enum(['queued', 'generating', 'succeeded', 'failed']),
     generationId: z.string().trim().min(1).max(160).optional(),
     assetIds: z.array(z.string().trim().min(1).max(160)).optional(),
+    cacheHit: z.boolean().optional(),
     error: z.string().trim().min(1).max(2000).optional(),
   })
   .strict()
