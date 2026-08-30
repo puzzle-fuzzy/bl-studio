@@ -13,6 +13,7 @@
   },
   "dependencies": {
     "@bailian-studio/db": "workspace:*",
+    "@bailian-studio/shared": "workspace:*",
     "drizzle-orm": "catalog:"
   },
   "devDependencies": {

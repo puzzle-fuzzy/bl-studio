@@ -46,6 +46,9 @@ cp deploy/env/.env.example deploy/env/.env.test
 # 同时启动 API(5003, bun) / Worker(tsx) / 三个前端
 # Studio(5002) / Writer(5006) / Canvas(5007)
 bun run dev
+
+# 运行 API、Worker 和三个前端的启动健康检查（需先启动 bun run dev）
+bun run dev:smoke
 ```
 
 如果本机已有其他项目占用默认 Docker 端口，可在当前 PowerShell 会话中覆盖宿主机端口；同时把 `deploy/env/.env.dev` 中的 `DATABASE_URL`/`SMTP_PORT` 改为对应值：

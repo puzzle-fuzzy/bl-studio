@@ -5,6 +5,9 @@ import { join, relative, resolve } from 'node:path'
 
 const repositoryRoot = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..')
 const dockerfile = readFileSync(join(repositoryRoot, 'deploy', 'docker', 'Dockerfile'), 'utf8')
+const rootPackage = JSON.parse(readFileSync(join(repositoryRoot, 'package.json'), 'utf8')) as {
+  packageManager?: string
+}
 
 function listWorkspaceManifests(): string[] {
   const manifests: string[] = []
@@ -30,6 +33,13 @@ function listDockerfileManifests(): string[] {
 }
 
 describe('Docker workspace dependency cache', () => {
+  it('keeps the Docker Bun base aligned with the repository package manager', () => {
+    const packageManager = rootPackage.packageManager
+    expect(packageManager?.startsWith('bun@')).toBe(true)
+    const bunVersion = packageManager?.slice('bun@'.length)
+    expect(dockerfile).toContain(`FROM oven/bun:${bunVersion}-debian AS base`)
+  })
+
   it('copies every workspace manifest before installing dependencies', () => {
     expect(listDockerfileManifests()).toEqual(listWorkspaceManifests())
     expect(dockerfile.indexOf('bun install --frozen-lockfile')).toBeLessThan(dockerfile.indexOf('COPY apps ./apps'))

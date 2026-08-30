@@ -8,6 +8,12 @@ const defaultApiOrigin = process.env.REHEARSAL_API_ORIGIN?.trim() || 'http://127
 const defaultWebOrigin = process.env.REHEARSAL_WEB_ORIGIN?.trim() || 'http://127.0.0.1:5012'
 const startupTimeoutMs = 180_000
 const requestTimeoutMs = 5_000
+const releaseWebRoutes = [
+  { label: 'Studio', path: '/', assetPrefix: '/assets/' },
+  { label: 'Writer', path: '/writer/', assetPrefix: '/writer/assets/' },
+  { label: 'Canvas', path: '/canvas/', assetPrefix: '/canvas/assets/' },
+  { label: 'Admin', path: '/admin/', assetPrefix: '/admin/assets/' },
+] as const
 
 export interface RehearsalSmokeOptions {
   readonly build: boolean
@@ -96,6 +102,7 @@ export async function runRehearsalSmoke(
     await waitForReady(`${options.webOrigin}/api/health/ready`, fetchImpl)
     await waitForHtml(`${options.webOrigin}/`, fetchImpl)
     await verifyWebRelease(`${options.webOrigin}/`, fetchImpl)
+    await verifyWebRoutes(options.webOrigin, fetchImpl)
 
     // 端到端验证 LOG_FORMAT=json：api 容器日志必须包含结构化 JSON-lines 条目。
     verifyJsonLogLines(await captureCommand(['logs', 'api']))
@@ -161,6 +168,34 @@ export async function verifyWebRelease(
   if (assetResponse.headers.get('content-encoding') !== 'gzip') {
     throw new Error('Release Web assets must support gzip transfer encoding')
   }
+}
+
+export async function verifyWebRoutes(
+  origin: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<void> {
+  for (const route of releaseWebRoutes) {
+    const response = await fetchImpl(new URL(route.path, origin), {
+      signal: AbortSignal.timeout(requestTimeoutMs),
+    })
+    if (!response.ok) throw new Error(`Release ${route.label} route returned HTTP ${response.status}`)
+    assertSecurityHeaders(response.headers, `Release ${route.label} route`)
+
+    const html = await response.text()
+    if (!html.toLowerCase().includes('<!doctype html>')) {
+      throw new Error(`Release ${route.label} route did not return an HTML app shell`)
+    }
+    const assetPattern = new RegExp(
+      `(?:src|href)=["'](${escapeRegExp(route.assetPrefix)}[^"']+\\.(?:js|css))["']`,
+    )
+    if (!assetPattern.test(html)) {
+      throw new Error(`Release ${route.label} route did not reference its fingerprinted asset prefix`)
+    }
+  }
+}
+
+function escapeRegExp(value: string): string {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
 function assertSecurityHeaders(headers: Headers, label: string): void {

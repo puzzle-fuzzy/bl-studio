@@ -11,7 +11,7 @@
 # - `runtime`：**只装 api/worker/root 的生产依赖**（bun filtered install），供 api/worker/migrate。
 #   全量 devDeps 永远不进入 runtime 层链，runtime 镜像才真正变小。
 
-FROM oven/bun:1.3.14-debian AS base
+FROM oven/bun:1.4.0-debian AS base
 
 # Node 24 供 Worker（node --import tsx）与 CLI 脚本使用。
 # 注意：项目要求 Node ≥24（`import.meta.main` 原生，Node 20 无此特性会让 worker

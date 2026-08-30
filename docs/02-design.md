@@ -149,7 +149,7 @@ bl-studio/
 
 ## 五、基础设施
 
-- **Docker**：`oven/bun:1.3.14-debian` 基座 + 官方二进制 **Node 24**（apt 的 v20 缺 `import.meta.main`，会让 worker 静默退出）+ Bun/tsx 直跑源码 + ffmpeg；nginx 镜像同时承载 `apps/studio`、`apps/writer`、`apps/canvas` 和 `apps/admin` 四个静态构建。
+- **Docker**：`oven/bun:1.4.0-debian` 基座（与根目录 `packageManager` 保持一致）+ 官方二进制 **Node 24**（apt 的 v20 缺 `import.meta.main`，会让 worker 静默退出）+ Bun/tsx 直跑源码 + ffmpeg；nginx 镜像同时承载 `apps/studio`、`apps/writer`、`apps/canvas` 和 `apps/admin` 四个静态构建。
 - **Nginx**：主站 `/` 服务 `apps/studio/dist`，`/writer/`、`/canvas/`、`/admin/` 分别服务对应前端构建，`/api/` 反代 API 并保持 SSE 长连接。
 - **env 模板**：`AUTH_PUBLIC_WEB_ORIGIN` 默认改为 `http://localhost:5002`；CORS 默认仅 `localhost:5002`。
 - **Compose**：dev/test 双 Postgres（:55431/:55432）+ Mailpit，保留原端口。

@@ -402,6 +402,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@bailian-studio/db": "workspace:*",
+        "@bailian-studio/shared": "workspace:*",
         "drizzle-orm": "catalog:",
       },
       "devDependencies": {

@@ -4,6 +4,7 @@ import {
   parseRehearsalArgs,
   runRehearsalSmoke,
   verifyJsonLogLines,
+  verifyWebRoutes,
   verifyWebRelease,
 } from './rehearsal-smoke'
 
@@ -66,8 +67,14 @@ describe('rehearsal smoke command', () => {
           },
         })
       }
-      if (url.endsWith('/')) {
-        return new Response('<!doctype html><script src="/assets/index-release.js"></script>', {
+      const route = [
+        ['/', '/assets/'],
+        ['/writer/', '/writer/assets/'],
+        ['/canvas/', '/canvas/assets/'],
+        ['/admin/', '/admin/assets/'],
+      ].find(([path]) => new URL(url).pathname === path)
+      if (route !== undefined) {
+        return new Response(`<!doctype html><script src="${route[1]}index-release.js"></script>`, {
           headers: {
             ...releaseSecurityHeaders,
             'cache-control': 'no-cache',
@@ -91,6 +98,24 @@ describe('rehearsal smoke command', () => {
       ['restart', 'api', 'worker'],
       ['down', '--volumes', '--remove-orphans'],
     ])
+  })
+
+  it('checks the four production web app shells and their asset prefixes', async () => {
+    const fetchImpl = (async (input: URL | RequestInfo) => {
+      const pathname = new URL(String(input)).pathname
+      const route = [
+        ['/', '/assets/'],
+        ['/writer/', '/writer/assets/'],
+        ['/canvas/', '/canvas/assets/'],
+        ['/admin/', '/admin/assets/'],
+      ].find(([path]) => pathname === path)
+      if (route === undefined) throw new Error(`unexpected path ${pathname}`)
+      return new Response(`<!doctype html><script src="${route[1]}index-release.js"></script>`, {
+        headers: releaseSecurityHeaders,
+      })
+    }) as typeof fetch
+
+    await expect(verifyWebRoutes('http://127.0.0.1:5012/', fetchImpl)).resolves.toBeUndefined()
   })
 
   it('accepts JSON-lines entries with a compose service prefix and rejects plain logs', () => {
