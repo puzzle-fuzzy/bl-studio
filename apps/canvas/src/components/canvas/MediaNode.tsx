@@ -60,6 +60,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
   const { data: models } = useModelCatalog()
   const nodes = useCanvasStore(state => state.nodes)
   const edges = useCanvasStore(state => state.edges)
+  const documentId = useCanvasStore(state => state.documentId)
   const canvasExecutionBusy = useCanvasStore(state => state.canvasExecutionBusy)
   const updateNodeData = useCanvasStore(state => state.updateNodeData)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
@@ -199,7 +200,7 @@ export const MediaNode = memo(({ data, id, selected }: NodeProps) => {
     })
   }, [id, updateNodeData])
 
-  const { cancel, generate, resume } = useCanvasGeneration(id, onStatusChange)
+  const { cancel, generate, resume } = useCanvasGeneration(id, onStatusChange, documentId)
 
   // 旧快照如果仍处于 generating 且带有 generationId，重新建立当前页轮询。
   useEffect(() => {

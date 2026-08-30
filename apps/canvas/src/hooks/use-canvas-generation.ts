@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef } from 'react'
 import { apiClient } from '@bailian-studio/lib-client'
+import { matchesCanvasGenerationSession } from '@/lib/canvas-generation-session'
+import { useCanvasStore } from '@/stores/canvas-store'
 
 /** 画布节点生成轮询间隔（同 worker 的 PHASE_POLL_DELAY_MS）。 */
 const POLL_INTERVAL_MS = 3_000
@@ -63,9 +65,21 @@ export interface MediaGenerationResult {
 export function useCanvasGeneration(
   nodeId: string,
   onStatusChange: (status: 'generating' | 'ready' | 'error', result?: MediaGenerationResult, error?: string) => void,
+  documentId: string | undefined,
 ) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const runIdRef = useRef(0)
+
+  const isCurrentSession = useCallback((runId: number) => {
+    if (runIdRef.current !== runId) return false
+    const state = useCanvasStore.getState()
+    return matchesCanvasGenerationSession(
+      state.nodes.some(node => node.id === nodeId)
+        ? { documentId: state.documentId, nodeId }
+        : undefined,
+      { documentId, nodeId },
+    )
+  }, [documentId, nodeId])
 
   const clearTimer = useCallback(() => {
     if (timerRef.current === null) return
@@ -85,7 +99,7 @@ export function useCanvasGeneration(
     runId: number,
     startedAt: number,
   ): Promise<void> => {
-    if (runIdRef.current !== runId) return
+    if (!isCurrentSession(runId)) return
 
     if (Date.now() - startedAt > MAX_POLL_MS) {
       clearTimer()
@@ -95,12 +109,12 @@ export function useCanvasGeneration(
 
     try {
       const record = await apiClient.getGeneration(recordId)
-      if (runIdRef.current !== runId) return
+      if (!isCurrentSession(runId)) return
 
       if (record.status === 'succeeded') {
         clearTimer()
         const artifacts = await apiClient.listGenerationArtifacts(recordId)
-        if (runIdRef.current !== runId) return
+        if (!isCurrentSession(runId)) return
 
         const media = artifacts.items.find(
           artifact => (artifact.kind === 'image' || artifact.kind === 'video') && artifact.readUrl !== undefined,
@@ -118,6 +132,7 @@ export function useCanvasGeneration(
         // 窗口时丢失下游绑定。旧 API 没有该字段时才走兼容回退；读取失败仍展示预览，
         // 但暂时不能作为参考输入。
         const assetId = await resolveGeneratedAssetId(media, media.kind)
+        if (!isCurrentSession(runId)) return
 
         onStatusChange('ready', {
           url: media.readUrl,
@@ -140,11 +155,11 @@ export function useCanvasGeneration(
     }
     catch {
       // 网络抖动等：继续轮询，不中断。
-      if (runIdRef.current === runId) {
+      if (isCurrentSession(runId)) {
         timerRef.current = setTimeout(() => void pollGeneration(recordId, runId, startedAt), POLL_INTERVAL_MS)
       }
     }
-  }, [clearTimer, onStatusChange])
+  }, [clearTimer, isCurrentSession, onStatusChange])
 
   const startPolling = useCallback((recordId: string, runId: number) => {
     const startedAt = Date.now()
@@ -154,9 +169,10 @@ export function useCanvasGeneration(
   const resume = useCallback((recordId: string) => {
     stopPolling()
     const runId = runIdRef.current
+    if (!isCurrentSession(runId)) return
     onStatusChange('generating', { generationId: recordId })
     startPolling(recordId, runId)
-  }, [onStatusChange, startPolling, stopPolling])
+  }, [isCurrentSession, onStatusChange, startPolling, stopPolling])
 
   const cancel = useCallback(async (recordId: string): Promise<'cancelled' | 'pending'> => {
     // 取消请求本身会让当前轮询失效；如果服务端只记录了 processing 状态的
@@ -196,18 +212,18 @@ export function useCanvasGeneration(
         idempotencyKey,
       })
 
-      if (runIdRef.current !== runId) return
+      if (!isCurrentSession(runId)) return
 
       const recordId = response.record.id
       onStatusChange('generating', { generationId: recordId })
       startPolling(recordId, runId)
     }
     catch (error) {
-      if (runIdRef.current !== runId) return
+      if (!isCurrentSession(runId)) return
       const message = error instanceof Error ? error.message : String(error)
       onStatusChange('error', undefined, message)
     }
-  }, [nodeId, onStatusChange, startPolling, stopPolling])
+  }, [isCurrentSession, nodeId, onStatusChange, startPolling, stopPolling])
 
   return { cancel, generate, resume, stopPolling }
 }
