@@ -20,6 +20,7 @@ import { apiClient } from '@/lib/api'
 import { notifyError } from '@/lib/toast'
 import { formatCents } from '@/lib/money'
 import { parseDirectorPhaseResult, type DirectorPhaseResultSpec } from '@/lib/director-phase-result'
+import { markDirectorPhaseQueued } from '@/lib/director-phase-state'
 import { useReferenceAssetsStore } from '@/stores/reference-assets-store'
 import { useModelCatalog } from '@/hooks/use-model-catalog'
 import { usePhaseReview } from '@/hooks/use-phase-review'
@@ -562,9 +563,7 @@ export function DirectorProjectPage() {
       setActivePhase('analyze')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'analyze'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'analyze', run),
       })
       toast.success('剧本分析已加入执行队列')
     } catch {
@@ -604,9 +603,7 @@ export function DirectorProjectPage() {
       setActivePhase('analyze')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'analyze'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'analyze', run),
       })
       logDirectorClientEvent('script_chat.send.queued', {
         projectId: id,
@@ -640,9 +637,7 @@ export function DirectorProjectPage() {
       setActivePhase('characters')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'characters'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'characters', run),
       })
       toast.success('角色阶段已加入执行队列')
     } catch {
@@ -663,9 +658,7 @@ export function DirectorProjectPage() {
       setActivePhase('locations')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'locations'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'locations', run),
       })
       toast.success('场景阶段已加入执行队列')
     } catch {
@@ -686,9 +679,7 @@ export function DirectorProjectPage() {
       setActivePhase('storyboard')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'storyboard'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'storyboard', run),
       })
       toast.success('分镜阶段已加入执行队列')
     } catch {
@@ -709,9 +700,7 @@ export function DirectorProjectPage() {
       setActivePhase('continuity')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'continuity'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'continuity', run),
       })
       toast.success('连续性检查已加入执行队列')
     } catch {
@@ -736,9 +725,7 @@ export function DirectorProjectPage() {
       setAppliedPromptShotIds(new Set())
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'rebuild'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'rebuild', run),
       })
       toast.success('视频提示词重建已加入执行队列')
     } catch {
@@ -782,9 +769,7 @@ export function DirectorProjectPage() {
       setAppliedDialogueShotIds(new Set())
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'dialogue'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'dialogue', run),
       })
       toast.success('对白整理已加入执行队列')
     } catch {
@@ -856,9 +841,7 @@ export function DirectorProjectPage() {
       setActivePhase('bgm')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'bgm'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'bgm', run),
       })
       toast.success('音乐生成已加入执行队列')
     } catch {
@@ -916,9 +899,7 @@ export function DirectorProjectPage() {
       setActivePhase('assemble')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'assemble'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'assemble', run),
       })
       toast.success('合成任务已加入执行队列')
     } catch {
@@ -944,9 +925,7 @@ export function DirectorProjectPage() {
       setActivePhase('videos')
       setProject(current => current === undefined ? current : {
         ...current,
-        phases: current.phases.map(state => state.phase === 'videos'
-          ? { ...state, status: 'queued', activeRunId: run.id, version: run.version, lastError: null }
-          : state),
+        phases: markDirectorPhaseQueued(current.phases, 'videos', run),
       })
       toast.success('视频生成已加入执行队列')
     } catch {
