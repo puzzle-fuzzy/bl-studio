@@ -191,7 +191,7 @@ bun run prod:mem                  # 看服务器内存 + 容器占用
 ```
 
 启用后 `https://logs.yxswy.com`（basic_auth 密码 = `GRAFANA_ADMIN_PASSWORD`）进入 Grafana，
-4 个预置仪表盘可查日志和审计 outbox 运营数据（日志浏览器 / 错误面板 / 按 traceId、taskId、recordId 拉链路 / 审计 Outbox 运营）。审计面板读取 Worker 的结构化指标快照，不新增 Prometheus 或独立持久化指标服务。
+5 个预置仪表盘可查日志、审计 outbox 与 Canvas 运营数据（日志浏览器 / 错误面板 / 按 traceId、taskId、recordId 拉链路 / 审计 Outbox 运营 / Canvas 运营）。审计和 Canvas 面板读取 Worker 的结构化事件与指标快照，不新增 Prometheus 或独立持久化指标服务。
 
 ---
 

@@ -114,11 +114,12 @@ bun run deploy:prod                       # 会先在干净工作区强制跑 ve
 ### 5.1 Grafana（推荐）
 
 1. 打开 `https://logs.yxswy.com`（宿主机 nginx basic_auth），用 `GRAFANA_ADMIN_USER/PASSWORD` 登录。
-2. 四个预置仪表盘（`Bailian Studio` 文件夹）：
+2. 五个预置仪表盘（`Bailian Studio` 文件夹）：
    - **日志浏览器**：按 level/scope 过滤的全量日志流 + 日志量时序。
    - **错误面板**：`request.failed by errorCode`、`task.threw`、`task.outcome by outcome`、全部 error 日志。
    - **链路查询**：粘贴 `traceId` / `taskId` / `recordId` 任意一个，跨 api+worker 拉全链路。
    - **审计 Outbox 运营**：查看终态失败量、消费异常、Worker 消费耗时 max 和失败明细；数据来自 Worker 的结构化指标快照日志。
+   - **Canvas 运营**：查看 Canvas 执行成功率、平均/P95 耗时、任务与节点失败原因，以及节点生成排队和缓存命中情况；数据来自 Worker 的结构化事件日志。
 
 ### 5.2 常用 LogQL
 

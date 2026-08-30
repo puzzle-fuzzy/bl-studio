@@ -6,6 +6,13 @@ const dashboardDirectory = join(
   process.cwd(),
   'deploy/observability/grafana/provisioning/dashboards',
 )
+const productionComposeFile = join(process.cwd(), 'deploy/docker/compose.prod.yaml')
+const productionDeployScript = join(process.cwd(), 'scripts/deploy/deploy-prod.sh')
+const observabilityDeployScript = join(process.cwd(), 'scripts/deploy/prod-observability.sh')
+const dashboardProviderFile = join(
+  process.cwd(),
+  'deploy/observability/grafana/provisioning/dashboards/provider.yml',
+)
 
 interface DashboardTarget {
   datasource?: { type?: string; uid?: string }
@@ -82,11 +89,34 @@ describe('Grafana observability dashboards', () => {
       .join('\n')
 
     expect(expressions).toContain('task.duration')
-    expect(expressions).toContain('taskType=\"canvas.execute\"')
+    expect(expressions).toContain('taskType="canvas.execute"')
     expect(expressions).toContain('canvas.node_succeeded')
     expect(expressions).toContain('canvas.node_failed')
     expect(expressions).toContain('canvas.node_generation_queued')
     expect(expressions).toContain('cacheHit')
     expect(expressions).toContain('unwrap durationMs')
+  })
+
+  it('keeps versioned dashboards on the production deployment path', () => {
+    const productionCompose = readFileSync(productionComposeFile, 'utf8')
+    const productionDeployScriptText = readFileSync(productionDeployScript, 'utf8')
+    const observabilityDeployScriptText = readFileSync(observabilityDeployScript, 'utf8')
+    const dashboardProvider = readFileSync(dashboardProviderFile, 'utf8')
+
+    expect(productionCompose).toContain(
+      '../observability/grafana/provisioning:/etc/grafana/provisioning:ro',
+    )
+    expect(dashboardProvider).toContain(
+      'path: /etc/grafana/provisioning/dashboards',
+    )
+    expect(productionDeployScriptText).toContain(
+      'deploy/observability/grafana/ "$DEPLOY_HOST:$REMOTE_DEPLOY/observability/grafana/"',
+    )
+    expect(observabilityDeployScriptText).toContain(
+      'docker compose --env-file $REMOTE_DEPLOY/env/.env.prod --profile observability',
+    )
+    expect(observabilityDeployScriptText).toContain(
+      'OBSERVABILITY_SERVICES="loki alloy grafana monitor"',
+    )
   })
 })
