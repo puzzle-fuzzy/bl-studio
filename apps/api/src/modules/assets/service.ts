@@ -296,7 +296,15 @@ export async function importAsset(args: {
 	};
 }
 
+const AssetIdsQuerySchema = z.preprocess(
+	(value) => typeof value === "string" ? value.split(",") : value,
+	z.array(z.string().trim().min(1).max(160)).max(100).optional().transform((ids) => (
+		ids === undefined ? undefined : [...new Set(ids)]
+	)),
+);
+
 export const ListAssetsQuerySchema = z.object({
+	ids: AssetIdsQuerySchema,
 	limit: z.coerce.number().int().min(1).max(100).optional(),
 	cursor: z.string().optional(),
 	kind: z.enum(["image", "video", "audio", "text", "archive"]).optional(),

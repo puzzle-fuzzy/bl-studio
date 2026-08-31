@@ -31,19 +31,21 @@ async function hydrateAssetUrls(document: CanvasDocument): Promise<CanvasDocumen
   }
   if (ids.size === 0) return document
 
-  const assets = await Promise.all([...ids].map(async id => {
-    try {
-      return await apiClient.getAsset(id)
-    } catch {
-      return undefined
-    }
-  }))
+  const assetIds = [...ids]
+  const assetPages = await Promise.all(Array.from(
+    { length: Math.ceil(assetIds.length / 100) },
+    (_, index) => apiClient.listAssets({
+      ids: assetIds.slice(index * 100, (index + 1) * 100),
+      limit: Math.min(100, assetIds.length - index * 100),
+    }).catch(() => ({ items: [] })),
+  ))
+  const assets = assetPages.flatMap(page => page.items)
+  /* 资产 URL 解析是增强信息，批量接口失败时仍保留可编辑的文档快照。 */
+  const assetById = new Map(assets.map(asset => [asset.id, asset]))
   const urls = new Map(assets.flatMap(asset => {
-    if (asset === undefined) return []
     const url = assetUrl(asset)
     return url === undefined ? [] : [[asset.id, url] as const]
   }))
-  const assetById = new Map(assets.flatMap(asset => asset === undefined ? [] : [[asset.id, asset] as const]))
   return {
     ...document,
     snapshot: {

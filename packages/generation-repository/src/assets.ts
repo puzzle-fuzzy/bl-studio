@@ -282,11 +282,21 @@ export function createAssetRepository({ db, taskQueueTransactionStore }: CreateA
 		userId: string,
 		options: ListUnifiedAssetsOptions = {},
 	) {
-		const limit = clampLimit(options.limit ?? 20);
+		const requestedIds =
+			options.ids === undefined
+				? undefined
+				: [...new Set(options.ids.filter((id) => id.length > 0))];
+		if (requestedIds !== undefined && requestedIds.length === 0) {
+			return { items: [] };
+		}
+		const limit =
+			requestedIds === undefined
+				? clampLimit(options.limit ?? 20)
+				: Math.min(requestedIds.length, 100);
 		const sort = options.sort ?? "time";
 		const filters = assetCursorFilters(options);
 		const cursor =
-			options.cursor !== undefined
+			requestedIds === undefined && options.cursor !== undefined
 				? decodeAssetCursor(options.cursor, { sort, filters })
 				: undefined;
 		const fetchLimit = limit + 1;
@@ -381,6 +391,9 @@ export function createAssetRepository({ db, taskQueueTransactionStore }: CreateA
 					options.source !== undefined
 						? eq(userAssets.source, options.source)
 						: undefined,
+					requestedIds !== undefined
+						? inArray(userAssets.id, requestedIds)
+						: undefined,
 					searchCondition,
 					cursorCondition,
 				),
@@ -399,7 +412,7 @@ export function createAssetRepository({ db, taskQueueTransactionStore }: CreateA
 		);
 		const lastRow = pageRows[pageRows.length - 1];
 		const nextCursor =
-			lastRow !== undefined && rows.length > limit
+			requestedIds === undefined && lastRow !== undefined && rows.length > limit
 				? encodeAssetCursor({
 						sort,
 						value:

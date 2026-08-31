@@ -918,6 +918,16 @@ describe('createApiClient', () => {
     expect(calls[0]?.credentials).toBe('include')
   })
 
+  it('lists assets by a bounded ID set for canvas hydration', async () => {
+    const { fetch, calls } = queuedFetch([jsonResponse({ success: true, data: { items: [] } })])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await client.listAssets({ ids: ['asset-result', 'asset-reference'], limit: 2 })
+
+    expect(calls[0]?.url).toBe('http://api.test/api/assets?ids=asset-result%2Casset-reference&limit=2')
+    expect(calls[0]?.credentials).toBe('include')
+  })
+
   it('rejects non-string declared resolution asset metadata', async () => {
     const { fetch } = queuedFetch([
       jsonResponse({

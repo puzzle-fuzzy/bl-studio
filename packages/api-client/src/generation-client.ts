@@ -307,6 +307,7 @@ export interface ListGenerationsParams {
 export type AssetSort = 'time' | 'title' | 'size'
 
 export interface ListAssetsParams {
+  ids?: readonly string[]
   limit?: number
   cursor?: string
   kind?: string
@@ -1275,6 +1276,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
 
     async listAssets(params = {}) {
       const query = new URLSearchParams()
+      if (params.ids !== undefined) query.set('ids', params.ids.join(','))
       if (params.limit !== undefined) query.set('limit', String(params.limit))
       if (params.cursor !== undefined) query.set('cursor', params.cursor)
       if (params.kind !== undefined) query.set('kind', params.kind)

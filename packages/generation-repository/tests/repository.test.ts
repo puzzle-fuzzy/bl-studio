@@ -2617,6 +2617,22 @@ describe('generation repository', () => {
     expect(new Set(allIds).size).toBe(allIds.length)
   })
 
+  it('selects unified assets by ID without leaking another owner or opening a cursor page', async () => {
+    await repository.createUserAsset({ id: 'asset_requested_a', userId: 'user_a', kind: 'image', source: 'upload' })
+    await repository.createUserAsset({ id: 'asset_requested_b', userId: 'user_a', kind: 'video', source: 'upload' })
+    await repository.createUserAsset({ id: 'asset_private', userId: 'user_b', kind: 'image', source: 'upload' })
+
+    const result = await repository.listUnifiedAssets('user_a', {
+      ids: ['asset_requested_b', 'asset_requested_a', 'asset_requested_b', 'asset_private'],
+      limit: 100,
+      cursor: 'ignored-in-id-mode',
+    })
+
+    expect(result.items.map(item => item.id)).toEqual(['asset_requested_b', 'asset_requested_a'])
+    expect(result.nextCursor).toBeUndefined()
+    await expect(repository.listUnifiedAssets('user_a', { ids: [] })).resolves.toEqual({ items: [] })
+  })
+
   it('paginates unified assets by normalized title with the id as an ascending tie-breaker', async () => {
     const userId = 'user_a'
     await repository.createUserAsset({ id: 'asset_zulu', userId, kind: 'image', source: 'upload', fileName: 'Zulu.png', now: '2026-07-02T00:00:00.000Z' })

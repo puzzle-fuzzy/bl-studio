@@ -193,6 +193,40 @@ describe('asset routes', () => {
     expect(listInputs).toHaveLength(2)
   })
 
+  it('passes bounded asset IDs to the repository and returns only owned matches', async () => {
+    await createTestUser(isolated.db, 'asset_other')
+    await isolated.assetRepository.createUserAsset({
+      id: 'asset_requested_a',
+      userId: currentUserId,
+      kind: 'image',
+      source: 'upload',
+    })
+    await isolated.assetRepository.createUserAsset({
+      id: 'asset_requested_b',
+      userId: currentUserId,
+      kind: 'video',
+      source: 'upload',
+    })
+    await isolated.assetRepository.createUserAsset({
+      id: 'asset_private',
+      userId: 'asset_other',
+      kind: 'image',
+      source: 'upload',
+    })
+
+    const response = await app.handle(authed(
+      'http://localhost/api/assets?ids=asset_requested_b,asset_requested_a,asset_requested_b,asset_private',
+    ))
+    const body = await response.json() as { data: { items: Array<{ id: string }> } }
+
+    expect(response.status).toBe(200)
+    expect(listInputs.at(-1)).toMatchObject({
+      ids: ['asset_requested_b', 'asset_requested_a', 'asset_private'],
+      sort: 'time',
+    })
+    expect(body.data.items.map(item => item.id)).toEqual(['asset_requested_b', 'asset_requested_a'])
+  })
+
   it('returns fresh detail download URLs, omits them from lists, and scopes details to the owner', async () => {
     await isolated.assetRepository.createUserAsset({
       id: 'asset_detail',

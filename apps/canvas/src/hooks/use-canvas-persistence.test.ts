@@ -1,5 +1,5 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import type { CanvasDocument, CanvasDocumentSummary, CanvasVersion, ListCanvasesResult } from '@bailian-studio/api-client'
+import type { AssetItem, CanvasDocument, CanvasDocumentSummary, CanvasVersion, ListCanvasesResult } from '@bailian-studio/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCanvasPersistence } from './use-canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
@@ -8,6 +8,7 @@ const apiClientMock = vi.hoisted(() => ({
   createCanvas: vi.fn(),
   getAsset: vi.fn(),
   getCanvas: vi.fn(),
+  listAssets: vi.fn(),
   listCanvases: vi.fn(),
   listCanvasVersions: vi.fn(),
   restoreCanvas: vi.fn(),
@@ -20,10 +21,20 @@ function documentSummary(id: string, updatedAt = '2026-08-31T02:00:00.000Z'): Ca
   return { id, title: id, revision: 1, updatedAt }
 }
 
-function document(id: string): CanvasDocument {
+function asset(id: string, kind: 'image' | 'video' = 'image'): AssetItem {
+  return {
+    id,
+    kind,
+    source: 'upload',
+    url: `/signed/${id}`,
+    createdAt: '2026-08-31T02:00:00.000Z',
+  }
+}
+
+function document(id: string, snapshot: CanvasDocument['snapshot'] = { nodes: [], edges: [] }): CanvasDocument {
   return {
     ...documentSummary(id),
-    snapshot: { nodes: [], edges: [] },
+    snapshot,
     createdAt: '2026-08-31T01:00:00.000Z',
     currentVersionId: `${id}-version-1`,
   }
@@ -66,6 +77,7 @@ describe('useCanvasPersistence document directory', () => {
   beforeEach(() => {
     cleanup()
     vi.clearAllMocks()
+    apiClientMock.listAssets.mockResolvedValue({ items: [] })
     resetCanvasStore()
   })
 
@@ -140,6 +152,44 @@ describe('useCanvasPersistence document directory', () => {
 
     expect(useCanvasStore.getState().documentId).toBe('third')
     expect(useCanvasStore.getState().title).toBe('third')
+  })
+
+  it('hydrates referenced assets through one batch list request', async () => {
+    const first = documentSummary('first')
+    apiClientMock.listCanvases.mockResolvedValue({ items: [first] })
+    apiClientMock.getCanvas.mockResolvedValue(document('first', {
+      nodes: [{
+        id: 'node-1',
+        type: 'mediaNode',
+        position: { x: 0, y: 0 },
+        data: {
+          kind: 'image',
+          status: 'ready',
+          prompt: '',
+          modelId: 'qwen-image',
+          resultAssetId: 'asset-result',
+          referenceAssetIds: ['asset-reference'],
+        },
+      }],
+      edges: [],
+    }))
+    apiClientMock.listAssets.mockResolvedValue({
+      items: [asset('asset-result', 'image'), asset('asset-reference', 'video')],
+    })
+
+    const { result } = renderHook(() => useCanvasPersistence())
+    await waitFor(() => expect(result.current.documentLoading).toBe(false))
+
+    expect(apiClientMock.listAssets).toHaveBeenCalledTimes(1)
+    expect(apiClientMock.listAssets).toHaveBeenCalledWith({
+      ids: ['asset-result', 'asset-reference'],
+      limit: 2,
+    })
+    expect(apiClientMock.getAsset).not.toHaveBeenCalled()
+    expect(useCanvasStore.getState().nodes[0]?.data).toMatchObject({
+      resultUrl: '/signed/asset-result',
+      referenceAssetKinds: { 'asset-reference': 'video' },
+    })
   })
 
   it('persists a renamed document through the revisioned save path', async () => {

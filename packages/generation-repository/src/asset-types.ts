@@ -44,6 +44,8 @@ export interface UnifiedAssetItem {
 }
 
 export interface ListUnifiedAssetsOptions {
+  /** 按资产 ID 精确读取，供需要批量解析已持久化引用的调用方使用。 */
+  ids?: readonly string[]
   kind?: ArtifactKind
   source?: AssetSource
   limit?: number

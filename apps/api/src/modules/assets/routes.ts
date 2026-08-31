@@ -116,7 +116,7 @@ export function createAssetRoutes(deps: ApiDependencies) {
 		})
 		.get("/", async ({ request, query }) => {
 			const user = await requireAuthUser(request, deps.authService);
-			const { limit, cursor, kind, source, q, sort } = validateInput(
+			const { ids, limit, cursor, kind, source, q, sort } = validateInput(
 				ListAssetsQuerySchema,
 				query,
 			);
@@ -132,6 +132,7 @@ export function createAssetRoutes(deps: ApiDependencies) {
 							.map((model) => model.id);
 			const data = await deps.assetRepository.listUnifiedAssets(user.id, {
 				sort,
+				...(ids !== undefined ? { ids } : {}),
 				...(limit !== undefined ? { limit } : {}),
 				...(cursor !== undefined ? { cursor } : {}),
 				...(kind !== undefined ? { kind } : {}),
