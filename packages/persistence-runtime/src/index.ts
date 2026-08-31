@@ -36,7 +36,6 @@ import {
 } from '@bailian-studio/director-repository'
 import {
   createAdminRepository,
-  type AdminAssetRepository,
   type AdminRepository,
 } from '@bailian-studio/admin-repository'
 import {
@@ -150,16 +149,6 @@ function closeOnce(db: BailianStudioDb): () => Promise<void> {
   }
 }
 
-function createAdminAssetRepository(
-  assetRepository: AssetRepository,
-): AdminAssetRepository {
-  return {
-    listUserAssets: (userId, options) =>
-      assetRepository.listUnifiedAssets(userId, options),
-    getUserAsset: (input) => assetRepository.getUserAsset(input),
-  }
-}
-
 export function createApiPersistenceRuntime(
   options: CreateApiPersistenceRuntimeOptions,
 ): ApiPersistenceRuntime {
@@ -197,10 +186,7 @@ export function createApiPersistenceRuntime(
       promptLibraryRepository: createPromptLibraryRepository(db),
       feedbackRepository: createFeedbackRepository(db),
       contentReportRepository: createContentReportRepository(db),
-      adminRepository: createAdminRepository({
-        db,
-        assets: createAdminAssetRepository(assetRepository),
-      }),
+      adminRepository: createAdminRepository(db),
       canvasRepository: createCanvasRepository(db),
       taskQueueRepository: createTaskQueueRepository({ db }),
       usageRepository: createUsageRepository(db),

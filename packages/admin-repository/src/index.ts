@@ -1,5 +1,5 @@
 export { AdminRepositoryError, type AdminRepositoryErrorCode } from './errors'
-export { type AdminAssetRepository } from './admin-assets'
+export { createAdminAssetRepository, type AdminAssetRepository } from './admin-assets'
 export { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
 export { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
 export { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
@@ -30,8 +30,8 @@ export type {
   RetentionAnalytics,
   TaskDiagnosticError,
 } from './types'
+import { createAdminAssetRepository, type AdminAssetRepository } from './admin-assets'
 import { createAdminGalleryRepository, type AdminGalleryRepository } from './admin-gallery'
-import type { AdminAssetRepository } from './admin-assets'
 import { createAdminTaskRepository, type AdminTaskRepository } from './admin-tasks'
 import { createAnalyticsRepository, type AnalyticsRepository } from './analytics'
 
@@ -44,14 +44,11 @@ export interface AdminRepository {
 
 import type { BailianStudioDb } from '@bailian-studio/db'
 
-export function createAdminRepository(input: {
-  db: BailianStudioDb
-  assets: AdminAssetRepository
-}): AdminRepository {
+export function createAdminRepository(db: BailianStudioDb): AdminRepository {
   return {
-    assets: input.assets,
-    gallery: createAdminGalleryRepository(input.db),
-    tasks: createAdminTaskRepository(input.db),
-    analytics: createAnalyticsRepository(input.db),
+    assets: createAdminAssetRepository(db),
+    gallery: createAdminGalleryRepository(db),
+    tasks: createAdminTaskRepository(db),
+    analytics: createAnalyticsRepository(db),
   }
 }
