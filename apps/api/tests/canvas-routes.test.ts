@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import type { CanvasRepository } from '@bailian-studio/canvas-repository'
 import { CanvasRepositoryError } from '@bailian-studio/canvas-repository'
 import { CanvasExecutionTaskInputSchema, type CanvasDocument, type CanvasExecutionTaskInput, type CanvasSnapshot, type CanvasVersion } from '@bailian-studio/canvas-contracts'
+import type { AssetRepository } from '@bailian-studio/generation-repository'
 import type { TaskRecord } from '@bailian-studio/task-engine'
 import type { CancelTaskInput } from '@bailian-studio/task-repository'
 import { createTestApp } from '../src/test-app'
@@ -318,6 +319,86 @@ describe('canvas routes', () => {
     expect((await history.json()).data.items).toMatchObject([
       { id: firstExecution.id, documentId: 'canvas-1', status: 'failed', durationMs: 2_000 },
     ])
+  })
+
+  it('resolves static canvas references through one owner-scoped asset batch', async () => {
+    document = {
+      ...document,
+      snapshot: {
+        nodes: [
+          {
+            id: 'node-1',
+            type: 'mediaNode',
+            position: { x: 0, y: 0 },
+            data: {
+              kind: 'image',
+              status: 'empty',
+              prompt: 'combine the references',
+              modelId: 'qwen-image-edit',
+              referenceAssetIds: ['asset-image-a', 'asset-image-b'],
+            },
+          },
+        ],
+        edges: [],
+      },
+    }
+    let listCalls = 0
+    let requestedUserId: string | undefined
+    let requestedIds: readonly string[] | undefined
+    let getCalls = 0
+    const assetRepository: AssetRepository = {
+      async createUserAsset() {},
+      async listUnifiedAssets(userId, options) {
+        listCalls += 1
+        requestedUserId = userId
+        requestedIds = options?.ids
+        return {
+          items: (options?.ids ?? []).map(id => ({
+            id,
+            kind: 'image' as const,
+            source: 'upload' as const,
+            createdAt: '2026-08-30T00:00:00.000Z',
+          })),
+        }
+      },
+      async getUserAsset() {
+        getCalls += 1
+        return undefined
+      },
+      async softDeleteUserAsset() {
+        return false
+      },
+    }
+    const taskRepository = createFakeTaskRepository()
+    const app = createTestApp({
+      assetRepository,
+      authService: createFakeAuthService(() => user),
+      canvasRepository: createFakeCanvasRepository(),
+      taskQueueRepository: taskRepository,
+    }).app
+
+    const response = await app.handle(
+      new Request('http://localhost/api/canvases/canvas-1/execute', {
+        method: 'POST',
+        headers: {
+          cookie: 'bailian_studio_session=fake-token',
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ expectedRevision: 1, idempotencyKey: 'batch-assets' }),
+      }),
+    )
+
+    expect(response.status).toBe(200)
+    expect(listCalls).toBe(1)
+    expect(requestedUserId).toBe(user.id)
+    expect(requestedIds).toEqual(['asset-image-a', 'asset-image-b'])
+    expect(getCalls).toBe(0)
+    const execution = (await response.json()).data.execution
+    const stored = taskRepository.tasks.get(execution.id)
+    if (stored === undefined) throw new Error('expected stored canvas task')
+    expect(CanvasExecutionTaskInputSchema.parse(stored.input).plan.nodes[0]).toMatchObject({
+      assetRefs: { image: ['asset-image-a', 'asset-image-b'] },
+    })
   })
 
   it('derives an idempotent node rerun and preserves successful nodes', async () => {

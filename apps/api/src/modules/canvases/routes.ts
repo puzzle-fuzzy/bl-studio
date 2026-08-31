@@ -522,16 +522,17 @@ async function resolveCanvasAssetKinds(
     if (!Array.isArray(value)) continue
     for (const assetId of value) if (typeof assetId === 'string' && assetId.trim().length > 0) ids.add(assetId)
   }
-  const entries = await Promise.all(
-    [...ids].map(async assetId => {
-      const asset = await deps.assetRepository.getUserAsset({
-        userId,
-        assetId,
-      })
-      return asset === undefined ? undefined : ([assetId, asset.kind] as const)
-    }),
+  if (ids.size === 0) return new Map()
+  const assetIds = [...ids]
+  const results = await Promise.all(
+    Array.from({ length: Math.ceil(assetIds.length / 100) }, (_, index) =>
+      deps.assetRepository.listUnifiedAssets(userId, {
+        ids: assetIds.slice(index * 100, (index + 1) * 100),
+      })),
   )
-  return new Map(entries.filter((entry): entry is readonly [string, CanvasExecutionAssetKind] => entry !== undefined))
+  return new Map(
+    results.flatMap(result => result.items).map(asset => [asset.id, asset.kind] as const satisfies readonly [string, CanvasExecutionAssetKind]),
+  )
 }
 
 function assertCanvasExecutionTaskOwner(
