@@ -423,6 +423,20 @@ describe('canvas routes', () => {
     )
     expect(active.status).toBe(409)
     expect((await active.json()).error.code).toBe('CANVAS_EXECUTION_NOT_RETRYABLE')
+
+    document = { ...document, revision: 2 }
+    taskRepository.tasks.set('source-execution', {
+      ...taskRepository.tasks.get('source-execution')!,
+      status: 'failed',
+    })
+    const stale = await app.handle(
+      new Request(
+        'http://localhost/api/canvases/canvas-1/executions/source-execution/nodes/target/retry',
+        { ...init, body: JSON.stringify({ idempotencyKey: 'node-retry-stale-revision' }) },
+      ),
+    )
+    expect(stale.status).toBe(409)
+    expect((await stale.json()).error.code).toBe('CANVAS_REVISION_CONFLICT')
   })
 
   it('cancels a queued canvas execution and makes the terminal state readable', async () => {

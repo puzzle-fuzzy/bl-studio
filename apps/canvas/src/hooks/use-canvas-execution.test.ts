@@ -8,6 +8,7 @@ const apiClientMock = vi.hoisted(() => ({
   getAsset: vi.fn(),
   getCanvasExecution: vi.fn(),
   listCanvasExecutions: vi.fn(),
+  retryCanvasNode: vi.fn(),
 }))
 
 vi.mock('@bailian-studio/lib-client', () => ({ apiClient: apiClientMock }))
@@ -123,5 +124,28 @@ describe('useCanvasExecution', () => {
     })
     await waitFor(() => expect(result.current.status).toBe('running'))
     act(() => result.current.stop())
+  })
+
+  it('does not rerun a historical execution after the current document revision changes', async () => {
+    const historical = {
+      ...execution(),
+      documentRevision: 1,
+      nodeStatuses: [],
+    }
+    useCanvasStore.setState({ revision: 2 })
+    apiClientMock.getCanvasExecution.mockResolvedValue(historical)
+
+    const { result } = renderHook(() => useCanvasExecution())
+    await waitFor(() => expect(apiClientMock.listCanvasExecutions).toHaveBeenCalledWith('doc-1', { limit: 20 }))
+
+    await act(async () => {
+      await result.current.loadExecution('execution-1')
+    })
+    await waitFor(() => expect(result.current.status).toBe('succeeded'))
+
+    await act(async () => {
+      await result.current.retryNode('node-1')
+    })
+    expect(apiClientMock.retryCanvasNode).not.toHaveBeenCalled()
   })
 })

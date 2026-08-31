@@ -86,6 +86,7 @@ export function CanvasPage() {
   ))
   const selectedNodeId = nodes.find(node => node.selected)?.id
   const documentId = useCanvasStore(state => state.documentId)
+  const documentRevision = useCanvasStore(state => state.revision)
   const documentTitle = useCanvasStore(state => state.title)
   const setDocumentTitle = useCanvasStore(state => state.setTitle)
   const [showExecutions, setShowExecutions] = useState(false)
@@ -138,6 +139,7 @@ export function CanvasPage() {
     [execution],
   )
   const diagnosticNode = attentionNodes.find(node => node.nodeId === diagnosticNodeId) ?? attentionNodes[0]
+  const canRetryExecution = execution?.documentRevision === documentRevision
 
   const focusCanvasNode = useCallback((nodeId: string) => {
     selectNode(nodeId)
@@ -475,6 +477,7 @@ export function CanvasPage() {
           variant="secondary"
           disabled={
             saveStatus !== 'saved' ||
+            isDirty ||
             models === undefined ||
             hasNodeGenerationInFlight ||
             executionStatus === 'submitting' ||
@@ -484,6 +487,8 @@ export function CanvasPage() {
           onClick={handleExecute}
           title={hasNodeGenerationInFlight
             ? '请等待节点生成完成后再运行画布'
+            : isDirty
+              ? '请等待画布保存完成'
             : models === undefined
               ? '正在加载模型目录'
               : preflight.valid
@@ -504,6 +509,7 @@ export function CanvasPage() {
           </Button>
         )}
         {selectedNodeId !== undefined
+          && canRetryExecution
           && (executionStatus === 'succeeded' || executionStatus === 'failed' || executionStatus === 'cancelled') && (
             <Button
               size="sm"
@@ -572,7 +578,7 @@ export function CanvasPage() {
           generationDiagnostics={generationDiagnostics}
           diagnosticsLoading={diagnosticsLoading}
           diagnosticsError={diagnosticsError}
-          canRetry={executionStatus === 'succeeded' || executionStatus === 'failed' || executionStatus === 'cancelled'}
+          canRetry={canRetryExecution && (executionStatus === 'succeeded' || executionStatus === 'failed' || executionStatus === 'cancelled')}
           onSelectNode={openNodeDiagnostics}
           onRetryNode={nodeId => {
             focusCanvasNode(nodeId)

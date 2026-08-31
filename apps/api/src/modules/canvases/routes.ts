@@ -166,6 +166,26 @@ export function createCanvasRoutes(deps: ApiDependencies) {
       }
 
       const sourceInput = CanvasExecutionTaskInputSchema.parse(sourceTask.input)
+      const document = await deps.canvasRepository.getDocument({
+        userId: user.id,
+        documentId: params.id,
+      })
+      if (document === undefined) {
+        throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas not found: ${params.id}`)
+      }
+      if (document.revision !== sourceInput.documentRevision) {
+        throw new CanvasRepositoryError(
+          'CANVAS_REVISION_CONFLICT',
+          'Canvas revision conflict: execution belongs to revision '
+            + sourceInput.documentRevision
+            + ', current is '
+            + document.revision,
+          {
+            expectedRevision: sourceInput.documentRevision,
+            currentRevision: document.revision,
+          },
+        )
+      }
       const rerunInput = prepareCanvasNodeRerun(sourceInput, params.nodeId, sourceTask.status)
       const taskId =
         input.idempotencyKey === undefined

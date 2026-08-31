@@ -265,6 +265,7 @@ export function useCanvasExecution() {
       documentId === undefined
       || revision === undefined
       || taskId === undefined
+      || execution?.documentRevision !== revision
       || (status !== 'succeeded' && status !== 'failed' && status !== 'cancelled')
     ) return
     stop()
@@ -282,7 +283,7 @@ export function useCanvasExecution() {
       setExecutionStatus('failed')
       setError(nextError instanceof Error ? nextError.message : String(nextError))
     }
-  }, [documentId, isCurrentSession, revision, setExecutionStatus, status, stop, taskId, trackExecution])
+  }, [documentId, execution?.documentRevision, isCurrentSession, revision, setExecutionStatus, status, stop, taskId, trackExecution])
 
   const cancel = useCallback(async () => {
     if (
