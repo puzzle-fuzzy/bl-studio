@@ -6,24 +6,21 @@
  * ValidationError，经全局 onError 统一映射为 400。
  */
 
-import type { UnifiedAssetItem } from "@bailian-studio/generation-repository";
 import { ValidationError, validateInput } from "@bailian-studio/shared";
-import {
-	assetDownloadFileName,
-	type StorageAdapter,
-} from "@bailian-studio/storage";
 import { Elysia } from "elysia";
 import type { ApiDependencies } from "../../dependencies";
 import { auditErrorCode, recordApiAuditEvent } from "../../lib/audit";
+import {
+	assetWithDownloadUrl,
+	assetWithReadUrl,
+} from "../../lib/asset-read-url";
 import { requestErrorResponseBody } from "../../lib/http-errors";
 import { requireAuthUser } from "../auth/session";
+import { ListAssetsQuerySchema } from "./contracts";
 import {
 	ALLOWED_MIME_TYPES,
-	assetDownloadStorageKey,
-	assetWithReadUrl,
 	ImportAssetSchema,
 	importAsset,
-	ListAssetsQuerySchema,
 	uploadAsset,
 } from "./service";
 
@@ -196,26 +193,4 @@ export function createAssetRoutes(deps: ApiDependencies) {
 			});
 			return new Response(null, { status: 204 });
 		});
-}
-
-async function assetWithDownloadUrl(
-	item: UnifiedAssetItem,
-	storage: StorageAdapter,
-) {
-	const publicItem = await assetWithReadUrl(item, storage);
-	const storageKey = assetDownloadStorageKey(item, storage);
-	if (storageKey === undefined) return publicItem;
-
-	return {
-		...publicItem,
-		downloadUrl: await storage.createReadUrl({
-			key: storageKey,
-			expiresInSeconds: 3600,
-			downloadFileName: assetDownloadFileName(
-				item.fileName,
-				item.id,
-				item.mimeType,
-			),
-		}),
-	};
 }

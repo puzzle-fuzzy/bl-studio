@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import type { AssetRepository } from '@bailian-studio/generation-repository'
 import type { StorageAdapter, StorageReadUrlInput, StorageWriteInput, StorageWriteResult, StorageWriteStreamInput } from '@bailian-studio/storage'
-import { assetDownloadStorageKey, uploadAsset } from '../src/modules/assets/service'
+import { assetDownloadStorageKey } from '../src/lib/asset-read-url'
+import { uploadAsset } from '../src/modules/assets/service'
 import { parseMediaDuration } from '../src/modules/assets/media-metadata'
 import type { AssetConfig } from '../src/lib/asset-config'
 

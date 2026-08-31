@@ -8,14 +8,9 @@
 import type {
 	AssetRepository,
 	CreateUserAssetInput,
-	UnifiedAssetItem,
 } from "@bailian-studio/generation-repository";
 import { ValidationError } from "@bailian-studio/shared";
-import {
-	OSS_IMAGE_THUMBNAIL_PROCESS,
-	OSS_VIDEO_SNAPSHOT_PROCESS,
-	type StorageAdapter,
-} from "@bailian-studio/storage";
+import type { StorageAdapter } from "@bailian-studio/storage";
 import { z } from "zod";
 import type { AssetConfig } from "../../lib/asset-config";
 import { assertFileMatchesMime } from "../../lib/file-sniff";
@@ -23,21 +18,6 @@ import { probeMediaDuration } from "./media-metadata";
 
 export type AssetKind = "image" | "video" | "audio" | "text" | "archive";
 export type AssetSource = "upload" | "link" | "generation" | "derived";
-
-/**
- * 仅当当前适配器拥有该存储对象时才返回物理 key。
- * 其他 provider 的 key 绝不能被本进程签名。
- */
-export function assetDownloadStorageKey(
-	item: Pick<UnifiedAssetItem, "storageKey" | "storageProvider">,
-	storage: Pick<StorageAdapter, "provider">,
-): string | undefined {
-	return item.storageKey !== undefined &&
-		item.storageKey.length > 0 &&
-		item.storageProvider === storage.provider
-		? item.storageKey
-		: undefined;
-}
 
 const ASSET_KINDS: readonly AssetKind[] = [
 	"image",
@@ -293,103 +273,5 @@ export async function importAsset(args: {
 		source: "link",
 		url: input.url,
 		createdAt: new Date().toISOString(),
-	};
-}
-
-const AssetIdsQuerySchema = z.preprocess(
-	(value) => typeof value === "string" ? value.split(",") : value,
-	z.array(z.string().trim().min(1).max(160)).max(100).optional().transform((ids) => (
-		ids === undefined ? undefined : [...new Set(ids)]
-	)),
-);
-
-export const ListAssetsQuerySchema = z.object({
-	ids: AssetIdsQuerySchema,
-	limit: z.coerce.number().int().min(1).max(100).optional(),
-	cursor: z.string().optional(),
-	kind: z.enum(["image", "video", "audio", "text", "archive"]).optional(),
-	source: z.enum(["upload", "link", "generation", "derived"]).optional(),
-	q: z.string().trim().max(120).optional(),
-	sort: z.enum(["time", "title", "size"]).default("time"),
-});
-
-/**
- * 为统一资产项生成带签名的读取 URL（含缩略图回退：OSS 图片处理/视频截帧）。
- * 从路由下沉到 service：admin 模块也需要同一整形，不允许跨模块 import 路由。
- */
-export async function assetWithReadUrl(
-	item: UnifiedAssetItem,
-	storage: StorageAdapter,
-) {
-	const publicItem = {
-		id: item.id,
-		kind: item.kind,
-		source: item.source,
-		...(item.url !== undefined ? { url: item.url } : {}),
-		...(item.text !== undefined ? { text: item.text } : {}),
-		...(item.mimeType !== undefined ? { mimeType: item.mimeType } : {}),
-		...(item.byteSize !== undefined ? { byteSize: item.byteSize } : {}),
-		...(item.durationSeconds !== undefined
-			? { durationSeconds: item.durationSeconds }
-			: {}),
-		...(item.declaredResolution !== undefined
-			? { declaredResolution: item.declaredResolution }
-			: {}),
-		...(item.fileName !== undefined ? { fileName: item.fileName } : {}),
-		...(item.recordId !== undefined ? { recordId: item.recordId } : {}),
-		...(item.modelId !== undefined ? { modelId: item.modelId } : {}),
-		...(item.thumbnailStatus !== undefined
-			? { thumbnailStatus: item.thumbnailStatus }
-			: {}),
-		createdAt: item.createdAt,
-	};
-	const withOriginal =
-		item.storageKey === undefined
-			? publicItem
-			: {
-					...publicItem,
-					url: await storage.createReadUrl({
-						key: item.storageKey,
-						expiresInSeconds: 3600,
-					}),
-				};
-
-	if (
-		item.thumbnailStatus === "ready" &&
-		item.thumbnailStorageKey !== undefined &&
-		item.thumbnailStorageProvider === storage.provider
-	) {
-		try {
-			return {
-				...withOriginal,
-				thumbnailUrl: await storage.createReadUrl({
-					key: item.thumbnailStorageKey,
-					expiresInSeconds: 3600,
-				}),
-			};
-		} catch {
-			return withOriginal;
-		}
-	}
-
-	if (
-		item.storageKey === undefined ||
-		storage.provider !== "oss" ||
-		(item.kind !== "image" && item.kind !== "video")
-	)
-		return withOriginal;
-
-	const process =
-		item.kind === "image"
-			? OSS_IMAGE_THUMBNAIL_PROCESS
-			: OSS_VIDEO_SNAPSHOT_PROCESS;
-	return {
-		...withOriginal,
-		thumbnailStatus: "ready" as const,
-		thumbnailUrl: await storage.createReadUrl({
-			key: item.storageKey,
-			expiresInSeconds: 3600,
-			process,
-		}),
 	};
 }

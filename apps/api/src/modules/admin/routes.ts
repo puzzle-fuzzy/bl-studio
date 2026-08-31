@@ -13,7 +13,8 @@ import {
 } from '../../lib/local-file-response'
 import { getRequestTrace } from '../../lib/middleware'
 import { resolveArtifactReadUrlUseCase } from '../artifacts/service'
-import { assetWithReadUrl, ListAssetsQuerySchema } from '../assets/service'
+import { assetWithReadUrl } from '../../lib/asset-read-url'
+import { ListAssetsQuerySchema } from '../assets/contracts'
 import { requireAdminUser } from '../auth/session'
 import { resolveGalleryArtifact, resolveGalleryCover } from '../gallery/service'
 import {
