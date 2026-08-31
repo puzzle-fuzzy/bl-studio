@@ -148,6 +148,8 @@ export function useCanvasPersistence() {
   const [documentDirectoryLoading, setDocumentDirectoryLoading] = useState(false)
   const [documentDirectoryError, setDocumentDirectoryError] = useState<string | undefined>()
   const [versions, setVersions] = useState<CanvasVersion[]>([])
+  const [versionsLoading, setVersionsLoading] = useState(false)
+  const [versionsError, setVersionsError] = useState<string | undefined>()
   const [saveTick, setSaveTick] = useState(0)
   const [lastSavedSignature, setLastSavedSignature] = useState<string | undefined>()
 
@@ -190,18 +192,33 @@ export function useCanvasPersistence() {
     }
   }, [invalidatePendingSave, setSaveStatus])
 
-  const refreshVersions = useCallback(async () => {
+  const refreshVersions = useCallback(async (): Promise<CanvasVersion[]> => {
     const id = useCanvasStore.getState().documentId
     if (id === undefined) return []
     const requestId = versionsRequestRef.current + 1
     versionsRequestRef.current = requestId
-    const nextVersions = await apiClient.listCanvasVersions(id, { limit: 30 })
-    if (
-      !disposedRef.current
-      && versionsRequestRef.current === requestId
-      && useCanvasStore.getState().documentId === id
-    ) setVersions(nextVersions)
-    return nextVersions
+    setVersionsLoading(true)
+    setVersionsError(undefined)
+    try {
+      const nextVersions = await apiClient.listCanvasVersions(id, { limit: 30 })
+      if (
+        !disposedRef.current
+        && versionsRequestRef.current === requestId
+        && useCanvasStore.getState().documentId === id
+      ) setVersions(nextVersions)
+      return nextVersions
+    } catch (error) {
+      if (
+        !disposedRef.current
+        && versionsRequestRef.current === requestId
+        && useCanvasStore.getState().documentId === id
+      ) setVersionsError(error instanceof Error ? error.message : '版本历史加载失败')
+      return []
+    } finally {
+      if (versionsRequestRef.current === requestId) {
+        if (!disposedRef.current) setVersionsLoading(false)
+      }
+    }
   }, [])
 
   const restoreVersion = useCallback(async (versionId: string) => {
@@ -213,16 +230,23 @@ export function useCanvasPersistence() {
     const state = useCanvasStore.getState()
     if (state.documentId === undefined || state.revision === undefined) return
     setSaveStatus('saving')
-    const document = await hydrateAssetUrls(await apiClient.restoreCanvas(state.documentId, {
-      versionId,
-      expectedRevision: state.revision,
-    }))
-    if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
-    setLastSavedSignature(documentSignature(document.title, document.snapshot))
-    applyDocument(document)
-    setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
-    setSaveStatus('saved')
-    await refreshVersions()
+    try {
+      const document = await hydrateAssetUrls(await apiClient.restoreCanvas(state.documentId, {
+        versionId,
+        expectedRevision: state.revision,
+      }))
+      if (disposedRef.current || operationEpochRef.current !== operationEpoch) return
+      setLastSavedSignature(documentSignature(document.title, document.snapshot))
+      applyDocument(document)
+      setDocuments(current => current.map(summary => summary.id === document.id ? summaryOf(document) : summary))
+      setSaveStatus('saved')
+      await refreshVersions()
+    } catch (error) {
+      if (!disposedRef.current && operationEpochRef.current === operationEpoch) {
+        setSaveStatus(error instanceof ApiClientError && error.code === 'CANVAS_REVISION_CONFLICT' ? 'conflict' : 'error')
+      }
+      throw error
+    }
   }, [invalidatePendingSave, refreshVersions, setSaveStatus])
 
   const openDocument = useCallback(async (nextDocumentId: string): Promise<boolean> => {
@@ -246,6 +270,8 @@ export function useCanvasPersistence() {
       applyDocument(hydratedDocument)
       versionsRequestRef.current += 1
       setVersions([])
+      setVersionsError(undefined)
+      setVersionsLoading(false)
       setSaveStatus('saved')
       return true
     } catch (error) {
@@ -257,6 +283,8 @@ export function useCanvasPersistence() {
         setLastSavedSignature(undefined)
         versionsRequestRef.current += 1
         setVersions([])
+        setVersionsError(undefined)
+        setVersionsLoading(false)
         setSaveStatus('error')
         return true
       }
@@ -292,6 +320,8 @@ export function useCanvasPersistence() {
         ...current.filter(summary => summary.id !== hydratedDocument.id),
       ])
       setVersions([])
+      setVersionsError(undefined)
+      setVersionsLoading(false)
       setSaveStatus('saved')
       return true
     } catch (error) {
@@ -357,6 +387,9 @@ export function useCanvasPersistence() {
         if (documentDirectoryRequestRef.current !== requestId) return
         setDocuments(list.items)
         setDocumentNextCursor(list.nextCursor)
+        setVersions([])
+        setVersionsError(undefined)
+        setVersionsLoading(false)
         const summary = selectCanvasDocument(list.items, useCanvasStore.getState().documentId)
         if (summary === undefined) {
           const document = await apiClient.createCanvas({ title: '未命名画布', snapshot: localSnapshot })
@@ -497,5 +530,7 @@ export function useCanvasPersistence() {
     restoreVersion,
     saveStatus,
     versions,
+    versionsError,
+    versionsLoading,
   }
 }

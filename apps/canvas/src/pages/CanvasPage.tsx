@@ -63,6 +63,8 @@ export function CanvasPage() {
     openDocument,
     saveStatus,
     versions,
+    versionsError,
+    versionsLoading,
     refreshDocument,
     refreshVersions,
     restoreVersion,
@@ -587,7 +589,16 @@ export function CanvasPage() {
             <span className="text-[10px] text-muted-foreground">恢复会创建新版本</span>
           </div>
           <div className="max-h-64 space-y-1 overflow-y-auto">
-            {versions.length === 0 ? (
+            {versionsError !== undefined && versions.length === 0 && !versionsLoading ? (
+              <div className="space-y-2 px-1 py-3 text-center">
+                <p className="text-[10px] text-destructive">{versionsError}</p>
+                <Button size="xs" variant="outline" onClick={() => void refreshVersions()}>
+                  重试
+                </Button>
+              </div>
+            ) : versions.length === 0 && versionsLoading ? (
+              <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">加载中…</p>
+            ) : versions.length === 0 ? (
               <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无版本</p>
             ) : (
               versions.map(version => (
@@ -616,6 +627,14 @@ export function CanvasPage() {
                   </Button>
                 </div>
               ))
+            )}
+            {versionsError !== undefined && versions.length > 0 && (
+              <div className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-destructive/30 px-2 py-1.5">
+                <span className="min-w-0 truncate text-[10px] text-destructive">{versionsError}</span>
+                <Button size="xs" variant="outline" onClick={() => void refreshVersions()}>
+                  重试
+                </Button>
+              </div>
             )}
           </div>
         </div>
