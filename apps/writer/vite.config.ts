@@ -13,6 +13,7 @@ export default defineConfig({
   // 生产挂在主站 /writer 前缀下（nginx 静态托管 + SPA fallback）。
   base: '/writer/',
   server: {
+    host: '127.0.0.1',
     port: 5006,
     strictPort: true,
     proxy: {

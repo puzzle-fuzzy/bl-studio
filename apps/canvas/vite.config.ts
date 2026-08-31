@@ -12,6 +12,7 @@ const webRoot = fileURLToPath(new URL('.', import.meta.url))
 export default defineConfig({
   base: '/canvas/',
   server: {
+    host: '127.0.0.1',
     port: 5007,
     strictPort: true,
     proxy: {
