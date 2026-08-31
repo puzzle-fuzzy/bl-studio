@@ -1,4 +1,3 @@
-import type { UnifiedAssetItem } from '@bailian-studio/generation-repository'
 import {
   assetDownloadFileName,
   OSS_IMAGE_THUMBNAIL_PROCESS,
@@ -6,9 +5,31 @@ import {
   type StorageAdapter,
 } from '@bailian-studio/storage'
 
+/** API 对可读取资产的最小投影；用户资产和 admin 资产都可接入。 */
+export interface AssetReadItem {
+  id: string
+  kind: string
+  source: string
+  url?: string
+  storageProvider?: string
+  storageKey?: string
+  thumbnailStatus?: string
+  thumbnailStorageProvider?: string
+  thumbnailStorageKey?: string
+  text?: string
+  mimeType?: string
+  byteSize?: number
+  durationSeconds?: number
+  declaredResolution?: string
+  fileName?: string
+  recordId?: string
+  modelId?: string
+  createdAt: string
+}
+
 /** 仅当当前适配器拥有该存储对象时才返回物理 key，避免签发其他 provider 的 key。 */
 export function assetDownloadStorageKey(
-  item: Pick<UnifiedAssetItem, 'storageKey' | 'storageProvider'>,
+  item: Pick<AssetReadItem, 'storageKey' | 'storageProvider'>,
   storage: Pick<StorageAdapter, 'provider'>,
 ): string | undefined {
   return item.storageKey !== undefined
@@ -20,7 +41,7 @@ export function assetDownloadStorageKey(
 
 /** 为用户资产和 admin 资产投影生成短期读取 URL。 */
 export async function assetWithReadUrl(
-  item: UnifiedAssetItem,
+  item: AssetReadItem,
   storage: StorageAdapter,
 ) {
   const publicItem = {
@@ -95,7 +116,7 @@ export async function assetWithReadUrl(
 
 /** 生成附件下载 URL；下载能力只对当前存储 provider 的对象开放。 */
 export async function assetWithDownloadUrl(
-  item: UnifiedAssetItem,
+  item: AssetReadItem,
   storage: StorageAdapter,
 ) {
   const publicItem = await assetWithReadUrl(item, storage)
