@@ -4,6 +4,7 @@ import type {
 } from '@bailian-studio/audit-repository'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type {
+	AdminAssetRepository,
 	AdminGalleryRepository,
 	AdminRepository,
 	AdminTaskRepository,
@@ -24,6 +25,7 @@ let currentUser: { id: string; role: 'user' | 'admin' } = {
   role: 'admin',
 }
 const audits: Array<Record<string, unknown>> = []
+const adminAssetReads = { list: 0, get: 0 }
 const failedAuditEvent: AuditOutboxEvent = {
   id: 'audit-outbox-failed-1',
   userId: 'user-1',
@@ -339,6 +341,16 @@ const app = createTestApp({
   assetRepository: fakeAssetRepository,
   auditOutboxRepository: fakeAuditOutboxRepository,
   adminRepository: {
+    assets: {
+      listUserAssets: async (userId, options) => {
+        adminAssetReads.list += 1
+        return fakeAssetRepository.listUnifiedAssets(userId, options)
+      },
+      getUserAsset: async (input) => {
+        adminAssetReads.get += 1
+        return fakeAssetRepository.getUserAsset(input)
+      },
+    } satisfies AdminAssetRepository,
     gallery: {} as AdminGalleryRepository,
     tasks: fakeAdminTaskRepository,
     analytics: fakeAnalyticsRepository,
@@ -360,6 +372,8 @@ describe('admin routes', () => {
   beforeEach(() => {
     currentUser = { id: 'admin-1', role: 'admin' }
     audits.length = 0
+    adminAssetReads.list = 0
+    adminAssetReads.get = 0
     fakeAuthService.__setBanned(false)
   })
 
@@ -629,6 +643,7 @@ describe('admin routes', () => {
       data: { items: Array<{ url: string }> }
     }
     expect(body.data.items[0]?.url).toContain('/signed/')
+    expect(adminAssetReads.list).toBe(1)
   })
 
   it('returns generation request parameters and signed reference assets for administrators', async () => {
@@ -652,6 +667,7 @@ describe('admin routes', () => {
     expect(body.data.context?.inputAssets[0]?.asset.url).toContain(
       '/signed/inputs/reference-1.png',
     )
+    expect(adminAssetReads.get).toBe(1)
   })
 
   it('returns Canvas node diagnostics from the admin task context endpoint', async () => {

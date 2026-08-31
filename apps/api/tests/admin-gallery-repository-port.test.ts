@@ -1,4 +1,5 @@
 import type {
+	AdminAssetRepository,
 	AdminGalleryRepository,
 	AdminRepository,
 	AnalyticsRepository,
@@ -24,7 +25,8 @@ const fakeAdminGalleryRepository = {
 } as unknown as AdminGalleryRepository;
 
 const adminRepository = {
-	gallery: fakeAdminGalleryRepository,
+  assets: {} as AdminAssetRepository,
+  gallery: fakeAdminGalleryRepository,
 	tasks: {} as AdminTaskRepository,
 	analytics: {} as AnalyticsRepository,
 } satisfies AdminRepository

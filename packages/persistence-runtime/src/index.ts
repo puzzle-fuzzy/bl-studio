@@ -36,6 +36,7 @@ import {
 } from '@bailian-studio/director-repository'
 import {
   createAdminRepository,
+  type AdminAssetRepository,
   type AdminRepository,
 } from '@bailian-studio/admin-repository'
 import {
@@ -149,6 +150,16 @@ function closeOnce(db: BailianStudioDb): () => Promise<void> {
   }
 }
 
+function createAdminAssetRepository(
+  assetRepository: AssetRepository,
+): AdminAssetRepository {
+  return {
+    listUserAssets: (userId, options) =>
+      assetRepository.listUnifiedAssets(userId, options),
+    getUserAsset: (input) => assetRepository.getUserAsset(input),
+  }
+}
+
 export function createApiPersistenceRuntime(
   options: CreateApiPersistenceRuntimeOptions,
 ): ApiPersistenceRuntime {
@@ -165,6 +176,7 @@ export function createApiPersistenceRuntime(
       modelResolver: options.modelResolver,
     })
     const shareRepository = createShareRepository(db)
+    const assetRepository = createAssetRepository({ db, taskQueueTransactionStore })
     return {
       auditOutboxRepository: createAuditOutboxRepository({ db }),
       auditRepository: createAuditRepository(db),
@@ -177,7 +189,7 @@ export function createApiPersistenceRuntime(
       generationDiagnosticsRepository:
         createGenerationDiagnosticsRepository(db, taskQueueReadStore),
       generationRecoveryRepository: createGenerationRecoveryRepository(db, taskQueueReadStore),
-      assetRepository: createAssetRepository({ db, taskQueueTransactionStore }),
+      assetRepository,
       shareRepository,
       publicShareRepository: shareRepository,
       socialRepository: createSocialRepository(db),
@@ -185,7 +197,10 @@ export function createApiPersistenceRuntime(
       promptLibraryRepository: createPromptLibraryRepository(db),
       feedbackRepository: createFeedbackRepository(db),
       contentReportRepository: createContentReportRepository(db),
-      adminRepository: createAdminRepository(db),
+      adminRepository: createAdminRepository({
+        db,
+        assets: createAdminAssetRepository(assetRepository),
+      }),
       canvasRepository: createCanvasRepository(db),
       taskQueueRepository: createTaskQueueRepository({ db }),
       usageRepository: createUsageRepository(db),

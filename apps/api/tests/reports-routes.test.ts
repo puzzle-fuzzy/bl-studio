@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import type { AuditRepository, ContentReportRepository, GenerationRepository } from '@bailian-studio/generation-repository'
-import type { AdminGalleryRepository, AdminRepository, AdminTaskRepository, AnalyticsRepository } from '@bailian-studio/admin-repository'
+import type { AdminAssetRepository, AdminGalleryRepository, AdminRepository, AdminTaskRepository, AnalyticsRepository } from '@bailian-studio/admin-repository'
 import type { CreditLedger } from '@bailian-studio/credit-ledger'
 import type { StorageAdapter } from '@bailian-studio/storage'
 import { createTestApp } from '../src/test-app'
@@ -65,6 +65,7 @@ const fakeAdminGalleryRepository = {
 } as unknown as AdminGalleryRepository
 
 const adminRepository = {
+  assets: {} as AdminAssetRepository,
   gallery: fakeAdminGalleryRepository,
   tasks: {} as AdminTaskRepository,
   analytics: {} as AnalyticsRepository,

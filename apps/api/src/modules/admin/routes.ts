@@ -370,7 +370,7 @@ export function createAdminRoutes(deps: ApiDependencies) {
                       .includes(normalizedQuery),
                   )
                   .map((model) => model.id)
-          const data = await deps.assetRepository.listUnifiedAssets(userId, {
+          const data = await deps.adminRepository.assets.listUserAssets(userId, {
             sort,
             ...(limit !== undefined ? { limit } : {}),
             ...(cursor !== undefined ? { cursor } : {}),
@@ -638,7 +638,7 @@ export function createAdminRoutes(deps: ApiDependencies) {
 
           const inputAssets = await Promise.all(
             record.inputAssets.map(async (inputAsset) => {
-              const asset = await deps.assetRepository.getUserAsset({
+              const asset = await deps.adminRepository.assets.getUserAsset({
                 userId: inputAsset.userId,
                 assetId: inputAsset.assetId,
                 includeDeleted: true,

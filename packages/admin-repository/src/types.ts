@@ -47,6 +47,44 @@ export interface ListAdminGalleryResult {
   nextCursor?: string
 }
 
+/** 管理员查看指定用户资产时使用的内部只读投影；存储坐标由 API 层签发 URL。 */
+export interface AdminAssetItem {
+  id: string
+  kind: ArtifactKind
+  source: 'upload' | 'link' | 'generation' | 'derived'
+  generationArtifactId?: string
+  url?: string
+  storageProvider?: string
+  storageKey?: string
+  thumbnailStatus?: 'queued' | 'processing' | 'ready' | 'failed'
+  thumbnailStorageProvider?: string
+  thumbnailStorageKey?: string
+  text?: string
+  mimeType?: string
+  byteSize?: number
+  durationSeconds?: number
+  declaredResolution?: string
+  fileName?: string
+  recordId?: string
+  modelId?: string
+  createdAt: string
+}
+
+export interface AdminAssetListOptions {
+  kind?: ArtifactKind
+  source?: 'upload' | 'link' | 'generation' | 'derived'
+  limit?: number
+  cursor?: string
+  q?: string
+  sort?: 'time' | 'title' | 'size'
+  modelIds?: readonly string[]
+}
+
+export interface ListAdminAssetsResult {
+  items: AdminAssetItem[]
+  nextCursor?: string
+}
+
 export interface GenerationInputAsset {
   generationId: string
   parameterName: string
