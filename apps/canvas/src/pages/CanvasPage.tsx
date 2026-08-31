@@ -65,6 +65,8 @@ export function CanvasPage() {
     versions,
     versionsError,
     versionsLoading,
+    versionsNextCursor,
+    loadMoreVersions,
     refreshDocument,
     refreshVersions,
     restoreVersion,
@@ -641,6 +643,16 @@ export function CanvasPage() {
                   重试
                 </Button>
               </div>
+            )}
+            {versionsNextCursor !== undefined && !versionsLoading && (
+              <Button
+                size="xs"
+                variant="outline"
+                className="mt-1 w-full"
+                onClick={() => void loadMoreVersions()}
+              >
+                加载更多版本
+              </Button>
             )}
           </div>
         </div>

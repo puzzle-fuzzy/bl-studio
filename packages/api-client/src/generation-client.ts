@@ -20,7 +20,7 @@ import {
   type CanvasExecutionTaskSummary,
   type ExecuteCanvasInput,
   type RetryCanvasNodeInput,
-  type CanvasVersion,
+  type CanvasVersionsResult,
   type CreateCanvasInput,
   type ListCanvasesResult,
   type ListCanvasExecutionsResult,
@@ -482,7 +482,7 @@ export interface BailianStudioApiClient extends CreativeAssetApiClient {
   /** `PATCH /api/canvases/:id` —— 以 expectedRevision 保存画布。 */
   saveCanvas(id: string, input: SaveCanvasInput): Promise<CanvasDocument>
   /** `GET /api/canvases/:id/versions` —— 获取不可变版本历史。 */
-  listCanvasVersions(id: string, params?: { limit?: number }): Promise<CanvasVersion[]>
+  listCanvasVersions(id: string, params?: { limit?: number; cursor?: string }): Promise<CanvasVersionsResult>
   /** `POST /api/canvases/:id/restore` —— 从历史版本创建新的当前版本。 */
   restoreCanvas(id: string, input: RestoreCanvasInput): Promise<CanvasDocument>
   /** `POST /api/canvases/:id/execute` —— 按当前版本编译并排入整张画布。 */
@@ -1367,6 +1367,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
     async listCanvasVersions(id, params = {}) {
       const query = new URLSearchParams()
       if (params.limit !== undefined) query.set('limit', String(params.limit))
+      if (params.cursor !== undefined) query.set('cursor', params.cursor)
       const qs = query.toString()
       const data = await unwrapData(
         `${base}/api/canvases/${encodeURIComponent(id)}/versions${qs.length > 0 ? `?${qs}` : ''}`,
@@ -1374,7 +1375,7 @@ export function createApiClient(options: CreateApiClientOptions): BailianStudioA
         fetchImpl,
         CanvasVersionsResponseSchema,
       )
-      return data.versions
+      return data
     },
 
     async restoreCanvas(id, input) {

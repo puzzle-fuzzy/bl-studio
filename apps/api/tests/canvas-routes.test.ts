@@ -43,7 +43,7 @@ function createFakeCanvasRepository(): CanvasRepository {
       return document
     },
     async listVersions() {
-      return versions
+      return { versions }
     },
     async restoreVersion() {
       return document

@@ -32,11 +32,7 @@ const ListCanvasesQuerySchema = z
 
 const ListCanvasExecutionsQuerySchema = ListCanvasesQuerySchema
 
-const ListCanvasVersionsQuerySchema = z
-  .object({
-    limit: z.coerce.number().int().min(1).max(100).optional(),
-  })
-  .strict()
+const ListCanvasVersionsQuerySchema = ListCanvasesQuerySchema
 
 const CANVAS_SSE_POLL_INTERVAL_MS = 1_000
 const CANVAS_SSE_HEARTBEAT_INTERVAL_MS = 15_000
@@ -459,13 +455,20 @@ export function createCanvasRoutes(deps: ApiDependencies) {
     })
     .get('/:id/versions', async ({ request, params, query }) => {
       const user = await requireAuthUser(request, deps.authService)
-      const { limit } = validateInput(ListCanvasVersionsQuerySchema, query)
-      const versions = await deps.canvasRepository.listVersions({
+      const { limit, cursor } = validateInput(ListCanvasVersionsQuerySchema, query)
+      const page = await deps.canvasRepository.listVersions({
         userId: user.id,
         documentId: params.id,
         ...(limit !== undefined ? { limit } : {}),
+        ...(cursor !== undefined ? { cursor } : {}),
       })
-      return { success: true, data: { versions } }
+      return {
+        success: true,
+        data: {
+          versions: page.versions,
+          ...(page.nextCursor !== undefined ? { nextCursor: page.nextCursor } : {}),
+        },
+      }
     })
     .post('/:id/restore', async ({ request, params, body }) => {
       const user = await requireAuthUser(request, deps.authService)

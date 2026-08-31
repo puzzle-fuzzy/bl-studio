@@ -246,7 +246,8 @@ export const CanvasDocumentResponseSchema = z
 
 export const CanvasVersionsResponseSchema = z
   .object({
-    versions: z.array(CanvasVersionSchema),
+    versions: z.array(CanvasVersionSchema).max(100),
+    nextCursor: z.string().trim().min(1).max(1024).optional(),
   })
   .strict()
 

@@ -51,7 +51,10 @@ export interface CanvasRepository {
     title?: string
     now?: Date
   }): Promise<CanvasDocument>
-  listVersions(input: { userId: string; documentId: string; limit?: number }): Promise<CanvasVersion[]>
+  listVersions(input: { userId: string; documentId: string; limit?: number; cursor?: string }): Promise<{
+    versions: CanvasVersion[]
+    nextCursor?: string
+  }>
   restoreVersion(input: {
     userId: string
     documentId: string
@@ -90,6 +93,27 @@ function decodeDocumentCursor(value: string): CanvasDocumentCursor {
     throw new CanvasRepositoryError('CANVAS_INVALID_CURSOR', 'Invalid canvas document cursor')
   }
   return { updatedAt: decoded.updatedAt, id: decoded.id }
+}
+
+interface CanvasVersionCursor {
+  version: number
+}
+
+function encodeVersionCursor(cursor: CanvasVersionCursor): string {
+  return encodeCursor({ version: cursor.version })
+}
+
+function decodeVersionCursor(value: string): CanvasVersionCursor {
+  const decoded = decodeCursor(value)
+  if (
+    decoded === undefined
+    || typeof decoded.version !== 'number'
+    || !Number.isSafeInteger(decoded.version)
+    || decoded.version <= 0
+  ) {
+    throw new CanvasRepositoryError('CANVAS_INVALID_CURSOR', 'Invalid canvas version cursor')
+  }
+  return { version: decoded.version }
 }
 
 function snapshotOf(value: unknown): CanvasSnapshot {
@@ -321,7 +345,7 @@ export function createCanvasRepository(db: BailianStudioDb): CanvasRepository {
       }
     },
 
-    async listVersions({ userId, documentId, limit }) {
+    async listVersions({ userId, documentId, limit, cursor: cursorToken }) {
       try {
         const document = await db
           .select({ id: canvasDocuments.id })
@@ -331,16 +355,28 @@ export function createCanvasRepository(db: BailianStudioDb): CanvasRepository {
         if (document[0] === undefined) {
           throw new CanvasRepositoryError('CANVAS_NOT_FOUND', `Canvas not found: ${documentId}`)
         }
+        const limitValue = limitOf(limit, 50, 100)
+        const cursor = cursorToken === undefined ? undefined : decodeVersionCursor(cursorToken)
+        const conditions = [
+          eq(canvasDocumentVersions.documentId, documentId),
+          eq(canvasDocumentVersions.userId, userId),
+        ]
+        if (cursor !== undefined) conditions.push(lt(canvasDocumentVersions.version, cursor.version))
         const rows = await db
           .select()
           .from(canvasDocumentVersions)
-          .where(and(
-            eq(canvasDocumentVersions.documentId, documentId),
-            eq(canvasDocumentVersions.userId, userId),
-          ))
+          .where(and(...conditions))
           .orderBy(desc(canvasDocumentVersions.version))
-          .limit(limitOf(limit, 50, 100))
-        return rows.map(toVersion)
+          .limit(limitValue + 1)
+        const hasMore = rows.length > limitValue
+        const page = hasMore ? rows.slice(0, limitValue) : rows
+        const last = page[page.length - 1]
+        return {
+          versions: page.map(toVersion),
+          ...(hasMore && last !== undefined
+            ? { nextCursor: encodeVersionCursor({ version: last.version }) }
+            : {}),
+        }
       } catch (error) {
         throw asRepositoryError(error)
       }

@@ -1300,6 +1300,31 @@ describe('createApiClient', () => {
     expect(calls[0]?.url).toBe('http://api.test/api/canvases?limit=10&cursor=previous+page')
   })
 
+  it('lists canvas versions with a keyset cursor', async () => {
+    const version = {
+      id: 'canvas_version_2',
+      documentId: 'canvas_1',
+      version: 2,
+      snapshot: { nodes: [], edges: [] },
+      createdAt: '2026-08-30T00:00:00.000Z',
+    }
+    const { fetch, calls } = queuedFetch([
+      jsonResponse({ success: true, data: { versions: [version], nextCursor: 'next-version-page' } }),
+    ])
+    const client = createApiClient({ baseUrl: 'http://api.test', fetch })
+
+    await expect(client.listCanvasVersions('canvas 1', {
+      limit: 10,
+      cursor: 'previous version page',
+    })).resolves.toEqual({
+      versions: [version],
+      nextCursor: 'next-version-page',
+    })
+    expect(calls[0]?.url).toBe(
+      'http://api.test/api/canvases/canvas%201/versions?limit=10&cursor=previous+version+page',
+    )
+  })
+
   it('saves a canvas title with the optimistic revision', async () => {
     const document = {
       id: 'canvas_1',

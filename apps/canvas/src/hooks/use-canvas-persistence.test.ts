@@ -1,5 +1,12 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react'
-import type { AssetItem, CanvasDocument, CanvasDocumentSummary, CanvasVersion, ListCanvasesResult } from '@bailian-studio/api-client'
+import type {
+  AssetItem,
+  CanvasDocument,
+  CanvasDocumentSummary,
+  CanvasVersion,
+  CanvasVersionsResult,
+  ListCanvasesResult,
+} from '@bailian-studio/api-client'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useCanvasPersistence } from './use-canvas-persistence'
 import { useCanvasStore } from '@/stores/canvas-store'
@@ -233,7 +240,7 @@ describe('useCanvasPersistence document directory', () => {
     apiClientMock.listCanvases.mockResolvedValue({ items: [first] })
     apiClientMock.getCanvas.mockResolvedValue(document('first'))
     apiClientMock.listCanvasVersions
-      .mockResolvedValueOnce([firstVersion])
+      .mockResolvedValueOnce({ versions: [firstVersion] })
       .mockRejectedValueOnce(new Error('版本服务暂不可用'))
 
     const { result } = renderHook(() => useCanvasPersistence())
@@ -254,6 +261,46 @@ describe('useCanvasPersistence document directory', () => {
     expect(result.current.versionsLoading).toBe(false)
   })
 
+  it('loads more version history pages without replacing the current page', async () => {
+    const first = documentSummary('first')
+    const firstVersion = version('version-2', 'first')
+    const secondVersion = { ...version('version-1', 'first'), version: 1 }
+    const nextPage = deferred<CanvasVersionsResult>()
+    apiClientMock.listCanvases.mockResolvedValue({ items: [first] })
+    apiClientMock.getCanvas.mockResolvedValue(document('first'))
+    apiClientMock.listCanvasVersions
+      .mockResolvedValueOnce({ versions: [firstVersion], nextCursor: 'cursor-1' })
+      .mockImplementationOnce(() => nextPage.promise)
+
+    const { result } = renderHook(() => useCanvasPersistence())
+    await waitFor(() => expect(result.current.documentLoading).toBe(false))
+
+    await act(async () => {
+      await expect(result.current.refreshVersions()).resolves.toEqual([firstVersion])
+    })
+    expect(result.current.versionsNextCursor).toBe('cursor-1')
+
+    let loadMore!: Promise<boolean>
+    act(() => {
+      loadMore = result.current.loadMoreVersions()
+    })
+    await waitFor(() => expect(apiClientMock.listCanvasVersions).toHaveBeenCalledWith('first', {
+      limit: 30,
+      cursor: 'cursor-1',
+    }))
+    await act(async () => {
+      await expect(result.current.loadMoreVersions()).resolves.toBe(false)
+    })
+    expect(apiClientMock.listCanvasVersions).toHaveBeenCalledTimes(2)
+
+    nextPage.resolve({ versions: [secondVersion] })
+    await act(async () => {
+      await expect(loadMore).resolves.toBe(true)
+    })
+    expect(result.current.versions.map(item => item.id)).toEqual(['version-2', 'version-1'])
+    expect(result.current.versionsNextCursor).toBeUndefined()
+  })
+
   it('marks restore failures as errors instead of leaving the document saving forever', async () => {
     const first = documentSummary('first')
     apiClientMock.listCanvases.mockResolvedValue({ items: [first] })
@@ -272,11 +319,11 @@ describe('useCanvasPersistence document directory', () => {
   it('ignores a stale version response after switching documents', async () => {
     const first = documentSummary('first')
     const second = documentSummary('second', '2026-08-30T02:00:00.000Z')
-    const staleVersions = deferred<CanvasVersion[]>()
+    const staleVersions = deferred<CanvasVersionsResult>()
     apiClientMock.listCanvases.mockResolvedValue({ items: [first, second] })
     apiClientMock.getCanvas.mockImplementation((id: string) => Promise.resolve(document(id)))
     apiClientMock.listCanvasVersions.mockImplementation((id: string) => (
-      id === 'first' ? staleVersions.promise : Promise.resolve([version('version-2', 'second')])
+      id === 'first' ? staleVersions.promise : Promise.resolve({ versions: [version('version-2', 'second')] })
     ))
 
     const { result } = renderHook(() => useCanvasPersistence())
@@ -294,7 +341,7 @@ describe('useCanvasPersistence document directory', () => {
     expect(useCanvasStore.getState().documentId).toBe('second')
     expect(result.current.versions).toEqual([])
 
-    staleVersions.resolve([version('version-1', 'first')])
+    staleVersions.resolve({ versions: [version('version-1', 'first')] })
     await act(async () => {
       await expect(staleRefresh).resolves.toEqual([expect.objectContaining({ id: 'version-1' })])
     })
