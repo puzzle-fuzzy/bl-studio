@@ -349,9 +349,18 @@ export function useCanvasExecution() {
     let disposed = false
     void (async () => {
       try {
-        const page = await apiClient.listCanvasExecutions(documentId, { limit: 20 })
-        if (disposed || !isCurrentSession(requestRunId, documentId, revision)) return
-        const execution = findResumableCanvasExecution(page.items, revision)
+        let cursor: string | undefined
+        let execution: CanvasExecutionTaskSummary | undefined
+        do {
+          if (disposed || !isCurrentSession(requestRunId, documentId, revision)) return
+          const page = await apiClient.listCanvasExecutions(documentId, {
+            limit: 20,
+            ...(cursor === undefined ? {} : { cursor }),
+          })
+          if (disposed || !isCurrentSession(requestRunId, documentId, revision)) return
+          execution = findResumableCanvasExecution(page.items, revision)
+          cursor = page.nextCursor
+        } while (execution === undefined && cursor !== undefined)
         if (execution === undefined) return
         await trackExecution(execution, requestRunId, documentId, revision)
       }

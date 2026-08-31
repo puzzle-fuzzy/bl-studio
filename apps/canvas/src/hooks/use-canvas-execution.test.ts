@@ -93,4 +93,35 @@ describe('useCanvasExecution', () => {
     expect(useCanvasStore.getState().documentId).toBe('doc-2')
     expect(useCanvasStore.getState().nodes[0]?.data).toEqual({ status: 'idle' })
   })
+
+  it('continues through execution history pages when resuming an active run', async () => {
+    const resumable = {
+      ...execution(),
+      status: 'running' as const,
+      nodeStatuses: [{
+        nodeId: 'node-1',
+        status: 'generating' as const,
+      }],
+    }
+    apiClientMock.listCanvasExecutions
+      .mockReset()
+      .mockResolvedValueOnce({
+        items: [execution()],
+        nextCursor: 'cursor-1',
+      })
+      .mockResolvedValueOnce({
+        items: [resumable],
+        nextCursor: undefined,
+      })
+    apiClientMock.getCanvasExecution.mockResolvedValue(resumable)
+
+    const { result } = renderHook(() => useCanvasExecution())
+    await waitFor(() => expect(apiClientMock.listCanvasExecutions).toHaveBeenCalledTimes(2))
+    expect(apiClientMock.listCanvasExecutions).toHaveBeenNthCalledWith(2, 'doc-1', {
+      limit: 20,
+      cursor: 'cursor-1',
+    })
+    await waitFor(() => expect(result.current.status).toBe('running'))
+    act(() => result.current.stop())
+  })
 })
