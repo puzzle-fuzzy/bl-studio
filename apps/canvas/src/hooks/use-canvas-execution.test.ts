@@ -5,8 +5,8 @@ import { useCanvasExecution } from './use-canvas-execution'
 import { useCanvasStore } from '@/stores/canvas-store'
 
 const apiClientMock = vi.hoisted(() => ({
-  getAsset: vi.fn(),
   getCanvasExecution: vi.fn(),
+  listAssets: vi.fn(),
   listCanvasExecutions: vi.fn(),
   retryCanvasNode: vi.fn(),
 }))
@@ -26,6 +26,16 @@ function execution(): CanvasExecutionTaskSummary {
     }],
     createdAt: '2026-08-31T02:00:00.000Z',
     updatedAt: '2026-08-31T02:00:00.000Z',
+  }
+}
+
+function asset(id: string, kind: 'image' | 'video' = 'image'): AssetItem {
+  return {
+    id,
+    kind,
+    source: 'generation',
+    url: `/signed/${id}`,
+    createdAt: '2026-08-31T02:00:00.000Z',
   }
 }
 
@@ -62,6 +72,7 @@ describe('useCanvasExecution', () => {
     cleanup()
     vi.clearAllMocks()
     apiClientMock.listCanvasExecutions.mockResolvedValue({ items: [] })
+    apiClientMock.listAssets.mockResolvedValue({ items: [] })
     resetCanvasStore()
   })
 
@@ -70,9 +81,9 @@ describe('useCanvasExecution', () => {
   })
 
   it('does not write a failed asset hydration result into a newly selected document', async () => {
-    const pendingAsset = deferred<AssetItem>()
+    const pendingAssets = deferred<{ items: AssetItem[] }>()
     apiClientMock.getCanvasExecution.mockResolvedValue(execution())
-    apiClientMock.getAsset.mockImplementation(() => pendingAsset.promise)
+    apiClientMock.listAssets.mockImplementation(() => pendingAssets.promise)
 
     const { result } = renderHook(() => useCanvasExecution())
     await waitFor(() => expect(apiClientMock.listCanvasExecutions).toHaveBeenCalledWith('doc-1', { limit: 20 }))
@@ -81,18 +92,58 @@ describe('useCanvasExecution', () => {
     act(() => {
       loadPromise = result.current.loadExecution('execution-1')
     })
-    await waitFor(() => expect(apiClientMock.getAsset).toHaveBeenCalledWith('asset-1'))
+    await waitFor(() => expect(apiClientMock.listAssets).toHaveBeenCalledWith({ ids: ['asset-1'] }))
 
     act(() => {
       resetCanvasStore('doc-2')
     })
-    pendingAsset.reject(new Error('asset service unavailable'))
+    pendingAssets.reject(new Error('asset service unavailable'))
 
     await act(async () => {
       await loadPromise
     })
     expect(useCanvasStore.getState().documentId).toBe('doc-2')
     expect(useCanvasStore.getState().nodes[0]?.data).toEqual({ status: 'idle' })
+  })
+
+  it('hydrates all successful node assets through one batch request', async () => {
+    useCanvasStore.setState({
+      nodes: [
+        {
+          id: 'node-1',
+          type: 'mediaNode',
+          position: { x: 0, y: 0 },
+          data: { status: 'idle' },
+        },
+        {
+          id: 'node-2',
+          type: 'mediaNode',
+          position: { x: 0, y: 120 },
+          data: { status: 'idle' },
+        },
+      ],
+    })
+    const completed = {
+      ...execution(),
+      nodeStatuses: [
+        { nodeId: 'node-1', status: 'succeeded' as const, assetIds: ['asset-1'] },
+        { nodeId: 'node-2', status: 'succeeded' as const, assetIds: ['asset-2'] },
+      ],
+    }
+    apiClientMock.getCanvasExecution.mockResolvedValue(completed)
+    apiClientMock.listAssets.mockResolvedValue({ items: [asset('asset-1'), asset('asset-2', 'video')] })
+
+    const { result } = renderHook(() => useCanvasExecution())
+    await act(async () => {
+      await result.current.loadExecution('execution-1')
+    })
+
+    expect(apiClientMock.listAssets).toHaveBeenCalledTimes(1)
+    expect(apiClientMock.listAssets).toHaveBeenCalledWith({ ids: ['asset-1', 'asset-2'] })
+    expect(useCanvasStore.getState().nodes.map(node => node.data)).toEqual([
+      expect.objectContaining({ status: 'ready', resultAssetId: 'asset-1', resultKind: 'image', resultUrl: '/signed/asset-1' }),
+      expect.objectContaining({ status: 'ready', resultAssetId: 'asset-2', resultKind: 'video', resultUrl: '/signed/asset-2' }),
+    ])
   })
 
   it('continues through execution history pages when resuming an active run', async () => {

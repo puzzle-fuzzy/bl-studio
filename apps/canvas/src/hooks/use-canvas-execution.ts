@@ -11,6 +11,7 @@ import { useCanvasStore } from '@/stores/canvas-store'
 
 const POLL_INTERVAL_MS = 2_000
 const MAX_POLL_MS = 15 * 60_000
+const ASSET_HYDRATION_BATCH_SIZE = 100
 
 export type CanvasExecutionStatus =
   | 'idle'
@@ -87,6 +88,26 @@ export function useCanvasExecution() {
       canvasId: string,
       canvasRevision?: number,
     ): Promise<void> => {
+      const succeededNodes = summary.nodeStatuses.filter(node => (
+        node.status === 'succeeded' && node.assetIds?.[0] !== undefined
+      ))
+      const assetById = new Map<string, AssetItem>()
+      for (let offset = 0; offset < succeededNodes.length; offset += ASSET_HYDRATION_BATCH_SIZE) {
+        if (!isCurrentSession(runId, canvasId, canvasRevision)) return
+        const assetIds = succeededNodes
+          .slice(offset, offset + ASSET_HYDRATION_BATCH_SIZE)
+          .map(node => node.assetIds?.[0])
+          .filter((assetId): assetId is string => assetId !== undefined)
+        try {
+          const page = await apiClient.listAssets({ ids: assetIds })
+          if (!isCurrentSession(runId, canvasId, canvasRevision)) return
+          for (const asset of page.items) assetById.set(asset.id, asset)
+        } catch {
+          // The server task already records stable asset IDs. Keep the result
+          // usable when URL hydration is temporarily unavailable.
+        }
+      }
+
       for (const node of summary.nodeStatuses) {
         if (!isCurrentSession(runId, canvasId, canvasRevision)) return
         if (node.status === 'failed') {
@@ -112,27 +133,16 @@ export function useCanvasExecution() {
         }
         const assetId = node.assetIds?.[0]
         if (assetId === undefined) continue
-        try {
-          const asset = await apiClient.getAsset(assetId)
-          if (!isCurrentSession(runId, canvasId, canvasRevision)) return
-          const url = assetUrl(asset)
-          updateNodeData(node.nodeId, {
-            status: 'ready',
-            resultAssetId: asset.id,
-            resultKind: asset.kind === 'video' ? 'video' : 'image',
-            ...(url === undefined ? {} : { resultUrl: url }),
-            errorMessage: undefined,
-          })
-        } catch {
-          // The server task already records the stable asset ID. A temporary
-          // signed URL failure should not turn a successful node into an error.
-          if (!isCurrentSession(runId, canvasId, canvasRevision)) return
-          updateNodeData(node.nodeId, {
-            status: 'ready',
-            resultAssetId: assetId,
-            errorMessage: undefined,
-          })
-        }
+        if (!isCurrentSession(runId, canvasId, canvasRevision)) return
+        const asset = assetById.get(assetId)
+        const url = asset === undefined ? undefined : assetUrl(asset)
+        updateNodeData(node.nodeId, {
+          status: 'ready',
+          resultAssetId: assetId,
+          ...(asset === undefined ? {} : { resultKind: asset.kind === 'video' ? 'video' as const : 'image' as const }),
+          ...(url === undefined ? {} : { resultUrl: url }),
+          errorMessage: undefined,
+        })
       }
     },
     [isCurrentSession, updateNodeData],
