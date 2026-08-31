@@ -126,6 +126,7 @@ export function useCanvasExecution() {
         } catch {
           // The server task already records the stable asset ID. A temporary
           // signed URL failure should not turn a successful node into an error.
+          if (!isCurrentSession(runId, canvasId, canvasRevision)) return
           updateNodeData(node.nodeId, {
             status: 'ready',
             resultAssetId: assetId,
