@@ -15,6 +15,7 @@ interface AssetPickerProps {
 }
 
 const ASSET_PAGE_SIZE = 50
+const ASSET_BATCH_SIZE = 100
 
 function sortAssets(assets: readonly AssetItem[]): AssetItem[] {
   return [...assets].sort((left, right) => right.createdAt.localeCompare(left.createdAt))
@@ -146,16 +147,20 @@ export function AssetPicker({
     if (missingIds.length === 0) return
 
     let disposed = false
-    void Promise.all(missingIds.map(async assetId => {
+    const batches = Array.from(
+      { length: Math.ceil(missingIds.length / ASSET_BATCH_SIZE) },
+      (_, index) => missingIds.slice(index * ASSET_BATCH_SIZE, (index + 1) * ASSET_BATCH_SIZE),
+    )
+    void Promise.all(batches.map(async ids => {
       try {
-        return await apiClient.getAsset(assetId)
+        return await apiClient.listAssets({ ids })
       }
       catch {
         return undefined
       }
     })).then(results => {
       if (disposed) return
-      const additions = results.filter((asset): asset is AssetItem => asset !== undefined)
+      const additions = results.flatMap(result => result?.items ?? [])
       if (additions.length === 0) return
       setAssets(current => {
         const byId = new Map(current.map(asset => [asset.id, asset]))

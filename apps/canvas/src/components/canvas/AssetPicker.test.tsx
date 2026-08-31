@@ -68,4 +68,26 @@ describe('AssetPicker', () => {
     secondPage.resolve({ items: [asset('second')], nextCursor: undefined })
     await waitFor(() => expect(screen.getByTitle('second.png')).toBeDefined())
   })
+
+  it('hydrates selected assets missing from the current page in one batch', async () => {
+    apiClientMock.listAssets.mockImplementation(async (params: { ids?: readonly string[] }) => (
+      params.ids === undefined ? { items: [] } : { items: [asset('legacy-selected')] }
+    ))
+
+    render(
+      <AssetPicker
+        kind="image"
+        allowedKinds={['image']}
+        maxSelectableByKind={{ image: 2 }}
+        selectedIds={['legacy-selected']}
+        selectedKinds={{ 'legacy-selected': 'image' }}
+        onChange={vi.fn()}
+        onClose={vi.fn()}
+      />,
+    )
+
+    await waitFor(() => expect(screen.getByTitle('legacy-selected.png')).toBeDefined())
+    expect(apiClientMock.listAssets).toHaveBeenCalledWith({ ids: ['legacy-selected'] })
+    expect(apiClientMock.getAsset).not.toHaveBeenCalled()
+  })
 })
