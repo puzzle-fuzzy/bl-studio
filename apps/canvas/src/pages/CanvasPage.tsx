@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent } from 'react'
+import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react'
 import {
   Background,
   BackgroundVariant,
@@ -22,6 +22,7 @@ import { CanvasExecutionDiagnosticsPanel } from '../components/canvas/CanvasExec
 import { useCanvasStore } from '../stores/canvas-store'
 import { useCanvasPersistence } from '../hooks/use-canvas-persistence'
 import { useCanvasExecution } from '../hooks/use-canvas-execution'
+import { useCanvasExecutionHistory } from '../hooks/use-canvas-execution-history'
 import { useModelCatalog } from '../hooks/use-model-catalog'
 import { preflightCanvasState } from '../lib/canvas-preflight'
 import {
@@ -85,6 +86,14 @@ export function CanvasPage() {
   const documentId = useCanvasStore(state => state.documentId)
   const documentTitle = useCanvasStore(state => state.title)
   const setDocumentTitle = useCanvasStore(state => state.setTitle)
+  const [showExecutions, setShowExecutions] = useState(false)
+  const {
+    cursor: executionCursor,
+    error: executionHistoryError,
+    executions,
+    load: loadExecutionHistory,
+    loading: executionHistoryLoading,
+  } = useCanvasExecutionHistory(documentId, showExecutions, executionStatus)
   const onNodesChange = useCanvasStore(state => state.onNodesChange)
   const onEdgesChange = useCanvasStore(state => state.onEdgesChange)
   const onConnect = useCanvasStore(state => state.onConnect)
@@ -92,12 +101,6 @@ export function CanvasPage() {
   const { screenToFlowPosition, getNode, setCenter } = useReactFlow()
   const [menu, setMenu] = useState<CanvasMenu | null>(null)
   const [showVersions, setShowVersions] = useState(false)
-  const [showExecutions, setShowExecutions] = useState(false)
-  const [executions, setExecutions] = useState<CanvasExecutionTaskSummary[]>([])
-  const [executionCursor, setExecutionCursor] = useState<string | undefined>()
-  const [executionHistoryLoading, setExecutionHistoryLoading] = useState(false)
-  const [executionHistoryError, setExecutionHistoryError] = useState<string | undefined>()
-  const executionHistoryRequestRef = useRef(0)
   const [restoringVersion, setRestoringVersion] = useState<string | undefined>()
   const [refreshingDocument, setRefreshingDocument] = useState(false)
   const [showPreflightIssues, setShowPreflightIssues] = useState(false)
@@ -226,39 +229,6 @@ export function CanvasPage() {
   useEffect(() => {
     if (showVersions) void refreshVersions()
   }, [refreshVersions, showVersions])
-
-  const loadExecutionHistory = useCallback(async (cursor?: string, append = false) => {
-    if (documentId === undefined) return
-    const requestId = executionHistoryRequestRef.current + 1
-    executionHistoryRequestRef.current = requestId
-    setExecutionHistoryLoading(true)
-    setExecutionHistoryError(undefined)
-    try {
-      const page = await apiClient.listCanvasExecutions(documentId, {
-        limit: 20,
-        ...(cursor === undefined ? {} : { cursor }),
-      })
-      if (requestId !== executionHistoryRequestRef.current || useCanvasStore.getState().documentId !== documentId) return
-      setExecutions(current => append ? [...current, ...page.items] : page.items)
-      setExecutionCursor(page.nextCursor)
-    } catch (error) {
-      if (requestId !== executionHistoryRequestRef.current || useCanvasStore.getState().documentId !== documentId) return
-      setExecutionHistoryError(error instanceof Error ? error.message : String(error))
-    } finally {
-      if (requestId === executionHistoryRequestRef.current) setExecutionHistoryLoading(false)
-    }
-  }, [documentId])
-
-  useEffect(() => {
-    executionHistoryRequestRef.current += 1
-    setExecutions([])
-    setExecutionCursor(undefined)
-    setExecutionHistoryError(undefined)
-  }, [documentId])
-
-  useEffect(() => {
-    if (showExecutions) void loadExecutionHistory()
-  }, [executionStatus, loadExecutionHistory, showExecutions])
 
   const saveLabel =
     saveStatus === 'loading'
@@ -657,12 +627,25 @@ export function CanvasPage() {
             <span className="text-xs font-medium">运行记录</span>
             <span className="text-[10px] text-muted-foreground">点击可恢复节点结果</span>
           </div>
-          {executionHistoryError !== undefined ? (
-            <p className="px-1 py-3 text-center text-[10px] text-destructive">{executionHistoryError}</p>
+          {executionHistoryError !== undefined && executions.length === 0 && !executionHistoryLoading ? (
+            <div className="space-y-2 px-1 py-3 text-center">
+              <p className="text-[10px] text-destructive">{executionHistoryError}</p>
+              <Button size="xs" variant="outline" onClick={() => void loadExecutionHistory()}>
+                重试
+              </Button>
+            </div>
           ) : executions.length === 0 && !executionHistoryLoading ? (
             <p className="px-1 py-3 text-center text-[10px] text-muted-foreground">暂无运行记录</p>
           ) : (
             <div className="max-h-72 space-y-1 overflow-y-auto">
+              {executionHistoryError !== undefined && (
+                <div className="flex items-center justify-between gap-2 rounded-lg border border-destructive/30 px-2 py-1.5">
+                  <span className="min-w-0 truncate text-[10px] text-destructive">{executionHistoryError}</span>
+                  <Button size="xs" variant="outline" onClick={() => void loadExecutionHistory(executionCursor, executionCursor !== undefined)}>
+                    重试
+                  </Button>
+                </div>
+              )}
               {executions.map(execution => (
                 <button
                   key={execution.id}
