@@ -31,7 +31,7 @@ export interface CanvasExecutionTaskHandlerDeps {
     GenerationRepositoryPort,
     'createGeneration' | 'getGenerationRecord' | 'listArtifactsForRecord'
   >
-  readonly assetRepository?: Pick<AssetRepository, 'getUserAsset'>
+  readonly assetRepository?: Pick<AssetRepository, 'listUnifiedAssets'>
   readonly generationQuota?: GenerationQuotaLimits
   /** 单个 Canvas 任务内允许同时运行的节点数；默认 4。 */
   readonly maxParallelNodes?: number
@@ -358,15 +358,15 @@ async function inspectGeneratingNode(
     }
   }
   try {
-    const assets = await Promise.all(
-      assetIds.map(assetId =>
-        assetRepository.getUserAsset({
-          userId: task.userId as string,
-          assetId,
-        }),
-      ),
+    const uniqueAssetIds = [...new Set(assetIds)]
+    const assetPages = await Promise.all(
+      Array.from({ length: Math.ceil(uniqueAssetIds.length / 100) }, (_, index) =>
+        assetRepository.listUnifiedAssets(task.userId as string, {
+          ids: uniqueAssetIds.slice(index * 100, (index + 1) * 100),
+        })),
     )
-    if (assets.some(asset => asset === undefined)) {
+    const resolvedAssetIds = new Set(assetPages.flatMap(page => page.items.map(asset => asset.id)))
+    if (resolvedAssetIds.size !== uniqueAssetIds.length) {
       return {
         kind: 'waiting',
         nodeId: planNode.nodeId,

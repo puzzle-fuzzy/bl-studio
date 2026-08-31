@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type {
+  AssetRepository,
   CreateGenerationResult,
   CreateGenerationInput,
   GenerationArtifact,
@@ -267,8 +268,8 @@ describe('processCanvasExecutionTask', () => {
       source: 'generation',
       createdAt: NOW,
     } satisfies UnifiedAssetItem
-    const assetRepository = {
-      getUserAsset: async () => (assetReady ? readyAsset : undefined),
+    const assetRepository: Pick<AssetRepository, 'listUnifiedAssets'> = {
+      listUnifiedAssets: async () => ({ items: assetReady ? [readyAsset] : [] }),
     }
     const runningInput = canvasInput({
       nodeRuns: {
@@ -317,7 +318,6 @@ describe('processCanvasExecutionTask', () => {
       kind: 'image',
       status: 'stored',
     })
-    let assetLookups = 0
     const result = await processCanvasExecutionTask(task(canvasInput({
       nodeRuns: {
         node_1: { status: 'generating', generationId: generated.id, cacheHit: false, startedAt: NOW },
@@ -329,10 +329,7 @@ describe('processCanvasExecutionTask', () => {
         listArtifactsForRecord: async () => [artifact],
       },
       assetRepository: {
-        getUserAsset: async () => {
-          assetLookups += 1
-          return undefined
-        },
+        listUnifiedAssets: async () => ({ items: [] }),
       },
       logger: createRecordingLogger(),
     })
@@ -341,7 +338,6 @@ describe('processCanvasExecutionTask', () => {
       status: 'retry',
       error: { code: 'CANVAS_ASSET_WAITING' },
     })
-    expect(assetLookups).toBe(0)
   })
 
   it('persists a failed node cursor when its generation fails', async () => {
